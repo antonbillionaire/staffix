@@ -48,7 +48,7 @@ export default function RegisterPage() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link href="/" className="flex items-center justify-center gap-2">
           <Bot className="h-10 w-10 text-blue-600" />
-          <span className="text-2xl font-bold text-gray-900">AI Employee</span>
+          <span className="text-2xl font-bold text-gray-900">Staffix</span>
         </Link>
         <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
           Создать аккаунт

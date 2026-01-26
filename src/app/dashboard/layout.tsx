@@ -53,7 +53,7 @@ export default function DashboardLayout({
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
           <Link href="/dashboard" className="flex items-center gap-2">
             <Bot className="h-8 w-8 text-blue-600" />
-            <span className="text-lg font-bold text-gray-900">AI Employee</span>
+            <span className="text-lg font-bold text-gray-900">Staffix</span>
           </Link>
           <button
             onClick={() => setSidebarOpen(false)}

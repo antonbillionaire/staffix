@@ -9,7 +9,7 @@ export default function Home() {
         <nav className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Bot className="h-8 w-8 text-blue-600" />
-            <span className="text-xl font-bold text-gray-900">AI Employee</span>
+            <span className="text-xl font-bold text-gray-900">Staffix</span>
           </div>
           <div className="flex items-center gap-4">
             <Link
@@ -184,7 +184,7 @@ export default function Home() {
             Готовы автоматизировать бизнес?
           </h2>
           <p className="text-blue-100 mb-8 text-lg">
-            Присоединяйтесь к сотням компаний, которые уже используют AI Employee
+            Присоединяйтесь к сотням компаний, которые уже используют Staffix
           </p>
           <Link
             href="/register"
@@ -197,7 +197,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="container mx-auto px-4 py-8 text-center text-gray-500">
-        <p>&copy; 2024 AI Employee. Все права защищены.</p>
+        <p>&copy; 2025 Staffix. Все права защищены.</p>
       </footer>
     </div>
   );

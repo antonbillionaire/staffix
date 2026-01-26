@@ -7,8 +7,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "AI Employee - AI-ассистент для вашего бизнеса",
-  description: "Автоматизируйте общение с клиентами с помощью AI-бота в Telegram",
+  title: "Staffix - AI-сотрудник для вашего бизнеса",
+  description: "Создайте AI-бота для Telegram за 5 минут. Отвечает клиентам, записывает на услуги, работает 24/7.",
 };
 
 export default function RootLayout({
