@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Пользователи платформы (владельцы бизнесов)
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  businesses    Business[]
+}
+
+// Бизнесы
+model Business {
+  id            String    @id @default(cuid())
+  name          String
+  phone         String?
+  address       String?
+  workingHours  String?
+  welcomeMessage String?
+
+  // Telegram bot
+  botToken      String?   @unique
+  botUsername   String?
+  botActive     Boolean   @default(false)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  services      Service[]
+  staff         Staff[]
+  faqs          FAQ[]
+  bookings      Booking[]
+  conversations Conversation[]
+  subscription  Subscription?
+}
+
+// Услуги
+model Service {
+  id            String    @id @default(cuid())
+  name          String
+  price         Int
+  duration      Int       // минуты
+
+  businessId    String
+  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  bookings      Booking[]
+}
+
+// Мастера/сотрудники
+model Staff {
+  id            String    @id @default(cuid())
+  name          String
+  role          String?
+
+  businessId    String
+  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  bookings      Booking[]
+}
+
+// FAQ / База знаний
+model FAQ {
+  id            String    @id @default(cuid())
+  question      String
+  answer        String
+
+  businessId    String
+  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+// Записи клиентов
+model Booking {
+  id            String    @id @default(cuid())
+  clientName    String
+  clientPhone   String?
+  clientTelegramId BigInt?
+
+  date          DateTime
+  status        String    @default("pending") // pending, confirmed, cancelled, completed
+
+  businessId    String
+  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  serviceId     String?
+  service       Service?  @relation(fields: [serviceId], references: [id])
+
+  staffId       String?
+  staff         Staff?    @relation(fields: [staffId], references: [id])
+
+  createdAt     DateTime  @default(now())
+}
+
+// Диалоги с клиентами
+model Conversation {
+  id                  String    @id @default(cuid())
+  clientTelegramId    BigInt
+  clientName          String?
+
+  businessId          String
+  business            Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  messages            Message[]
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([businessId, clientTelegramId])
+}
+
+// Сообщения в диалогах
+model Message {
+  id              String    @id @default(cuid())
+  role            String    // user, assistant
+  content         String
+
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime  @default(now())
+}
+
+// Подписки
+model Subscription {
+  id              String    @id @default(cuid())
+  plan            String    @default("trial") // trial, starter, business, pro
+  messagesUsed    Int       @default(0)
+  messagesLimit   Int       @default(100)
+  expiresAt       DateTime
+
+  businessId      String    @unique
+  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
