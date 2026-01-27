@@ -16,10 +16,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           // Check if user exists
           const existingUser = await prisma.user.findUnique({
             where: { email: user.email! },
+            include: { businesses: true },
           });
 
           if (!existingUser) {
-            // Create new user and business
+            // Create new user with empty business (onboarding not completed)
             const newUser = await prisma.user.create({
               data: {
                 email: user.email!,
@@ -27,7 +28,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 password: "", // Empty password for OAuth users
                 businesses: {
                   create: {
-                    name: "Мой бизнес",
+                    name: "Мой бизнес", // Temporary name, will be updated in onboarding
+                    onboardingCompleted: false,
                     subscription: {
                       create: {
                         plan: "trial",
@@ -60,6 +62,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
       return session;
+    },
+    async redirect({ url, baseUrl }) {
+      // After sign in, check if onboarding is completed
+      // This is handled in the dashboard layout, so just redirect to dashboard
+      if (url.includes("/api/auth")) {
+        return `${baseUrl}/dashboard`;
+      }
+      return url.startsWith(baseUrl) ? url : baseUrl;
     },
   },
   pages: {

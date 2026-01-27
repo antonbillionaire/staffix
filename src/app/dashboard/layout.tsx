@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import {
   Bot,
   LayoutDashboard,
@@ -14,6 +15,7 @@ import {
   LogOut,
   Menu,
   X,
+  Loader2,
 } from "lucide-react";
 
 const navigation = [
@@ -32,7 +34,52 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [businessName, setBusinessName] = useState("");
+
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      try {
+        const res = await fetch("/api/business");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.business) {
+            if (!data.business.onboardingCompleted) {
+              router.push("/onboarding");
+              return;
+            }
+            setBusinessName(data.business.name);
+          } else {
+            router.push("/onboarding");
+            return;
+          }
+        } else if (res.status === 404) {
+          router.push("/onboarding");
+          return;
+        }
+      } catch (error) {
+        console.error("Error checking onboarding:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkOnboarding();
+  }, [router]);
+
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: "/" });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -63,6 +110,14 @@ export default function DashboardLayout({
           </button>
         </div>
 
+        {/* Business name */}
+        {businessName && (
+          <div className="px-4 py-3 border-b border-gray-200">
+            <p className="text-xs text-gray-500">Ваш бизнес</p>
+            <p className="text-sm font-medium text-gray-900 truncate">{businessName}</p>
+          </div>
+        )}
+
         <nav className="p-4 space-y-1">
           {navigation.map((item) => {
             const isActive = pathname === item.href;
@@ -84,7 +139,10 @@ export default function DashboardLayout({
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
-          <button className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+          >
             <LogOut className="h-5 w-5" />
             Выйти
           </button>

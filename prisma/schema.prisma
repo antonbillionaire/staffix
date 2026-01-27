@@ -28,6 +28,17 @@ model Business {
   workingHours  String?
   welcomeMessage String?
 
+  // Onboarding
+  businessType  String?   // salon, clinic, barbershop, auto_service, other
+  staffCount    Int?      // количество сотрудников
+  language      String    @default("ru") // ru, uz, kz, kg, tj, am, ge
+  onboardingCompleted Boolean @default(false)
+
+  // AI настройки
+  aiTone        String?   // friendly, professional, casual
+  aiRules       String?   // что можно/нельзя говорить
+  systemPrompt  String?   // сгенерированный промпт для AI
+
   // Telegram bot
   botToken      String?   @unique
   botUsername   String?
@@ -46,6 +57,7 @@ model Business {
   bookings      Booking[]
   conversations Conversation[]
   subscription  Subscription?
+  documents     Document[]
 }
 
 // Услуги
@@ -147,4 +159,23 @@ model Subscription {
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+}
+
+// Загруженные документы
+model Document {
+  id            String    @id @default(cuid())
+  name          String    // имя файла
+  type          String    // price_list, services, faq, other
+  url           String    // URL к файлу
+  mimeType      String    // application/pdf, etc.
+  size          Int       // размер в байтах
+
+  // Извлечённые данные
+  extractedText String?   // текст из документа
+  parsed        Boolean   @default(false) // был ли распарсен AI
+
+  businessId    String
+  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime  @default(now())
 }
