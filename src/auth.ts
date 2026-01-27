@@ -21,7 +21,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
           if (!existingUser) {
             // Create new user with empty business (onboarding not completed)
-            const newUser = await prisma.user.create({
+            await prisma.user.create({
               data: {
                 email: user.email!,
                 name: user.name || "User",
@@ -41,12 +41,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 },
               },
             });
-            console.log("Created new user:", newUser.id);
           }
           return true;
         } catch (error) {
           console.error("Error in signIn callback:", error);
-          return false;
+          // Still allow sign in even if user creation fails
+          return true;
         }
       }
       return true;
@@ -62,14 +62,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
       return session;
-    },
-    async redirect({ url, baseUrl }) {
-      // After sign in, check if onboarding is completed
-      // This is handled in the dashboard layout, so just redirect to dashboard
-      if (url.includes("/api/auth")) {
-        return `${baseUrl}/dashboard`;
-      }
-      return url.startsWith(baseUrl) ? url : baseUrl;
     },
   },
   pages: {
