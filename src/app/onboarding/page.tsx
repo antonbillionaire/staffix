@@ -1,19 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Building2,
   Scissors,
   Stethoscope,
   Car,
   Users,
-  Globe,
   ArrowRight,
   ArrowLeft,
   Check,
   Loader2,
-  Store
+  Store,
+  Upload,
+  FileText,
+  X,
 } from "lucide-react";
 
 const businessTypes = [
@@ -29,10 +30,6 @@ const languages = [
   { id: "ru", name: "Русский", flag: "🇷🇺" },
   { id: "uz", name: "O'zbek", flag: "🇺🇿" },
   { id: "kz", name: "Қазақша", flag: "🇰🇿" },
-  { id: "kg", name: "Кыргызча", flag: "🇰🇬" },
-  { id: "tj", name: "Тоҷикӣ", flag: "🇹🇯" },
-  { id: "am", name: "Հայերdelays", flag: "🇦🇲" },
-  { id: "ge", name: "ქართული", flag: "🇬🇪" },
 ];
 
 const staffCounts = [
@@ -42,11 +39,19 @@ const staffCounts = [
   { id: "11+", name: "Больше 10" },
 ];
 
+interface UploadedFile {
+  name: string;
+  size: number;
+  type: string;
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
   const [formData, setFormData] = useState({
     businessType: "",
@@ -56,6 +61,8 @@ export default function OnboardingPage() {
     staffCount: "",
     language: "ru",
   });
+
+  const totalSteps = 5;
 
   const handleNext = () => {
     if (step === 1 && !formData.businessType) {
@@ -75,6 +82,49 @@ export default function OnboardingPage() {
     setStep(step - 1);
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      const newFiles: UploadedFile[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        // Accept PDF, Excel, Word, images
+        const allowedTypes = [
+          'application/pdf',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'image/jpeg',
+          'image/png',
+          'text/plain'
+        ];
+        if (allowedTypes.includes(file.type) || file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+          newFiles.push({
+            name: file.name,
+            size: file.size,
+            type: file.type
+          });
+        }
+      }
+      setUploadedFiles([...uploadedFiles, ...newFiles]);
+    }
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(uploadedFiles.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
   const handleFinish = async () => {
     setSaving(true);
     setError("");
@@ -83,7 +133,10 @@ export default function OnboardingPage() {
       const res = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          files: uploadedFiles
+        }),
       });
 
       if (!res.ok) {
@@ -103,7 +156,7 @@ export default function OnboardingPage() {
       <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-8">
         {/* Progress */}
         <div className="flex items-center justify-between mb-8">
-          {[1, 2, 3, 4].map((s) => (
+          {[1, 2, 3, 4, 5].map((s) => (
             <div key={s} className="flex items-center">
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center font-medium ${
@@ -116,9 +169,9 @@ export default function OnboardingPage() {
               >
                 {s < step ? <Check className="h-5 w-5" /> : s}
               </div>
-              {s < 4 && (
+              {s < totalSteps && (
                 <div
-                  className={`w-16 sm:w-24 h-1 mx-2 ${
+                  className={`w-12 sm:w-16 h-1 mx-1 sm:mx-2 ${
                     s < step ? "bg-green-500" : "bg-gray-200"
                   }`}
                 />
@@ -255,28 +308,93 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 3: Language */}
+        {/* Step 3: File Upload */}
         {step === 3 && (
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              Загрузите документы
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Прайс-лист, меню услуг, FAQ — AI изучит их и будет использовать в работе
+            </p>
+
+            {/* Upload area */}
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all"
+            >
+              <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-600 font-medium">
+                Нажмите для загрузки или перетащите файлы
+              </p>
+              <p className="text-sm text-gray-400 mt-2">
+                PDF, Excel, Word, изображения (до 10 MB)
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.xlsx,.xls,.doc,.docx,.jpg,.jpeg,.png,.txt"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+            </div>
+
+            {/* Uploaded files list */}
+            {uploadedFiles.length > 0 && (
+              <div className="mt-6 space-y-3">
+                <p className="text-sm font-medium text-gray-700">Загруженные файлы:</p>
+                {uploadedFiles.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{file.name}</p>
+                        <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => removeFile(index)}
+                      className="text-gray-400 hover:text-red-500"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <p className="mt-4 text-sm text-gray-500">
+              Можно пропустить этот шаг и загрузить документы позже
+            </p>
+          </div>
+        )}
+
+        {/* Step 4: Language */}
+        {step === 4 && (
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
               Выберите язык
             </h2>
             <p className="text-gray-600 mb-6">
-              На этом языке будет общаться AI-ассистент и работать ваш dashboard
+              На этом языке будет общаться AI-ассистент с вашими клиентами
             </p>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               {languages.map((lang) => (
                 <button
                   key={lang.id}
                   onClick={() => setFormData({ ...formData, language: lang.id })}
-                  className={`p-4 rounded-xl border-2 transition-all ${
+                  className={`p-6 rounded-xl border-2 transition-all ${
                     formData.language === lang.id
                       ? "border-blue-500 bg-blue-50"
                       : "border-gray-200 hover:border-gray-300"
                   }`}
                 >
-                  <span className="text-3xl mb-2 block">{lang.flag}</span>
+                  <span className="text-4xl mb-3 block">{lang.flag}</span>
                   <p
                     className={`text-sm font-medium ${
                       formData.language === lang.id
@@ -292,8 +410,8 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 4: Confirmation */}
-        {step === 4 && (
+        {/* Step 5: Confirmation */}
+        {step === 5 && (
           <div>
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -331,6 +449,12 @@ export default function OnboardingPage() {
                 </div>
               )}
               <div className="flex justify-between">
+                <span className="text-gray-500">Документы:</span>
+                <span className="font-medium">
+                  {uploadedFiles.length > 0 ? `${uploadedFiles.length} файл(ов)` : "Не загружены"}
+                </span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-gray-500">Язык:</span>
                 <span className="font-medium">
                   {languages.find((l) => l.id === formData.language)?.flag}{" "}
@@ -362,12 +486,12 @@ export default function OnboardingPage() {
             <div />
           )}
 
-          {step < 4 ? (
+          {step < totalSteps ? (
             <button
               onClick={handleNext}
               className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
             >
-              Далее
+              {step === 3 ? "Далее" : "Далее"}
               <ArrowRight className="h-4 w-4" />
             </button>
           ) : (
