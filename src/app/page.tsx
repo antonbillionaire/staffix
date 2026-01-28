@@ -10,11 +10,11 @@ import {
   Shield,
   Zap,
   ChevronRight,
-  Play,
   Star,
   Check,
   ArrowRight,
   Sparkles,
+  Quote,
 } from "lucide-react";
 
 const industries = [
@@ -26,14 +26,38 @@ const industries = [
   "вашего бизнеса",
 ];
 
+const chatExamples = [
+  {
+    userMessage: "Здравствуйте, хочу записаться на стрижку на завтра",
+    botMessage: "Добрый день! 😊 С удовольствием запишу вас. На завтра есть свободные окна:\n\n• 10:00 — мастер Алексей\n• 14:30 — мастер Дмитрий\n• 17:00 — мастер Алексей\n\nКакое время вам удобно?",
+  },
+  {
+    userMessage: "Сколько стоит маникюр с покрытием?",
+    botMessage: "Рада помочь! 💅 У нас есть несколько вариантов:\n\n• Маникюр + обычный лак — 800 ₽\n• Маникюр + гель-лак — 1200 ₽\n• Маникюр + укрепление + гель — 1500 ₽\n\nЗаписать вас на процедуру?",
+  },
+  {
+    userMessage: "Какие услуги у вас есть для автомобиля?",
+    botMessage: "Добрый день! 🚗 В нашем автосервисе:\n\n• Диагностика — от 1000 ₽\n• Замена масла — от 1500 ₽\n• Шиномонтаж — от 2000 ₽\n• Ремонт ходовой — по диагностике\n\nЧто вас интересует?",
+  },
+];
+
 export default function Home() {
   const [industryIndex, setIndustryIndex] = useState(0);
+  const [chatIndex, setChatIndex] = useState(0);
 
   // Rotate industries
   useEffect(() => {
     const interval = setInterval(() => {
       setIndustryIndex((prev) => (prev + 1) % industries.length);
     }, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Rotate chat examples
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setChatIndex((prev) => (prev + 1) % chatExamples.length);
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -114,16 +138,16 @@ export default function Home() {
               <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link
-              href="#demo"
+              href="#features"
               className="bg-white/5 border border-white/10 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-white/10 transition-colors flex items-center justify-center gap-2 backdrop-blur-sm"
             >
-              <Play className="h-5 w-5" />
-              Смотреть демо
+              Узнать больше
+              <ChevronRight className="h-5 w-5" />
             </Link>
           </div>
 
           <p className="text-sm text-gray-500">
-            ✨ 14 дней бесплатно • Карта не нужна для старта
+            ✨ 14 дней бесплатно
           </p>
         </div>
 
@@ -140,7 +164,7 @@ export default function Home() {
                   <Brain className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <p className="font-medium">Анна — AI-сотрудник</p>
+                  <p className="font-medium">AI-сотрудник</p>
                   <p className="text-xs text-green-400 flex items-center gap-1">
                     <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                     Онлайн 24/7
@@ -148,58 +172,61 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-4 min-h-[180px]">
                 <div className="flex justify-end">
                   <div className="bg-blue-600 rounded-2xl rounded-tr-sm px-4 py-3 max-w-xs">
-                    <p className="text-sm">Здравствуйте, хочу записаться на стрижку на завтра</p>
+                    <p className="text-sm">{chatExamples[chatIndex].userMessage}</p>
                   </div>
                 </div>
                 <div className="flex justify-start">
                   <div className="bg-white/5 rounded-2xl rounded-tl-sm px-4 py-3 max-w-sm">
-                    <p className="text-sm text-gray-200">
-                      Добрый день! 😊 С удовольствием запишу вас. На завтра есть свободные окна:
-                      <br/><br/>
-                      • 10:00 — мастер Алексей<br/>
-                      • 14:30 — мастер Дмитрий<br/>
-                      • 17:00 — мастер Алексей
-                      <br/><br/>
-                      Какое время вам удобно?
+                    <p className="text-sm text-gray-200 whitespace-pre-line">
+                      {chatExamples[chatIndex].botMessage}
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* Chat navigation dots */}
+              <div className="flex justify-center gap-2 mt-4 pt-4 border-t border-white/5">
+                {chatExamples.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setChatIndex(i)}
+                    className={`w-2 h-2 rounded-full transition-all ${
+                      i === chatIndex ? "bg-blue-500 w-4" : "bg-white/20 hover:bg-white/40"
+                    }`}
+                  />
+                ))}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Social proof */}
-      <section className="relative z-10 border-y border-white/5 bg-white/[0.02] py-12">
+      {/* Reviews */}
+      <section className="relative z-10 border-y border-white/5 bg-white/[0.02] py-16">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16">
-            <div className="text-center">
-              <p className="text-4xl font-bold text-white">500+</p>
-              <p className="text-gray-500 text-sm">Бизнесов используют</p>
-            </div>
-            <div className="hidden md:block w-px h-12 bg-white/10" />
-            <div className="text-center">
-              <p className="text-4xl font-bold text-white">50K+</p>
-              <p className="text-gray-500 text-sm">Клиентов обслужено</p>
-            </div>
-            <div className="hidden md:block w-px h-12 bg-white/10" />
-            <div className="text-center">
-              <p className="text-4xl font-bold text-white">4.9</p>
-              <div className="flex items-center justify-center gap-1">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                ))}
-              </div>
-            </div>
-            <div className="hidden md:block w-px h-12 bg-white/10" />
-            <div className="text-center">
-              <p className="text-4xl font-bold text-white">24/7</p>
-              <p className="text-gray-500 text-sm">Работает без выходных</p>
-            </div>
+          <h3 className="text-center text-lg text-gray-400 mb-8">Что говорят наши клиенты</h3>
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            <ReviewCard
+              text="AI-сотрудник экономит мне 3-4 часа в день. Клиенты получают ответы моментально, а я могу сосредоточиться на работе."
+              author="Анна К."
+              role="Владелец салона красоты"
+              rating={5}
+            />
+            <ReviewCard
+              text="Раньше пропускали много звонков ночью. Теперь AI отвечает 24/7 и записывает клиентов даже в 3 часа ночи!"
+              author="Дмитрий М."
+              role="Барбершоп «Бритва»"
+              rating={5}
+            />
+            <ReviewCard
+              text="Настроили за 10 минут. Загрузили прайс — и бот уже отвечает на вопросы о ценах. Магия!"
+              author="Елена С."
+              role="Медицинский центр"
+              rating={5}
+            />
           </div>
         </div>
       </section>
@@ -232,7 +259,7 @@ export default function Home() {
                   "Не знает ваш бизнес",
                   "Раздражает клиентов",
                   "Требует программиста",
-                  "Работает только днём",
+                  "Ограниченное использование",
                 ].map((item, i) => (
                   <li key={i} className="flex items-center gap-3 text-gray-400">
                     <span className="text-red-400">✕</span>
@@ -583,6 +610,32 @@ function PricingCard({
       >
         {cta}
       </Link>
+    </div>
+  );
+}
+
+function ReviewCard({
+  text,
+  author,
+  role,
+  rating,
+}: {
+  text: string;
+  author: string;
+  role: string;
+  rating: number;
+}) {
+  return (
+    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6">
+      <Quote className="h-8 w-8 text-blue-500/30 mb-4" />
+      <p className="text-gray-300 mb-4 leading-relaxed">{text}</p>
+      <div className="flex items-center gap-1 mb-3">
+        {[...Array(rating)].map((_, i) => (
+          <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+        ))}
+      </div>
+      <p className="text-white font-medium">{author}</p>
+      <p className="text-gray-500 text-sm">{role}</p>
     </div>
   );
 }
