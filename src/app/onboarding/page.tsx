@@ -15,6 +15,8 @@ import {
   Upload,
   FileText,
   X,
+  Brain,
+  Sparkles,
 } from "lucide-react";
 
 const businessTypes = [
@@ -88,7 +90,6 @@ export default function OnboardingPage() {
       const newFiles: UploadedFile[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        // Accept PDF, Excel, Word, images
         const allowedTypes = [
           'application/pdf',
           'application/vnd.ms-excel',
@@ -109,7 +110,6 @@ export default function OnboardingPage() {
       }
       setUploadedFiles([...uploadedFiles, ...newFiles]);
     }
-    // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -152,27 +152,41 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-8">
+    <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background gradients */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[120px]" />
+      </div>
+
+      <div className="relative z-10 bg-[#12122a] border border-white/5 rounded-2xl max-w-2xl w-full p-8">
+        {/* Header */}
+        <div className="flex items-center justify-center gap-3 mb-8">
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+            <Brain className="h-6 w-6 text-white" />
+          </div>
+          <span className="text-xl font-bold text-white">Staffix</span>
+        </div>
+
         {/* Progress */}
         <div className="flex items-center justify-between mb-8">
           {[1, 2, 3, 4, 5].map((s) => (
             <div key={s} className="flex items-center">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-medium ${
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-medium transition-all ${
                   s < step
                     ? "bg-green-500 text-white"
                     : s === step
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 text-gray-500"
+                    ? "bg-gradient-to-br from-blue-500 to-purple-600 text-white"
+                    : "bg-white/5 text-gray-500"
                 }`}
               >
                 {s < step ? <Check className="h-5 w-5" /> : s}
               </div>
               {s < totalSteps && (
                 <div
-                  className={`w-12 sm:w-16 h-1 mx-1 sm:mx-2 ${
-                    s < step ? "bg-green-500" : "bg-gray-200"
+                  className={`w-12 sm:w-16 h-1 mx-1 sm:mx-2 rounded ${
+                    s < step ? "bg-green-500" : "bg-white/10"
                   }`}
                 />
               )}
@@ -183,11 +197,11 @@ export default function OnboardingPage() {
         {/* Step 1: Business Type */}
         {step === 1 && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            <h2 className="text-2xl font-bold text-white mb-2">
               Какой у вас бизнес?
             </h2>
-            <p className="text-gray-600 mb-6">
-              Это поможет настроить AI-ассистента под ваши потребности
+            <p className="text-gray-400 mb-6">
+              Это поможет настроить AI-сотрудника под ваши потребности
             </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -199,22 +213,22 @@ export default function OnboardingPage() {
                     onClick={() => setFormData({ ...formData, businessType: type.id })}
                     className={`p-4 rounded-xl border-2 transition-all ${
                       formData.businessType === type.id
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-200 hover:border-gray-300"
+                        ? "border-blue-500 bg-blue-500/10"
+                        : "border-white/10 hover:border-white/20 bg-white/5"
                     }`}
                   >
                     <Icon
                       className={`h-8 w-8 mx-auto mb-2 ${
                         formData.businessType === type.id
-                          ? "text-blue-600"
+                          ? "text-blue-400"
                           : "text-gray-400"
                       }`}
                     />
                     <p
                       className={`text-sm font-medium ${
                         formData.businessType === type.id
-                          ? "text-blue-600"
-                          : "text-gray-700"
+                          ? "text-blue-400"
+                          : "text-gray-300"
                       }`}
                     >
                       {type.name}
@@ -229,16 +243,16 @@ export default function OnboardingPage() {
         {/* Step 2: Business Info */}
         {step === 2 && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            <h2 className="text-2xl font-bold text-white mb-2">
               Расскажите о бизнесе
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-400 mb-6">
               Эта информация будет доступна вашим клиентам
             </p>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Название бизнеса *
                 </label>
                 <input
@@ -248,12 +262,12 @@ export default function OnboardingPage() {
                     setFormData({ ...formData, businessName: e.target.value })
                   }
                   placeholder="Салон красоты 'Звезда'"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Телефон
                 </label>
                 <input
@@ -263,12 +277,12 @@ export default function OnboardingPage() {
                     setFormData({ ...formData, phone: e.target.value })
                   }
                   placeholder="+998 90 123 45 67"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Адрес
                 </label>
                 <input
@@ -278,12 +292,12 @@ export default function OnboardingPage() {
                     setFormData({ ...formData, address: e.target.value })
                   }
                   placeholder="г. Ташкент, ул. Навои, 10"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-3">
                   Сколько сотрудников?
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -293,10 +307,10 @@ export default function OnboardingPage() {
                       onClick={() =>
                         setFormData({ ...formData, staffCount: count.id })
                       }
-                      className={`py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                      className={`py-2.5 px-3 rounded-xl border text-sm font-medium transition-all ${
                         formData.staffCount === count.id
-                          ? "border-blue-500 bg-blue-50 text-blue-600"
-                          : "border-gray-200 text-gray-700 hover:border-gray-300"
+                          ? "border-blue-500 bg-blue-500/10 text-blue-400"
+                          : "border-white/10 text-gray-400 hover:border-white/20"
                       }`}
                     >
                       {count.name}
@@ -311,23 +325,23 @@ export default function OnboardingPage() {
         {/* Step 3: File Upload */}
         {step === 3 && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            <h2 className="text-2xl font-bold text-white mb-2">
               Загрузите документы
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-400 mb-6">
               Прайс-лист, меню услуг, FAQ — AI изучит их и будет использовать в работе
             </p>
 
             {/* Upload area */}
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all"
+              className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 transition-all"
             >
-              <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-600 font-medium">
+              <Upload className="h-12 w-12 mx-auto text-gray-500 mb-4" />
+              <p className="text-gray-300 font-medium">
                 Нажмите для загрузки или перетащите файлы
               </p>
-              <p className="text-sm text-gray-400 mt-2">
+              <p className="text-sm text-gray-500 mt-2">
                 PDF, Excel, Word, изображения (до 10 MB)
               </p>
               <input
@@ -343,22 +357,22 @@ export default function OnboardingPage() {
             {/* Uploaded files list */}
             {uploadedFiles.length > 0 && (
               <div className="mt-6 space-y-3">
-                <p className="text-sm font-medium text-gray-700">Загруженные файлы:</p>
+                <p className="text-sm font-medium text-gray-300">Загруженные файлы:</p>
                 {uploadedFiles.map((file, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    className="flex items-center justify-between p-3 bg-white/5 rounded-xl"
                   >
                     <div className="flex items-center gap-3">
-                      <FileText className="h-5 w-5 text-blue-600" />
+                      <FileText className="h-5 w-5 text-blue-400" />
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{file.name}</p>
+                        <p className="text-sm font-medium text-white">{file.name}</p>
                         <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
                       </div>
                     </div>
                     <button
                       onClick={() => removeFile(index)}
-                      className="text-gray-400 hover:text-red-500"
+                      className="text-gray-500 hover:text-red-400 transition-colors"
                     >
                       <X className="h-5 w-5" />
                     </button>
@@ -376,11 +390,11 @@ export default function OnboardingPage() {
         {/* Step 4: Language */}
         {step === 4 && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            <h2 className="text-2xl font-bold text-white mb-2">
               Выберите язык
             </h2>
-            <p className="text-gray-600 mb-6">
-              На этом языке будет общаться AI-ассистент с вашими клиентами
+            <p className="text-gray-400 mb-6">
+              На этом языке будет общаться AI-сотрудник с вашими клиентами
             </p>
 
             <div className="grid grid-cols-3 gap-4">
@@ -390,16 +404,16 @@ export default function OnboardingPage() {
                   onClick={() => setFormData({ ...formData, language: lang.id })}
                   className={`p-6 rounded-xl border-2 transition-all ${
                     formData.language === lang.id
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200 hover:border-gray-300"
+                      ? "border-blue-500 bg-blue-500/10"
+                      : "border-white/10 hover:border-white/20"
                   }`}
                 >
                   <span className="text-4xl mb-3 block">{lang.flag}</span>
                   <p
                     className={`text-sm font-medium ${
                       formData.language === lang.id
-                        ? "text-blue-600"
-                        : "text-gray-700"
+                        ? "text-blue-400"
+                        : "text-gray-300"
                     }`}
                   >
                     {lang.name}
@@ -414,60 +428,68 @@ export default function OnboardingPage() {
         {step === 5 && (
           <div>
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Check className="h-8 w-8 text-green-600" />
+              <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Check className="h-8 w-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-white mb-2">
                 Всё готово!
               </h2>
-              <p className="text-gray-600">
+              <p className="text-gray-400">
                 Проверьте данные и нажмите "Начать работу"
               </p>
             </div>
 
-            <div className="bg-gray-50 rounded-xl p-6 space-y-3">
+            <div className="bg-white/5 rounded-xl p-6 space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-500">Тип бизнеса:</span>
-                <span className="font-medium">
+                <span className="text-white font-medium">
                   {businessTypes.find((t) => t.id === formData.businessType)?.name}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Название:</span>
-                <span className="font-medium">{formData.businessName}</span>
+                <span className="text-white font-medium">{formData.businessName}</span>
               </div>
               {formData.phone && (
                 <div className="flex justify-between">
                   <span className="text-gray-500">Телефон:</span>
-                  <span className="font-medium">{formData.phone}</span>
+                  <span className="text-white font-medium">{formData.phone}</span>
                 </div>
               )}
               {formData.address && (
                 <div className="flex justify-between">
                   <span className="text-gray-500">Адрес:</span>
-                  <span className="font-medium">{formData.address}</span>
+                  <span className="text-white font-medium">{formData.address}</span>
                 </div>
               )}
               <div className="flex justify-between">
                 <span className="text-gray-500">Документы:</span>
-                <span className="font-medium">
+                <span className="text-white font-medium">
                   {uploadedFiles.length > 0 ? `${uploadedFiles.length} файл(ов)` : "Не загружены"}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Язык:</span>
-                <span className="font-medium">
+                <span className="text-white font-medium">
                   {languages.find((l) => l.id === formData.language)?.flag}{" "}
                   {languages.find((l) => l.id === formData.language)?.name}
                 </span>
               </div>
+            </div>
+
+            {/* Trial info */}
+            <div className="mt-6 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl p-4 flex items-center gap-3">
+              <Sparkles className="h-5 w-5 text-yellow-400 flex-shrink-0" />
+              <p className="text-sm text-gray-300">
+                У вас <span className="text-white font-medium">14 дней бесплатного</span> использования AI-сотрудника
+              </p>
             </div>
           </div>
         )}
 
         {/* Error message */}
         {error && (
-          <div className="mt-4 bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+          <div className="mt-4 bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-xl text-sm">
             {error}
           </div>
         )}
@@ -477,7 +499,7 @@ export default function OnboardingPage() {
           {step > 1 ? (
             <button
               onClick={handleBack}
-              className="flex items-center gap-2 px-6 py-3 text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-2 px-6 py-3 text-gray-400 hover:text-white transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
               Назад
@@ -489,16 +511,16 @@ export default function OnboardingPage() {
           {step < totalSteps ? (
             <button
               onClick={handleNext}
-              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 transition-all"
             >
-              {step === 3 ? "Далее" : "Далее"}
+              Далее
               <ArrowRight className="h-4 w-4" />
             </button>
           ) : (
             <button
               onClick={handleFinish}
               disabled={saving}
-              className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50"
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-medium hover:opacity-90 disabled:opacity-50 transition-all"
             >
               {saving ? (
                 <>
