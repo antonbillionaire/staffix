@@ -1,25 +1,24 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bot, Copy, Check, ExternalLink, AlertCircle, Loader2 } from "lucide-react";
+import {
+  Brain,
+  Copy,
+  Check,
+  ExternalLink,
+  AlertCircle,
+  Loader2,
+  Sparkles,
+  Sliders,
+  Save,
+} from "lucide-react";
 
-export default function BotConfigPage() {
+export default function AIEmployeePage() {
   const [token, setToken] = useState("");
   const [savingToken, setSavingToken] = useState(false);
   const [tokenSaved, setTokenSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   const [tokenError, setTokenError] = useState("");
-
-  // Business info state
-  const [businessInfo, setBusinessInfo] = useState({
-    name: "",
-    phone: "",
-    address: "",
-    workingHours: "",
-  });
-  const [savingBusiness, setSavingBusiness] = useState(false);
-  const [businessSaved, setBusinessSaved] = useState(false);
-  const [businessError, setBusinessError] = useState("");
   const [loading, setLoading] = useState(true);
 
   // Bot connection info
@@ -29,20 +28,22 @@ export default function BotConfigPage() {
     name: "",
   });
 
-  // Загрузка данных при монтировании
+  // AI personality settings
+  const [aiSettings, setAiSettings] = useState({
+    tone: "friendly",
+    welcomeMessage: "",
+    rules: "",
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
   useEffect(() => {
-    const fetchBusinessData = async () => {
+    const fetchData = async () => {
       try {
         const res = await fetch("/api/business");
         if (res.ok) {
           const data = await res.json();
           if (data.business) {
-            setBusinessInfo({
-              name: data.business.name || "",
-              phone: data.business.phone || "",
-              address: data.business.address || "",
-              workingHours: data.business.workingHours || "",
-            });
             if (data.business.botToken) {
               setToken(data.business.botToken);
               setBotInfo({
@@ -51,16 +52,21 @@ export default function BotConfigPage() {
                 name: data.business.name || "",
               });
             }
+            setAiSettings({
+              tone: data.business.aiTone || "friendly",
+              welcomeMessage: data.business.welcomeMessage || "",
+              rules: data.business.aiRules || "",
+            });
           }
         }
       } catch (error) {
-        console.error("Error fetching business data:", error);
+        console.error("Error fetching data:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchBusinessData();
+    fetchData();
   }, []);
 
   const handleSaveToken = async () => {
@@ -93,33 +99,30 @@ export default function BotConfigPage() {
     }
   };
 
-  const handleSaveBusiness = async () => {
-    if (!businessInfo.name.trim()) {
-      setBusinessError("Введите название бизнеса");
-      return;
-    }
-
-    setSavingBusiness(true);
-    setBusinessError("");
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
 
     try {
       const res = await fetch("/api/business", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(businessInfo),
+        body: JSON.stringify({
+          aiTone: aiSettings.tone,
+          welcomeMessage: aiSettings.welcomeMessage,
+          aiRules: aiSettings.rules,
+        }),
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Ошибка сохранения");
+        throw new Error("Ошибка сохранения");
       }
 
-      setBusinessSaved(true);
-      setTimeout(() => setBusinessSaved(false), 3000);
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 3000);
     } catch (err) {
-      setBusinessError(err instanceof Error ? err.message : "Ошибка сохранения данных");
+      console.error(err);
     } finally {
-      setSavingBusiness(false);
+      setSavingSettings(false);
     }
   };
 
@@ -132,137 +135,159 @@ export default function BotConfigPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
-      {/* Instructions */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Bot className="h-5 w-5 text-blue-600" />
-          Как создать бота?
-        </h2>
-
-        <ol className="space-y-4 text-sm">
-          <li className="flex gap-3">
-            <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">
-              1
-            </span>
-            <div>
-              <p className="text-gray-900 font-medium">Откройте @BotFather в Telegram</p>
-              <a
-                href="https://t.me/BotFather"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline inline-flex items-center gap-1 mt-1"
-              >
-                Открыть BotFather <ExternalLink className="h-3 w-3" />
-              </a>
+    <div className="max-w-3xl space-y-6">
+      {/* Status card */}
+      <div className={`rounded-xl p-6 border ${
+        botInfo.connected
+          ? "bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/30"
+          : "bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/30"
+      }`}>
+        <div className="flex items-center gap-4">
+          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+            botInfo.connected
+              ? "bg-green-500/20"
+              : "bg-gradient-to-br from-blue-500 to-purple-600"
+          }`}>
+            <Brain className={`h-7 w-7 ${botInfo.connected ? "text-green-400" : "text-white"}`} />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-white">
+              {botInfo.connected ? "AI-сотрудник активен" : "Активируйте AI-сотрудника"}
+            </h2>
+            <p className="text-gray-400 text-sm">
+              {botInfo.connected
+                ? `@${botInfo.username} готов отвечать клиентам`
+                : "Подключите Telegram бота, чтобы начать работу"}
+            </p>
+          </div>
+          {botInfo.connected && (
+            <div className="ml-auto flex items-center gap-2">
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              <span className="text-green-400 text-sm font-medium">Онлайн 24/7</span>
             </div>
-          </li>
-
-          <li className="flex gap-3">
-            <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">
-              2
-            </span>
-            <div>
-              <p className="text-gray-900 font-medium">Отправьте команду /newbot</p>
-              <div className="mt-1 flex items-center gap-2">
-                <code className="bg-gray-100 px-2 py-1 rounded text-xs">/newbot</code>
-                <button
-                  onClick={() => copyToClipboard("/newbot")}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-          </li>
-
-          <li className="flex gap-3">
-            <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">
-              3
-            </span>
-            <div>
-              <p className="text-gray-900 font-medium">Введите название бота</p>
-              <p className="text-gray-500 text-xs mt-1">
-                Например: Салон Красоты Звезда
-              </p>
-            </div>
-          </li>
-
-          <li className="flex gap-3">
-            <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">
-              4
-            </span>
-            <div>
-              <p className="text-gray-900 font-medium">Введите username бота</p>
-              <p className="text-gray-500 text-xs mt-1">
-                Должен заканчиваться на bot, например: zvezda_salon_bot
-              </p>
-            </div>
-          </li>
-
-          <li className="flex gap-3">
-            <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">
-              5
-            </span>
-            <div>
-              <p className="text-gray-900 font-medium">Скопируйте токен</p>
-              <p className="text-gray-500 text-xs mt-1">
-                BotFather пришлёт вам токен вида: 123456789:ABCdefGHIjklMNOpqrSTUvwxYZ
-              </p>
-            </div>
-          </li>
-        </ol>
+          )}
+        </div>
       </div>
 
+      {/* Instructions */}
+      {!botInfo.connected && (
+        <div className="bg-[#12122a] rounded-xl border border-white/5 p-6">
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-yellow-400" />
+            Как создать Telegram бота?
+          </h3>
+
+          <ol className="space-y-4 text-sm">
+            <li className="flex gap-3">
+              <span className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">
+                1
+              </span>
+              <div>
+                <p className="text-white font-medium">Откройте @BotFather в Telegram</p>
+                <a
+                  href="https://t.me/BotFather"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 inline-flex items-center gap-1 mt-1"
+                >
+                  Открыть BotFather <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            </li>
+
+            <li className="flex gap-3">
+              <span className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">
+                2
+              </span>
+              <div>
+                <p className="text-white font-medium">Отправьте команду /newbot</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg text-sm text-gray-300">/newbot</code>
+                  <button
+                    onClick={() => copyToClipboard("/newbot")}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            </li>
+
+            <li className="flex gap-3">
+              <span className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">
+                3
+              </span>
+              <div>
+                <p className="text-white font-medium">Введите название и username бота</p>
+                <p className="text-gray-500 text-xs mt-1">
+                  Username должен заканчиваться на bot (например: my_salon_bot)
+                </p>
+              </div>
+            </li>
+
+            <li className="flex gap-3">
+              <span className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">
+                4
+              </span>
+              <div>
+                <p className="text-white font-medium">Скопируйте токен и вставьте ниже</p>
+                <p className="text-gray-500 text-xs mt-1">
+                  Токен выглядит так: 123456789:ABCdefGHIjklMNOpqrSTUvwxYZ
+                </p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      )}
+
       {/* Token input */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          Токен бота
-        </h2>
+      <div className="bg-[#12122a] rounded-xl border border-white/5 p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">
+          {botInfo.connected ? "Подключенный бот" : "Токен бота"}
+        </h3>
 
         {tokenError && (
-          <div className="mb-4 bg-red-50 text-red-600 p-3 rounded-lg text-sm flex items-center gap-2">
+          <div className="mb-4 bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg text-sm flex items-center gap-2">
             <AlertCircle className="h-4 w-4" />
             {tokenError}
           </div>
         )}
 
         {botInfo.connected ? (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <p className="text-green-800 font-medium flex items-center gap-2">
-              <Check className="h-5 w-5" />
-              Бот подключен
-            </p>
-            <p className="text-green-700 text-sm mt-1">
-              @{botInfo.username} • {botInfo.name}
-            </p>
+          <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <Check className="h-5 w-5 text-green-400" />
+              <div>
+                <p className="text-green-400 font-medium">Бот успешно подключен</p>
+                <p className="text-gray-400 text-sm">@{botInfo.username}</p>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
             <div>
-              <label htmlFor="token" className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
                 Вставьте токен от BotFather
               </label>
               <input
-                id="token"
                 type="text"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
                 placeholder="123456789:ABCdefGHIjklMNOpqrSTUvwxYZ"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
               />
             </div>
 
             <button
               onClick={handleSaveToken}
               disabled={savingToken || !token.trim()}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-xl font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
             >
               {savingToken ? (
                 <>
@@ -272,101 +297,105 @@ export default function BotConfigPage() {
               ) : tokenSaved ? (
                 <>
                   <Check className="h-4 w-4" />
-                  Сохранено!
+                  Подключено!
                 </>
               ) : (
-                "Подключить бота"
+                <>
+                  <Brain className="h-4 w-4" />
+                  Активировать AI-сотрудника
+                </>
               )}
             </button>
           </div>
         )}
       </div>
 
-      {/* Business info */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          Информация о бизнесе
-        </h2>
+      {/* AI Personality settings */}
+      <div className="bg-[#12122a] rounded-xl border border-white/5 p-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <Sliders className="h-5 w-5 text-purple-400" />
+          Настройки личности AI
+        </h3>
 
-        {businessError && (
-          <div className="mb-4 bg-red-50 text-red-600 p-3 rounded-lg text-sm flex items-center gap-2">
-            <AlertCircle className="h-4 w-4" />
-            {businessError}
-          </div>
-        )}
-
-        {businessSaved && (
-          <div className="mb-4 bg-green-50 text-green-600 p-3 rounded-lg text-sm flex items-center gap-2">
-            <Check className="h-4 w-4" />
-            Данные сохранены!
-          </div>
-        )}
-
-        <div className="space-y-4">
+        <div className="space-y-5">
+          {/* Tone selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Название
+            <label className="block text-sm font-medium text-gray-300 mb-3">
+              Стиль общения
             </label>
-            <input
-              type="text"
-              value={businessInfo.name}
-              onChange={(e) => setBusinessInfo({ ...businessInfo, name: e.target.value })}
-              placeholder="Салон красоты 'Звезда'"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { id: "friendly", name: "Дружелюбный", emoji: "😊" },
+                { id: "professional", name: "Профессиональный", emoji: "👔" },
+                { id: "casual", name: "Неформальный", emoji: "😎" },
+              ].map((tone) => (
+                <button
+                  key={tone.id}
+                  onClick={() => setAiSettings({ ...aiSettings, tone: tone.id })}
+                  className={`p-4 rounded-xl border text-center transition-all ${
+                    aiSettings.tone === tone.id
+                      ? "bg-blue-500/20 border-blue-500/50 text-white"
+                      : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"
+                  }`}
+                >
+                  <span className="text-2xl block mb-1">{tone.emoji}</span>
+                  <span className="text-sm">{tone.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Welcome message */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Приветственное сообщение
+            </label>
+            <textarea
+              value={aiSettings.welcomeMessage}
+              onChange={(e) => setAiSettings({ ...aiSettings, welcomeMessage: e.target.value })}
+              placeholder="Здравствуйте! Я AI-ассистент салона красоты. Чем могу помочь?"
+              rows={3}
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             />
           </div>
 
+          {/* Rules */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Телефон
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Особые инструкции для AI
             </label>
-            <input
-              type="tel"
-              value={businessInfo.phone}
-              onChange={(e) => setBusinessInfo({ ...businessInfo, phone: e.target.value })}
-              placeholder="+998 90 123 45 67"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            <textarea
+              value={aiSettings.rules}
+              onChange={(e) => setAiSettings({ ...aiSettings, rules: e.target.value })}
+              placeholder="Например: Всегда предлагай записаться. Не обсуждай политику. При вопросах о ценах направляй в прайс-лист."
+              rows={4}
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Адрес
-            </label>
-            <input
-              type="text"
-              value={businessInfo.address}
-              onChange={(e) => setBusinessInfo({ ...businessInfo, address: e.target.value })}
-              placeholder="г. Ташкент, ул. Навои, 10"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Часы работы
-            </label>
-            <input
-              type="text"
-              value={businessInfo.workingHours}
-              onChange={(e) => setBusinessInfo({ ...businessInfo, workingHours: e.target.value })}
-              placeholder="Пн-Сб: 09:00-19:00"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+            <p className="text-xs text-gray-500 mt-2">
+              Эти правила помогут AI лучше понимать, как отвечать клиентам
+            </p>
           </div>
 
           <button
-            onClick={handleSaveBusiness}
-            disabled={savingBusiness}
-            className="w-full bg-gray-900 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            onClick={handleSaveSettings}
+            disabled={savingSettings}
+            className="w-full bg-white/5 border border-white/10 text-white py-3 px-4 rounded-xl font-medium hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
           >
-            {savingBusiness ? (
+            {savingSettings ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Сохранение...
               </>
+            ) : settingsSaved ? (
+              <>
+                <Check className="h-4 w-4 text-green-400" />
+                Сохранено!
+              </>
             ) : (
-              "Сохранить"
+              <>
+                <Save className="h-4 w-4" />
+                Сохранить настройки
+              </>
             )}
           </button>
         </div>
