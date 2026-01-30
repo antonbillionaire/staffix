@@ -11,6 +11,11 @@ import {
   Sparkles,
   Sliders,
   Save,
+  Upload,
+  FileText,
+  X,
+  Wand2,
+  Image,
 } from "lucide-react";
 
 export default function AIEmployeePage() {
@@ -37,12 +42,62 @@ export default function AIEmployeePage() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
 
+  // File uploads
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{id: string; name: string; size: number; url: string}>>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+
+  // Logo upload
+  const [botLogo, setBotLogo] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  // Prompt templates
+  const promptTemplates = [
+    {
+      id: "salon",
+      name: "Салон красоты",
+      icon: "💇",
+      prompt: "Ты AI-сотрудник салона красоты. Помогай клиентам записаться на услуги, рассказывай о ценах и мастерах. Будь дружелюбным и предлагай подходящие услуги.",
+    },
+    {
+      id: "clinic",
+      name: "Медицинская клиника",
+      icon: "🏥",
+      prompt: "Ты AI-ассистент медицинской клиники. Помогай записаться к врачам, объясняй подготовку к процедурам. Важно: не ставь диагнозы, направляй к специалистам.",
+    },
+    {
+      id: "restaurant",
+      name: "Ресторан/Кафе",
+      icon: "🍽️",
+      prompt: "Ты AI-сотрудник ресторана. Помогай с бронированием столиков, рассказывай о меню и акциях. Рекомендуй блюда и напитки.",
+    },
+    {
+      id: "fitness",
+      name: "Фитнес-клуб",
+      icon: "🏋️",
+      prompt: "Ты AI-консультант фитнес-клуба. Помогай с записью на тренировки, рассказывай об абонементах и тренерах. Мотивируй клиентов заниматься спортом.",
+    },
+    {
+      id: "auto",
+      name: "Автосервис",
+      icon: "🚗",
+      prompt: "Ты AI-консультант автосервиса. Помогай записаться на ТО и ремонт, объясняй виды услуг и примерные сроки. Спрашивай марку и модель автомобиля.",
+    },
+    {
+      id: "shop",
+      name: "Интернет-магазин",
+      icon: "🛒",
+      prompt: "Ты AI-консультант интернет-магазина. Помогай найти товары, рассказывай о характеристиках, наличии и доставке. Предлагай похожие товары.",
+    },
+  ];
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch("/api/business");
-        if (res.ok) {
-          const data = await res.json();
+        // Fetch business data
+        const businessRes = await fetch("/api/business");
+        if (businessRes.ok) {
+          const data = await businessRes.json();
           if (data.business) {
             if (data.business.botToken) {
               setToken(data.business.botToken);
@@ -58,6 +113,13 @@ export default function AIEmployeePage() {
               rules: data.business.aiRules || "",
             });
           }
+        }
+
+        // Fetch uploaded documents
+        const docsRes = await fetch("/api/documents");
+        if (docsRes.ok) {
+          const docsData = await docsRes.json();
+          setUploadedFiles(docsData.documents || []);
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -130,6 +192,62 @@ export default function AIEmployeePage() {
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    setUploadError("");
+
+    try {
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("type", "other");
+
+        const res = await fetch("/api/documents/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Ошибка загрузки");
+        }
+
+        const data = await res.json();
+        setUploadedFiles(prev => [data.document, ...prev]);
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      setUploadError(error instanceof Error ? error.message : "Ошибка загрузки файла");
+    } finally {
+      setUploading(false);
+      // Reset input
+      e.target.value = "";
+    }
+  };
+
+  const removeFile = async (documentId: string) => {
+    try {
+      const res = await fetch("/api/documents", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentId }),
+      });
+
+      if (res.ok) {
+        setUploadedFiles(uploadedFiles.filter((f) => f.id !== documentId));
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+    }
+  };
+
+  const applyTemplate = (prompt: string) => {
+    setAiSettings({ ...aiSettings, rules: prompt });
   };
 
   if (loading) {
@@ -224,9 +342,9 @@ export default function AIEmployeePage() {
                 3
               </span>
               <div>
-                <p className="text-white font-medium">Введите название и username бота</p>
+                <p className="text-white font-medium">Придумайте название бота</p>
                 <p className="text-gray-500 text-xs mt-1">
-                  Username должен заканчиваться на bot (например: my_salon_bot)
+                  Например: Салон красоты "Элегант"
                 </p>
               </div>
             </li>
@@ -234,6 +352,18 @@ export default function AIEmployeePage() {
             <li className="flex gap-3">
               <span className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">
                 4
+              </span>
+              <div>
+                <p className="text-white font-medium">Придумайте username бота</p>
+                <p className="text-gray-500 text-xs mt-1">
+                  Username должен заканчиваться на bot (например: elegant_salon_bot)
+                </p>
+              </div>
+            </li>
+
+            <li className="flex gap-3">
+              <span className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">
+                5
               </span>
               <div>
                 <p className="text-white font-medium">Скопируйте токен и вставьте ниже</p>
@@ -308,6 +438,180 @@ export default function AIEmployeePage() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Prompt templates */}
+      <div className="bg-[#12122a] rounded-xl border border-white/5 p-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <Wand2 className="h-5 w-5 text-yellow-400" />
+          Шаблоны промптов
+        </h3>
+        <p className="text-gray-400 text-sm mb-4">
+          Выберите готовый шаблон для вашего типа бизнеса
+        </p>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {promptTemplates.map((template) => (
+            <button
+              key={template.id}
+              onClick={() => applyTemplate(template.prompt)}
+              className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/50 rounded-xl text-left transition-all group"
+            >
+              <span className="text-2xl block mb-2">{template.icon}</span>
+              <span className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">
+                {template.name}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* File upload */}
+      <div className="bg-[#12122a] rounded-xl border border-white/5 p-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <Upload className="h-5 w-5 text-green-400" />
+          База знаний
+        </h3>
+        <p className="text-gray-400 text-sm mb-4">
+          Загрузите документы с информацией о вашем бизнесе (прайс-листы, FAQ, каталоги)
+        </p>
+
+        <label className="block">
+          <div className="border-2 border-dashed border-white/10 hover:border-blue-500/50 rounded-xl p-8 text-center cursor-pointer transition-colors">
+            <input
+              type="file"
+              multiple
+              accept=".pdf,.doc,.docx,.txt,.xlsx,.xls"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            {uploading ? (
+              <div className="flex flex-col items-center">
+                <Loader2 className="h-10 w-10 text-blue-400 animate-spin mb-3" />
+                <p className="text-gray-400">Загрузка...</p>
+              </div>
+            ) : (
+              <>
+                <Upload className="h-10 w-10 text-gray-500 mx-auto mb-3" />
+                <p className="text-white font-medium">Нажмите для загрузки файлов</p>
+                <p className="text-gray-500 text-sm mt-1">
+                  PDF, DOC, DOCX, TXT, XLSX (до 10MB)
+                </p>
+              </>
+            )}
+          </div>
+        </label>
+
+        {uploadError && (
+          <div className="mt-4 bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg text-sm flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            {uploadError}
+          </div>
+        )}
+
+        {uploadedFiles.length > 0 && (
+          <div className="mt-4 space-y-2">
+            {uploadedFiles.map((file) => (
+              <div
+                key={file.id}
+                className="flex items-center justify-between bg-white/5 rounded-lg p-3"
+              >
+                <div className="flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-blue-400" />
+                  <div>
+                    <p className="text-sm text-white">{file.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {(file.size / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => removeFile(file.id)}
+                  className="text-gray-400 hover:text-red-400 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Logo upload */}
+      <div className="bg-[#12122a] rounded-xl border border-white/5 p-6">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <Image className="h-5 w-5 text-pink-400" />
+          Логотип бота
+        </h3>
+        <p className="text-gray-400 text-sm mb-4">
+          Загрузите логотип вашего бизнеса для аватара бота (White Label)
+        </p>
+
+        <div className="flex items-center gap-6">
+          {/* Preview */}
+          <div className="w-24 h-24 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
+            {botLogo ? (
+              <img src={botLogo} alt="Logo" className="w-full h-full object-cover" />
+            ) : (
+              <Brain className="h-10 w-10 text-gray-500" />
+            )}
+          </div>
+
+          {/* Upload button */}
+          <div className="flex-1">
+            <label className="block">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setUploadingLogo(true);
+                  try {
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    formData.append("type", "logo");
+                    const res = await fetch("/api/documents/upload", {
+                      method: "POST",
+                      body: formData,
+                    });
+                    if (res.ok) {
+                      const data = await res.json();
+                      setBotLogo(data.document.url);
+                      // Save logo URL to business
+                      await fetch("/api/business", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ botLogo: data.document.url }),
+                      });
+                    }
+                  } catch (error) {
+                    console.error("Logo upload error:", error);
+                  } finally {
+                    setUploadingLogo(false);
+                  }
+                }}
+                className="hidden"
+              />
+              <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/10 rounded-lg text-white text-sm font-medium cursor-pointer transition-colors">
+                {uploadingLogo ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Загрузка...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Загрузить логотип
+                  </>
+                )}
+              </span>
+            </label>
+            <p className="text-xs text-gray-500 mt-2">
+              PNG, JPG до 2MB. Рекомендуемый размер: 512x512
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* AI Personality settings */}

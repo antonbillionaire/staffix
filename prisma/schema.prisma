@@ -13,10 +13,21 @@ model User {
   email         String    @unique
   password      String
   name          String
+
+  // Настройки
+  theme         String    @default("dark") // dark, light
+
+  // Настройки уведомлений
+  notifyNewBookings    Boolean @default(true)
+  notifyCancellations  Boolean @default(true)
+  notifyLowMessages    Boolean @default(true)
+  notifyTrialEnding    Boolean @default(true)
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   businesses    Business[]
+  supportTickets SupportTicket[]
 }
 
 // Бизнесы
@@ -43,6 +54,7 @@ model Business {
   botToken      String?   @unique
   botUsername   String?
   botActive     Boolean   @default(false)
+  botLogo       String?   // URL к логотипу бота
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -176,6 +188,34 @@ model Document {
 
   businessId    String
   business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime  @default(now())
+}
+
+// Тикеты поддержки
+model SupportTicket {
+  id            String    @id @default(cuid())
+  subject       String
+  priority      String    @default("normal") // low, normal, high
+  status        String    @default("open")   // open, in_progress, closed
+
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  messages      SupportMessage[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// Сообщения в тикетах поддержки
+model SupportMessage {
+  id            String    @id @default(cuid())
+  content       String
+  isFromSupport Boolean   @default(false) // true = от поддержки, false = от пользователя
+
+  ticketId      String
+  ticket        SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
   createdAt     DateTime  @default(now())
 }
