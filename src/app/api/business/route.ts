@@ -1,12 +1,27 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
+import { auth } from "@/auth";
 
 // GET - получить данные бизнеса текущего пользователя
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("userId")?.value;
+    // Try NextAuth session first
+    const session = await auth();
+    let userId: string | undefined;
+
+    if (session?.user?.email) {
+      const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+      });
+      userId = user?.id;
+    }
+
+    // Fallback to cookie-based auth
+    if (!userId) {
+      const cookieStore = await cookies();
+      userId = cookieStore.get("userId")?.value;
+    }
 
     if (!userId) {
       return NextResponse.json(
@@ -42,8 +57,22 @@ export async function GET() {
 // PUT - обновить данные бизнеса
 export async function PUT(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("userId")?.value;
+    // Try NextAuth session first
+    const session = await auth();
+    let userId: string | undefined;
+
+    if (session?.user?.email) {
+      const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+      });
+      userId = user?.id;
+    }
+
+    // Fallback to cookie-based auth
+    if (!userId) {
+      const cookieStore = await cookies();
+      userId = cookieStore.get("userId")?.value;
+    }
 
     if (!userId) {
       return NextResponse.json(
