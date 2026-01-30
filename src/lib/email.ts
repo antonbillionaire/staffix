@@ -1,8 +1,19 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const FROM_EMAIL = process.env.FROM_EMAIL || "Staffix <noreply@staffix.io>";
+
+// Lazy initialization to avoid errors during build
+let resendClient: Resend | null = null;
+
+function getResend(): Resend | null {
+  if (!process.env.RESEND_API_KEY) {
+    return null;
+  }
+  if (!resendClient) {
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendClient;
+}
 
 export async function sendVerificationEmail(
   email: string,
@@ -14,6 +25,11 @@ export async function sendVerificationEmail(
     if (!process.env.RESEND_API_KEY) {
       console.log(`[DEV] Verification code for ${email}: ${code}`);
       return { success: true }; // Allow registration in dev mode without email
+    }
+
+    const resend = getResend();
+    if (!resend) {
+      return { success: false, error: "Email service not configured" };
     }
 
     const { error } = await resend.emails.send({

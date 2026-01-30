@@ -148,10 +148,10 @@ export default function DashboardLayout({
       <aside
         className={`fixed top-0 left-0 z-50 h-full w-72 ${bgSidebar} border-r ${borderColor} transform transition-transform duration-200 lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        } flex flex-col`}
       >
         {/* Logo */}
-        <div className={`flex items-center justify-between h-16 px-5 border-b ${borderColor}`}>
+        <div className={`flex items-center justify-between h-16 px-5 border-b ${borderColor} flex-shrink-0`}>
           <Link href="/dashboard" className="flex items-center gap-3">
             <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
               <Brain className="h-5 w-5 text-white" />
@@ -168,14 +168,14 @@ export default function DashboardLayout({
 
         {/* Business name */}
         {businessName && (
-          <div className={`px-5 py-4 border-b ${borderColor}`}>
+          <div className={`px-5 py-4 border-b ${borderColor} flex-shrink-0`}>
             <p className={`text-xs ${textMuted} uppercase tracking-wider`}>Ваш бизнес</p>
             <p className={`text-sm font-medium ${textPrimary} truncate mt-1`}>{businessName}</p>
           </div>
         )}
 
-        {/* Navigation */}
-        <nav className="p-4 space-y-1">
+        {/* Navigation - scrollable area */}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
           {navigation.map((item) => {
             const isActive = pathname === item.href;
             const isMessages = item.href === "/dashboard/messages";
@@ -203,8 +203,8 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        {/* Subscription card */}
-        <div className="absolute bottom-20 left-4 right-4">
+        {/* Subscription card - fixed at bottom */}
+        <div className={`flex-shrink-0 p-4 border-t ${borderColor}`}>
           <div className={`bg-gradient-to-br from-blue-600/20 to-purple-600/20 border ${borderColor} rounded-xl p-4`}>
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="h-4 w-4 text-yellow-400" />
@@ -244,7 +244,7 @@ export default function DashboardLayout({
         </div>
 
         {/* Logout */}
-        <div className={`absolute bottom-0 left-0 right-0 p-4 border-t ${borderColor}`}>
+        <div className={`flex-shrink-0 p-4 border-t ${borderColor}`}>
           <button
             onClick={handleLogout}
             className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-medium ${textSecondary} ${hoverBg} transition-all`}
