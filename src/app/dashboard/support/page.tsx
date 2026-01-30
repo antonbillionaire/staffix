@@ -107,15 +107,20 @@ export default function SupportPage() {
             Статьи и руководства по использованию
           </p>
         </div>
-        <div className={`${bgCard} rounded-xl border ${borderColor} p-5`}>
+        <a
+          href="https://t.me/staffix_support_bot"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${bgCard} rounded-xl border ${borderColor} p-5 block hover:border-purple-500/50 transition-colors`}
+        >
           <div className={`w-10 h-10 ${isDark ? 'bg-purple-500/10' : 'bg-purple-50'} rounded-lg flex items-center justify-center mb-3`}>
             <MessageSquare className="h-5 w-5 text-purple-500" />
           </div>
           <h3 className={`font-medium ${textPrimary} mb-1`}>Telegram</h3>
           <p className={`text-sm ${textSecondary}`}>
-            Напишите нам: @staffix_support
+            @staffix_support_bot
           </p>
-        </div>
+        </a>
         <div className={`${bgCard} rounded-xl border ${borderColor} p-5`}>
           <div className={`w-10 h-10 ${isDark ? 'bg-green-500/10' : 'bg-green-50'} rounded-lg flex items-center justify-center mb-3`}>
             <Clock className="h-5 w-5 text-green-500" />
@@ -290,10 +295,10 @@ export default function SupportPage() {
               Также вы можете написать нам на email:
             </p>
             <a
-              href="mailto:support@staffix.kz"
+              href="mailto:support@staffix.io"
               className="text-blue-500 hover:text-blue-400 font-medium"
             >
-              support@staffix.kz
+              support@staffix.io
             </a>
           </div>
         </div>

@@ -21,11 +21,11 @@ import {
   Sparkles,
   CreditCard,
   HelpCircle,
-  MessageCircle,
   Mail,
   BarChart3,
   AlertTriangle,
 } from "lucide-react";
+import ChatWidget from "@/components/ChatWidget";
 
 const navigation = [
   { name: "Главная", href: "/dashboard", icon: LayoutDashboard },
@@ -305,14 +305,8 @@ export default function DashboardLayout({
         {/* Page content */}
         <main className="p-4 md:p-8">{children}</main>
 
-        {/* Floating help button */}
-        <Link
-          href="/dashboard/support"
-          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg hover:opacity-90 transition-all hover:scale-105 z-50"
-          title="Помощь"
-        >
-          <MessageCircle className="h-6 w-6 text-white" />
-        </Link>
+        {/* Chat Widget */}
+        <ChatWidget />
       </div>
     </div>
   );

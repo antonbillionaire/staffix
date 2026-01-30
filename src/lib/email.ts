@@ -103,3 +103,122 @@ export async function sendVerificationEmail(
     };
   }
 }
+
+// Send support ticket notification to admin
+export async function sendSupportTicketNotification(
+  ticketId: string,
+  subject: string,
+  message: string,
+  userEmail: string,
+  userName: string,
+  priority: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const adminEmail = process.env.ADMIN_EMAIL;
+
+    if (!adminEmail) {
+      console.log("[DEV] Support ticket notification - no admin email configured");
+      return { success: true };
+    }
+
+    const resend = getResend();
+    if (!resend) {
+      console.log("[DEV] New support ticket:", { ticketId, subject, userEmail });
+      return { success: true };
+    }
+
+    const priorityLabels: Record<string, string> = {
+      low: "🟢 Низкий",
+      normal: "🟡 Обычный",
+      high: "🔴 Высокий",
+    };
+
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: adminEmail,
+      subject: `[Staffix Support] ${subject}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+        </head>
+        <body style="font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5;">
+          <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; padding: 24px; border: 1px solid #e5e5e5;">
+            <h2 style="color: #1a1a1a; margin: 0 0 16px;">Новое обращение в поддержку</h2>
+
+            <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+              <p style="margin: 0 0 8px;"><strong>Тикет ID:</strong> ${ticketId}</p>
+              <p style="margin: 0 0 8px;"><strong>От:</strong> ${userName} (${userEmail})</p>
+              <p style="margin: 0 0 8px;"><strong>Приоритет:</strong> ${priorityLabels[priority] || priority}</p>
+              <p style="margin: 0;"><strong>Тема:</strong> ${subject}</p>
+            </div>
+
+            <h3 style="color: #1a1a1a; margin: 16px 0 8px;">Сообщение:</h3>
+            <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; white-space: pre-wrap;">${message}</div>
+
+            <p style="color: #666; font-size: 12px; margin-top: 24px;">
+              Это автоматическое уведомление от Staffix.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    if (error) {
+      console.error("Support notification email error:", error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Support notification error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Ошибка отправки уведомления",
+    };
+  }
+}
+
+// Send Telegram notification
+export async function sendTelegramNotification(
+  message: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const botToken = process.env.SUPPORT_BOT_TOKEN;
+    const chatId = process.env.SUPPORT_CHAT_ID;
+
+    if (!botToken || !chatId) {
+      console.log("[DEV] Telegram notification - not configured");
+      return { success: true };
+    }
+
+    const response = await fetch(
+      `https://api.telegram.org/bot${botToken}/sendMessage`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: "HTML",
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("Telegram notification error:", error);
+      return { success: false, error };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Telegram notification error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Ошибка Telegram",
+    };
+  }
+}

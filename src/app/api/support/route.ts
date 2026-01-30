@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  sendSupportTicketNotification,
+  sendTelegramNotification,
+} from "@/lib/email";
 
 // GET - Fetch all support tickets for user
 export async function GET() {
@@ -55,6 +59,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get user info for notification
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { email: true, name: true },
+    });
+
     const ticket = await prisma.supportTicket.create({
       data: {
         subject,
@@ -71,6 +81,29 @@ export async function POST(request: NextRequest) {
         messages: true,
       },
     });
+
+    // Send notifications (don't await to not block response)
+    const ticketPriority = priority || "normal";
+
+    // Email notification
+    sendSupportTicketNotification(
+      ticket.id,
+      subject,
+      message,
+      user?.email || session.user.email || "unknown",
+      user?.name || "Пользователь",
+      ticketPriority
+    ).catch((err) => console.error("Email notification failed:", err));
+
+    // Telegram notification
+    const priorityEmoji = ticketPriority === "high" ? "🔴" : ticketPriority === "low" ? "🟢" : "🟡";
+    sendTelegramNotification(
+      `${priorityEmoji} <b>Новое обращение в поддержку</b>\n\n` +
+      `<b>От:</b> ${user?.name || "Пользователь"}\n` +
+      `<b>Email:</b> ${user?.email || "N/A"}\n` +
+      `<b>Тема:</b> ${subject}\n\n` +
+      `<b>Сообщение:</b>\n${message}`
+    ).catch((err) => console.error("Telegram notification failed:", err));
 
     return NextResponse.json({
       success: true,
