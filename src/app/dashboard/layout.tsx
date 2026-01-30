@@ -24,6 +24,7 @@ import {
   MessageCircle,
   Mail,
   BarChart3,
+  AlertTriangle,
 } from "lucide-react";
 
 const navigation = [
@@ -270,6 +271,36 @@ export default function DashboardLayout({
             </h1>
           </div>
         </header>
+
+        {/* Low messages warning */}
+        {subscription.messagesLimit - subscription.messagesUsed <= 50 && (
+          <div className={`mx-4 md:mx-8 mt-4 p-4 rounded-xl border ${
+            subscription.messagesLimit - subscription.messagesUsed <= 10
+              ? "bg-red-500/10 border-red-500/30"
+              : "bg-yellow-500/10 border-yellow-500/30"
+          }`}>
+            <div className="flex items-center gap-3">
+              <AlertTriangle className={`h-5 w-5 flex-shrink-0 ${
+                subscription.messagesLimit - subscription.messagesUsed <= 10
+                  ? "text-red-500"
+                  : "text-yellow-500"
+              }`} />
+              <div className="flex-1">
+                <p className={`text-sm font-medium ${textPrimary}`}>
+                  {subscription.messagesLimit - subscription.messagesUsed <= 10
+                    ? "Сообщения почти закончились!"
+                    : "Осталось мало сообщений"}
+                </p>
+                <p className={`text-xs ${textSecondary}`}>
+                  Осталось {subscription.messagesLimit - subscription.messagesUsed} из {subscription.messagesLimit} сообщений.{" "}
+                  <Link href="/pricing" className="text-blue-400 hover:text-blue-300">
+                    Обновить тариф
+                  </Link>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Page content */}
         <main className="p-4 md:p-8">{children}</main>

@@ -16,13 +16,22 @@ export default function RegisterPage() {
     name: "",
     email: "",
     password: "",
+    confirmPassword: "",
     businessName: "",
   });
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    // Validate password confirmation
+    if (formData.password !== formData.confirmPassword) {
+      setError("Пароли не совпадают");
+      setLoading(false);
+      return;
+    }
 
     try {
       const res = await fetch("/api/auth/register", {
@@ -37,7 +46,8 @@ export default function RegisterPage() {
         throw new Error(data.error || "Ошибка регистрации");
       }
 
-      router.push("/dashboard");
+      // Redirect to email verification page
+      router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка регистрации");
     } finally {
@@ -190,6 +200,31 @@ export default function RegisterPage() {
                   className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-white"
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
+                Подтвердите пароль
+              </label>
+              <div className="relative">
+                <input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  required
+                  minLength={6}
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  className="block w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Повторите пароль"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-white"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
             </div>

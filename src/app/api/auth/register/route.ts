@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 
 export async function POST(request: Request) {
   try {
@@ -36,12 +37,19 @@ export async function POST(request: Request) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Generate verification token
+    const verificationToken = randomBytes(32).toString("hex");
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
     // Create user with business and trial subscription
     const user = await prisma.user.create({
       data: {
         name,
         email,
         password: hashedPassword,
+        emailVerified: false,
+        verificationToken,
+        verificationExpires,
         businesses: {
           create: {
             name: businessName,
@@ -61,11 +69,18 @@ export async function POST(request: Request) {
     });
 
     // Remove password from response
-    const { password: _, ...userWithoutPassword } = user;
+    const { password: _, verificationToken: __, ...userWithoutPassword } = user;
+
+    // TODO: Send verification email via SMTP
+    // For now, return verification token for testing
+    const verificationUrl = `${process.env.NEXTAUTH_URL || "https://staffix.io"}/verify-email?token=${verificationToken}`;
 
     return NextResponse.json({
-      message: "Регистрация успешна",
+      message: "Регистрация успешна. Проверьте email для подтверждения.",
       user: userWithoutPassword,
+      requiresVerification: true,
+      // Remove verificationUrl in production after SMTP is configured
+      verificationUrl: process.env.NODE_ENV === "development" ? verificationUrl : undefined,
     });
   } catch (error) {
     console.error("Registration error:", error);

@@ -40,7 +40,7 @@ export default function PricingPage() {
       name: "Pro",
       description: "Для малого и среднего бизнеса",
       monthlyPrice: 50,
-      yearlyPrice: 500,
+      yearlyPrice: 480,
       features: [
         "500 сообщений в месяц",
         "1 AI-сотрудник",
@@ -58,7 +58,7 @@ export default function PricingPage() {
       name: "Business",
       description: "Для растущих компаний",
       monthlyPrice: 100,
-      yearlyPrice: 1000,
+      yearlyPrice: 960,
       features: [
         "Безлимит сообщений",
         "2 AI-сотрудника:",
@@ -147,7 +147,7 @@ export default function PricingPage() {
           >
             Ежегодно
             <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">
-              -15%
+              -20%
             </span>
           </button>
         </div>
@@ -188,7 +188,7 @@ export default function PricingPage() {
                 </div>
                 {billingPeriod === "yearly" && plan.yearlyPrice > 0 && (
                   <p className="text-sm text-gray-500 mt-1">
-                    ${plan.yearlyPrice} в год (экономия 17%)
+                    ${plan.yearlyPrice} в год (экономия 20%)
                   </p>
                 )}
                 {plan.monthlyPrice === 0 && (

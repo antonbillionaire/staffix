@@ -13,7 +13,10 @@ import {
   Download,
   Loader2,
   HelpCircle,
+  Info,
+  Lock,
 } from "lucide-react";
+import Link from "next/link";
 
 interface Stats {
   totalMessages: number;
@@ -124,6 +127,22 @@ export default function StatisticsPage() {
             <Download className="h-4 w-4" />
             Экспорт
           </button>
+        </div>
+      </div>
+
+      {/* Analytics disclaimer */}
+      <div className={`${cardBg} rounded-xl border ${borderColor} p-4 mb-2`}>
+        <div className="flex items-start gap-3">
+          <Info className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className={`text-sm ${textPrimary} font-medium mb-1`}>Уровень аналитики</p>
+            <p className={`text-sm ${textSecondary}`}>
+              <span className="text-blue-400">Базовая аналитика (Pro):</span> сообщения, записи, клиенты, время ответа
+            </p>
+            <p className={`text-sm ${textSecondary}`}>
+              <span className="text-purple-400">Полная аналитика (Business):</span> + популярные вопросы, конверсия, экспорт данных
+            </p>
+          </div>
         </div>
       </div>
 
