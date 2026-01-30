@@ -402,12 +402,12 @@ export default function Home() {
 
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             <PricingCard
-              name="Пробный"
+              name="Бесплатный"
               price="0"
-              period="14 дней"
+              period="/месяц"
               description="Для знакомства с платформой"
               features={[
-                "100 сообщений",
+                "100 сообщений/месяц",
                 "1 AI-сотрудник",
                 "Базовая аналитика",
                 "Email поддержка",
@@ -416,13 +416,13 @@ export default function Home() {
               highlighted={false}
             />
             <PricingCard
-              name="Бизнес"
-              price="29"
+              name="Pro"
+              price="50"
               period="/месяц"
               description="Для малого и среднего бизнеса"
               features={[
-                "1000 сообщений",
-                "1 AI-сотрудник",
+                "1000 сообщений/месяц",
+                "3 AI-сотрудника",
                 "Полная аналитика",
                 "Приоритетная поддержка",
                 "Загрузка документов",
@@ -432,13 +432,13 @@ export default function Home() {
               badge="Популярный"
             />
             <PricingCard
-              name="Корпоративный"
-              price="99"
+              name="Business"
+              price="100"
               period="/месяц"
               description="Для крупного бизнеса и сетей"
               features={[
                 "Безлимит сообщений",
-                "5 AI-сотрудников",
+                "10 AI-сотрудников",
                 "API доступ",
                 "Персональный менеджер",
                 "White-label",
