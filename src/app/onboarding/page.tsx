@@ -42,9 +42,12 @@ const staffCounts = [
 ];
 
 interface UploadedFile {
+  id?: string;
   name: string;
   size: number;
   type: string;
+  status: "uploading" | "success" | "error";
+  error?: string;
 }
 
 export default function OnboardingPage() {
@@ -84,38 +87,109 @@ export default function OnboardingPage() {
     setStep(step - 1);
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files) {
-      const newFiles: UploadedFile[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const allowedTypes = [
-          'application/pdf',
-          'application/vnd.ms-excel',
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'application/msword',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'image/jpeg',
-          'image/png',
-          'text/plain'
-        ];
-        if (allowedTypes.includes(file.type) || file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-          newFiles.push({
-            name: file.name,
-            size: file.size,
-            type: file.type
-          });
-        }
+    if (!files || files.length === 0) return;
+
+    const allowedTypes = [
+      'application/pdf',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/jpeg',
+      'image/png',
+      'text/plain'
+    ];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      // Check file type
+      if (!allowedTypes.includes(file.type) &&
+          !file.name.endsWith('.xlsx') &&
+          !file.name.endsWith('.xls') &&
+          !file.name.endsWith('.docx') &&
+          !file.name.endsWith('.doc')) {
+        continue;
       }
-      setUploadedFiles([...uploadedFiles, ...newFiles]);
+
+      // Check file size (10 MB max)
+      if (file.size > 10 * 1024 * 1024) {
+        setUploadedFiles(prev => [...prev, {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          status: "error",
+          error: "Файл слишком большой (макс. 10 MB)"
+        }]);
+        continue;
+      }
+
+      // Add file with uploading status
+      const tempId = `temp-${Date.now()}-${i}`;
+      setUploadedFiles(prev => [...prev, {
+        id: tempId,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        status: "uploading"
+      }]);
+
+      // Upload file
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          // Update file status to success
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === tempId
+              ? { ...f, id: data.document.id, status: "success" as const }
+              : f
+          ));
+        } else {
+          // Update file status to error
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === tempId
+              ? { ...f, status: "error" as const, error: data.error || "Ошибка загрузки" }
+              : f
+          ));
+        }
+      } catch {
+        // Update file status to error
+        setUploadedFiles(prev => prev.map(f =>
+          f.id === tempId
+            ? { ...f, status: "error" as const, error: "Ошибка сети" }
+            : f
+        ));
+      }
     }
+
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const removeFile = (index: number) => {
+  const removeFile = async (index: number) => {
+    const file = uploadedFiles[index];
+
+    // If file was successfully uploaded, delete from server
+    if (file.status === "success" && file.id && !file.id.startsWith("temp-")) {
+      try {
+        await fetch(`/api/upload?id=${file.id}`, { method: "DELETE" });
+      } catch {
+        // Ignore delete errors, just remove from UI
+      }
+    }
+
     setUploadedFiles(uploadedFiles.filter((_, i) => i !== index));
   };
 
@@ -133,10 +207,7 @@ export default function OnboardingPage() {
       const res = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          files: uploadedFiles
-        }),
+        body: JSON.stringify(formData),
       });
 
       if (!res.ok) {
@@ -360,22 +431,42 @@ export default function OnboardingPage() {
                 <p className="text-sm font-medium text-gray-300">Загруженные файлы:</p>
                 {uploadedFiles.map((file, index) => (
                   <div
-                    key={index}
-                    className="flex items-center justify-between p-3 bg-white/5 rounded-xl"
+                    key={file.id || index}
+                    className={`flex items-center justify-between p-3 rounded-xl ${
+                      file.status === "error"
+                        ? "bg-red-500/10 border border-red-500/30"
+                        : file.status === "uploading"
+                        ? "bg-blue-500/10 border border-blue-500/30"
+                        : "bg-green-500/10 border border-green-500/30"
+                    }`}
                   >
                     <div className="flex items-center gap-3">
-                      <FileText className="h-5 w-5 text-blue-400" />
+                      {file.status === "uploading" ? (
+                        <Loader2 className="h-5 w-5 text-blue-400 animate-spin" />
+                      ) : file.status === "error" ? (
+                        <X className="h-5 w-5 text-red-400" />
+                      ) : (
+                        <Check className="h-5 w-5 text-green-400" />
+                      )}
                       <div>
                         <p className="text-sm font-medium text-white">{file.name}</p>
-                        <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                        <p className="text-xs text-gray-500">
+                          {file.status === "uploading"
+                            ? "Загрузка..."
+                            : file.status === "error"
+                            ? file.error
+                            : formatFileSize(file.size)}
+                        </p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => removeFile(index)}
-                      className="text-gray-500 hover:text-red-400 transition-colors"
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
+                    {file.status !== "uploading" && (
+                      <button
+                        onClick={() => removeFile(index)}
+                        className="text-gray-500 hover:text-red-400 transition-colors"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -465,7 +556,9 @@ export default function OnboardingPage() {
               <div className="flex justify-between">
                 <span className="text-gray-500">Документы:</span>
                 <span className="text-white font-medium">
-                  {uploadedFiles.length > 0 ? `${uploadedFiles.length} файл(ов)` : "Не загружены"}
+                  {uploadedFiles.filter(f => f.status === "success").length > 0
+                    ? `${uploadedFiles.filter(f => f.status === "success").length} файл(ов)`
+                    : "Не загружены"}
                 </span>
               </div>
               <div className="flex justify-between">
