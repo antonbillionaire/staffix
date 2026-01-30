@@ -1,31 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(request: NextRequest) {
-  try {
-    const searchParams = request.nextUrl.searchParams;
-    const token = searchParams.get("token");
+// Generate 6-digit verification code
+function generateVerificationCode(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
-    if (!token) {
+// Verify code
+export async function POST(request: NextRequest) {
+  try {
+    const { email, code } = await request.json();
+
+    if (!email || !code) {
       return NextResponse.json(
-        { error: "Токен не указан" },
+        { error: "Email и код обязательны" },
         { status: 400 }
       );
     }
 
-    // Find user by verification token
-    const user = await prisma.user.findFirst({
-      where: {
-        verificationToken: token,
-        verificationExpires: {
-          gt: new Date(),
-        },
-      },
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email },
     });
 
     if (!user) {
       return NextResponse.json(
-        { error: "Неверный или истёкший токен" },
+        { error: "Пользователь не найден" },
+        { status: 404 }
+      );
+    }
+
+    if (user.emailVerified) {
+      return NextResponse.json(
+        { error: "Email уже подтверждён" },
+        { status: 400 }
+      );
+    }
+
+    // Check if code is expired
+    if (!user.verificationExpires || user.verificationExpires < new Date()) {
+      return NextResponse.json(
+        { error: "Код истёк. Запросите новый код." },
+        { status: 400 }
+      );
+    }
+
+    // Check if code matches
+    if (user.verificationToken !== code) {
+      return NextResponse.json(
+        { error: "Неверный код" },
         { status: 400 }
       );
     }
@@ -53,8 +76,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Resend verification email
-export async function POST(request: NextRequest) {
+// Resend verification code
+export async function PUT(request: NextRequest) {
   try {
     const { email } = await request.json();
 
@@ -83,27 +106,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate new verification token
-    const { randomBytes } = await import("crypto");
-    const verificationToken = randomBytes(32).toString("hex");
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    // Generate new 6-digit code
+    const verificationCode = generateVerificationCode();
+    const verificationExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        verificationToken,
+        verificationToken: verificationCode,
         verificationExpires,
       },
     });
 
-    // TODO: Send verification email via SMTP
-    const verificationUrl = `${process.env.NEXTAUTH_URL || "https://staffix.io"}/verify-email?token=${verificationToken}`;
+    // TODO: Send verification email via SMTP with the new code
+    console.log(`[DEV] New verification code for ${email}: ${verificationCode}`);
 
     return NextResponse.json({
-      message: "Письмо с подтверждением отправлено",
+      message: "Новый код отправлен на ваш email",
       success: true,
-      // Remove in production after SMTP is configured
-      verificationUrl: process.env.NODE_ENV === "development" ? verificationUrl : undefined,
+      // Return code only in development for testing
+      verificationCode: process.env.NODE_ENV === "development" ? verificationCode : undefined,
     });
   } catch (error) {
     console.error("Resend verification error:", error);

@@ -1,38 +1,102 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Brain, Loader2, CheckCircle, XCircle, Mail } from "lucide-react";
 
 export default function VerifyEmailPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const token = searchParams.get("token");
   const email = searchParams.get("email");
 
-  const [status, setStatus] = useState<"loading" | "success" | "error" | "waiting">(
-    token ? "loading" : "waiting"
-  );
+  const [code, setCode] = useState(["", "", "", "", "", ""]);
+  const [status, setStatus] = useState<"input" | "loading" | "success" | "error">("input");
   const [message, setMessage] = useState("");
   const [resending, setResending] = useState(false);
 
-  useEffect(() => {
-    if (token) {
-      verifyEmail(token);
-    }
-  }, [token]);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  const verifyEmail = async (verificationToken: string) => {
+  // Focus first input on mount
+  useEffect(() => {
+    if (inputRefs.current[0]) {
+      inputRefs.current[0].focus();
+    }
+  }, []);
+
+  const handleCodeChange = (index: number, value: string) => {
+    // Only allow digits
+    if (value && !/^\d$/.test(value)) return;
+
+    const newCode = [...code];
+    newCode[index] = value;
+    setCode(newCode);
+
+    // Auto-focus next input
+    if (value && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+
+    // Auto-submit when all digits entered
+    if (value && index === 5 && newCode.every(d => d !== "")) {
+      verifyCode(newCode.join(""));
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !code[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData("text").slice(0, 6);
+    if (/^\d+$/.test(pastedData)) {
+      const newCode = [...code];
+      for (let i = 0; i < pastedData.length; i++) {
+        newCode[i] = pastedData[i];
+      }
+      setCode(newCode);
+
+      // Auto-submit if full code pasted
+      if (pastedData.length === 6) {
+        verifyCode(pastedData);
+      } else {
+        inputRefs.current[pastedData.length]?.focus();
+      }
+    }
+  };
+
+  const verifyCode = async (verificationCode: string) => {
+    if (!email) {
+      setMessage("Email не указан");
+      setStatus("error");
+      return;
+    }
+
+    setStatus("loading");
+
     try {
-      const res = await fetch(`/api/auth/verify-email?token=${verificationToken}`);
+      const res = await fetch("/api/auth/verify-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code: verificationCode }),
+      });
       const data = await res.json();
 
       if (res.ok) {
         setStatus("success");
-        setMessage(data.message);
+        setMessage("Email подтверждён! Переход на страницу входа...");
+        setTimeout(() => {
+          router.push("/login");
+        }, 2000);
       } else {
         setStatus("error");
-        setMessage(data.error);
+        setMessage(data.error || "Неверный код");
+        // Reset code on error
+        setCode(["", "", "", "", "", ""]);
+        inputRefs.current[0]?.focus();
       }
     } catch {
       setStatus("error");
@@ -40,20 +104,24 @@ export default function VerifyEmailPage() {
     }
   };
 
-  const resendVerification = async () => {
+  const resendCode = async () => {
     if (!email) return;
     setResending(true);
+    setMessage("");
 
     try {
       const res = await fetch("/api/auth/verify-email", {
-        method: "POST",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
 
       if (res.ok) {
-        setMessage("Письмо отправлено повторно. Проверьте почту.");
+        setMessage("Новый код отправлен на ваш email");
+        setStatus("input");
+        setCode(["", "", "", "", "", ""]);
+        inputRefs.current[0]?.focus();
       } else {
         setMessage(data.error);
       }
@@ -86,7 +154,7 @@ export default function VerifyEmailPage() {
           {status === "loading" && (
             <>
               <Loader2 className="h-16 w-16 animate-spin text-blue-500 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-white mb-2">Проверка...</h2>
+              <h2 className="text-xl font-bold text-white mb-2">Проверка кода...</h2>
               <p className="text-gray-400">Подтверждаем ваш email</p>
             </>
           )}
@@ -96,75 +164,108 @@ export default function VerifyEmailPage() {
               <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
               <h2 className="text-xl font-bold text-white mb-2">Email подтверждён!</h2>
               <p className="text-gray-400 mb-6">{message}</p>
-              <Link
-                href="/login"
-                className="inline-block w-full py-3 px-4 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 transition-all"
-              >
-                Войти в аккаунт
-              </Link>
             </>
           )}
 
           {status === "error" && (
             <>
               <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-white mb-2">Ошибка верификации</h2>
+              <h2 className="text-xl font-bold text-white mb-2">Ошибка</h2>
               <p className="text-gray-400 mb-6">{message}</p>
-              {email && (
-                <button
-                  onClick={resendVerification}
-                  disabled={resending}
-                  className="inline-block w-full py-3 px-4 rounded-xl text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-all disabled:opacity-50"
-                >
-                  {resending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
-                      Отправка...
-                    </>
-                  ) : (
-                    "Отправить письмо повторно"
-                  )}
-                </button>
-              )}
-              <Link
-                href="/login"
-                className="block mt-4 text-blue-400 hover:text-blue-300 text-sm"
+
+              {/* Code input for retry */}
+              <div className="mb-6">
+                <p className="text-sm text-gray-400 mb-4">Введите код ещё раз:</p>
+                <div className="flex justify-center gap-2" onPaste={handlePaste}>
+                  {code.map((digit, index) => (
+                    <input
+                      key={index}
+                      ref={(el) => { inputRefs.current[index] = el; }}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleCodeChange(index, e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(index, e)}
+                      className="w-12 h-14 text-center text-2xl font-bold bg-white/5 border border-white/10 rounded-xl text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={resendCode}
+                disabled={resending}
+                className="inline-block w-full py-3 px-4 rounded-xl text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-all disabled:opacity-50"
               >
-                Вернуться к входу
-              </Link>
+                {resending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                    Отправка...
+                  </>
+                ) : (
+                  "Отправить код повторно"
+                )}
+              </button>
             </>
           )}
 
-          {status === "waiting" && (
+          {status === "input" && (
             <>
               <Mail className="h-16 w-16 text-blue-500 mx-auto mb-4" />
               <h2 className="text-xl font-bold text-white mb-2">Подтвердите email</h2>
-              <p className="text-gray-400 mb-6">
-                Мы отправили письмо с ссылкой для подтверждения на указанный email.
-                Проверьте папку "Входящие" и "Спам".
+              <p className="text-gray-400 mb-2">
+                Мы отправили 6-значный код на
               </p>
               {email && (
-                <button
-                  onClick={resendVerification}
-                  disabled={resending}
-                  className="inline-block w-full py-3 px-4 rounded-xl text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-all disabled:opacity-50"
-                >
-                  {resending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
-                      Отправка...
-                    </>
-                  ) : (
-                    "Отправить письмо повторно"
-                  )}
-                </button>
+                <p className="text-white font-medium mb-6">{email}</p>
               )}
-              <Link
-                href="/login"
-                className="block mt-4 text-blue-400 hover:text-blue-300 text-sm"
+
+              {/* 6-digit code input */}
+              <div className="mb-6">
+                <div className="flex justify-center gap-2" onPaste={handlePaste}>
+                  {code.map((digit, index) => (
+                    <input
+                      key={index}
+                      ref={(el) => { inputRefs.current[index] = el; }}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleCodeChange(index, e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(index, e)}
+                      className="w-12 h-14 text-center text-2xl font-bold bg-white/5 border border-white/10 rounded-xl text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {message && (
+                <p className="text-green-400 text-sm mb-4">{message}</p>
+              )}
+
+              <p className="text-gray-500 text-sm mb-4">
+                Код действителен 15 минут
+              </p>
+
+              <button
+                onClick={resendCode}
+                disabled={resending}
+                className="inline-block w-full py-3 px-4 rounded-xl text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-all disabled:opacity-50"
               >
-                Уже подтвердили? Войти
-              </Link>
+                {resending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                    Отправка...
+                  </>
+                ) : (
+                  "Отправить код повторно"
+                )}
+              </button>
+
+              <p className="mt-4 text-gray-500 text-sm">
+                Проверьте папку &quot;Спам&quot;, если не видите письмо
+              </p>
             </>
           )}
         </div>

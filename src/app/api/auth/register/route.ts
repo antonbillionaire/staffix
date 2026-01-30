@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { randomBytes } from "crypto";
+
+// Generate 6-digit verification code
+function generateVerificationCode(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
 export async function POST(request: Request) {
   try {
@@ -37,9 +41,9 @@ export async function POST(request: Request) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Generate verification token
-    const verificationToken = randomBytes(32).toString("hex");
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    // Generate 6-digit verification code
+    const verificationCode = generateVerificationCode();
+    const verificationExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     // Create user with business and trial subscription
     const user = await prisma.user.create({
@@ -48,7 +52,7 @@ export async function POST(request: Request) {
         email,
         password: hashedPassword,
         emailVerified: false,
-        verificationToken,
+        verificationToken: verificationCode, // Store 6-digit code
         verificationExpires,
         businesses: {
           create: {
@@ -71,16 +75,16 @@ export async function POST(request: Request) {
     // Remove password from response
     const { password: _, verificationToken: __, ...userWithoutPassword } = user;
 
-    // TODO: Send verification email via SMTP
-    // For now, return verification token for testing
-    const verificationUrl = `${process.env.NEXTAUTH_URL || "https://staffix.io"}/verify-email?token=${verificationToken}`;
+    // TODO: Send verification email via SMTP with the 6-digit code
+    // Email template should show: "Ваш код подтверждения: 123456"
+    console.log(`[DEV] Verification code for ${email}: ${verificationCode}`);
 
     return NextResponse.json({
-      message: "Регистрация успешна. Проверьте email для подтверждения.",
+      message: "Регистрация успешна. Введите код подтверждения.",
       user: userWithoutPassword,
       requiresVerification: true,
-      // Remove verificationUrl in production after SMTP is configured
-      verificationUrl: process.env.NODE_ENV === "development" ? verificationUrl : undefined,
+      // Return code only in development for testing
+      verificationCode: process.env.NODE_ENV === "development" ? verificationCode : undefined,
     });
   } catch (error) {
     console.error("Registration error:", error);
