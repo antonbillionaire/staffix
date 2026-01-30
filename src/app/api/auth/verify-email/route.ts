@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sendVerificationEmail } from "@/lib/email";
 
 // Generate 6-digit verification code
 function generateVerificationCode(): string {
@@ -118,14 +119,20 @@ export async function PUT(request: NextRequest) {
       },
     });
 
-    // TODO: Send verification email via SMTP with the new code
-    console.log(`[DEV] New verification code for ${email}: ${verificationCode}`);
+    // Send verification email
+    const emailResult = await sendVerificationEmail(email, verificationCode, user.name);
+
+    if (!emailResult.success) {
+      console.error("Failed to send verification email:", emailResult.error);
+      return NextResponse.json(
+        { error: "Ошибка отправки email. Попробуйте позже." },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       message: "Новый код отправлен на ваш email",
       success: true,
-      // Return code only in development for testing
-      verificationCode: process.env.NODE_ENV === "development" ? verificationCode : undefined,
     });
   } catch (error) {
     console.error("Resend verification error:", error);

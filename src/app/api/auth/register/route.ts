@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sendVerificationEmail } from "@/lib/email";
 import bcrypt from "bcryptjs";
 
 // Generate 6-digit verification code
@@ -75,16 +76,18 @@ export async function POST(request: Request) {
     // Remove password from response
     const { password: _, verificationToken: __, ...userWithoutPassword } = user;
 
-    // TODO: Send verification email via SMTP with the 6-digit code
-    // Email template should show: "Ваш код подтверждения: 123456"
-    console.log(`[DEV] Verification code for ${email}: ${verificationCode}`);
+    // Send verification email
+    const emailResult = await sendVerificationEmail(email, verificationCode, name);
+
+    if (!emailResult.success) {
+      console.error("Failed to send verification email:", emailResult.error);
+      // Still allow registration, user can request resend
+    }
 
     return NextResponse.json({
-      message: "Регистрация успешна. Введите код подтверждения.",
+      message: "Регистрация успешна. Код подтверждения отправлен на email.",
       user: userWithoutPassword,
       requiresVerification: true,
-      // Return code only in development for testing
-      verificationCode: process.env.NODE_ENV === "development" ? verificationCode : undefined,
     });
   } catch (error) {
     console.error("Registration error:", error);
