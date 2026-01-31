@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Disable trailing slash redirect to fix Telegram webhook 307 error
+  skipTrailingSlashRedirect: true,
 };
 
 export default nextConfig;
