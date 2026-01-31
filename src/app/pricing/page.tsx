@@ -11,7 +11,6 @@ import {
   Users,
   Zap,
   Shield,
-  Headphones,
   ArrowLeft,
 } from "lucide-react";
 
@@ -260,19 +259,6 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* FAQ */}
-        <div className="mt-16 text-center">
-          <p className="text-gray-400 mb-4">Остались вопросы?</p>
-          <div className="flex items-center justify-center gap-4">
-            <Link
-              href="/contact"
-              className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors"
-            >
-              <Headphones className="h-5 w-5" />
-              Связаться с нами
-            </Link>
-          </div>
-        </div>
       </main>
     </div>
   );
