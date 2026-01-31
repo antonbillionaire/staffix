@@ -544,7 +544,7 @@ export default function AIEmployeePage() {
           Логотип бота
         </h3>
         <p className="text-gray-400 text-sm mb-4">
-          Загрузите логотип вашего бизнеса для аватара бота (White Label)
+          Загрузите логотип вашего бизнеса для аватара бота
         </p>
 
         <div className="flex items-center gap-6">

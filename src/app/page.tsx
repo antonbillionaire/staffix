@@ -426,6 +426,7 @@ export default function Home() {
                 "Полная аналитика",
                 "Приоритетная поддержка",
                 "Загрузка документов",
+                "Загрузка собственного логотипа",
               ]}
               cta="Выбрать план"
               highlighted={true}
@@ -441,7 +442,7 @@ export default function Home() {
                 "10 AI-сотрудников",
                 "API доступ",
                 "Персональный менеджер",
-                "White-label",
+                "Загрузка собственного логотипа",
               ]}
               cta="Связаться"
               highlighted={false}
@@ -494,9 +495,9 @@ export default function Home() {
               <span className="text-lg font-bold">Staffix</span>
             </div>
             <div className="flex items-center gap-6 text-gray-500 text-sm">
-              <Link href="#" className="hover:text-white transition-colors">Политика конфиденциальности</Link>
-              <Link href="#" className="hover:text-white transition-colors">Условия использования</Link>
-              <Link href="#" className="hover:text-white transition-colors">Контакты</Link>
+              <Link href="/privacy" className="hover:text-white transition-colors">Политика конфиденциальности</Link>
+              <Link href="/terms" className="hover:text-white transition-colors">Условия использования</Link>
+              <Link href="/contacts" className="hover:text-white transition-colors">Контакты</Link>
             </div>
             <p className="text-gray-600 text-sm">
               © 2025 Staffix. Все права защищены.

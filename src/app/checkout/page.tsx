@@ -20,13 +20,13 @@ const plans: Record<string, { name: string; monthlyPrice: number; yearlyPrice: n
     name: "Pro",
     monthlyPrice: 50,
     yearlyPrice: 500,
-    features: ["500 сообщений в месяц", "1 AI-сотрудник", "Полная аналитика", "White Label"],
+    features: ["500 сообщений в месяц", "1 AI-сотрудник", "Полная аналитика", "Загрузка собственного логотипа"],
   },
   "business": {
     name: "Business",
     monthlyPrice: 100,
     yearlyPrice: 1000,
-    features: ["Безлимит сообщений", "2 AI-сотрудника", "Персональный менеджер", "White Label"],
+    features: ["Безлимит сообщений", "2 AI-сотрудника", "Персональный менеджер", "Загрузка собственного логотипа"],
   },
 };
 
