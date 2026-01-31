@@ -39,6 +39,12 @@ export default function MessagesPage() {
   const [sending, setSending] = useState(false);
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const selectedTicketIdRef = useRef<string | null>(null);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    selectedTicketIdRef.current = selectedTicket?.id || null;
+  }, [selectedTicket]);
 
   // Theme-based classes
   const isDark = theme === "dark";
@@ -50,6 +56,9 @@ export default function MessagesPage() {
 
   useEffect(() => {
     fetchTickets();
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchTickets, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -65,7 +74,16 @@ export default function MessagesPage() {
       const res = await fetch("/api/support");
       if (res.ok) {
         const data = await res.json();
-        setTickets(data.tickets || []);
+        const newTickets = data.tickets || [];
+        setTickets(newTickets);
+
+        // Update selected ticket if it exists in new data
+        if (selectedTicketIdRef.current) {
+          const updated = newTickets.find((t: SupportTicket) => t.id === selectedTicketIdRef.current);
+          if (updated) {
+            setSelectedTicket(updated);
+          }
+        }
       }
     } catch (error) {
       console.error("Error fetching tickets:", error);

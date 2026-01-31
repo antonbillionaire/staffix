@@ -95,14 +95,17 @@ export async function POST(request: NextRequest) {
       ticketPriority
     ).catch((err) => console.error("Email notification failed:", err));
 
-    // Telegram notification
+    // Telegram notification with reply instructions
     const priorityEmoji = ticketPriority === "high" ? "🔴" : ticketPriority === "low" ? "🟢" : "🟡";
+    const shortTicketId = ticket.id.slice(-8); // Last 8 chars for easier typing
     sendTelegramNotification(
       `${priorityEmoji} <b>Новое обращение в поддержку</b>\n\n` +
+      `<b>Тикет:</b> <code>${shortTicketId}</code>\n` +
       `<b>От:</b> ${user?.name || "Пользователь"}\n` +
       `<b>Email:</b> ${user?.email || "N/A"}\n` +
       `<b>Тема:</b> ${subject}\n\n` +
-      `<b>Сообщение:</b>\n${message}`
+      `<b>Сообщение:</b>\n${message}\n\n` +
+      `💬 <i>Чтобы ответить:</i>\n<code>/reply ${shortTicketId} Ваш ответ</code>`
     ).catch((err) => console.error("Telegram notification failed:", err));
 
     return NextResponse.json({

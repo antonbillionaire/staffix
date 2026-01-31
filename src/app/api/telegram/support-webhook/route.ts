@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { prisma } from "@/lib/prisma";
 
 // Telegram types
 interface TelegramUpdate {
@@ -101,6 +102,57 @@ async function sendTypingAction(chatId: number): Promise<void> {
     });
   } catch {
     // Ignore errors
+  }
+}
+
+// Handle admin reply to ticket
+async function handleAdminReply(
+  ticketIdShort: string,
+  replyMessage: string,
+  adminChatId: string
+): Promise<string> {
+  try {
+    // Find ticket by short ID (last 8 chars)
+    const tickets = await prisma.supportTicket.findMany({
+      where: {
+        id: { endsWith: ticketIdShort },
+      },
+      include: {
+        user: { select: { email: true, name: true } },
+      },
+    });
+
+    if (tickets.length === 0) {
+      return `❌ Тикет с ID "${ticketIdShort}" не найден.`;
+    }
+
+    if (tickets.length > 1) {
+      return `⚠️ Найдено несколько тикетов. Используйте полный ID.`;
+    }
+
+    const ticket = tickets[0];
+
+    // Save the reply message
+    await prisma.supportMessage.create({
+      data: {
+        content: replyMessage,
+        isFromSupport: true,
+        ticketId: ticket.id,
+      },
+    });
+
+    // Update ticket status to in_progress if it was open
+    if (ticket.status === "open") {
+      await prisma.supportTicket.update({
+        where: { id: ticket.id },
+        data: { status: "in_progress" },
+      });
+    }
+
+    return `✅ Ответ отправлен!\n\n<b>Тикет:</b> ${ticketIdShort}\n<b>Клиент:</b> ${ticket.user.name || ticket.user.email}\n<b>Ваш ответ:</b>\n${replyMessage}`;
+  } catch (error) {
+    console.error("Error handling admin reply:", error);
+    return `❌ Ошибка при сохранении ответа. Попробуйте позже.`;
   }
 }
 
@@ -249,6 +301,57 @@ export async function POST(request: NextRequest) {
         `Ваш запрос передан нашему специалисту. Он свяжется с вами в ближайшее время.\n\n` +
           `Пока ожидаете, вы можете задать мне другие вопросы — возможно, я смогу помочь!`
       );
+      return NextResponse.json({ ok: true });
+    }
+
+    // Handle /reply command (admin only)
+    const adminChatId = process.env.SUPPORT_CHAT_ID;
+    if (userMessage.startsWith("/reply ") && String(chatId) === adminChatId) {
+      // Parse: /reply TICKET_ID message
+      const parts = userMessage.slice(7).trim().split(" ");
+      const ticketIdShort = parts[0];
+      const replyMessage = parts.slice(1).join(" ");
+
+      if (!ticketIdShort || !replyMessage) {
+        await sendTelegramMessage(
+          chatId,
+          `❌ <b>Неверный формат</b>\n\nИспользуйте:\n<code>/reply TICKET_ID Ваш ответ</code>`
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      const result = await handleAdminReply(ticketIdShort, replyMessage, adminChatId);
+      await sendTelegramMessage(chatId, result);
+      return NextResponse.json({ ok: true });
+    }
+
+    // Handle /tickets command (admin only) - show open tickets
+    if (userMessage === "/tickets" && String(chatId) === adminChatId) {
+      try {
+        const openTickets = await prisma.supportTicket.findMany({
+          where: { status: { in: ["open", "in_progress"] } },
+          include: { user: { select: { name: true, email: true } } },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        });
+
+        if (openTickets.length === 0) {
+          await sendTelegramMessage(chatId, "✅ Нет открытых тикетов!");
+        } else {
+          let msg = `📋 <b>Открытые тикеты (${openTickets.length}):</b>\n\n`;
+          for (const t of openTickets) {
+            const shortId = t.id.slice(-8);
+            const status = t.status === "open" ? "🆕" : "⏳";
+            msg += `${status} <code>${shortId}</code> - ${t.subject}\n`;
+            msg += `   👤 ${t.user.name || t.user.email}\n\n`;
+          }
+          msg += `\n💬 Ответить: <code>/reply ID сообщение</code>`;
+          await sendTelegramMessage(chatId, msg);
+        }
+      } catch (error) {
+        console.error("Error fetching tickets:", error);
+        await sendTelegramMessage(chatId, "❌ Ошибка при загрузке тикетов");
+      }
       return NextResponse.json({ ok: true });
     }
 
