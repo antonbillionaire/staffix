@@ -1,4 +1,13 @@
 {
   "buildCommand": "prisma generate && next build",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "trailingSlash": false,
+  "headers": [
+    {
+      "source": "/api/telegram/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    }
+  ]
 }
