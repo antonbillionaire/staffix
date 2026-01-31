@@ -289,18 +289,6 @@ export default function SupportPage() {
             ))}
           </div>
 
-          {/* Contact email */}
-          <div className={`mt-6 p-4 bg-gradient-to-br ${isDark ? 'from-blue-500/10 to-purple-500/10' : 'from-blue-50 to-purple-50'} rounded-xl border ${isDark ? 'border-blue-500/20' : 'border-blue-200'}`}>
-            <p className={`text-sm ${textSecondary}`}>
-              Также вы можете написать нам на email:
-            </p>
-            <a
-              href="mailto:support@staffix.io"
-              className="text-blue-500 hover:text-blue-400 font-medium"
-            >
-              support@staffix.io
-            </a>
-          </div>
         </div>
       </div>
     </div>
