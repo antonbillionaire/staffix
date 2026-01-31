@@ -181,44 +181,62 @@ export async function sendSupportTicketNotification(
   }
 }
 
-// Send Telegram notification
+// Send Telegram notification with retry
 export async function sendTelegramNotification(
   message: string
 ): Promise<{ success: boolean; error?: string }> {
-  try {
-    const botToken = process.env.SUPPORT_BOT_TOKEN;
-    const chatId = process.env.SUPPORT_CHAT_ID;
+  const botToken = process.env.SUPPORT_BOT_TOKEN;
+  const chatId = process.env.SUPPORT_CHAT_ID;
 
-    if (!botToken || !chatId) {
-      console.log("[DEV] Telegram notification - not configured");
-      return { success: true };
-    }
-
-    const response = await fetch(
-      `https://api.telegram.org/bot${botToken}/sendMessage`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: message,
-          parse_mode: "HTML",
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error("Telegram notification error:", error);
-      return { success: false, error };
-    }
-
+  if (!botToken || !chatId) {
+    console.log("[DEV] Telegram notification - not configured");
     return { success: true };
-  } catch (error) {
-    console.error("Telegram notification error:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Ошибка Telegram",
-    };
   }
+
+  // Retry up to 3 times with exponential backoff
+  const maxRetries = 3;
+  let lastError: string = "";
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const response = await fetch(
+        `https://api.telegram.org/bot${botToken}/sendMessage`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: message,
+            parse_mode: "HTML",
+          }),
+          signal: controller.signal,
+        }
+      );
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        console.log(`Telegram notification sent successfully (attempt ${attempt})`);
+        return { success: true };
+      }
+
+      const errorText = await response.text();
+      lastError = errorText;
+      console.error(`Telegram notification error (attempt ${attempt}):`, errorText);
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : "Unknown error";
+      console.error(`Telegram notification failed (attempt ${attempt}):`, error);
+
+      // Wait before retry (exponential backoff: 1s, 2s, 4s)
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
+      }
+    }
+  }
+
+  console.error("Telegram notification failed after all retries");
+  return { success: false, error: lastError };
 }
