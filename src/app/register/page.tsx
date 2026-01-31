@@ -20,6 +20,8 @@ export default function RegisterPage() {
     businessName: "",
   });
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [agreeNewsletter, setAgreeNewsletter] = useState(true);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -244,9 +246,44 @@ export default function RegisterPage() {
               />
             </div>
 
+            {/* Consent checkboxes */}
+            <div className="space-y-3 mt-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={agreeTerms}
+                  onChange={(e) => setAgreeTerms(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-white/20 bg-white/5 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                />
+                <span className="text-sm text-gray-400">
+                  Я принимаю{" "}
+                  <Link href="/terms" className="text-blue-400 hover:text-blue-300">
+                    условия использования
+                  </Link>{" "}
+                  и{" "}
+                  <Link href="/privacy" className="text-blue-400 hover:text-blue-300">
+                    политику конфиденциальности
+                  </Link>
+                  <span className="text-red-400">*</span>
+                </span>
+              </label>
+
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={agreeNewsletter}
+                  onChange={(e) => setAgreeNewsletter(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-white/20 bg-white/5 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                />
+                <span className="text-sm text-gray-400">
+                  Я хочу получать новости и обновления о продукте
+                </span>
+              </label>
+            </div>
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !agreeTerms}
               className="w-full flex justify-center py-3 px-4 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-6"
             >
               {loading ? (
@@ -258,13 +295,6 @@ export default function RegisterPage() {
                 "Создать аккаунт"
               )}
             </button>
-
-            <p className="text-xs text-center text-gray-500">
-              Нажимая кнопку, вы соглашаетесь с{" "}
-              <a href="#" className="text-blue-400 hover:text-blue-300">
-                условиями использования
-              </a>
-            </p>
           </form>
         </div>
       </div>

@@ -29,188 +29,228 @@ export default function TermsOfUsePage() {
 
       {/* Content */}
       <main className="container mx-auto px-4 py-12 max-w-4xl">
-        <h1 className="text-4xl font-bold mb-8">Условия использования</h1>
+        <h1 className="text-4xl font-bold mb-4">Условия использования</h1>
+        <h2 className="text-xl text-blue-400 mb-8">Публичная оферта на оказание услуг</h2>
         <p className="text-gray-400 mb-8">Последнее обновление: 31 января 2025 г.</p>
 
         <div className="prose prose-invert prose-gray max-w-none space-y-8">
-          <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">1. Принятие условий</h2>
+          {/* ВАЖНО: Оферта */}
+          <section className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-6">
+            <h2 className="text-2xl font-semibold text-white mb-4">⚠️ Важная информация</h2>
             <p className="text-gray-300 leading-relaxed">
-              Добро пожаловать в Staffix! Настоящие Условия использования (&quot;Условия&quot;) регулируют
-              ваш доступ и использование сервиса Staffix, доступного по адресу staffix.io (&quot;Сервис&quot;).
+              Настоящий документ является <strong className="text-white">публичной офертой</strong> в соответствии
+              со статьёй 435 и частью 2 статьи 437 Гражданского кодекса.
             </p>
             <p className="text-gray-300 leading-relaxed mt-4">
-              Регистрируясь или используя Сервис, вы подтверждаете, что прочитали, поняли и согласны
-              соблюдать настоящие Условия. Если вы не согласны с какой-либо частью Условий,
-              вы не должны использовать Сервис.
+              <strong className="text-white">Акцептом (принятием) оферты</strong> является:
+            </p>
+            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-2">
+              <li>Регистрация учётной записи на сайте staffix.io</li>
+              <li>Оплата любого тарифного плана</li>
+              <li>Использование Сервиса после регистрации</li>
+            </ul>
+            <p className="text-gray-300 leading-relaxed mt-4">
+              Акцепт оферты означает полное и безоговорочное принятие всех условий настоящего договора.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">2. Описание сервиса</h2>
-            <p className="text-gray-300 leading-relaxed">
-              Staffix предоставляет платформу для создания и управления AI-сотрудниками —
-              виртуальными ассистентами на базе искусственного интеллекта, которые могут:
-            </p>
-            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-4">
-              <li>Отвечать на вопросы клиентов вашего бизнеса</li>
-              <li>Обрабатывать заявки и записи</li>
-              <li>Предоставлять информацию о ваших услугах и товарах</li>
-              <li>Интегрироваться с мессенджерами (Telegram и др.)</li>
-              <li>Собирать аналитику по взаимодействиям с клиентами</li>
+            <h2 className="text-2xl font-semibold text-white mb-4">1. Термины и определения</h2>
+            <ul className="text-gray-300 space-y-3">
+              <li><strong className="text-white">Исполнитель</strong> — Staffix, предоставляющий доступ к Сервису.</li>
+              <li><strong className="text-white">Заказчик (Клиент)</strong> — физическое или юридическое лицо, акцептовавшее оферту.</li>
+              <li><strong className="text-white">Сервис</strong> — платформа staffix.io для создания и управления AI-сотрудниками.</li>
+              <li><strong className="text-white">AI-сотрудник</strong> — виртуальный ассистент на базе искусственного интеллекта.</li>
+              <li><strong className="text-white">Подписка</strong> — оплаченный период доступа к функциям Сервиса.</li>
+              <li><strong className="text-white">Личный кабинет</strong> — защищённый раздел сайта для управления Сервисом.</li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">3. Регистрация и учетная запись</h2>
-            <h3 className="text-xl font-medium text-white mb-3">3.1. Требования к регистрации</h3>
+            <h2 className="text-2xl font-semibold text-white mb-4">2. Предмет договора</h2>
             <p className="text-gray-300 leading-relaxed">
-              Для использования Сервиса вы должны:
+              2.1. Исполнитель обязуется предоставить Заказчику доступ к Сервису Staffix для:
             </p>
             <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-4">
-              <li>Быть старше 18 лет или иметь согласие законного представителя</li>
-              <li>Предоставить достоверную информацию при регистрации</li>
-              <li>Поддерживать актуальность данных учетной записи</li>
+              <li>Создания и настройки AI-сотрудников для бизнеса Заказчика</li>
+              <li>Автоматизации общения с клиентами через мессенджеры</li>
+              <li>Сбора и анализа статистики взаимодействий</li>
+              <li>Интеграции с внешними сервисами (Telegram и др.)</li>
             </ul>
-
-            <h3 className="text-xl font-medium text-white mb-3 mt-6">3.2. Безопасность учетной записи</h3>
-            <p className="text-gray-300 leading-relaxed">
-              Вы несете ответственность за:
+            <p className="text-gray-300 leading-relaxed mt-4">
+              2.2. Заказчик обязуется оплачивать услуги согласно выбранному тарифному плану.
             </p>
-            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-4">
-              <li>Сохранение конфиденциальности пароля</li>
-              <li>Все действия, совершенные под вашей учетной записью</li>
-              <li>Немедленное уведомление нас о несанкционированном доступе</li>
-            </ul>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">4. Тарифы и оплата</h2>
-            <h3 className="text-xl font-medium text-white mb-3">4.1. Тарифные планы</h3>
+            <h2 className="text-2xl font-semibold text-white mb-4">3. Порядок оказания услуг</h2>
             <p className="text-gray-300 leading-relaxed">
-              Сервис предлагает различные тарифные планы, включая бесплатный пробный период.
-              Актуальные цены и условия указаны на странице тарифов.
+              3.1. Для получения доступа к Сервису Заказчик:
             </p>
+            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-2">
+              <li>Регистрирует учётную запись на сайте staffix.io</li>
+              <li>Подтверждает email-адрес</li>
+              <li>Выбирает тарифный план и производит оплату (при необходимости)</li>
+            </ul>
+            <p className="text-gray-300 leading-relaxed mt-4">
+              3.2. Доступ к Сервису предоставляется в течение 5 минут после завершения регистрации
+              или поступления оплаты.
+            </p>
+            <p className="text-gray-300 leading-relaxed mt-4">
+              3.3. Пробный период (14 дней) предоставляется бесплатно и не требует оплаты.
+            </p>
+          </section>
 
-            <h3 className="text-xl font-medium text-white mb-3 mt-6">4.2. Оплата</h3>
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-4">4. Стоимость и порядок оплаты</h2>
+            <p className="text-gray-300 leading-relaxed">
+              4.1. Актуальные тарифы размещены на странице{" "}
+              <Link href="/pricing" className="text-blue-400 hover:text-blue-300">staffix.io/pricing</Link>.
+            </p>
+            <p className="text-gray-300 leading-relaxed mt-4">
+              4.2. Оплата производится:
+            </p>
+            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-2">
+              <li>Банковскими картами (Visa, Mastercard, МИР)</li>
+              <li>Электронными платёжными системами</li>
+              <li>Безналичным переводом для юридических лиц</li>
+            </ul>
+            <p className="text-gray-300 leading-relaxed mt-4">
+              4.3. Подписка продлевается автоматически, если не отменена за 24 часа до окончания периода.
+            </p>
+            <p className="text-gray-300 leading-relaxed mt-4">
+              4.4. Возврат средств возможен в течение 14 дней с момента первой оплаты,
+              если Заказчик не удовлетворён Сервисом.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-4">5. Права и обязанности сторон</h2>
+            <h3 className="text-xl font-medium text-white mb-3">5.1. Исполнитель обязуется:</h3>
             <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4">
-              <li>Оплата производится заранее за выбранный период</li>
-              <li>Цены указаны в долларах США</li>
-              <li>Мы принимаем банковские карты и электронные платежи</li>
-              <li>Счета выставляются автоматически в начале каждого расчетного периода</li>
+              <li>Обеспечивать работоспособность Сервиса 99% времени</li>
+              <li>Обеспечивать безопасность данных Заказчика</li>
+              <li>Оказывать техническую поддержку</li>
+              <li>Уведомлять о плановых технических работах за 24 часа</li>
             </ul>
 
-            <h3 className="text-xl font-medium text-white mb-3 mt-6">4.3. Возврат средств</h3>
-            <p className="text-gray-300 leading-relaxed">
-              Возврат средств возможен в течение 14 дней с момента первой оплаты,
-              если вы не удовлетворены Сервисом. Для оформления возврата свяжитесь с поддержкой.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">5. Правила использования</h2>
-            <h3 className="text-xl font-medium text-white mb-3">5.1. Допустимое использование</h3>
-            <p className="text-gray-300 leading-relaxed">Вы можете использовать Сервис для:</p>
-            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-4">
-              <li>Автоматизации клиентского сервиса вашего бизнеса</li>
-              <li>Обучения AI-сотрудника информации о ваших услугах</li>
-              <li>Интеграции с разрешенными платформами и мессенджерами</li>
+            <h3 className="text-xl font-medium text-white mb-3 mt-6">5.2. Заказчик обязуется:</h3>
+            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4">
+              <li>Своевременно оплачивать выбранный тарифный план</li>
+              <li>Не использовать Сервис для противоправных целей</li>
+              <li>Не распространять вредоносный контент через AI-сотрудника</li>
+              <li>Обеспечивать конфиденциальность данных доступа</li>
             </ul>
 
-            <h3 className="text-xl font-medium text-white mb-3 mt-6">5.2. Запрещенное использование</h3>
-            <p className="text-gray-300 leading-relaxed">Запрещается:</p>
-            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-4">
-              <li>Использовать Сервис для рассылки спама или мошенничества</li>
-              <li>Распространять вредоносный, оскорбительный или незаконный контент</li>
-              <li>Нарушать права интеллектуальной собственности третьих лиц</li>
-              <li>Пытаться получить несанкционированный доступ к системам Сервиса</li>
-              <li>Перепродавать доступ к Сервису без письменного согласия</li>
-              <li>Использовать Сервис для деятельности, нарушающей законодательство</li>
-              <li>Создавать AI-сотрудников, выдающих себя за реальных людей</li>
+            <h3 className="text-xl font-medium text-white mb-3 mt-6">5.3. Заказчик имеет право:</h3>
+            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4">
+              <li>Использовать все функции выбранного тарифного плана</li>
+              <li>Получать техническую поддержку</li>
+              <li>Отменить подписку в любое время</li>
+              <li>Запросить экспорт своих данных</li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">6. Контент и интеллектуальная собственность</h2>
-            <h3 className="text-xl font-medium text-white mb-3">6.1. Ваш контент</h3>
+            <h2 className="text-2xl font-semibold text-white mb-4">6. Ограничение ответственности</h2>
             <p className="text-gray-300 leading-relaxed">
-              Вы сохраняете все права на контент, который загружаете в Сервис (тексты, изображения,
-              документы для обучения AI). Вы предоставляете нам лицензию на использование этого
-              контента исключительно для предоставления Сервиса.
+              6.1. Сервис предоставляется «как есть». Исполнитель не гарантирует:
             </p>
-
-            <h3 className="text-xl font-medium text-white mb-3 mt-6">6.2. Наш контент</h3>
-            <p className="text-gray-300 leading-relaxed">
-              Сервис, включая дизайн, код, торговые марки и другие материалы, является
-              собственностью Staffix и защищен законами об интеллектуальной собственности.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">7. Ограничение ответственности</h2>
-            <p className="text-gray-300 leading-relaxed">
-              Сервис предоставляется &quot;как есть&quot;. Мы не гарантируем:
-            </p>
-            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-4">
+            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-2">
               <li>Бесперебойную работу Сервиса</li>
-              <li>Точность или полноту ответов AI-сотрудника</li>
-              <li>Соответствие Сервиса всем вашим требованиям</li>
+              <li>100% точность ответов AI-сотрудника</li>
+              <li>Достижение конкретных бизнес-результатов</li>
             </ul>
             <p className="text-gray-300 leading-relaxed mt-4">
-              Мы не несем ответственности за:
+              6.2. Исполнитель не несёт ответственности за:
             </p>
-            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-4">
-              <li>Косвенные, случайные или штрафные убытки</li>
-              <li>Потерю данных или прибыли</li>
+            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-2">
+              <li>Косвенные убытки Заказчика</li>
               <li>Действия третьих лиц на основе ответов AI-сотрудника</li>
+              <li>Сбои, вызванные внешними факторами (интернет, API мессенджеров)</li>
             </ul>
             <p className="text-gray-300 leading-relaxed mt-4">
-              Максимальная ответственность ограничивается суммой, уплаченной вами за последние 12 месяцев.
+              6.3. Максимальная ответственность Исполнителя ограничена суммой,
+              уплаченной Заказчиком за последние 3 месяца.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">8. Прекращение использования</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">7. Конфиденциальность и персональные данные</h2>
             <p className="text-gray-300 leading-relaxed">
-              Вы можете прекратить использование Сервиса в любое время, удалив учетную запись.
+              7.1. Обработка персональных данных осуществляется в соответствии с{" "}
+              <Link href="/privacy" className="text-blue-400 hover:text-blue-300">
+                Политикой конфиденциальности
+              </Link>.
             </p>
             <p className="text-gray-300 leading-relaxed mt-4">
-              Мы можем приостановить или прекратить ваш доступ в случае:
+              7.2. Заказчик даёт согласие на получение информационных сообщений от Сервиса.
+              Отписаться можно в настройках личного кабинета.
             </p>
-            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-4">
-              <li>Нарушения настоящих Условий</li>
-              <li>Неоплаты подписки</li>
-              <li>Запроса правоохранительных органов</li>
-              <li>Прекращения деятельности Сервиса</li>
+            <p className="text-gray-300 leading-relaxed mt-4">
+              7.3. Для B2B клиентов доступно{" "}
+              <Link href="/dpa" className="text-blue-400 hover:text-blue-300">
+                Соглашение об обработке данных (DPA)
+              </Link>.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-4">8. Срок действия и расторжение</h2>
+            <p className="text-gray-300 leading-relaxed">
+              8.1. Договор вступает в силу с момента акцепта оферты и действует бессрочно.
+            </p>
+            <p className="text-gray-300 leading-relaxed mt-4">
+              8.2. Заказчик может расторгнуть договор, удалив учётную запись в личном кабинете.
+            </p>
+            <p className="text-gray-300 leading-relaxed mt-4">
+              8.3. Исполнитель может расторгнуть договор в одностороннем порядке в случае:
+            </p>
+            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-2">
+              <li>Нарушения Заказчиком условий договора</li>
+              <li>Использования Сервиса для противоправных целей</li>
+              <li>Неоплаты подписки более 30 дней</li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">9. Изменения условий</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">9. Разрешение споров</h2>
             <p className="text-gray-300 leading-relaxed">
-              Мы можем обновлять эти Условия. При существенных изменениях мы уведомим вас
-              за 30 дней до вступления изменений в силу. Продолжение использования Сервиса
-              означает принятие обновленных Условий.
+              9.1. Все споры решаются путём переговоров.
+            </p>
+            <p className="text-gray-300 leading-relaxed mt-4">
+              9.2. Претензионный порядок обязателен. Срок ответа на претензию — 30 календарных дней.
+            </p>
+            <p className="text-gray-300 leading-relaxed mt-4">
+              9.3. При невозможности урегулирования спор передаётся в компетентный суд.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">10. Применимое право</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">10. Заключительные положения</h2>
             <p className="text-gray-300 leading-relaxed">
-              Настоящие Условия регулируются и толкуются в соответствии с законодательством.
-              Любые споры подлежат разрешению путем переговоров, а при недостижении согласия —
-              в компетентном суде.
+              10.1. Исполнитель вправе изменять условия оферты. Изменения публикуются на сайте
+              и вступают в силу через 30 дней после публикации.
+            </p>
+            <p className="text-gray-300 leading-relaxed mt-4">
+              10.2. Продолжение использования Сервиса после изменений означает согласие с новыми условиями.
+            </p>
+            <p className="text-gray-300 leading-relaxed mt-4">
+              10.3. Недействительность отдельных положений не влечёт недействительности договора в целом.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">11. Контакты</h2>
-            <p className="text-gray-300 leading-relaxed">
-              По вопросам, связанным с настоящими Условиями, обращайтесь:
-            </p>
+            <h2 className="text-2xl font-semibold text-white mb-4">11. Реквизиты Исполнителя</h2>
             <div className="mt-4 p-4 bg-white/5 rounded-xl border border-white/10">
               <p className="text-white font-medium">Staffix</p>
               <p className="text-gray-300 mt-2">
+                Сайт:{" "}
+                <a href="https://staffix.io" className="text-blue-400 hover:text-blue-300">
+                  staffix.io
+                </a>
+              </p>
+              <p className="text-gray-300">
                 Email:{" "}
                 <a href="mailto:support@staffix.io" className="text-blue-400 hover:text-blue-300">
                   support@staffix.io
