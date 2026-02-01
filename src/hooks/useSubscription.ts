@@ -41,6 +41,8 @@ export interface UseSubscriptionResult {
   daysLeft: number;
   isExpired: boolean;
   isTrialPlan: boolean;
+  isTrialExpired: boolean; // Trial plan AND expired
+  needsUpgrade: boolean;   // Show upgrade prompt (trial expired)
 
   // Feature checks
   canUseAutomations: boolean;
@@ -105,6 +107,8 @@ export function useSubscription(): UseSubscriptionResult {
     : 14; // Default 14 days for new trial
   const isExpired = expiresAt ? expiresAt < now : false;
   const isTrialPlan = plan === "trial";
+  const isTrialExpired = isTrialPlan && isExpired;
+  const needsUpgrade = isTrialExpired; // Trial ended, needs to pay
 
   // Helper to check if user has access to a required plan level
   const hasAccess = useCallback((requiredPlan: PlanId): boolean => {
@@ -130,13 +134,15 @@ export function useSubscription(): UseSubscriptionResult {
     daysLeft,
     isExpired,
     isTrialPlan,
+    isTrialExpired,
+    needsUpgrade,
 
-    // Feature checks
-    canUseAutomations: canUseAutomations(plan),
-    canUploadLogo: canUploadLogo(plan),
-    canUploadFiles: canUploadFiles(plan),
-    canExportAnalytics: canExportAnalytics(plan),
-    hasFullAnalytics: hasFullAnalytics(plan),
+    // Feature checks (blocked if trial expired)
+    canUseAutomations: !needsUpgrade && canUseAutomations(plan),
+    canUploadLogo: !needsUpgrade && canUploadLogo(plan),
+    canUploadFiles: !needsUpgrade && canUploadFiles(plan),
+    canExportAnalytics: !needsUpgrade && canExportAnalytics(plan),
+    hasFullAnalytics: !needsUpgrade && hasFullAnalytics(plan),
 
     // Helpers
     hasAccess,

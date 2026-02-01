@@ -39,7 +39,7 @@ interface Stats {
 export default function AutomationPage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const { canUseAutomations, loading: subscriptionLoading } = useSubscription();
+  const { canUseAutomations, needsUpgrade, loading: subscriptionLoading } = useSubscription();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -120,12 +120,15 @@ export default function AutomationPage() {
     );
   }
 
-  // Show upgrade prompt for users without automation access
-  if (!canUseAutomations) {
+  // Show upgrade prompt if trial expired or no access
+  if (!canUseAutomations || needsUpgrade) {
     return (
       <UpgradePrompt
         feature="Автоматизация"
-        description="Автоматические напоминания о записях, сбор отзывов и реактивация клиентов доступны в платных тарифах."
+        description={needsUpgrade
+          ? "Ваш пробный период закончился. Оформите подписку Pro чтобы продолжить использовать автоматизации."
+          : "Автоматические напоминания о записях, сбор отзывов и реактивация клиентов доступны в платных тарифах."
+        }
         requiredPlan="pro"
       />
     );

@@ -29,6 +29,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import ChatWidget from "@/components/ChatWidget";
+import TrialExpiredBanner from "@/components/TrialExpiredBanner";
 import { type PlanId, hasMenuAccess, getPlan } from "@/lib/plans";
 
 interface NavItem {
@@ -47,7 +48,7 @@ const navigation: NavItem[] = [
   { name: "Команда", href: "/dashboard/staff", icon: Users },
   { name: "База знаний", href: "/dashboard/faq", icon: FileText },
   { name: "Записи", href: "/dashboard/bookings", icon: Calendar },
-  { name: "Автоматизация", href: "/dashboard/automation", icon: Zap, requiredPlan: "pro", badge: "Pro" },
+  { name: "Автоматизация", href: "/dashboard/automation", icon: Zap },
   { name: "Сообщения", href: "/dashboard/messages", icon: Mail },
   { name: "Настройки", href: "/dashboard/settings", icon: Settings },
   { name: "Помощь", href: "/dashboard/support", icon: HelpCircle },
@@ -70,6 +71,7 @@ export default function DashboardLayout({
     messagesUsed: 0,
     messagesLimit: 100,
     daysLeft: 14,
+    isExpired: false,
   });
 
   // Theme-based classes
@@ -96,14 +98,18 @@ export default function DashboardLayout({
             setBusinessName(data.business.name);
             if (data.business.subscription) {
               const sub = data.business.subscription;
+              const expiresAt = new Date(sub.expiresAt);
+              const now = new Date();
               const daysLeft = Math.max(0, Math.ceil(
-                (new Date(sub.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+                (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
               ));
+              const isExpired = expiresAt < now;
               setSubscription({
                 plan: sub.plan,
                 messagesUsed: sub.messagesUsed,
                 messagesLimit: sub.messagesLimit,
                 daysLeft,
+                isExpired,
               });
             }
           } else {
@@ -309,6 +315,11 @@ export default function DashboardLayout({
             </h1>
           </div>
         </header>
+
+        {/* Trial expired banner */}
+        {subscription.plan === "trial" && subscription.isExpired && (
+          <TrialExpiredBanner />
+        )}
 
         {/* Low messages warning */}
         {subscription.messagesLimit - subscription.messagesUsed <= 50 && (
