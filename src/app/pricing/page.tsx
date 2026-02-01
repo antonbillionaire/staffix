@@ -13,73 +13,25 @@ import {
   Shield,
   ArrowLeft,
 } from "lucide-react";
+import { PLANS } from "@/lib/plans";
 
 export default function PricingPage() {
   const router = useRouter();
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("monthly");
 
+  // Convert PLANS object to array for rendering
   const plans = [
-    {
-      name: "Пробный",
-      description: "14 дней бесплатно",
-      monthlyPrice: 0,
-      yearlyPrice: 0,
-      features: [
-        "100 сообщений",
-        "1 AI-сотрудник",
-        "Базовая аналитика",
-        "Поддержка через личный кабинет",
-        "Интеграция с Telegram",
-      ],
-      popular: false,
-      cta: "Начать бесплатно",
-      isTrial: true,
-    },
-    {
-      name: "Pro",
-      description: "Для малого и среднего бизнеса",
-      monthlyPrice: 50,
-      yearlyPrice: 480,
-      features: [
-        "500 сообщений в месяц",
-        "1 AI-сотрудник",
-        "Полная аналитика",
-        "Загрузка файлов для обучения",
-        "Приоритетная поддержка (2-4ч)",
-        "Загрузка собственного логотипа",
-        "Интеграция с Telegram",
-      ],
-      popular: true,
-      cta: "Выбрать Pro",
-      isTrial: false,
-    },
-    {
-      name: "Business",
-      description: "Для растущих компаний",
-      monthlyPrice: 100,
-      yearlyPrice: 960,
-      features: [
-        "Безлимит сообщений",
-        "2 AI-сотрудника:",
-        "→ Менеджер по клиентам",
-        "→ Маркетинг-менеджер",
-        "Полная аналитика + экспорт",
-        "Персональный менеджер",
-        "Загрузка собственного логотипа",
-        "Все интеграции",
-      ],
-      popular: false,
-      cta: "Выбрать Business",
-      isTrial: false,
-    },
+    { ...PLANS.trial, cta: "Начать бесплатно" },
+    { ...PLANS.pro, cta: "Выбрать Pro" },
+    { ...PLANS.business, cta: "Выбрать Business" },
   ];
 
-  const handleSelectPlan = (planName: string, isTrial?: boolean) => {
+  const handleSelectPlan = (planId: string, isTrial?: boolean) => {
     if (isTrial) {
       // For trial, go directly to register
       router.push("/register");
     } else {
-      router.push(`/checkout?plan=${planName.toLowerCase()}&billing=${billingPeriod}`);
+      router.push(`/checkout?plan=${planId}&billing=${billingPeriod}`);
     }
   };
 
@@ -198,7 +150,7 @@ export default function PricingPage() {
               </div>
 
               <ul className="space-y-3 mb-8">
-                {plan.features.map((feature, idx) => (
+                {plan.featuresList.map((feature: string, idx: number) => (
                   <li key={idx} className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-green-400 flex-shrink-0" />
                     <span className="text-gray-300 text-sm">{feature}</span>
@@ -207,7 +159,7 @@ export default function PricingPage() {
               </ul>
 
               <button
-                onClick={() => handleSelectPlan(plan.name, plan.isTrial)}
+                onClick={() => handleSelectPlan(plan.id, plan.isTrial)}
                 className={`w-full py-3 rounded-xl font-medium transition-all ${
                   plan.popular
                     ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90"

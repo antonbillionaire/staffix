@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-
-// Plan configurations
-const planConfigs: Record<string, { messagesLimit: number }> = {
-  "стартовый": { messagesLimit: 500 },
-  "бизнес": { messagesLimit: 2000 },
-  "корпоративный": { messagesLimit: 999999 }, // Unlimited
-};
+import { getPlan, type PlanId } from "@/lib/plans";
 
 // GET - Fetch current subscription
 export async function GET() {
@@ -62,13 +56,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const planConfig = planConfigs[plan];
-    if (!planConfig) {
+    // Validate plan ID
+    const validPlans: PlanId[] = ["trial", "pro", "business"];
+    if (!validPlans.includes(plan as PlanId)) {
       return NextResponse.json(
         { error: "Недопустимый тарифный план" },
         { status: 400 }
       );
     }
+
+    const planConfig = getPlan(plan as PlanId);
 
     // Find user's business
     const business = await prisma.business.findFirst({
@@ -95,14 +92,14 @@ export async function POST(request: NextRequest) {
       where: { businessId: business.id },
       update: {
         plan: plan,
-        messagesLimit: planConfig.messagesLimit,
+        messagesLimit: planConfig.features.messagesLimit,
         messagesUsed: 0, // Reset on new subscription
         expiresAt,
       },
       create: {
         businessId: business.id,
         plan: plan,
-        messagesLimit: planConfig.messagesLimit,
+        messagesLimit: planConfig.features.messagesLimit,
         messagesUsed: 0,
         expiresAt,
       },

@@ -25,10 +25,21 @@ import {
   BarChart3,
   AlertTriangle,
   Zap,
+  Lock,
+  type LucideIcon,
 } from "lucide-react";
 import ChatWidget from "@/components/ChatWidget";
+import { type PlanId, hasMenuAccess, getPlan } from "@/lib/plans";
 
-const navigation = [
+interface NavItem {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  requiredPlan?: PlanId;
+  badge?: string;
+}
+
+const navigation: NavItem[] = [
   { name: "Главная", href: "/dashboard", icon: LayoutDashboard },
   { name: "AI-сотрудник", href: "/dashboard/bot", icon: Brain },
   { name: "Статистика", href: "/dashboard/statistics", icon: BarChart3 },
@@ -36,7 +47,7 @@ const navigation = [
   { name: "Команда", href: "/dashboard/staff", icon: Users },
   { name: "База знаний", href: "/dashboard/faq", icon: FileText },
   { name: "Записи", href: "/dashboard/bookings", icon: Calendar },
-  { name: "Автоматизация", href: "/dashboard/automation", icon: Zap },
+  { name: "Автоматизация", href: "/dashboard/automation", icon: Zap, requiredPlan: "pro", badge: "Pro" },
   { name: "Сообщения", href: "/dashboard/messages", icon: Mail },
   { name: "Настройки", href: "/dashboard/settings", icon: Settings },
   { name: "Помощь", href: "/dashboard/support", icon: HelpCircle },
@@ -181,6 +192,31 @@ export default function DashboardLayout({
           {navigation.map((item) => {
             const isActive = pathname === item.href;
             const isMessages = item.href === "/dashboard/messages";
+            const userPlan = subscription.plan as PlanId;
+            const hasAccess = hasMenuAccess(userPlan, item.requiredPlan);
+            const isLocked = !hasAccess;
+
+            // For locked items, show upgrade prompt instead of navigating
+            if (isLocked) {
+              return (
+                <Link
+                  key={item.name}
+                  href="/pricing"
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${textMuted} ${hoverBg} group`}
+                >
+                  <item.icon className="h-5 w-5 opacity-50" />
+                  <span className="opacity-50">{item.name}</span>
+                  {item.badge && (
+                    <span className="ml-auto flex items-center gap-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                      <Lock className="h-3 w-3" />
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              );
+            }
+
             return (
               <Link
                 key={item.name}
@@ -210,8 +246,8 @@ export default function DashboardLayout({
           <div className={`bg-gradient-to-br from-blue-600/20 to-purple-600/20 border ${borderColor} rounded-xl p-4`}>
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="h-4 w-4 text-yellow-400" />
-              <span className={`text-sm font-medium ${textPrimary} capitalize`}>
-                {subscription.plan === 'trial' ? 'Пробный период' : subscription.plan}
+              <span className={`text-sm font-medium ${textPrimary}`}>
+                {getPlan(subscription.plan as PlanId).name}
               </span>
             </div>
 

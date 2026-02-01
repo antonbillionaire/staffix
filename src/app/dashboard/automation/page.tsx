@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useSubscription } from "@/hooks/useSubscription";
+import UpgradePrompt from "@/components/UpgradePrompt";
 import {
   Bell,
   Star,
@@ -13,7 +15,6 @@ import {
   Gift,
   ExternalLink,
   CheckCircle,
-  XCircle,
   Info,
 } from "lucide-react";
 
@@ -38,6 +39,7 @@ interface Stats {
 export default function AutomationPage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const { canUseAutomations, loading: subscriptionLoading } = useSubscription();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -110,11 +112,22 @@ export default function AutomationPage() {
     }
   };
 
-  if (loading) {
+  if (loading || subscriptionLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
       </div>
+    );
+  }
+
+  // Show upgrade prompt for users without automation access
+  if (!canUseAutomations) {
+    return (
+      <UpgradePrompt
+        feature="Автоматизация"
+        description="Автоматические напоминания о записях, сбор отзывов и реактивация клиентов доступны в платных тарифах."
+        requiredPlan="pro"
+      />
     );
   }
 

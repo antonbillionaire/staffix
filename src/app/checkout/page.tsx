@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -14,30 +14,16 @@ import {
   Lock,
   AlertCircle,
 } from "lucide-react";
-
-const plans: Record<string, { name: string; monthlyPrice: number; yearlyPrice: number; features: string[] }> = {
-  "pro": {
-    name: "Pro",
-    monthlyPrice: 50,
-    yearlyPrice: 500,
-    features: ["500 сообщений в месяц", "1 AI-сотрудник", "Полная аналитика", "Загрузка собственного логотипа"],
-  },
-  "business": {
-    name: "Business",
-    monthlyPrice: 100,
-    yearlyPrice: 1000,
-    features: ["Безлимит сообщений", "2 AI-сотрудника", "Персональный менеджер", "Загрузка собственного логотипа"],
-  },
-};
+import { PLANS, type PlanId } from "@/lib/plans";
 
 function CheckoutContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const planKey = searchParams.get("plan") || "стартовый";
+  const planKey = (searchParams.get("plan") || "pro") as PlanId;
   const billing = searchParams.get("billing") || "monthly";
 
-  const plan = plans[planKey] || plans["стартовый"];
+  const plan = PLANS[planKey] || PLANS.pro;
   const price = billing === "yearly" ? plan.yearlyPrice : plan.monthlyPrice;
   const monthlyEquivalent = billing === "yearly" ? Math.round(plan.yearlyPrice / 12) : plan.monthlyPrice;
 
@@ -168,7 +154,7 @@ function CheckoutContent() {
               <div className="border-t border-white/10 pt-4">
                 <p className="text-sm text-gray-400 mb-3">Включено:</p>
                 <ul className="space-y-2">
-                  {plan.features.map((feature, idx) => (
+                  {plan.featuresList.map((feature: string, idx: number) => (
                     <li key={idx} className="flex items-center gap-2 text-sm text-gray-300">
                       <Check className="h-4 w-4 text-green-400" />
                       {feature}
