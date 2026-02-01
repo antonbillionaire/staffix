@@ -24,6 +24,7 @@ import {
   Mail,
   BarChart3,
   AlertTriangle,
+  Zap,
 } from "lucide-react";
 import ChatWidget from "@/components/ChatWidget";
 
@@ -35,6 +36,7 @@ const navigation = [
   { name: "Команда", href: "/dashboard/staff", icon: Users },
   { name: "База знаний", href: "/dashboard/faq", icon: FileText },
   { name: "Записи", href: "/dashboard/bookings", icon: Calendar },
+  { name: "Автоматизация", href: "/dashboard/automation", icon: Zap },
   { name: "Сообщения", href: "/dashboard/messages", icon: Mail },
   { name: "Настройки", href: "/dashboard/settings", icon: Settings },
   { name: "Помощь", href: "/dashboard/support", icon: HelpCircle },

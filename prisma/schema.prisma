@@ -75,6 +75,12 @@ model Business {
   conversations Conversation[]
   subscription  Subscription?
   documents     Document[]
+
+  // Автоматизации
+  automationSettings AutomationSettings?
+  scheduledReminders ScheduledReminder[]
+  reviews            Review[]
+  clients            Client[]
 }
 
 // Услуги
@@ -122,6 +128,11 @@ model Booking {
   date          DateTime
   status        String    @default("pending") // pending, confirmed, cancelled, completed
 
+  // Флаги напоминаний
+  reminder24hSent Boolean @default(false)
+  reminder2hSent  Boolean @default(false)
+  reviewRequested Boolean @default(false)
+
   businessId    String
   business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
@@ -130,6 +141,10 @@ model Booking {
 
   staffId       String?
   staff         Staff?    @relation(fields: [staffId], references: [id])
+
+  // Автоматизации
+  reminders     ScheduledReminder[]
+  reviews       Review[]
 
   createdAt     DateTime  @default(now())
 }
@@ -223,4 +238,119 @@ model SupportMessage {
   ticket        SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
   createdAt     DateTime  @default(now())
+}
+
+// ========================================
+// АВТОМАТИЗАЦИИ
+// ========================================
+
+// Настройки автоматизаций для бизнеса
+model AutomationSettings {
+  id                    String    @id @default(cuid())
+
+  // Напоминания о записи
+  reminder24hEnabled    Boolean   @default(true)
+  reminder2hEnabled     Boolean   @default(true)
+
+  // Сбор отзывов
+  reviewEnabled         Boolean   @default(true)
+  reviewDelayHours      Int       @default(2)    // через сколько часов после визита
+  reviewGoogleLink      String?                  // ссылка на Google отзывы
+  review2gisLink        String?                  // ссылка на 2GIS отзывы
+
+  // Реактивация клиентов
+  reactivationEnabled   Boolean   @default(true)
+  reactivationDays      Int       @default(30)   // через сколько дней без визита
+  reactivationDiscount  Int       @default(10)   // размер скидки %
+
+  businessId            String    @unique
+  business              Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+// Запланированные напоминания
+model ScheduledReminder {
+  id              String    @id @default(cuid())
+
+  type            String    // reminder_24h, reminder_2h, review, reactivation
+  status          String    @default("pending") // pending, sent, failed, cancelled
+
+  scheduledFor    DateTime  // когда отправить
+  sentAt          DateTime? // когда отправлено
+
+  // Данные для отправки
+  clientTelegramId BigInt
+  clientName      String?
+  serviceName     String?
+  appointmentDate DateTime?
+
+  // Для реактивации
+  lastVisitDate   DateTime?
+  discountCode    String?
+
+  bookingId       String?
+  booking         Booking?  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  businessId      String
+  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime  @default(now())
+
+  @@index([status, scheduledFor])
+  @@index([businessId, type])
+}
+
+// Отзывы клиентов
+model Review {
+  id              String    @id @default(cuid())
+
+  rating          Int       // 1-5
+  comment         String?
+
+  clientTelegramId BigInt
+  clientName      String?
+
+  // Связь с записью
+  bookingId       String?
+  booking         Booking?  @relation(fields: [bookingId], references: [id])
+
+  // Статус
+  isPublic        Boolean   @default(false)   // опубликован ли
+  responded       Boolean   @default(false)   // ответил ли бизнес
+  responseText    String?                     // ответ бизнеса
+
+  businessId      String
+  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime  @default(now())
+
+  @@index([businessId, rating])
+}
+
+// Клиенты (для отслеживания последнего визита)
+model Client {
+  id                String    @id @default(cuid())
+
+  telegramId        BigInt
+  name              String?
+  phone             String?
+
+  // Статус
+  lastVisitDate     DateTime?
+  totalVisits       Int       @default(0)
+  isBlocked         Boolean   @default(false)  // отписался от рассылок
+
+  // Последняя реактивация
+  lastReactivationSent DateTime?
+
+  businessId        String
+  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([businessId, telegramId])
+  @@index([businessId, lastVisitDate])
 }
