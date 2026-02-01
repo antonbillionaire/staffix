@@ -217,7 +217,7 @@ model SupportTicket {
   id            String    @id @default(cuid())
   subject       String
   priority      String    @default("normal") // low, normal, high
-  status        String    @default("open")   // open, in_progress, closed
+  status        String    @default("open")   // open, in_progress, resolved, closed
 
   userId        String
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -233,6 +233,8 @@ model SupportMessage {
   id            String    @id @default(cuid())
   content       String
   isFromSupport Boolean   @default(false) // true = от поддержки, false = от пользователя
+  isRead        Boolean   @default(false) // прочитано ли пользователем
+  readAt        DateTime?                 // когда прочитано
 
   ticketId      String
   ticket        SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)

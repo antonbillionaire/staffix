@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
 import {
   Mail,
@@ -9,15 +9,17 @@ import {
   MessageSquare,
   Clock,
   ChevronLeft,
-  AlertCircle,
   CheckCircle,
   Circle,
+  CheckCheck,
+  RotateCcw,
 } from "lucide-react";
 
 interface SupportMessage {
   id: string;
   content: string;
   isFromSupport: boolean;
+  isRead?: boolean;
   createdAt: string;
 }
 
@@ -37,6 +39,7 @@ export default function MessagesPage() {
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [resolving, setResolving] = useState(false);
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const selectedTicketIdRef = useRef<string | null>(null);
@@ -54,22 +57,7 @@ export default function MessagesPage() {
   const textSecondary = isDark ? "text-gray-400" : "text-gray-600";
   const inputBg = isDark ? "bg-white/5" : "bg-gray-50";
 
-  useEffect(() => {
-    fetchTickets();
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchTickets, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [selectedTicket?.messages]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const fetchTickets = async () => {
+  const fetchTickets = useCallback(async () => {
     try {
       const res = await fetch("/api/support");
       if (res.ok) {
@@ -90,6 +78,43 @@ export default function MessagesPage() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetchTickets();
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchTickets, 30000);
+    return () => clearInterval(interval);
+  }, [fetchTickets]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [selectedTicket?.messages]);
+
+  // Mark messages as read when selecting a ticket
+  const selectTicket = async (ticket: SupportTicket) => {
+    setSelectedTicket(ticket);
+
+    // Check if there are unread messages from support
+    const hasUnread = ticket.messages.some(m => m.isFromSupport && !m.isRead);
+
+    if (hasUnread) {
+      try {
+        await fetch(`/api/support/${ticket.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "markAsRead" }),
+        });
+        // Refresh to update unread count in sidebar
+        fetchTickets();
+      } catch (error) {
+        console.error("Error marking as read:", error);
+      }
+    }
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -110,6 +135,7 @@ export default function MessagesPage() {
         setSelectedTicket({
           ...selectedTicket,
           messages: [...selectedTicket.messages, data.message],
+          status: selectedTicket.status === "resolved" ? "open" : selectedTicket.status,
         });
         setNewMessage("");
         // Refresh tickets list
@@ -119,6 +145,56 @@ export default function MessagesPage() {
       console.error("Error sending message:", error);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleResolveTicket = async () => {
+    if (!selectedTicket) return;
+
+    setResolving(true);
+    try {
+      const res = await fetch(`/api/support/${selectedTicket.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "resolve" }),
+      });
+
+      if (res.ok) {
+        setSelectedTicket({
+          ...selectedTicket,
+          status: "resolved",
+        });
+        fetchTickets();
+      }
+    } catch (error) {
+      console.error("Error resolving ticket:", error);
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  const handleReopenTicket = async () => {
+    if (!selectedTicket) return;
+
+    setResolving(true);
+    try {
+      const res = await fetch(`/api/support/${selectedTicket.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reopen" }),
+      });
+
+      if (res.ok) {
+        setSelectedTicket({
+          ...selectedTicket,
+          status: "open",
+        });
+        fetchTickets();
+      }
+    } catch (error) {
+      console.error("Error reopening ticket:", error);
+    } finally {
+      setResolving(false);
     }
   };
 
@@ -141,7 +217,9 @@ export default function MessagesPage() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "closed":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-gray-500" />;
+      case "resolved":
+        return <CheckCheck className="h-4 w-4 text-green-500" />;
       case "in_progress":
         return <Clock className="h-4 w-4 text-yellow-500" />;
       default:
@@ -153,11 +231,18 @@ export default function MessagesPage() {
     switch (status) {
       case "closed":
         return "Закрыт";
+      case "resolved":
+        return "Решён";
       case "in_progress":
         return "В работе";
       default:
         return "Открыт";
     }
+  };
+
+  // Check if ticket has unread messages from support
+  const hasUnreadMessages = (ticket: SupportTicket) => {
+    return ticket.messages.some(m => m.isFromSupport && !m.isRead);
   };
 
   if (loading) {
@@ -197,12 +282,12 @@ export default function MessagesPage() {
               ) : (
                 tickets.map((ticket) => {
                   const lastMessage = ticket.messages[ticket.messages.length - 1];
-                  const hasUnread = lastMessage?.isFromSupport;
+                  const unread = hasUnreadMessages(ticket);
 
                   return (
                     <button
                       key={ticket.id}
-                      onClick={() => setSelectedTicket(ticket)}
+                      onClick={() => selectTicket(ticket)}
                       className={`w-full p-4 text-left border-b ${borderColor} hover:${isDark ? 'bg-white/5' : 'bg-gray-50'} transition-colors ${
                         selectedTicket?.id === ticket.id ? (isDark ? 'bg-white/10' : 'bg-blue-50') : ''
                       }`}
@@ -210,7 +295,7 @@ export default function MessagesPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            {hasUnread && (
+                            {unread && (
                               <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />
                             )}
                             <p className={`font-medium ${textPrimary} truncate`}>
@@ -256,6 +341,37 @@ export default function MessagesPage() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Resolve/Reopen button */}
+                  {selectedTicket.status !== "closed" && (
+                    selectedTicket.status === "resolved" ? (
+                      <button
+                        onClick={handleReopenTicket}
+                        disabled={resolving}
+                        className={`px-3 py-1.5 text-sm rounded-lg border ${borderColor} ${textSecondary} hover:${isDark ? 'bg-white/5' : 'bg-gray-50'} transition-colors flex items-center gap-1.5`}
+                      >
+                        {resolving ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-4 w-4" />
+                        )}
+                        Переоткрыть
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleResolveTicket}
+                        disabled={resolving}
+                        className="px-3 py-1.5 text-sm rounded-lg bg-green-500/10 text-green-500 hover:bg-green-500/20 transition-colors flex items-center gap-1.5"
+                      >
+                        {resolving ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCheck className="h-4 w-4" />
+                        )}
+                        Проблема решена
+                      </button>
+                    )
+                  )}
                 </div>
 
                 {/* Messages */}
@@ -280,22 +396,64 @@ export default function MessagesPage() {
                         <p className={`text-sm ${message.isFromSupport ? textPrimary : 'text-white'} whitespace-pre-wrap`}>
                           {message.content}
                         </p>
-                        <p className={`text-xs mt-1 ${message.isFromSupport ? textSecondary : 'text-white/70'}`}>
-                          {new Date(message.createdAt).toLocaleString("ru", {
-                            day: "numeric",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
+                        <div className={`flex items-center gap-1 mt-1`}>
+                          <span className={`text-xs ${message.isFromSupport ? textSecondary : 'text-white/70'}`}>
+                            {new Date(message.createdAt).toLocaleString("ru", {
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                          {/* Show read status for user messages */}
+                          {!message.isFromSupport && (
+                            <CheckCheck className={`h-3.5 w-3.5 text-white/70`} />
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input */}
-                {selectedTicket.status !== "closed" && (
+                {/* Input or status message */}
+                {selectedTicket.status === "closed" ? (
+                  <div className={`p-4 border-t ${borderColor} text-center`}>
+                    <p className={`text-sm ${textSecondary}`}>
+                      Этот тикет закрыт администратором. Создайте новое обращение если вопрос не решён.
+                    </p>
+                  </div>
+                ) : selectedTicket.status === "resolved" ? (
+                  <div className={`p-4 border-t ${borderColor}`}>
+                    <div className={`p-3 rounded-lg ${isDark ? 'bg-green-500/10' : 'bg-green-50'} text-center`}>
+                      <p className="text-sm text-green-600">
+                        Вы отметили проблему как решённую. Если вопрос снова возник — напишите сообщение.
+                      </p>
+                    </div>
+                    <form onSubmit={handleSendMessage} className="mt-3">
+                      <div className="flex gap-3">
+                        <input
+                          type="text"
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          placeholder="Написать снова..."
+                          className={`flex-1 px-4 py-3 ${inputBg} border ${borderColor} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        />
+                        <button
+                          type="submit"
+                          disabled={sending || !newMessage.trim()}
+                          className="px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                          {sending ? (
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          ) : (
+                            <Send className="h-5 w-5" />
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                ) : (
                   <form onSubmit={handleSendMessage} className={`p-4 border-t ${borderColor}`}>
                     <div className="flex gap-3">
                       <input
@@ -318,14 +476,6 @@ export default function MessagesPage() {
                       </button>
                     </div>
                   </form>
-                )}
-
-                {selectedTicket.status === "closed" && (
-                  <div className={`p-4 border-t ${borderColor} text-center`}>
-                    <p className={`text-sm ${textSecondary}`}>
-                      Этот тикет закрыт. Создайте новое обращение если вопрос не решён.
-                    </p>
-                  </div>
                 )}
               </>
             ) : (
