@@ -1,25 +1,20 @@
 // Unified plan configuration for Staffix
 // This is the single source of truth for all plan-related data
 
-export type PlanId = "trial" | "pro" | "business";
+export type PlanId = "trial" | "starter" | "pro" | "business" | "enterprise";
 
 export interface PlanFeatures {
   // Limits
   messagesLimit: number;
   aiEmployeesLimit: number;
 
-  // Features
-  basicAnalytics: boolean;
-  fullAnalytics: boolean;
-  exportAnalytics: boolean;
+  // All plans have same features
+  analytics: boolean;
   customLogo: boolean;
   fileUpload: boolean;
   automations: boolean;
-  prioritySupport: boolean;
-  personalManager: boolean;
-
-  // Support response time
-  supportResponseHours: number | null; // null = standard (24-48h)
+  crm: boolean;
+  broadcasts: boolean;
 }
 
 export interface Plan {
@@ -34,65 +29,94 @@ export interface Plan {
   isTrial?: boolean;
 }
 
+// Message pack add-ons
+export interface MessagePack {
+  id: string;
+  name: string;
+  messages: number;
+  price: number;
+  pricePerMessage: number;
+}
+
+export const MESSAGE_PACKS: MessagePack[] = [
+  { id: "pack_100", name: "+100 сообщений", messages: 100, price: 5, pricePerMessage: 0.05 },
+  { id: "pack_500", name: "+500 сообщений", messages: 500, price: 20, pricePerMessage: 0.04 },
+  { id: "pack_1000", name: "+1000 сообщений", messages: 1000, price: 35, pricePerMessage: 0.035 },
+];
+
+// All features available to all plans
+const ALL_FEATURES: PlanFeatures = {
+  messagesLimit: 0, // Will be overwritten per plan
+  aiEmployeesLimit: 1,
+  analytics: true,
+  customLogo: true,
+  fileUpload: true,
+  automations: true,
+  crm: true,
+  broadcasts: true,
+};
+
 export const PLANS: Record<PlanId, Plan> = {
   trial: {
     id: "trial",
     name: "Пробный",
-    description: "14 дней бесплатно — все функции Pro",
+    description: "14 дней бесплатно — все функции",
     monthlyPrice: 0,
     yearlyPrice: 0,
     features: {
-      // Trial = все функции Pro на 14 дней
-      messagesLimit: 500,
-      aiEmployeesLimit: 1,
-      basicAnalytics: true,
-      fullAnalytics: true,
-      exportAnalytics: false,
-      customLogo: true,
-      fileUpload: true,
-      automations: true,
-      prioritySupport: false,
-      personalManager: false,
-      supportResponseHours: null,
+      ...ALL_FEATURES,
+      messagesLimit: 200,
     },
     featuresList: [
       "14 дней бесплатно",
-      "Все функции Pro плана",
-      "500 сообщений",
-      "Полная аналитика",
+      "200 сообщений",
+      "Все функции платных планов",
+      "CRM и рассылки",
       "Автоматизации",
-      "Загрузка файлов",
+      "Аналитика",
     ],
     isTrial: true,
+  },
+  starter: {
+    id: "starter",
+    name: "Starter",
+    description: "Для начинающих бизнесов",
+    monthlyPrice: 25,
+    yearlyPrice: 240, // 20% discount
+    features: {
+      ...ALL_FEATURES,
+      messagesLimit: 200,
+    },
+    featuresList: [
+      "200 сообщений в месяц",
+      "1 AI-сотрудник",
+      "Полная аналитика",
+      "CRM клиентов",
+      "Рассылки в Telegram",
+      "Автоматизации",
+      "Загрузка файлов",
+      "Свой логотип",
+    ],
   },
   pro: {
     id: "pro",
     name: "Pro",
     description: "Для малого и среднего бизнеса",
     monthlyPrice: 50,
-    yearlyPrice: 480,
+    yearlyPrice: 480, // 20% discount
     features: {
-      messagesLimit: 500,
-      aiEmployeesLimit: 1,
-      basicAnalytics: true,
-      fullAnalytics: true,
-      exportAnalytics: false,
-      customLogo: true,
-      fileUpload: true,
-      automations: true,
-      prioritySupport: true,
-      personalManager: false,
-      supportResponseHours: 4,
+      ...ALL_FEATURES,
+      messagesLimit: 1000,
     },
     featuresList: [
-      "500 сообщений в месяц",
+      "1 000 сообщений в месяц",
       "1 AI-сотрудник",
       "Полная аналитика",
-      "Загрузка файлов для обучения",
-      "Приоритетная поддержка (2-4ч)",
-      "Загрузка собственного логотипа",
-      "Автоматизации (напоминания, отзывы)",
-      "Интеграция с Telegram",
+      "CRM клиентов",
+      "Рассылки в Telegram",
+      "Автоматизации",
+      "Загрузка файлов",
+      "Свой логотип",
     ],
     popular: true,
   },
@@ -101,29 +125,41 @@ export const PLANS: Record<PlanId, Plan> = {
     name: "Business",
     description: "Для растущих компаний",
     monthlyPrice: 100,
-    yearlyPrice: 960,
+    yearlyPrice: 960, // 20% discount
     features: {
+      ...ALL_FEATURES,
+      messagesLimit: 3000,
+    },
+    featuresList: [
+      "3 000 сообщений в месяц",
+      "1 AI-сотрудник",
+      "Полная аналитика",
+      "CRM клиентов",
+      "Рассылки в Telegram",
+      "Автоматизации",
+      "Загрузка файлов",
+      "Свой логотип",
+    ],
+  },
+  enterprise: {
+    id: "enterprise",
+    name: "Enterprise",
+    description: "Для крупного бизнеса и сетей",
+    monthlyPrice: 200,
+    yearlyPrice: 1920, // 20% discount
+    features: {
+      ...ALL_FEATURES,
       messagesLimit: 999999, // Unlimited
-      aiEmployeesLimit: 2,
-      basicAnalytics: true,
-      fullAnalytics: true,
-      exportAnalytics: true,
-      customLogo: true,
-      fileUpload: true,
-      automations: true,
-      prioritySupport: true,
-      personalManager: true,
-      supportResponseHours: 2,
     },
     featuresList: [
       "Безлимит сообщений",
-      "2 AI-сотрудника",
-      "Полная аналитика + экспорт",
-      "Персональный менеджер",
-      "Приоритетная поддержка (до 2ч)",
-      "Загрузка собственного логотипа",
-      "Все автоматизации",
-      "Все интеграции",
+      "1 AI-сотрудник",
+      "Полная аналитика",
+      "CRM клиентов",
+      "Рассылки в Telegram",
+      "Автоматизации",
+      "Загрузка файлов",
+      "Свой логотип",
     ],
   },
 };
@@ -137,76 +173,37 @@ export function getPlanFeatures(planId: string): PlanFeatures {
   return getPlan(planId).features;
 }
 
-export function isFeatureAvailable(planId: string, feature: keyof PlanFeatures): boolean {
-  const features = getPlanFeatures(planId);
-  return !!features[feature];
-}
-
 export function getMessagesLimit(planId: string): number {
   return getPlanFeatures(planId).messagesLimit;
 }
 
-// Feature check helpers for specific features
-export function canUseAutomations(planId: string): boolean {
-  return isFeatureAvailable(planId, "automations");
+export function isUnlimited(planId: string): boolean {
+  return getMessagesLimit(planId) >= 999999;
 }
 
-export function canUploadLogo(planId: string): boolean {
-  return isFeatureAvailable(planId, "customLogo");
+// All plans have the same features, only difference is message limits
+export function hasMenuAccess(_userPlan: PlanId, _requiredPlan?: PlanId): boolean {
+  // All plans have access to all features
+  return true;
 }
 
-export function canUploadFiles(planId: string): boolean {
-  return isFeatureAvailable(planId, "fileUpload");
+// For backwards compatibility - all plans have all features
+export function canUseAutomations(_planId: string): boolean {
+  return true;
 }
 
-export function canExportAnalytics(planId: string): boolean {
-  return isFeatureAvailable(planId, "exportAnalytics");
+export function canUploadLogo(_planId: string): boolean {
+  return true;
 }
 
-export function hasFullAnalytics(planId: string): boolean {
-  return isFeatureAvailable(planId, "fullAnalytics");
+export function canUploadFiles(_planId: string): boolean {
+  return true;
 }
 
-// Dashboard menu items configuration
-export interface MenuItem {
-  name: string;
-  href: string;
-  icon: string; // Icon name from lucide-react
-  requiredPlan?: PlanId; // Minimum plan required, undefined = available to all
-  badge?: string; // Optional badge text like "Pro"
+export function canExportAnalytics(_planId: string): boolean {
+  return true;
 }
 
-export const DASHBOARD_MENU: MenuItem[] = [
-  { name: "Главная", href: "/dashboard", icon: "LayoutDashboard" },
-  { name: "AI-сотрудник", href: "/dashboard/bot", icon: "Brain" },
-  { name: "Статистика", href: "/dashboard/statistics", icon: "BarChart3" },
-  { name: "Услуги", href: "/dashboard/services", icon: "Scissors" },
-  { name: "Команда", href: "/dashboard/staff", icon: "Users" },
-  { name: "База знаний", href: "/dashboard/faq", icon: "FileText" },
-  { name: "Записи", href: "/dashboard/bookings", icon: "Calendar" },
-  { name: "Автоматизация", href: "/dashboard/automation", icon: "Zap", requiredPlan: "pro", badge: "Pro" },
-  { name: "Сообщения", href: "/dashboard/messages", icon: "Mail" },
-  { name: "Настройки", href: "/dashboard/settings", icon: "Settings" },
-  { name: "Помощь", href: "/dashboard/support", icon: "HelpCircle" },
-];
-
-// Check if user has access to a menu item
-export function hasMenuAccess(userPlan: PlanId, requiredPlan?: PlanId): boolean {
-  if (!requiredPlan) return true;
-
-  const planOrder: PlanId[] = ["trial", "pro", "business"];
-  const userPlanIndex = planOrder.indexOf(userPlan);
-  const requiredPlanIndex = planOrder.indexOf(requiredPlan);
-
-  return userPlanIndex >= requiredPlanIndex;
-}
-
-// Get available menu items for a user's plan
-export function getAvailableMenuItems(userPlan: PlanId): MenuItem[] {
-  return DASHBOARD_MENU.filter(item => hasMenuAccess(userPlan, item.requiredPlan));
-}
-
-// Get locked menu items for upgrade prompts
-export function getLockedMenuItems(userPlan: PlanId): MenuItem[] {
-  return DASHBOARD_MENU.filter(item => !hasMenuAccess(userPlan, item.requiredPlan));
+export function hasFullAnalytics(_planId: string): boolean {
+  return true;
 }
