@@ -36,7 +36,6 @@ interface UserDetail {
   business: {
     id: string;
     name: string;
-    description: string | null;
     phone: string | null;
     address: string | null;
     botActive: boolean;
@@ -273,9 +272,6 @@ export default function AdminUserDetailPage({
               <div className="space-y-4">
                 <div>
                   <p className="text-xl font-bold text-white">{business.name}</p>
-                  {business.description && (
-                    <p className="text-gray-400 mt-1">{business.description}</p>
-                  )}
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

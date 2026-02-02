@@ -112,7 +112,6 @@ export async function GET(
         ? {
             id: business.id,
             name: business.name,
-            description: business.description,
             phone: business.phone,
             address: business.address,
             botActive: business.botActive,
