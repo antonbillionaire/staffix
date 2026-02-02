@@ -30,7 +30,6 @@ interface UserDetail {
     id: string;
     email: string;
     name: string;
-    image: string | null;
     createdAt: string;
     emailVerified: boolean;
   };
