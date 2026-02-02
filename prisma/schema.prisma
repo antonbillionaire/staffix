@@ -356,3 +356,119 @@ model Client {
   @@unique([businessId, telegramId])
   @@index([businessId, lastVisitDate])
 }
+
+// ========================================
+// ADMIN CRM - АВТОМАТИЗАЦИИ И РАССЫЛКИ
+// ========================================
+
+// Автоматизации для админа (триггеры + действия)
+model AdminAutomation {
+  id              String    @id @default(cuid())
+  name            String
+  description     String?
+
+  // Триггер
+  trigger         String    // trial_expiring, trial_expired, messages_low, etc.
+  triggerParams   Json      @default("{}")
+
+  // Действие
+  action          String    // send_email, send_telegram, extend_trial, etc.
+  actionParams    Json      @default("{}")
+
+  isActive        Boolean   @default(true)
+
+  executions      AutomationExecution[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// Логи выполнения автоматизаций
+model AutomationExecution {
+  id              String    @id @default(cuid())
+
+  automationId    String
+  automation      AdminAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  // Для кого сработало
+  userId          String?
+  userEmail       String?
+
+  // Результат
+  success         Boolean
+  error           String?
+  details         Json      @default("{}")
+
+  createdAt       DateTime  @default(now())
+
+  @@index([automationId, createdAt])
+}
+
+// Рассылки от админа
+model Broadcast {
+  id              String    @id @default(cuid())
+  name            String
+
+  // Контент
+  subject         String?   // для email
+  content         String    // текст сообщения
+
+  // Канал
+  channel         String    // email, telegram, in_app
+
+  // Фильтры получателей
+  targetPlan      String?   // all, trial, pro, business
+  targetStatus    String?   // all, active, expired, expiring
+
+  // Статус
+  status          String    @default("draft") // draft, scheduled, sending, sent, cancelled
+  scheduledFor    DateTime?
+  sentAt          DateTime?
+
+  // Статистика
+  totalRecipients Int       @default(0)
+  delivered       Int       @default(0)
+  opened          Int       @default(0)
+  clicked         Int       @default(0)
+
+  deliveries      BroadcastDelivery[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// Доставка рассылки
+model BroadcastDelivery {
+  id              String    @id @default(cuid())
+
+  broadcastId     String
+  broadcast       Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+
+  // Получатель
+  userId          String
+  userEmail       String
+
+  // Статус
+  status          String    @default("pending") // pending, sent, delivered, opened, clicked, failed
+  sentAt          DateTime?
+  openedAt        DateTime?
+  clickedAt       DateTime?
+  error           String?
+
+  createdAt       DateTime  @default(now())
+
+  @@index([broadcastId, status])
+  @@index([userId])
+}
+
+// Теги пользователей для сегментации
+model UserTag {
+  id              String    @id @default(cuid())
+  userId          String
+  tag             String
+
+  createdAt       DateTime  @default(now())
+
+  @@unique([userId, tag])
+  @@index([tag])
+}
