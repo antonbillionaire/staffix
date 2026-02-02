@@ -81,6 +81,9 @@ model Business {
   scheduledReminders ScheduledReminder[]
   reviews            Review[]
   clients            Client[]
+
+  // Рассылки клиентам
+  clientBroadcasts   ClientBroadcast[]
 }
 
 // Услуги
@@ -471,4 +474,59 @@ model UserTag {
 
   @@unique([userId, tag])
   @@index([tag])
+}
+
+// ========================================
+// CLIENT CRM - РАССЫЛКИ ДЛЯ КЛИЕНТОВ БИЗНЕСА
+// ========================================
+
+// Рассылки от бизнеса своим клиентам
+model ClientBroadcast {
+  id              String    @id @default(cuid())
+
+  title           String    // название рассылки
+  content         String    // текст сообщения
+
+  // Сегментация
+  targetSegment   String    @default("all") // all, vip, active, inactive
+
+  // Статус
+  status          String    @default("draft") // draft, scheduled, sending, sent, cancelled
+  scheduledAt     DateTime?
+  sentAt          DateTime?
+
+  // Статистика
+  recipientsCount Int       @default(0)
+
+  businessId      String
+  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  deliveries      ClientBroadcastDelivery[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([businessId, status])
+}
+
+// Доставка рассылки клиенту
+model ClientBroadcastDelivery {
+  id              String    @id @default(cuid())
+
+  broadcastId     String
+  broadcast       ClientBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+
+  // Получатель
+  clientId        String
+  telegramId      BigInt
+
+  // Статус
+  status          String    @default("pending") // pending, sent, delivered, failed
+  sentAt          DateTime?
+  error           String?
+
+  createdAt       DateTime  @default(now())
+
+  @@index([broadcastId, status])
+  @@index([clientId])
 }

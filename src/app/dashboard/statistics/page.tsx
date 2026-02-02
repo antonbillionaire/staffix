@@ -15,6 +15,12 @@ import {
   HelpCircle,
   Info,
   Lock,
+  Crown,
+  Sparkles,
+  Moon,
+  DollarSign,
+  Send,
+  Star,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -26,6 +32,12 @@ interface Stats {
   conversionRate: number;
   popularQuestions: { question: string; count: number }[];
   messagesByDay: { date: string; count: number }[];
+  // Enhanced stats
+  customerSegments?: { vip: number; active: number; inactive: number };
+  bookingsByStatus?: { pending: number; confirmed: number; completed: number; cancelled: number };
+  totalRevenue?: number;
+  broadcastsSent?: number;
+  avgRating?: number;
 }
 
 export default function StatisticsPage() {
@@ -268,6 +280,121 @@ export default function StatisticsPage() {
         <p className={`text-sm ${textSecondary} mt-2`}>
           Процент пользователей, которые записались после общения с AI-сотрудником
         </p>
+      </div>
+
+      {/* CRM Analytics */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Customer Segments */}
+        <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
+          <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Сегменты клиентов</h3>
+          {stats.customerSegments ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Crown className="h-4 w-4 text-yellow-400" />
+                  <span className={textSecondary}>VIP клиенты</span>
+                </div>
+                <span className={`font-bold ${textPrimary}`}>{stats.customerSegments.vip}</span>
+              </div>
+              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                <div className="h-full bg-yellow-500 rounded-full" style={{ width: `${(stats.customerSegments.vip / stats.totalClients) * 100}%` }} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-green-400" />
+                  <span className={textSecondary}>Активные</span>
+                </div>
+                <span className={`font-bold ${textPrimary}`}>{stats.customerSegments.active}</span>
+              </div>
+              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                <div className="h-full bg-green-500 rounded-full" style={{ width: `${(stats.customerSegments.active / stats.totalClients) * 100}%` }} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Moon className="h-4 w-4 text-gray-400" />
+                  <span className={textSecondary}>Неактивные</span>
+                </div>
+                <span className={`font-bold ${textPrimary}`}>{stats.customerSegments.inactive}</span>
+              </div>
+              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                <div className="h-full bg-gray-500 rounded-full" style={{ width: `${(stats.customerSegments.inactive / stats.totalClients) * 100}%` }} />
+              </div>
+            </div>
+          ) : (
+            <p className={textSecondary}>Нет данных о сегментах</p>
+          )}
+        </div>
+
+        {/* Bookings by Status */}
+        <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
+          <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Записи по статусам</h3>
+          {stats.bookingsByStatus ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-yellow-500/10 rounded-lg">
+                <span className="text-yellow-400">Ожидают</span>
+                <span className={`font-bold ${textPrimary}`}>{stats.bookingsByStatus.pending}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-blue-500/10 rounded-lg">
+                <span className="text-blue-400">Подтверждены</span>
+                <span className={`font-bold ${textPrimary}`}>{stats.bookingsByStatus.confirmed}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg">
+                <span className="text-green-400">Завершены</span>
+                <span className={`font-bold ${textPrimary}`}>{stats.bookingsByStatus.completed}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-lg">
+                <span className="text-red-400">Отменены</span>
+                <span className={`font-bold ${textPrimary}`}>{stats.bookingsByStatus.cancelled}</span>
+              </div>
+            </div>
+          ) : (
+            <p className={textSecondary}>Нет данных о записях</p>
+          )}
+        </div>
+
+        {/* Quick Stats */}
+        <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
+          <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Дополнительно</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-green-400" />
+                <span className={textSecondary}>Выручка</span>
+              </div>
+              <span className={`font-bold ${textPrimary}`}>
+                {stats.totalRevenue?.toLocaleString() || 0}₸
+              </span>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Send className="h-5 w-5 text-blue-400" />
+                <span className={textSecondary}>Рассылок</span>
+              </div>
+              <span className={`font-bold ${textPrimary}`}>
+                {stats.broadcastsSent || 0}
+              </span>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Star className="h-5 w-5 text-yellow-400" />
+                <span className={textSecondary}>Средний рейтинг</span>
+              </div>
+              <span className={`font-bold ${textPrimary}`}>
+                {stats.avgRating?.toFixed(1) || "—"}
+              </span>
+            </div>
+          </div>
+
+          <Link
+            href="/dashboard/customers"
+            className={`mt-4 flex items-center justify-center gap-2 w-full py-3 ${isDark ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'} rounded-lg text-sm ${textPrimary} font-medium transition-colors`}
+          >
+            <Users className="h-4 w-4" />
+            Управление клиентами
+          </Link>
+        </div>
       </div>
     </div>
   );

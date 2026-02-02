@@ -124,14 +124,87 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
+    // Enhanced CRM stats
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Customer segments
+    const clients = await prisma.client.findMany({
+      where: { businessId: business.id },
+      select: { totalVisits: true, lastVisitDate: true },
+    });
+
+    const customerSegments = {
+      vip: clients.filter((c) => c.totalVisits >= 5).length,
+      active: clients.filter(
+        (c) => c.totalVisits < 5 && c.lastVisitDate && new Date(c.lastVisitDate) > thirtyDaysAgo
+      ).length,
+      inactive: clients.filter(
+        (c) => !c.lastVisitDate || new Date(c.lastVisitDate) <= thirtyDaysAgo
+      ).length,
+    };
+
+    // Bookings by status
+    const bookingStatusCounts = await prisma.booking.groupBy({
+      by: ["status"],
+      where: { businessId: business.id, createdAt: { gte: startDate } },
+      _count: true,
+    });
+
+    const bookingsByStatus = {
+      pending: 0,
+      confirmed: 0,
+      completed: 0,
+      cancelled: 0,
+    };
+    bookingStatusCounts.forEach((item) => {
+      if (item.status in bookingsByStatus) {
+        bookingsByStatus[item.status as keyof typeof bookingsByStatus] = item._count;
+      }
+    });
+
+    // Total revenue from completed bookings
+    const completedBookings = await prisma.booking.findMany({
+      where: {
+        businessId: business.id,
+        status: "completed",
+        createdAt: { gte: startDate },
+      },
+      include: { service: { select: { price: true } } },
+    });
+    const totalRevenue = completedBookings.reduce((sum, b) => sum + (b.service?.price || 0), 0);
+
+    // Broadcasts sent
+    const broadcastsSent = await prisma.clientBroadcast.count({
+      where: {
+        businessId: business.id,
+        status: "sent",
+        createdAt: { gte: startDate },
+      },
+    });
+
+    // Average rating
+    const reviews = await prisma.review.findMany({
+      where: { businessId: business.id, createdAt: { gte: startDate } },
+      select: { rating: true },
+    });
+    const avgRating = reviews.length > 0
+      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+      : null;
+
     return NextResponse.json({
       totalMessages,
       totalBookings,
-      totalClients,
+      totalClients: clients.length || totalClients,
       avgResponseTime: 2, // Placeholder - would need actual timing data
       conversionRate,
       popularQuestions,
       messagesByDay,
+      // Enhanced CRM stats
+      customerSegments,
+      bookingsByStatus,
+      totalRevenue,
+      broadcastsSent,
+      avgRating,
     });
   } catch (error) {
     console.error("Statistics error:", error);
