@@ -62,24 +62,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build filter for recipients
-    const userWhere: Record<string, unknown> = {};
-    const businessInclude: Record<string, unknown> = {
-      subscription: true,
-    };
-
-    // Get potential recipients count
+    // Get potential recipients with their subscriptions
     const users = await prisma.user.findMany({
-      where: userWhere,
       include: {
         businesses: {
-          include: businessInclude,
+          include: {
+            subscription: true,
+          },
         },
       },
     });
 
     // Filter by plan and status
-    let recipients = users.filter((u) => {
+    const recipients = users.filter((u) => {
       const business = u.businesses[0];
       const subscription = business?.subscription;
 
