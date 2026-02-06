@@ -76,7 +76,8 @@ async function validateBotToken(token: string): Promise<{ valid: boolean; userna
 // Helper: Register webhook for the bot
 async function registerWebhook(token: string, businessId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://staffix.io'}/api/telegram/webhook?businessId=${businessId}`;
+    // Use www.staffix.io because Vercel redirects non-www to www
+    const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.staffix.io'}/api/telegram/webhook?businessId=${businessId}`;
 
     const response = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
       method: "POST",
