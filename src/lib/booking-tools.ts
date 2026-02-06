@@ -363,17 +363,6 @@ export async function createBooking(
     const slotEnd = new Date(bookingDate);
     slotEnd.setMinutes(slotEnd.getMinutes() + serviceDuration);
 
-    const conflicting = await prisma.booking.findFirst({
-      where: {
-        businessId,
-        staffId: actualStaffId || undefined,
-        status: { in: ["pending", "confirmed"] },
-        date: { gte: new Date(`${dateStr}T00:00:00`), lte: new Date(`${dateStr}T23:59:59`) },
-      },
-      include: { service: { select: { duration: true } } },
-    });
-
-    // Check all bookings for conflict
     const dayBookings = await prisma.booking.findMany({
       where: {
         businessId,
@@ -381,7 +370,10 @@ export async function createBooking(
         date: { gte: new Date(`${dateStr}T00:00:00`), lte: new Date(`${dateStr}T23:59:59`) },
         ...(actualStaffId ? { staffId: actualStaffId } : {}),
       },
-      include: { service: { select: { duration: true } } },
+      include: {
+        service: { select: { name: true, duration: true, price: true } },
+        staff: { select: { name: true } },
+      },
     });
 
     for (const existing of dayBookings) {
@@ -391,6 +383,20 @@ export async function createBooking(
       existingEnd.setMinutes(existingEnd.getMinutes() + existingDuration);
 
       if (bookingDate < existingEnd && slotEnd > existingStart) {
+        // If same client already booked this slot — return existing booking (idempotent)
+        if (existing.clientTelegramId === clientTelegramId) {
+          return {
+            success: true,
+            bookingId: existing.id,
+            details: {
+              date: dateStr,
+              time,
+              staffName: existing.staff?.name || staffName,
+              serviceName: existing.service?.name || serviceName,
+              clientName,
+            },
+          };
+        }
         return { success: false, error: "Этот слот уже занят. Пожалуйста, выберите другое время." };
       }
     }

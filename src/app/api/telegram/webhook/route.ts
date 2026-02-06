@@ -417,13 +417,30 @@ async function generateAIResponse(
       });
 
       // Вызываем Claude снова с результатами
-      response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1024,
-        system: systemWithDate,
-        messages: recentMessages,
-        tools: bookingToolDefinitions,
-      });
+      try {
+        response = await anthropic.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1024,
+          system: systemWithDate,
+          messages: recentMessages,
+          tools: bookingToolDefinitions,
+        });
+      } catch (apiError) {
+        // If API fails after successful tool execution, build response from tool results
+        console.error("[Webhook] API error after tool execution:", apiError);
+
+        // Try to extract useful info from the last tool results
+        for (const tr of toolResults) {
+          try {
+            const parsed = JSON.parse(tr.content);
+            if (parsed.success && parsed.details) {
+              const d = parsed.details;
+              return `Запись создана! ${d.serviceName} к мастеру ${d.staffName}, ${d.date} в ${d.time}. Ждём вас!`;
+            }
+          } catch { /* not JSON or no details */ }
+        }
+        return "Ваш запрос обработан. Если возникли вопросы, напишите ещё раз.";
+      }
     }
 
     // 8. Извлекаем финальный текстовый ответ
