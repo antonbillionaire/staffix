@@ -188,29 +188,10 @@ model Message {
 // Подписки
 model Subscription {
   id              String    @id @default(cuid())
-  plan            String    @default("trial") // trial, starter, business, pro, enterprise
+  plan            String    @default("trial") // trial, starter, business, pro
   messagesUsed    Int       @default(0)
   messagesLimit   Int       @default(100)
   expiresAt       DateTime
-
-  // Payment provider info
-  paymentProvider           String?   // stripe, click, payme, kaspi
-
-  // Stripe integration
-  stripeSubscriptionId      String?   @unique
-  stripeCustomerId          String?
-  stripePriceId             String?
-
-  // Lemon Squeezy integration (legacy)
-  lemonSqueezySubscriptionId String?   @unique
-  lemonSqueezyCustomerId     String?
-
-  // Local payment systems (one-time payments, stored for records)
-  lastPaymentId             String?   // ID from Click/Payme/Kaspi
-  lastPaymentProvider       String?
-  lastPaymentDate           DateTime?
-
-  status                     String    @default("active") // active, cancelled, past_due, expired, paused
 
   businessId      String    @unique
   business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
