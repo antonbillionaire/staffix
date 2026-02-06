@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Brain,
   MessageSquare,
@@ -38,6 +39,7 @@ interface DashboardData {
 
 export default function DashboardPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
 
@@ -73,7 +75,7 @@ export default function DashboardPage() {
                 daysLeft,
               },
               stats: {
-                bookingsToday: 0, // TODO: fetch from API
+                bookingsToday: 0,
                 totalClients: 0,
                 totalMessages: sub?.messagesUsed || 0,
               },
@@ -105,10 +107,10 @@ export default function DashboardPage() {
       {/* Welcome header */}
       <div>
         <h1 className={`text-2xl font-bold ${textPrimary} mb-2`}>
-          Добро пожаловать в Staffix! 👋
+          {t("dashboard.welcomeTitle")}
         </h1>
         <p className={textSecondary}>
-          Управляйте своим AI-сотрудником и отслеживайте эффективность
+          {t("dashboard.welcomeSubtitle")}
         </p>
       </div>
 
@@ -119,15 +121,15 @@ export default function DashboardPage() {
             <AlertCircle className="h-5 w-5 text-yellow-500" />
           </div>
           <div className="flex-1">
-            <h3 className={`font-semibold ${textPrimary} mb-1`}>AI-сотрудник не активирован</h3>
+            <h3 className={`font-semibold ${textPrimary} mb-1`}>{t("dashboard.aiNotActive")}</h3>
             <p className={`text-sm ${textSecondary} mb-3`}>
-              Подключите Telegram бота, чтобы ваш AI-сотрудник начал отвечать клиентам.
+              {t("dashboard.aiNotActiveDesc")}
             </p>
             <Link
               href="/dashboard/bot"
               className="inline-flex items-center gap-2 text-sm font-medium text-yellow-600 hover:text-yellow-500 transition-colors"
             >
-              Активировать сотрудника <ArrowRight className="h-4 w-4" />
+              {t("dashboard.activateEmployee")} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>
@@ -137,9 +139,9 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={<Brain className="h-5 w-5" />}
-          title="AI-сотрудник"
-          value={botConnected ? "Активен" : "Не активен"}
-          subtitle={botConnected ? `@${data?.business.botUsername}` : "требуется настройка"}
+          title={t("dashboard.aiEmployee")}
+          value={botConnected ? t("dashboard.active") : t("dashboard.inactive")}
+          subtitle={botConnected ? `@${data?.business.botUsername}` : t("dashboard.needsSetup")}
           gradient="from-blue-500 to-purple-500"
           status={botConnected ? "success" : "warning"}
           cardBg={cardBg}
@@ -147,12 +149,13 @@ export default function DashboardPage() {
           textPrimary={textPrimary}
           textSecondary={textSecondary}
           textTertiary={textTertiary}
+          t={t}
         />
         <StatCard
           icon={<MessageSquare className="h-5 w-5" />}
-          title="Сообщений"
+          title={t("dashboard.messages")}
           value={`${data?.subscription.messagesUsed || 0}`}
-          subtitle={`из ${data?.subscription.messagesLimit || 100} доступных`}
+          subtitle={t("dashboard.ofAvailable", { limit: data?.subscription.messagesLimit || 100 })}
           gradient="from-cyan-500 to-blue-500"
           progress={(data?.subscription.messagesUsed || 0) / (data?.subscription.messagesLimit || 100) * 100}
           cardBg={cardBg}
@@ -160,30 +163,33 @@ export default function DashboardPage() {
           textPrimary={textPrimary}
           textSecondary={textSecondary}
           textTertiary={textTertiary}
+          t={t}
         />
         <StatCard
           icon={<Calendar className="h-5 w-5" />}
-          title="Записей сегодня"
+          title={t("dashboard.bookingsToday")}
           value={data?.stats.bookingsToday?.toString() || "0"}
-          subtitle="новых записей"
+          subtitle={t("dashboard.newBookings")}
           gradient="from-green-500 to-emerald-500"
           cardBg={cardBg}
           borderColor={borderColor}
           textPrimary={textPrimary}
           textSecondary={textSecondary}
           textTertiary={textTertiary}
+          t={t}
         />
         <StatCard
           icon={<Users className="h-5 w-5" />}
-          title="Клиентов"
+          title={t("dashboard.customers")}
           value={data?.stats.totalClients?.toString() || "0"}
-          subtitle="всего обращений"
+          subtitle={t("dashboard.totalRequests")}
           gradient="from-purple-500 to-pink-500"
           cardBg={cardBg}
           borderColor={borderColor}
           textPrimary={textPrimary}
           textSecondary={textSecondary}
           textTertiary={textTertiary}
+          t={t}
         />
       </div>
 
@@ -191,14 +197,14 @@ export default function DashboardPage() {
       <div>
         <h2 className={`text-lg font-semibold ${textPrimary} mb-4 flex items-center gap-2`}>
           <Sparkles className="h-5 w-5 text-yellow-400" />
-          Быстрая настройка
+          {t("dashboard.quickSetup")}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <SetupCard
             href="/dashboard/bot"
             icon={<Brain className="h-6 w-6" />}
-            title="Активировать AI"
-            description="Подключите Telegram бота"
+            title={t("dashboard.activateAI")}
+            description={t("dashboard.connectTelegram")}
             completed={botConnected}
             step={1}
             cardBg={cardBg}
@@ -210,8 +216,8 @@ export default function DashboardPage() {
           <SetupCard
             href="/dashboard/services"
             icon={<span className="text-2xl">💇</span>}
-            title="Добавить услуги"
-            description="Укажите услуги и цены"
+            title={t("dashboard.addServices")}
+            description={t("dashboard.specifyPrices")}
             completed={false}
             step={2}
             cardBg={cardBg}
@@ -223,8 +229,8 @@ export default function DashboardPage() {
           <SetupCard
             href="/dashboard/staff"
             icon={<Users className="h-6 w-6" />}
-            title="Добавить команду"
-            description="Настройте мастеров"
+            title={t("dashboard.addTeam")}
+            description={t("dashboard.setupMasters")}
             completed={false}
             step={3}
             cardBg={cardBg}
@@ -236,8 +242,8 @@ export default function DashboardPage() {
           <SetupCard
             href="/dashboard/faq"
             icon={<FileText className="h-6 w-6" />}
-            title="База знаний"
-            description="Добавьте FAQ"
+            title={t("dashboard.knowledgeBase")}
+            description={t("dashboard.addFAQ")}
             completed={false}
             step={4}
             cardBg={cardBg}
@@ -254,16 +260,16 @@ export default function DashboardPage() {
         {/* Recent bookings */}
         <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className={`font-semibold ${textPrimary}`}>Последние записи</h3>
+            <h3 className={`font-semibold ${textPrimary}`}>{t("dashboard.recentBookings")}</h3>
             <Link href="/dashboard/bookings" className="text-sm text-blue-500 hover:text-blue-400">
-              Все записи →
+              {t("dashboard.allBookings")} →
             </Link>
           </div>
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Calendar className={`h-12 w-12 ${isDark ? "text-gray-600" : "text-gray-400"} mb-3`} />
-            <p className={textSecondary}>Пока нет записей</p>
+            <p className={textSecondary}>{t("dashboard.noBookingsYet")}</p>
             <p className={`text-sm ${textTertiary} mt-1`}>
-              Записи появятся, когда клиенты начнут бронировать через AI
+              {t("dashboard.bookingsWillAppear")}
             </p>
           </div>
         </div>
@@ -271,14 +277,14 @@ export default function DashboardPage() {
         {/* Activity feed */}
         <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className={`font-semibold ${textPrimary}`}>Активность</h3>
-            <span className={`text-sm ${textTertiary}`}>Последние 7 дней</span>
+            <h3 className={`font-semibold ${textPrimary}`}>{t("dashboard.activity")}</h3>
+            <span className={`text-sm ${textTertiary}`}>{t("dashboard.last7Days")}</span>
           </div>
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <TrendingUp className={`h-12 w-12 ${isDark ? "text-gray-600" : "text-gray-400"} mb-3`} />
-            <p className={textSecondary}>Нет данных за этот период</p>
+            <p className={textSecondary}>{t("dashboard.noDataPeriod")}</p>
             <p className={`text-sm ${textTertiary} mt-1`}>
-              Статистика появится после активации AI-сотрудника
+              {t("dashboard.statsAfterActivation")}
             </p>
           </div>
         </div>
@@ -300,6 +306,7 @@ function StatCard({
   textPrimary,
   textSecondary,
   textTertiary,
+  t,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -313,6 +320,7 @@ function StatCard({
   textPrimary: string;
   textSecondary: string;
   textTertiary: string;
+  t: (key: string) => string;
 }) {
   return (
     <div className={`${cardBg} border ${borderColor} rounded-xl p-5 hover:border-blue-500/20 transition-all`}>
@@ -329,7 +337,7 @@ function StatCard({
             ) : (
               <Clock className="h-3.5 w-3.5" />
             )}
-            {status === "success" ? "Онлайн" : "Офлайн"}
+            {status === "success" ? t("dashboard.online") : t("dashboard.offline")}
           </div>
         )}
       </div>
