@@ -44,7 +44,29 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({ business });
+    // Real stats from database
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
+
+    const [bookingsToday, totalClients] = await Promise.all([
+      prisma.booking.count({
+        where: {
+          businessId: business.id,
+          date: { gte: todayStart, lt: todayEnd },
+          status: { not: "cancelled" },
+        },
+      }),
+      prisma.client.count({
+        where: { businessId: business.id },
+      }),
+    ]);
+
+    return NextResponse.json({
+      business,
+      stats: { bookingsToday, totalClients },
+    });
   } catch (error) {
     console.error("Get business error:", error);
     return NextResponse.json(

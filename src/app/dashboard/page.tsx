@@ -75,8 +75,8 @@ export default function DashboardPage() {
                 daysLeft,
               },
               stats: {
-                bookingsToday: 0,
-                totalClients: 0,
+                bookingsToday: result.stats?.bookingsToday || 0,
+                totalClients: result.stats?.totalClients || 0,
                 totalMessages: sub?.messagesUsed || 0,
               },
             });

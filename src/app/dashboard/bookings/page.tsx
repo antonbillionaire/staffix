@@ -1,18 +1,21 @@
 "use client";
 
-import { Calendar, Clock, User, Phone } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Calendar, Clock, User, Phone, Loader2, Scissors } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 
 interface Booking {
-  id: number;
+  id: string;
   clientName: string;
-  clientPhone: string;
-  service: string;
-  staff: string;
+  clientPhone: string | null;
   date: string;
-  time: string;
   status: "pending" | "confirmed" | "completed" | "cancelled";
+  serviceName: string | null;
+  servicePrice: number | null;
+  serviceDuration: number | null;
+  staffName: string | null;
+  createdAt: string;
 }
 
 export default function BookingsPage() {
@@ -20,29 +23,34 @@ export default function BookingsPage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
-  // В реальном приложении данные будут загружаться с API
-  const bookings: Booking[] = [
-    {
-      id: 1,
-      clientName: "Анна Петрова",
-      clientPhone: "+998901234567",
-      service: "Стрижка женская",
-      staff: "Мария",
-      date: "2025-01-27",
-      time: "10:00",
-      status: "confirmed",
-    },
-    {
-      id: 2,
-      clientName: "Иван Сидоров",
-      clientPhone: "+998907654321",
-      service: "Стрижка мужская",
-      staff: "Анна",
-      date: "2025-01-27",
-      time: "11:00",
-      status: "pending",
-    },
-  ];
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "upcoming" | "past">("upcoming");
+
+  const fetchBookings = useCallback(async () => {
+    try {
+      const res = await fetch("/api/bookings");
+      if (res.ok) {
+        const data = await res.json();
+        setBookings(data.bookings || []);
+      }
+    } catch (error) {
+      console.error("Error fetching bookings:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBookings();
+  }, [fetchBookings]);
+
+  const now = new Date();
+  const filtered = bookings.filter((b) => {
+    if (filter === "upcoming") return new Date(b.date) >= now && b.status !== "cancelled";
+    if (filter === "past") return new Date(b.date) < now || b.status === "cancelled";
+    return true;
+  });
 
   const getStatusBadge = (status: Booking["status"]) => {
     const styles = {
@@ -74,27 +82,58 @@ export default function BookingsPage() {
     });
   };
 
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl">
-      <div className="mb-6">
-        <h2 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>{t("bookingsPage.title")}</h2>
-        <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-          {t("bookingsPage.subtitle")}
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+            {t("bookingsPage.title")}
+          </h2>
+          <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            {t("bookingsPage.subtitle")}
+          </p>
+        </div>
+        <div className="flex gap-1">
+          {(["upcoming", "all", "past"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                filter === f
+                  ? "bg-blue-500 text-white"
+                  : isDark
+                  ? "text-gray-400 hover:bg-white/5"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              {f === "upcoming" ? "Предстоящие" : f === "all" ? "Все" : "Прошедшие"}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Bookings list */}
       <div className="space-y-4">
-        {bookings.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className={`${isDark ? "bg-[#12122a] border-white/5 text-gray-400" : "bg-white border-gray-200 text-gray-500"} rounded-lg border p-8 text-center`}>
             <Calendar className={`h-12 w-12 mx-auto ${isDark ? "text-gray-600" : "text-gray-300"} mb-3`} />
             <p>{t("bookingsPage.noBookings")}</p>
-            <p className="text-sm mt-1">
-              {t("bookingsPage.noBookingsDesc")}
-            </p>
+            <p className="text-sm mt-1">{t("bookingsPage.noBookingsDesc")}</p>
           </div>
         ) : (
-          bookings.map((booking) => (
+          filtered.map((booking) => (
             <div
               key={booking.id}
               className={`${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border p-4`}
@@ -108,14 +147,27 @@ export default function BookingsPage() {
                     </span>
                     {getStatusBadge(booking.status)}
                   </div>
+                  {booking.clientPhone && (
+                    <div className={`flex items-center gap-2 text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                      <Phone className={`h-4 w-4 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
+                      {booking.clientPhone}
+                    </div>
+                  )}
                   <div className={`flex items-center gap-2 text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                    <Phone className={`h-4 w-4 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
-                    {booking.clientPhone}
-                  </div>
-                  <div className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                    <span className="font-medium">{booking.service}</span>
-                    {" · "}
-                    {booking.staff}
+                    <Scissors className={`h-4 w-4 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
+                    <span className="font-medium">{booking.serviceName || "Услуга"}</span>
+                    {booking.staffName && (
+                      <>
+                        {" · "}
+                        {booking.staffName}
+                      </>
+                    )}
+                    {booking.servicePrice && (
+                      <>
+                        {" · "}
+                        {booking.servicePrice.toLocaleString()} сум
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="text-right">
@@ -125,7 +177,7 @@ export default function BookingsPage() {
                   </div>
                   <div className={`flex items-center gap-1 mt-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
                     <Clock className={`h-4 w-4 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
-                    {booking.time}
+                    {formatTime(booking.date)}
                   </div>
                 </div>
               </div>
