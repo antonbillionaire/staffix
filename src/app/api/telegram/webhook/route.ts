@@ -15,6 +15,15 @@ import {
   extractClientName,
   extractPhone,
 } from "@/lib/ai-memory";
+import {
+  bookingToolDefinitions,
+  checkAvailability,
+  createBooking,
+  getServicesList,
+  getStaffList,
+  getClientBookings,
+  cancelBooking,
+} from "@/lib/booking-tools";
 
 // ========================================
 // ТИПЫ
@@ -236,6 +245,71 @@ async function saveMessage(
 // ГЕНЕРАЦИЯ AI ОТВЕТА
 // ========================================
 
+// ========================================
+// ОБРАБОТКА TOOL CALLS
+// ========================================
+
+async function handleToolCall(
+  toolName: string,
+  toolInput: Record<string, string>,
+  businessId: string,
+  telegramId: bigint
+): Promise<string> {
+  try {
+    switch (toolName) {
+      case "check_availability": {
+        const results = await checkAvailability(
+          businessId,
+          toolInput.date,
+          toolInput.service_id,
+          toolInput.staff_id
+        );
+        return JSON.stringify(results);
+      }
+
+      case "create_booking": {
+        const result = await createBooking(
+          businessId,
+          toolInput.date,
+          toolInput.time,
+          toolInput.client_name,
+          telegramId,
+          toolInput.service_id,
+          toolInput.staff_id,
+          toolInput.client_phone
+        );
+        return JSON.stringify(result);
+      }
+
+      case "get_services": {
+        const services = await getServicesList(businessId);
+        return JSON.stringify(services);
+      }
+
+      case "get_staff": {
+        const staff = await getStaffList(businessId);
+        return JSON.stringify(staff);
+      }
+
+      case "get_my_bookings": {
+        const bookings = await getClientBookings(businessId, telegramId);
+        return JSON.stringify(bookings);
+      }
+
+      case "cancel_booking": {
+        const result = await cancelBooking(toolInput.booking_id, telegramId);
+        return JSON.stringify(result);
+      }
+
+      default:
+        return JSON.stringify({ error: `Unknown tool: ${toolName}` });
+    }
+  } catch (error) {
+    console.error(`Error in tool ${toolName}:`, error);
+    return JSON.stringify({ error: "Ошибка выполнения инструмента" });
+  }
+}
+
 async function generateAIResponse(
   businessId: string,
   telegramId: bigint,
@@ -269,40 +343,104 @@ async function generateAIResponse(
     );
 
     // 5. Добавляем новое сообщение пользователя
-    const messages = [
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recentMessages: any[] = [
       ...conversation.messages.map((m) => ({
-        role: m.role as "user" | "assistant",
+        role: m.role,
         content: m.content,
       })),
-      { role: "user" as const, content: userMessage },
-    ];
+      { role: "user", content: userMessage },
+    ].slice(-20);
 
-    // Ограничиваем контекст (последние 20 сообщений)
-    const recentMessages = messages.slice(-20);
-
-    // 6. Вызываем Claude API
+    // 6. Вызываем Claude API с tools
     const anthropic = new Anthropic({ apiKey });
 
-    const response = await anthropic.messages.create({
+    // Сегодняшняя дата для контекста
+    const today = new Date().toISOString().split("T")[0];
+    const systemWithDate = systemPrompt + `\n\nСегодняшняя дата: ${today}. Используй инструменты для работы с записями.`;
+
+    let response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1024,
-      system: systemPrompt,
+      system: systemWithDate,
       messages: recentMessages,
+      tools: bookingToolDefinitions,
     });
 
+    // 7. Обрабатываем tool_use в цикле (до 5 итераций)
+    let iterations = 0;
+    const maxIterations = 5;
+
+    while (response.stop_reason === "tool_use" && iterations < maxIterations) {
+      iterations++;
+
+      // Собираем все tool_use блоки из ответа
+      const toolUseBlocks = response.content.filter(
+        (block) => block.type === "tool_use"
+      );
+
+      // Добавляем ответ ассистента в messages
+      recentMessages.push({
+        role: "assistant",
+        content: response.content,
+      });
+
+      // Обрабатываем каждый tool call и добавляем результаты
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const toolResults: any[] = [];
+
+      for (const block of toolUseBlocks) {
+        if (block.type === "tool_use") {
+          console.log(`[Webhook] Tool call: ${block.name}`, JSON.stringify(block.input));
+
+          const result = await handleToolCall(
+            block.name,
+            block.input as Record<string, string>,
+            businessId,
+            telegramId
+          );
+
+          console.log(`[Webhook] Tool result for ${block.name}:`, result.substring(0, 200));
+
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: block.id,
+            content: result,
+          });
+        }
+      }
+
+      // Добавляем результаты tool в messages
+      recentMessages.push({
+        role: "user",
+        content: toolResults,
+      });
+
+      // Вызываем Claude снова с результатами
+      response = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1024,
+        system: systemWithDate,
+        messages: recentMessages,
+        tools: bookingToolDefinitions,
+      });
+    }
+
+    // 8. Извлекаем финальный текстовый ответ
+    const textBlocks = response.content.filter((block) => block.type === "text");
     const assistantMessage =
-      response.content[0].type === "text"
-        ? response.content[0].text
+      textBlocks.length > 0 && textBlocks[0].type === "text"
+        ? textBlocks[0].text
         : "Извините, не могу обработать ваш запрос.";
 
-    // 7. Сохраняем сообщения в базу
+    // 9. Сохраняем сообщения в базу
     await saveMessage(conversation.id, "user", userMessage);
     await saveMessage(conversation.id, "assistant", assistantMessage);
 
-    // 8. Обновляем счётчик сообщений в разговоре
+    // 10. Обновляем счётчик сообщений в разговоре
     await updateConversationMessageCount(conversation.id);
 
-    // 9. Извлекаем и сохраняем информацию о клиенте
+    // 11. Извлекаем и сохраняем информацию о клиенте
     const extractedName = extractClientName(userMessage);
     const extractedPhone = extractPhone(userMessage);
 
