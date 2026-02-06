@@ -84,6 +84,10 @@ model Business {
 
   // Рассылки клиентам
   clientBroadcasts   ClientBroadcast[]
+
+  // Мультиканальность (WhatsApp, Instagram)
+  channelConnections ChannelConnection[]
+  channelClients     ChannelClient[]
 }
 
 // Услуги
@@ -184,10 +188,29 @@ model Message {
 // Подписки
 model Subscription {
   id              String    @id @default(cuid())
-  plan            String    @default("trial") // trial, starter, business, pro
+  plan            String    @default("trial") // trial, starter, business, pro, enterprise
   messagesUsed    Int       @default(0)
   messagesLimit   Int       @default(100)
   expiresAt       DateTime
+
+  // Payment provider info
+  paymentProvider           String?   // stripe, click, payme, kaspi
+
+  // Stripe integration
+  stripeSubscriptionId      String?   @unique
+  stripeCustomerId          String?
+  stripePriceId             String?
+
+  // Lemon Squeezy integration (legacy)
+  lemonSqueezySubscriptionId String?   @unique
+  lemonSqueezyCustomerId     String?
+
+  // Local payment systems (one-time payments, stored for records)
+  lastPaymentId             String?   // ID from Click/Payme/Kaspi
+  lastPaymentProvider       String?
+  lastPaymentDate           DateTime?
+
+  status                     String    @default("active") // active, cancelled, past_due, expired, paused
 
   businessId      String    @unique
   business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -474,6 +497,192 @@ model UserTag {
 
   @@unique([userId, tag])
   @@index([tag])
+}
+
+// ========================================
+// MULTI-CHANNEL MESSAGING (WhatsApp, Instagram)
+// ========================================
+
+// Подключение каналов (WhatsApp, Instagram, Telegram)
+model ChannelConnection {
+  id                    String    @id @default(cuid())
+
+  channel               String    // telegram, whatsapp, instagram
+  isConnected           Boolean   @default(false)
+  isVerified            Boolean   @default(false)
+
+  // Telegram
+  telegramBotId         String?
+  telegramBotUsername   String?
+
+  // WhatsApp Business API
+  whatsappPhoneId       String?   // Phone Number ID from Meta
+  whatsappPhoneNumber   String?   // Display phone number
+  whatsappBusinessAccId String?   // WhatsApp Business Account ID
+
+  // Instagram
+  instagramAccountId    String?   // Instagram Account ID
+  instagramUsername     String?
+  instagramPageId       String?   // Connected Facebook Page ID
+
+  // Meta API credentials (shared for WhatsApp & Instagram)
+  metaAccessToken       String?   // Access token
+  metaTokenExpiresAt    DateTime?
+
+  // Webhook
+  webhookUrl            String?
+  webhookSecret         String?
+  webhookVerified       Boolean   @default(false)
+
+  // Status
+  errorMessage          String?
+  errorAt               DateTime?
+
+  connectedAt           DateTime?
+  lastActivityAt        DateTime?
+
+  businessId            String
+  business              Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([businessId, channel])
+  @@index([channel, isConnected])
+}
+
+// Клиенты со всех каналов (унифицированные)
+model ChannelClient {
+  id                    String    @id @default(cuid())
+
+  // Имя
+  name                  String?
+  firstName             String?
+  lastName              String?
+
+  // Telegram
+  telegramId            String?
+  telegramUsername      String?
+  telegramChatId        String?
+
+  // WhatsApp
+  whatsappPhone         String?
+  whatsappId            String?
+
+  // Instagram
+  instagramId           String?
+  instagramUsername     String?
+
+  // Контактные данные
+  email                 String?
+  phone                 String?
+
+  // Профиль
+  profilePicUrl         String?
+  language              String?
+  timezone              String?
+
+  // Вовлечённость
+  firstContactAt        DateTime  @default(now())
+  lastContactAt         DateTime  @default(now())
+  lastChannel           String?   // telegram, whatsapp, instagram
+  totalMessages         Int       @default(0)
+
+  // Кастомизация
+  tags                  String[]  @default([])
+  notes                 String?
+  customFields          Json?
+
+  businessId            String
+  business              Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  // Связи
+  messages              ChannelMessage[]
+  leads                 Lead[]
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([businessId, telegramId])
+  @@index([businessId, whatsappPhone])
+  @@index([businessId, instagramId])
+  @@index([businessId, lastContactAt])
+}
+
+// Сообщения из всех каналов
+model ChannelMessage {
+  id                    String    @id @default(cuid())
+
+  channel               String    // telegram, whatsapp, instagram
+  channelMessageId      String?   // ID сообщения в канале
+  chatId                String    // ID чата в канале
+
+  direction             String    // incoming, outgoing
+  status                String    @default("sent") // pending, sent, delivered, read, failed
+
+  // Контент
+  text                  String?
+  attachments           Json?     // [{type, url, ...}]
+
+  // AI обработка
+  aiProcessed           Boolean   @default(false)
+  aiResponse            String?
+
+  // Статусы доставки
+  sentAt                DateTime?
+  deliveredAt           DateTime?
+  readAt                DateTime?
+
+  // Ошибки
+  errorMessage          String?
+  errorCode             String?
+
+  // Метаданные
+  metadata              Json?
+
+  clientId              String?
+  client                ChannelClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  businessId            String
+
+  createdAt             DateTime  @default(now())
+
+  @@index([businessId, channel])
+  @@index([businessId, clientId])
+  @@index([chatId, channel])
+}
+
+// Лиды (из рекламы Instagram/WhatsApp)
+model Lead {
+  id                    String    @id @default(cuid())
+
+  source                String    // instagram_ad, whatsapp_ctwa, organic, referral
+  adId                  String?   // ID рекламы
+  channel               String    // telegram, whatsapp, instagram
+
+  firstMessage          String?   // Первое сообщение клиента
+  status                String    @default("new") // new, contacted, qualified, converted, lost
+
+  // Оценка
+  score                 Int       @default(0)     // 0-100
+  qualifiedAt           DateTime?
+  convertedAt           DateTime?
+
+  // Метаданные
+  metadata              Json?
+  notes                 String?
+
+  clientId              String?
+  client                ChannelClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  businessId            String
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([businessId, source])
+  @@index([businessId, status])
+  @@index([businessId, createdAt])
 }
 
 // ========================================

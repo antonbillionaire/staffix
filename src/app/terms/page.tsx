@@ -57,7 +57,7 @@ export default function TermsOfUsePage() {
           <section>
             <h2 className="text-2xl font-semibold text-white mb-4">1. Термины и определения</h2>
             <ul className="text-gray-300 space-y-3">
-              <li><strong className="text-white">Исполнитель</strong> — Staffix, предоставляющий доступ к Сервису.</li>
+              <li><strong className="text-white">Исполнитель</strong> — K-Bridge Co. LTD (유한회사 케이브릿지), регистрационный номер 606-88-02444, Южная Корея, владелец и оператор платформы Staffix.</li>
               <li><strong className="text-white">Заказчик (Клиент)</strong> — физическое или юридическое лицо, акцептовавшее оферту.</li>
               <li><strong className="text-white">Сервис</strong> — платформа staffix.io для создания и управления AI-сотрудниками.</li>
               <li><strong className="text-white">AI-сотрудник</strong> — виртуальный ассистент на базе искусственного интеллекта.</li>
@@ -243,30 +243,41 @@ export default function TermsOfUsePage() {
           <section>
             <h2 className="text-2xl font-semibold text-white mb-4">11. Реквизиты Исполнителя</h2>
             <div className="mt-4 p-4 bg-white/5 rounded-xl border border-white/10">
-              <p className="text-white font-medium">Staffix</p>
-              <p className="text-gray-300 mt-2">
-                Сайт:{" "}
-                <a href="https://staffix.io" className="text-blue-400 hover:text-blue-300">
-                  staffix.io
-                </a>
-              </p>
-              <p className="text-gray-300">
-                Email:{" "}
-                <a href="mailto:support@staffix.io" className="text-blue-400 hover:text-blue-300">
-                  support@staffix.io
-                </a>
-              </p>
-              <p className="text-gray-300">
-                Telegram:{" "}
-                <a
-                  href="https://t.me/staffix_support_bot"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300"
-                >
-                  @staffix_support_bot
-                </a>
-              </p>
+              <p className="text-white font-medium text-lg">K-Bridge Co. LTD</p>
+              <p className="text-gray-400 text-sm">유한회사 케이브릿지</p>
+              <div className="mt-4 space-y-2 text-gray-300">
+                <p><span className="text-gray-500">Регистрационный номер:</span> 606-88-02444</p>
+                <p><span className="text-gray-500">Адрес:</span> Convensia daero 165, 26 floor, V553, Posco Tower Songdo, Incheon, South Korea</p>
+                <p>
+                  <span className="text-gray-500">Сайт:</span>{" "}
+                  <a href="https://staffix.io" className="text-blue-400 hover:text-blue-300">
+                    staffix.io
+                  </a>
+                </p>
+                <p>
+                  <span className="text-gray-500">Email:</span>{" "}
+                  <a href="mailto:support@staffix.io" className="text-blue-400 hover:text-blue-300">
+                    support@staffix.io
+                  </a>
+                </p>
+                <p>
+                  <span className="text-gray-500">Телефон:</span>{" "}
+                  <a href="tel:+821027181424" className="text-blue-400 hover:text-blue-300">
+                    +82 10 2718 1424
+                  </a>
+                </p>
+                <p>
+                  <span className="text-gray-500">Telegram:</span>{" "}
+                  <a
+                    href="https://t.me/staffix_support_bot"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300"
+                  >
+                    @staffix_support_bot
+                  </a>
+                </p>
+              </div>
             </div>
           </section>
         </div>

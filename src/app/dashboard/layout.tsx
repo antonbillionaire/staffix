@@ -28,6 +28,7 @@ import {
   Lock,
   UserCircle,
   Send,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 import ChatWidget from "@/components/ChatWidget";
@@ -45,6 +46,7 @@ interface NavItem {
 const navigation: NavItem[] = [
   { name: "Главная", href: "/dashboard", icon: LayoutDashboard },
   { name: "AI-сотрудник", href: "/dashboard/bot", icon: Brain },
+  { name: "Каналы", href: "/dashboard/channels", icon: MessageSquare },
   { name: "Статистика", href: "/dashboard/statistics", icon: BarChart3 },
   { name: "Услуги", href: "/dashboard/services", icon: Scissors },
   { name: "Команда", href: "/dashboard/staff", icon: Users },

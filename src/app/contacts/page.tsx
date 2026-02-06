@@ -103,6 +103,25 @@ export default function ContactsPage() {
           </div>
         </div>
 
+        {/* Company Info */}
+        <div className="mt-12 bg-[#12122a] border border-white/5 rounded-2xl p-8">
+          <h2 className="text-2xl font-semibold text-white mb-6 text-center">
+            Юридическая информация
+          </h2>
+          <div className="max-w-md mx-auto space-y-3 text-gray-300">
+            <p className="text-gray-400 text-sm mb-4">Staffix — SaaS-платформа, разработанная и управляемая:</p>
+            <p className="text-white font-medium text-lg">K-Bridge Co. LTD</p>
+            <p className="text-gray-400 text-sm">유한회사 케이브릿지</p>
+            <p><span className="text-gray-500">Регистрационный номер:</span> 606-88-02444</p>
+            <p><span className="text-gray-500">Страна:</span> South Korea</p>
+            <p><span className="text-gray-500">Адрес:</span> Convensia daero 165, 26 floor, V553, Posco Tower Songdo, Incheon</p>
+            <p>
+              <span className="text-gray-500">Телефон:</span>{" "}
+              <a href="tel:+821027181424" className="text-blue-400 hover:text-blue-300">+82 10 2718 1424</a>
+            </p>
+          </div>
+        </div>
+
         {/* CTA */}
         <div className="mt-12 text-center">
           <p className="text-gray-400 mb-6">

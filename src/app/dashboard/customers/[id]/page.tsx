@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   ArrowLeft,
   Loader2,
@@ -69,9 +70,19 @@ export default function CustomerDetailPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<CustomerDetail | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Theme-aware styles
+  const isDark = theme === "dark";
+  const cardBg = isDark ? "bg-[#12122a]" : "bg-white";
+  const borderColor = isDark ? "border-white/5" : "border-gray-200";
+  const textPrimary = isDark ? "text-white" : "text-gray-900";
+  const textSecondary = isDark ? "text-gray-400" : "text-gray-600";
+  const textTertiary = isDark ? "text-gray-500" : "text-gray-500";
+  const itemBg = isDark ? "bg-white/5" : "bg-gray-50";
 
   useEffect(() => {
     fetchCustomer();
@@ -154,7 +165,7 @@ export default function CustomerDetailPage({
 
   if (!data) {
     return (
-      <div className="text-center text-gray-400 py-12">
+      <div className={`text-center ${textSecondary} py-12`}>
         Клиент не найден
       </div>
     );
@@ -168,27 +179,27 @@ export default function CustomerDetailPage({
       <div className="flex items-center gap-4">
         <Link
           href="/dashboard/customers"
-          className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
+          className={`p-2 ${isDark ? "hover:bg-white/10" : "hover:bg-gray-100"} rounded-lg transition-colors ${textSecondary} hover:text-blue-500`}
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-white">{customer.name}</h1>
+            <h1 className={`text-2xl font-bold ${textPrimary}`}>{customer.name}</h1>
             {customer.isVip && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400 flex items-center gap-1">
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-500 flex items-center gap-1">
                 <Crown className="h-3 w-3" />
                 VIP
               </span>
             )}
             {customer.isBlocked && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-400">
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-500">
                 Заблокирован
               </span>
             )}
           </div>
           {customer.phone && (
-            <p className="text-gray-400 flex items-center gap-1">
+            <p className={`${textSecondary} flex items-center gap-1`}>
               <Phone className="h-4 w-4" />
               {customer.phone}
             </p>
@@ -199,8 +210,8 @@ export default function CustomerDetailPage({
           disabled={actionLoading}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors ${
             customer.isBlocked
-              ? "bg-green-500/10 text-green-400 hover:bg-green-500/20"
-              : "bg-red-500/10 text-red-400 hover:bg-red-500/20"
+              ? "bg-green-500/10 text-green-500 hover:bg-green-500/20"
+              : "bg-red-500/10 text-red-500 hover:bg-red-500/20"
           }`}
         >
           {actionLoading ? (
@@ -219,58 +230,58 @@ export default function CustomerDetailPage({
         <div className="lg:col-span-2 space-y-6">
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-[#12122a] border border-white/5 rounded-xl p-4">
+            <div className={`${cardBg} border ${borderColor} rounded-xl p-4`}>
               <div className="flex items-center gap-2 mb-2">
-                <Calendar className="h-4 w-4 text-blue-400" />
-                <span className="text-xs text-gray-400">Визитов</span>
+                <Calendar className="h-4 w-4 text-blue-500" />
+                <span className={`text-xs ${textSecondary}`}>Визитов</span>
               </div>
-              <p className="text-2xl font-bold text-white">{customer.totalVisits}</p>
+              <p className={`text-2xl font-bold ${textPrimary}`}>{customer.totalVisits}</p>
             </div>
-            <div className="bg-[#12122a] border border-white/5 rounded-xl p-4">
+            <div className={`${cardBg} border ${borderColor} rounded-xl p-4`}>
               <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="h-4 w-4 text-green-400" />
-                <span className="text-xs text-gray-400">Потрачено</span>
+                <DollarSign className="h-4 w-4 text-green-500" />
+                <span className={`text-xs ${textSecondary}`}>Потрачено</span>
               </div>
-              <p className="text-2xl font-bold text-white">{customer.totalSpent.toLocaleString()}₸</p>
+              <p className={`text-2xl font-bold ${textPrimary}`}>{customer.totalSpent.toLocaleString()}₸</p>
             </div>
-            <div className="bg-[#12122a] border border-white/5 rounded-xl p-4">
+            <div className={`${cardBg} border ${borderColor} rounded-xl p-4`}>
               <div className="flex items-center gap-2 mb-2">
-                <MessageSquare className="h-4 w-4 text-purple-400" />
-                <span className="text-xs text-gray-400">Сообщений</span>
+                <MessageSquare className="h-4 w-4 text-purple-500" />
+                <span className={`text-xs ${textSecondary}`}>Сообщений</span>
               </div>
-              <p className="text-2xl font-bold text-white">{conversation?.messagesCount || 0}</p>
+              <p className={`text-2xl font-bold ${textPrimary}`}>{conversation?.messagesCount || 0}</p>
             </div>
-            <div className="bg-[#12122a] border border-white/5 rounded-xl p-4">
+            <div className={`${cardBg} border ${borderColor} rounded-xl p-4`}>
               <div className="flex items-center gap-2 mb-2">
-                <Star className="h-4 w-4 text-yellow-400" />
-                <span className="text-xs text-gray-400">Рейтинг</span>
+                <Star className="h-4 w-4 text-yellow-500" />
+                <span className={`text-xs ${textSecondary}`}>Рейтинг</span>
               </div>
-              <p className="text-2xl font-bold text-white">
+              <p className={`text-2xl font-bold ${textPrimary}`}>
                 {customer.avgRating ? customer.avgRating.toFixed(1) : "—"}
               </p>
             </div>
           </div>
 
           {/* Bookings */}
-          <div className="bg-[#12122a] border border-white/5 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">История записей</h2>
+          <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
+            <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>История записей</h2>
             {bookings.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">Нет записей</p>
+              <p className={`${textTertiary} text-center py-4`}>Нет записей</p>
             ) : (
               <div className="space-y-3">
                 {bookings.map((booking) => (
                   <div
                     key={booking.id}
-                    className="flex items-center gap-4 p-3 bg-white/5 rounded-lg"
+                    className={`flex items-center gap-4 p-3 ${itemBg} rounded-lg`}
                   >
                     <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center">
-                      <Calendar className="h-5 w-5 text-blue-400" />
+                      <Calendar className="h-5 w-5 text-blue-500" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-white font-medium">
+                      <p className={`${textPrimary} font-medium`}>
                         {booking.serviceName || "Услуга"}
                       </p>
-                      <div className="flex items-center gap-3 text-sm text-gray-400">
+                      <div className={`flex items-center gap-3 text-sm ${textSecondary}`}>
                         <span>{formatShortDate(booking.date)}</span>
                         {booking.staffName && <span>• {booking.staffName}</span>}
                         {booking.servicePrice && (
@@ -286,14 +297,14 @@ export default function CustomerDetailPage({
           </div>
 
           {/* Reviews */}
-          <div className="bg-[#12122a] border border-white/5 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Отзывы</h2>
+          <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
+            <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>Отзывы</h2>
             {reviews.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">Нет отзывов</p>
+              <p className={`${textTertiary} text-center py-4`}>Нет отзывов</p>
             ) : (
               <div className="space-y-3">
                 {reviews.map((review) => (
-                  <div key={review.id} className="p-3 bg-white/5 rounded-lg">
+                  <div key={review.id} className={`p-3 ${itemBg} rounded-lg`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-1">
                         {[...Array(5)].map((_, i) => (
@@ -301,18 +312,18 @@ export default function CustomerDetailPage({
                             key={i}
                             className={`h-4 w-4 ${
                               i < review.rating
-                                ? "text-yellow-400 fill-yellow-400"
-                                : "text-gray-600"
+                                ? "text-yellow-500 fill-yellow-500"
+                                : isDark ? "text-gray-600" : "text-gray-300"
                             }`}
                           />
                         ))}
                       </div>
-                      <span className="text-xs text-gray-500">
+                      <span className={`text-xs ${textTertiary}`}>
                         {formatShortDate(review.createdAt)}
                       </span>
                     </div>
                     {review.comment && (
-                      <p className="text-gray-300 text-sm">{review.comment}</p>
+                      <p className={`${textSecondary} text-sm`}>{review.comment}</p>
                     )}
                   </div>
                 ))}
@@ -324,26 +335,26 @@ export default function CustomerDetailPage({
         {/* Right column - Info & Messages */}
         <div className="space-y-6">
           {/* Customer Info */}
-          <div className="bg-[#12122a] border border-white/5 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Информация</h2>
+          <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
+            <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>Информация</h2>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-gray-400">Telegram ID</span>
-                <span className="text-white font-mono text-sm">{customer.telegramId}</span>
+                <span className={textSecondary}>Telegram ID</span>
+                <span className={`${textPrimary} font-mono text-sm`}>{customer.telegramId}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-400">Первый контакт</span>
-                <span className="text-white text-sm">{formatShortDate(customer.createdAt)}</span>
+                <span className={textSecondary}>Первый контакт</span>
+                <span className={`${textPrimary} text-sm`}>{formatShortDate(customer.createdAt)}</span>
               </div>
               {customer.lastVisitDate && (
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Последний визит</span>
-                  <span className="text-white text-sm">{formatShortDate(customer.lastVisitDate)}</span>
+                  <span className={textSecondary}>Последний визит</span>
+                  <span className={`${textPrimary} text-sm`}>{formatShortDate(customer.lastVisitDate)}</span>
                 </div>
               )}
               <div className="flex items-center justify-between">
-                <span className="text-gray-400">Статус</span>
-                <span className={`text-sm ${customer.isActive ? "text-green-400" : "text-gray-400"}`}>
+                <span className={textSecondary}>Статус</span>
+                <span className={`text-sm ${customer.isActive ? "text-green-500" : textSecondary}`}>
                   {customer.isActive ? "Активный" : "Неактивный"}
                 </span>
               </div>
@@ -351,10 +362,10 @@ export default function CustomerDetailPage({
           </div>
 
           {/* Recent Messages */}
-          <div className="bg-[#12122a] border border-white/5 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Последние сообщения</h2>
+          <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
+            <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>Последние сообщения</h2>
             {!conversation || conversation.messages.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">Нет сообщений</p>
+              <p className={`${textTertiary} text-center py-4`}>Нет сообщений</p>
             ) : (
               <div className="space-y-3 max-h-80 overflow-y-auto">
                 {conversation.messages.slice(0, 10).map((msg) => (
@@ -363,20 +374,20 @@ export default function CustomerDetailPage({
                     className={`p-3 rounded-lg ${
                       msg.role === "user"
                         ? "bg-blue-500/10 ml-4"
-                        : "bg-white/5 mr-4"
+                        : `${itemBg} mr-4`
                     }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       {msg.role === "user" ? (
-                        <User className="h-3 w-3 text-blue-400" />
+                        <User className="h-3 w-3 text-blue-500" />
                       ) : (
-                        <Send className="h-3 w-3 text-gray-400" />
+                        <Send className={`h-3 w-3 ${textSecondary}`} />
                       )}
-                      <span className="text-xs text-gray-500">
+                      <span className={`text-xs ${textTertiary}`}>
                         {msg.role === "user" ? "Клиент" : "Бот"}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-300 whitespace-pre-wrap">
+                    <p className={`text-sm ${textSecondary} whitespace-pre-wrap`}>
                       {msg.content.length > 200
                         ? msg.content.substring(0, 200) + "..."
                         : msg.content}

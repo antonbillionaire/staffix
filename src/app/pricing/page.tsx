@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   Brain,
   Check,
@@ -18,7 +19,11 @@ import { PLANS, MESSAGE_PACKS } from "@/lib/plans";
 
 export default function PricingPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("monthly");
+
+  // Check if user is logged in
+  const isLoggedIn = status === "authenticated" && !!session;
 
   // Convert PLANS object to array for rendering (exclude trial from main cards)
   const paidPlans = [
@@ -44,7 +49,7 @@ export default function PricingPage() {
       <header className="relative z-10 border-b border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-3">
+            <Link href={isLoggedIn ? "/dashboard" : "/"} className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
                 <Brain className="h-6 w-6 text-white" />
               </div>
@@ -73,24 +78,26 @@ export default function PricingPage() {
           </p>
         </div>
 
-        {/* Trial banner */}
-        <div className="max-w-3xl mx-auto mb-12">
-          <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 rounded-2xl p-6 text-center">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Sparkles className="h-5 w-5 text-green-400" />
-              <span className="text-green-400 font-semibold">Бесплатный пробный период</span>
+        {/* Trial banner - only show for non-logged-in users */}
+        {!isLoggedIn && (
+          <div className="max-w-3xl mx-auto mb-12">
+            <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 rounded-2xl p-6 text-center">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Sparkles className="h-5 w-5 text-green-400" />
+                <span className="text-green-400 font-semibold">Бесплатный пробный период</span>
+              </div>
+              <p className="text-white text-lg mb-4">
+                14 дней бесплатно с 200 сообщениями и всеми функциями
+              </p>
+              <Link
+                href="/register"
+                className="inline-flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-green-500 transition-colors"
+              >
+                Начать бесплатно
+              </Link>
             </div>
-            <p className="text-white text-lg mb-4">
-              14 дней бесплатно с 200 сообщениями и всеми функциями
-            </p>
-            <Link
-              href="/register"
-              className="inline-flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-green-500 transition-colors"
-            >
-              Начать бесплатно
-            </Link>
           </div>
-        </div>
+        )}
 
         {/* Billing toggle */}
         <div className="flex items-center justify-center gap-4 mb-12">
@@ -262,9 +269,11 @@ export default function PricingPage() {
           </div>
         </div>
 
-        <p className="text-center text-gray-500 mt-8">
-          💳 Оплата после пробного периода. Отмена в любой момент.
-        </p>
+        {!isLoggedIn && (
+          <p className="text-center text-gray-500 mt-8">
+            💳 Оплата после пробного периода. Отмена в любой момент.
+          </p>
+        )}
       </main>
     </div>
   );

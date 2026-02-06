@@ -14,7 +14,10 @@ import {
   Loader2,
   Check,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  XCircle,
+  RefreshCw,
+  Calendar,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -45,10 +48,16 @@ export default function SettingsPage() {
   // Subscription info
   const [subscription, setSubscription] = useState({
     plan: "trial",
+    status: "active",
     messagesUsed: 0,
     messagesLimit: 100,
     daysLeft: 14,
+    expiresAt: "",
+    lemonSqueezySubscriptionId: null as string | null,
   });
+  const [subscriptionAction, setSubscriptionAction] = useState<"cancel" | "resume" | null>(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [subscriptionMessage, setSubscriptionMessage] = useState("");
 
   // Theme-based classes
   const isDark = theme === "dark";
@@ -89,19 +98,19 @@ export default function SettingsPage() {
 
       // Load subscription info
       try {
-        const res = await fetch("/api/business");
+        const res = await fetch("/api/subscription/manage");
         if (res.ok) {
           const data = await res.json();
-          if (data.business?.subscription) {
-            const sub = data.business.subscription;
-            const daysLeft = Math.max(0, Math.ceil(
-              (new Date(sub.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-            ));
+          if (data.subscription) {
+            const sub = data.subscription;
             setSubscription({
               plan: sub.plan,
+              status: sub.status || "active",
               messagesUsed: sub.messagesUsed,
               messagesLimit: sub.messagesLimit,
-              daysLeft,
+              daysLeft: sub.daysLeft,
+              expiresAt: sub.expiresAt,
+              lemonSqueezySubscriptionId: sub.lemonSqueezySubscriptionId,
             });
           }
         }
@@ -186,6 +195,64 @@ export default function SettingsPage() {
   // Navigate to pricing
   const handleChoosePlan = () => {
     router.push("/pricing");
+  };
+
+  // Cancel subscription
+  const handleCancelSubscription = async () => {
+    if (!confirm("Вы уверены, что хотите отменить подписку? Вы сможете пользоваться услугами до конца оплаченного периода.")) {
+      return;
+    }
+
+    setSubscriptionLoading(true);
+    setSubscriptionMessage("");
+
+    try {
+      const res = await fetch("/api/subscription/manage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cancel" }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Ошибка отмены подписки");
+      }
+
+      setSubscription({ ...subscription, status: "cancelled" });
+      setSubscriptionMessage(data.message);
+    } catch (err) {
+      setSubscriptionMessage(err instanceof Error ? err.message : "Ошибка отмены подписки");
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+
+  // Resume subscription
+  const handleResumeSubscription = async () => {
+    setSubscriptionLoading(true);
+    setSubscriptionMessage("");
+
+    try {
+      const res = await fetch("/api/subscription/manage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "resume" }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Ошибка возобновления подписки");
+      }
+
+      setSubscription({ ...subscription, status: "active" });
+      setSubscriptionMessage(data.message);
+    } catch (err) {
+      setSubscriptionMessage(err instanceof Error ? err.message : "Ошибка возобновления подписки");
+    } finally {
+      setSubscriptionLoading(false);
+    }
   };
 
   const tabs = [
@@ -358,6 +425,22 @@ export default function SettingsPage() {
       {/* Subscription Tab */}
       {activeTab === "subscription" && (
         <div className="space-y-4">
+          {/* Message feedback */}
+          {subscriptionMessage && (
+            <div className={`p-4 rounded-xl flex items-center gap-2 ${
+              subscriptionMessage.includes("Ошибка")
+                ? "bg-red-500/10 border border-red-500/30 text-red-400"
+                : "bg-green-500/10 border border-green-500/30 text-green-400"
+            }`}>
+              {subscriptionMessage.includes("Ошибка") ? (
+                <AlertCircle className="h-4 w-4" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
+              {subscriptionMessage}
+            </div>
+          )}
+
           <div className={`${bgCard} rounded-xl border ${borderColor} p-6`}>
             <h3 className={`text-lg font-medium ${textPrimary} mb-2`}>Текущий план</h3>
             <div className="flex items-center justify-between flex-wrap gap-4">
@@ -365,15 +448,30 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-2">
                   <p className={`text-2xl font-bold ${textPrimary}`}>
                     {subscription.plan === 'trial' ? 'Пробный период' :
-                     subscription.plan === 'starter' ? 'Стартовый' :
-                     subscription.plan === 'business' ? 'Бизнес' : 'Корпоративный'}
+                     subscription.plan === 'starter' ? 'Starter' :
+                     subscription.plan === 'pro' ? 'Pro' :
+                     subscription.plan === 'business' ? 'Business' :
+                     subscription.plan === 'enterprise' ? 'Enterprise' : 'Корпоративный'}
                   </p>
-                  <span className="px-2 py-1 bg-yellow-500/20 text-yellow-500 text-xs font-medium rounded-full">
-                    Активен
+                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                    subscription.status === 'active' ? 'bg-green-500/20 text-green-500' :
+                    subscription.status === 'cancelled' ? 'bg-yellow-500/20 text-yellow-500' :
+                    subscription.status === 'past_due' ? 'bg-red-500/20 text-red-500' :
+                    subscription.status === 'expired' ? 'bg-gray-500/20 text-gray-500' :
+                    'bg-yellow-500/20 text-yellow-500'
+                  }`}>
+                    {subscription.status === 'active' ? 'Активна' :
+                     subscription.status === 'cancelled' ? 'Отменена' :
+                     subscription.status === 'past_due' ? 'Просрочена' :
+                     subscription.status === 'expired' ? 'Истекла' : 'Активна'}
                   </span>
                 </div>
                 <p className={`text-sm ${textSecondary} mt-1`}>
-                  {subscription.plan === 'trial' ? `Осталось ${subscription.daysLeft} дней` : 'Активная подписка'}
+                  {subscription.plan === 'trial'
+                    ? `Осталось ${subscription.daysLeft} дней`
+                    : subscription.status === 'cancelled'
+                    ? `Действует до ${new Date(subscription.expiresAt).toLocaleDateString('ru-RU')}`
+                    : `Продлится ${new Date(subscription.expiresAt).toLocaleDateString('ru-RU')}`}
                 </p>
               </div>
               <div className="text-right">
@@ -391,6 +489,40 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+
+            {/* Subscription management buttons */}
+            {subscription.lemonSqueezySubscriptionId && subscription.plan !== 'trial' && (
+              <div className="mt-4 pt-4 border-t border-white/10">
+                {subscription.status === 'active' && (
+                  <button
+                    onClick={handleCancelSubscription}
+                    disabled={subscriptionLoading}
+                    className={`flex items-center gap-2 text-sm ${textSecondary} hover:text-red-400 transition-colors disabled:opacity-50`}
+                  >
+                    {subscriptionLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <XCircle className="h-4 w-4" />
+                    )}
+                    Отменить подписку
+                  </button>
+                )}
+                {subscription.status === 'cancelled' && (
+                  <button
+                    onClick={handleResumeSubscription}
+                    disabled={subscriptionLoading}
+                    className="flex items-center gap-2 text-sm text-green-500 hover:text-green-400 transition-colors disabled:opacity-50"
+                  >
+                    {subscriptionLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    Возобновить подписку
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Warning about messages */}
@@ -406,10 +538,26 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {/* Cancelled subscription notice */}
+          {subscription.status === 'cancelled' && (
+            <div className="bg-yellow-500/10 rounded-xl border border-yellow-500/20 p-4 flex items-start gap-3">
+              <Calendar className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-yellow-500">Подписка отменена</p>
+                <p className="text-sm text-yellow-500/70">
+                  Вы можете пользоваться услугами до {new Date(subscription.expiresAt).toLocaleDateString('ru-RU')}.
+                  После этого ваш аккаунт будет переведён на бесплатный тариф.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-xl border border-blue-500/20 p-6">
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="h-5 w-5 text-yellow-400" />
-              <h3 className={`text-lg font-medium ${textPrimary}`}>Обновить план</h3>
+              <h3 className={`text-lg font-medium ${textPrimary}`}>
+                {subscription.plan === 'trial' ? 'Выбрать план' : 'Обновить план'}
+              </h3>
             </div>
             <p className={`text-sm ${textSecondary} mb-4`}>
               Получите безлимитные сообщения, приоритетную поддержку и расширенную аналитику
@@ -419,7 +567,7 @@ export default function SettingsPage() {
                 onClick={handleChoosePlan}
                 className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:opacity-90 transition-all"
               >
-                Выбрать план
+                {subscription.plan === 'trial' ? 'Выбрать план' : 'Изменить план'}
               </button>
             </div>
           </div>

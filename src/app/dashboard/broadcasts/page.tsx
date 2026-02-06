@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   Send,
   Plus,
@@ -52,6 +53,7 @@ const statusLabels: Record<string, { label: string; bg: string; text: string }> 
 };
 
 export default function BroadcastsPage() {
+  const { theme } = useTheme();
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -63,6 +65,17 @@ export default function BroadcastsPage() {
   const [targetSegment, setTargetSegment] = useState("all");
   const [sendNow, setSendNow] = useState(true);
   const [creating, setCreating] = useState(false);
+
+  // Theme-aware styles
+  const isDark = theme === "dark";
+  const cardBg = isDark ? "bg-[#12122a]" : "bg-white";
+  const borderColor = isDark ? "border-white/5" : "border-gray-200";
+  const textPrimary = isDark ? "text-white" : "text-gray-900";
+  const textSecondary = isDark ? "text-gray-400" : "text-gray-600";
+  const textTertiary = isDark ? "text-gray-500" : "text-gray-500";
+  const inputBg = isDark ? "bg-white/5" : "bg-gray-50";
+  const inputBorder = isDark ? "border-white/10" : "border-gray-300";
+  const modalBg = isDark ? "bg-[#1a1a2e]" : "bg-white";
 
   useEffect(() => {
     fetchBroadcasts();
@@ -131,8 +144,8 @@ export default function BroadcastsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Рассылки</h1>
-          <p className="text-gray-400 mt-1">
+          <h1 className={`text-2xl font-bold ${textPrimary}`}>Рассылки</h1>
+          <p className={`${textSecondary} mt-1`}>
             Отправляйте сообщения своим клиентам в Telegram
           </p>
         </div>
@@ -147,37 +160,37 @@ export default function BroadcastsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-[#12122a] border border-white/5 rounded-xl p-4">
+        <div className={`${cardBg} border ${borderColor} rounded-xl p-4`}>
           <div className="flex items-center gap-2 mb-2">
-            <MessageSquare className="h-4 w-4 text-blue-400" />
-            <span className="text-xs text-gray-400">Всего рассылок</span>
+            <MessageSquare className="h-4 w-4 text-blue-500" />
+            <span className={`text-xs ${textSecondary}`}>Всего рассылок</span>
           </div>
-          <p className="text-2xl font-bold text-white">{broadcasts.length}</p>
+          <p className={`text-2xl font-bold ${textPrimary}`}>{broadcasts.length}</p>
         </div>
-        <div className="bg-[#12122a] border border-white/5 rounded-xl p-4">
+        <div className={`${cardBg} border ${borderColor} rounded-xl p-4`}>
           <div className="flex items-center gap-2 mb-2">
-            <CheckCircle className="h-4 w-4 text-green-400" />
-            <span className="text-xs text-gray-400">Отправлено</span>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+            <span className={`text-xs ${textSecondary}`}>Отправлено</span>
           </div>
-          <p className="text-2xl font-bold text-white">
+          <p className={`text-2xl font-bold ${textPrimary}`}>
             {broadcasts.filter((b) => b.status === "sent").length}
           </p>
         </div>
-        <div className="bg-[#12122a] border border-white/5 rounded-xl p-4">
+        <div className={`${cardBg} border ${borderColor} rounded-xl p-4`}>
           <div className="flex items-center gap-2 mb-2">
-            <Clock className="h-4 w-4 text-yellow-400" />
-            <span className="text-xs text-gray-400">Черновики</span>
+            <Clock className="h-4 w-4 text-yellow-500" />
+            <span className={`text-xs ${textSecondary}`}>Черновики</span>
           </div>
-          <p className="text-2xl font-bold text-white">
+          <p className={`text-2xl font-bold ${textPrimary}`}>
             {broadcasts.filter((b) => b.status === "draft").length}
           </p>
         </div>
-        <div className="bg-[#12122a] border border-white/5 rounded-xl p-4">
+        <div className={`${cardBg} border ${borderColor} rounded-xl p-4`}>
           <div className="flex items-center gap-2 mb-2">
-            <Send className="h-4 w-4 text-purple-400" />
-            <span className="text-xs text-gray-400">Доставлено сообщений</span>
+            <Send className="h-4 w-4 text-purple-500" />
+            <span className={`text-xs ${textSecondary}`}>Доставлено сообщений</span>
           </div>
-          <p className="text-2xl font-bold text-white">
+          <p className={`text-2xl font-bold ${textPrimary}`}>
             {broadcasts.reduce((sum, b) => sum + b.stats.sent, 0)}
           </p>
         </div>
@@ -197,7 +210,7 @@ export default function BroadcastsPage() {
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               filter === f.key
                 ? "bg-blue-600 text-white"
-                : "bg-white/5 text-gray-400 hover:bg-white/10"
+                : `${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} ${textSecondary}`
             }`}
           >
             {f.label}
@@ -211,10 +224,10 @@ export default function BroadcastsPage() {
           <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
         </div>
       ) : broadcasts.length === 0 ? (
-        <div className="bg-[#12122a] border border-white/5 rounded-xl p-12 text-center">
-          <Send className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-white mb-2">Нет рассылок</h3>
-          <p className="text-gray-400 mb-4">
+        <div className={`${cardBg} border ${borderColor} rounded-xl p-12 text-center`}>
+          <Send className={`h-12 w-12 ${isDark ? "text-gray-600" : "text-gray-400"} mx-auto mb-4`} />
+          <h3 className={`text-lg font-medium ${textPrimary} mb-2`}>Нет рассылок</h3>
+          <p className={`${textSecondary} mb-4`}>
             Создайте первую рассылку для ваших клиентов
           </p>
           <button
@@ -233,12 +246,12 @@ export default function BroadcastsPage() {
             return (
               <div
                 key={broadcast.id}
-                className="bg-[#12122a] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-colors"
+                className={`${cardBg} border ${borderColor} rounded-xl p-5 hover:border-blue-500/20 transition-colors`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-medium text-white truncate">
+                      <h3 className={`text-lg font-medium ${textPrimary} truncate`}>
                         {broadcast.title}
                       </h3>
                       <span
@@ -247,7 +260,7 @@ export default function BroadcastsPage() {
                         {status.label}
                       </span>
                     </div>
-                    <p className="text-gray-400 text-sm mb-3 line-clamp-2">
+                    <p className={`${textSecondary} text-sm mb-3 line-clamp-2`}>
                       {broadcast.content}
                     </p>
                     <div className="flex items-center gap-4 text-sm">
@@ -255,11 +268,11 @@ export default function BroadcastsPage() {
                         {segment.icon}
                         {segment.label}
                       </span>
-                      <span className="text-gray-500">
+                      <span className={textTertiary}>
                         {formatDate(broadcast.createdAt)}
                       </span>
                       {broadcast.sentAt && (
-                        <span className="text-gray-500">
+                        <span className={textTertiary}>
                           Отправлена: {formatDate(broadcast.sentAt)}
                         </span>
                       )}
@@ -269,23 +282,23 @@ export default function BroadcastsPage() {
                   {/* Stats */}
                   <div className="flex items-center gap-6 ml-4">
                     <div className="text-center">
-                      <p className="text-xl font-bold text-white">
+                      <p className={`text-xl font-bold ${textPrimary}`}>
                         {broadcast.stats.total}
                       </p>
-                      <p className="text-xs text-gray-500">Получателей</p>
+                      <p className={`text-xs ${textTertiary}`}>Получателей</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-xl font-bold text-green-400">
+                      <p className="text-xl font-bold text-green-500">
                         {broadcast.stats.sent}
                       </p>
-                      <p className="text-xs text-gray-500">Доставлено</p>
+                      <p className={`text-xs ${textTertiary}`}>Доставлено</p>
                     </div>
                     {broadcast.stats.failed > 0 && (
                       <div className="text-center">
-                        <p className="text-xl font-bold text-red-400">
+                        <p className="text-xl font-bold text-red-500">
                           {broadcast.stats.failed}
                         </p>
-                        <p className="text-xs text-gray-500">Ошибок</p>
+                        <p className={`text-xs ${textTertiary}`}>Ошибок</p>
                       </div>
                     )}
                   </div>
@@ -299,20 +312,20 @@ export default function BroadcastsPage() {
       {/* Create Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1a2e] rounded-2xl p-6 w-full max-w-lg border border-white/10">
+          <div className={`${modalBg} rounded-2xl p-6 w-full max-w-lg border ${isDark ? "border-white/10" : "border-gray-200"}`}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Новая рассылка</h2>
+              <h2 className={`text-xl font-bold ${textPrimary}`}>Новая рассылка</h2>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                className={`p-2 ${isDark ? "hover:bg-white/10" : "hover:bg-gray-100"} rounded-lg transition-colors`}
               >
-                <X className="h-5 w-5 text-gray-400" />
+                <X className={`h-5 w-5 ${textSecondary}`} />
               </button>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
                   Название рассылки
                 </label>
                 <input
@@ -320,12 +333,12 @@ export default function BroadcastsPage() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Новогодняя акция"
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:border-blue-500`}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
                   Текст сообщения
                 </label>
                 <textarea
@@ -333,12 +346,12 @@ export default function BroadcastsPage() {
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="Напишите текст рассылки..."
                   rows={4}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none"
+                  className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none`}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
                   Получатели
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -349,7 +362,7 @@ export default function BroadcastsPage() {
                       className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
                         targetSegment === key
                           ? "bg-blue-600 text-white"
-                          : "bg-white/5 text-gray-400 hover:bg-white/10"
+                          : `${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} ${textSecondary}`
                       }`}
                     >
                       <span className={targetSegment === key ? "text-white" : color}>
@@ -361,7 +374,7 @@ export default function BroadcastsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+              <div className={`flex items-center gap-3 p-3 ${isDark ? "bg-white/5" : "bg-gray-100"} rounded-xl`}>
                 <input
                   type="checkbox"
                   id="sendNow"
@@ -369,7 +382,7 @@ export default function BroadcastsPage() {
                   onChange={(e) => setSendNow(e.target.checked)}
                   className="w-5 h-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500"
                 />
-                <label htmlFor="sendNow" className="text-gray-300">
+                <label htmlFor="sendNow" className={textSecondary}>
                   Отправить сразу
                 </label>
               </div>
@@ -378,7 +391,7 @@ export default function BroadcastsPage() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowModal(false)}
-                className="flex-1 px-4 py-3 bg-white/5 text-gray-300 rounded-xl font-medium hover:bg-white/10 transition-colors"
+                className={`flex-1 px-4 py-3 ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} ${textSecondary} rounded-xl font-medium transition-colors`}
               >
                 Отмена
               </button>

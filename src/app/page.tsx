@@ -503,7 +503,10 @@ export default function Home() {
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <Brain className="h-4 w-4 text-white" />
               </div>
-              <span className="text-lg font-bold">Staffix</span>
+              <div>
+                <span className="text-lg font-bold">Staffix</span>
+                <p className="text-xs text-gray-500">by K-Bridge Co. LTD</p>
+              </div>
             </div>
             <div className="flex items-center gap-6 text-gray-500 text-sm">
               <Link href="/privacy" className="hover:text-white transition-colors">Политика конфиденциальности</Link>
@@ -511,7 +514,7 @@ export default function Home() {
               <Link href="/contacts" className="hover:text-white transition-colors">Контакты</Link>
             </div>
             <p className="text-gray-600 text-sm">
-              © 2025 Staffix. Все права защищены.
+              © 2025 K-Bridge Co. LTD. Все права защищены.
             </p>
           </div>
         </div>

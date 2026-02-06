@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   Brain,
   MessageSquare,
@@ -36,8 +37,17 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
+  const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
+
+  // Theme-aware styles
+  const isDark = theme === "dark";
+  const cardBg = isDark ? "bg-[#12122a]" : "bg-white";
+  const borderColor = isDark ? "border-white/5" : "border-gray-200";
+  const textPrimary = isDark ? "text-white" : "text-gray-900";
+  const textSecondary = isDark ? "text-gray-400" : "text-gray-600";
+  const textTertiary = isDark ? "text-gray-500" : "text-gray-500";
 
   useEffect(() => {
     const fetchData = async () => {
@@ -94,28 +104,28 @@ export default function DashboardPage() {
     <div className="space-y-8">
       {/* Welcome header */}
       <div>
-        <h1 className="text-2xl font-bold text-white mb-2">
+        <h1 className={`text-2xl font-bold ${textPrimary} mb-2`}>
           Добро пожаловать в Staffix! 👋
         </h1>
-        <p className="text-gray-400">
+        <p className={textSecondary}>
           Управляйте своим AI-сотрудником и отслеживайте эффективность
         </p>
       </div>
 
       {/* Alert if bot not connected */}
       {!botConnected && (
-        <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-xl p-5 flex items-start gap-4">
+        <div className={`${isDark ? "bg-gradient-to-r from-yellow-500/10 to-orange-500/10" : "bg-yellow-50"} border border-yellow-500/30 rounded-xl p-5 flex items-start gap-4`}>
           <div className="w-10 h-10 bg-yellow-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
-            <AlertCircle className="h-5 w-5 text-yellow-400" />
+            <AlertCircle className="h-5 w-5 text-yellow-500" />
           </div>
           <div className="flex-1">
-            <h3 className="font-semibold text-white mb-1">AI-сотрудник не активирован</h3>
-            <p className="text-sm text-gray-400 mb-3">
+            <h3 className={`font-semibold ${textPrimary} mb-1`}>AI-сотрудник не активирован</h3>
+            <p className={`text-sm ${textSecondary} mb-3`}>
               Подключите Telegram бота, чтобы ваш AI-сотрудник начал отвечать клиентам.
             </p>
             <Link
               href="/dashboard/bot"
-              className="inline-flex items-center gap-2 text-sm font-medium text-yellow-400 hover:text-yellow-300 transition-colors"
+              className="inline-flex items-center gap-2 text-sm font-medium text-yellow-600 hover:text-yellow-500 transition-colors"
             >
               Активировать сотрудника <ArrowRight className="h-4 w-4" />
             </Link>
@@ -132,6 +142,11 @@ export default function DashboardPage() {
           subtitle={botConnected ? `@${data?.business.botUsername}` : "требуется настройка"}
           gradient="from-blue-500 to-purple-500"
           status={botConnected ? "success" : "warning"}
+          cardBg={cardBg}
+          borderColor={borderColor}
+          textPrimary={textPrimary}
+          textSecondary={textSecondary}
+          textTertiary={textTertiary}
         />
         <StatCard
           icon={<MessageSquare className="h-5 w-5" />}
@@ -140,6 +155,11 @@ export default function DashboardPage() {
           subtitle={`из ${data?.subscription.messagesLimit || 100} доступных`}
           gradient="from-cyan-500 to-blue-500"
           progress={(data?.subscription.messagesUsed || 0) / (data?.subscription.messagesLimit || 100) * 100}
+          cardBg={cardBg}
+          borderColor={borderColor}
+          textPrimary={textPrimary}
+          textSecondary={textSecondary}
+          textTertiary={textTertiary}
         />
         <StatCard
           icon={<Calendar className="h-5 w-5" />}
@@ -147,6 +167,11 @@ export default function DashboardPage() {
           value={data?.stats.bookingsToday?.toString() || "0"}
           subtitle="новых записей"
           gradient="from-green-500 to-emerald-500"
+          cardBg={cardBg}
+          borderColor={borderColor}
+          textPrimary={textPrimary}
+          textSecondary={textSecondary}
+          textTertiary={textTertiary}
         />
         <StatCard
           icon={<Users className="h-5 w-5" />}
@@ -154,12 +179,17 @@ export default function DashboardPage() {
           value={data?.stats.totalClients?.toString() || "0"}
           subtitle="всего обращений"
           gradient="from-purple-500 to-pink-500"
+          cardBg={cardBg}
+          borderColor={borderColor}
+          textPrimary={textPrimary}
+          textSecondary={textSecondary}
+          textTertiary={textTertiary}
         />
       </div>
 
       {/* Quick Setup */}
       <div>
-        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+        <h2 className={`text-lg font-semibold ${textPrimary} mb-4 flex items-center gap-2`}>
           <Sparkles className="h-5 w-5 text-yellow-400" />
           Быстрая настройка
         </h2>
@@ -171,6 +201,11 @@ export default function DashboardPage() {
             description="Подключите Telegram бота"
             completed={botConnected}
             step={1}
+            cardBg={cardBg}
+            borderColor={borderColor}
+            textPrimary={textPrimary}
+            textSecondary={textSecondary}
+            isDark={isDark}
           />
           <SetupCard
             href="/dashboard/services"
@@ -179,6 +214,11 @@ export default function DashboardPage() {
             description="Укажите услуги и цены"
             completed={false}
             step={2}
+            cardBg={cardBg}
+            borderColor={borderColor}
+            textPrimary={textPrimary}
+            textSecondary={textSecondary}
+            isDark={isDark}
           />
           <SetupCard
             href="/dashboard/staff"
@@ -187,6 +227,11 @@ export default function DashboardPage() {
             description="Настройте мастеров"
             completed={false}
             step={3}
+            cardBg={cardBg}
+            borderColor={borderColor}
+            textPrimary={textPrimary}
+            textSecondary={textSecondary}
+            isDark={isDark}
           />
           <SetupCard
             href="/dashboard/faq"
@@ -195,6 +240,11 @@ export default function DashboardPage() {
             description="Добавьте FAQ"
             completed={false}
             step={4}
+            cardBg={cardBg}
+            borderColor={borderColor}
+            textPrimary={textPrimary}
+            textSecondary={textSecondary}
+            isDark={isDark}
           />
         </div>
       </div>
@@ -202,32 +252,32 @@ export default function DashboardPage() {
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent bookings */}
-        <div className="bg-[#12122a] border border-white/5 rounded-xl p-6">
+        <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-white">Последние записи</h3>
-            <Link href="/dashboard/bookings" className="text-sm text-blue-400 hover:text-blue-300">
+            <h3 className={`font-semibold ${textPrimary}`}>Последние записи</h3>
+            <Link href="/dashboard/bookings" className="text-sm text-blue-500 hover:text-blue-400">
               Все записи →
             </Link>
           </div>
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <Calendar className="h-12 w-12 text-gray-600 mb-3" />
-            <p className="text-gray-400">Пока нет записей</p>
-            <p className="text-sm text-gray-500 mt-1">
+            <Calendar className={`h-12 w-12 ${isDark ? "text-gray-600" : "text-gray-400"} mb-3`} />
+            <p className={textSecondary}>Пока нет записей</p>
+            <p className={`text-sm ${textTertiary} mt-1`}>
               Записи появятся, когда клиенты начнут бронировать через AI
             </p>
           </div>
         </div>
 
         {/* Activity feed */}
-        <div className="bg-[#12122a] border border-white/5 rounded-xl p-6">
+        <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-white">Активность</h3>
-            <span className="text-sm text-gray-500">Последние 7 дней</span>
+            <h3 className={`font-semibold ${textPrimary}`}>Активность</h3>
+            <span className={`text-sm ${textTertiary}`}>Последние 7 дней</span>
           </div>
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <TrendingUp className="h-12 w-12 text-gray-600 mb-3" />
-            <p className="text-gray-400">Нет данных за этот период</p>
-            <p className="text-sm text-gray-500 mt-1">
+            <TrendingUp className={`h-12 w-12 ${isDark ? "text-gray-600" : "text-gray-400"} mb-3`} />
+            <p className={textSecondary}>Нет данных за этот период</p>
+            <p className={`text-sm ${textTertiary} mt-1`}>
               Статистика появится после активации AI-сотрудника
             </p>
           </div>
@@ -245,6 +295,11 @@ function StatCard({
   gradient,
   status,
   progress,
+  cardBg,
+  borderColor,
+  textPrimary,
+  textSecondary,
+  textTertiary,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -253,16 +308,21 @@ function StatCard({
   gradient: string;
   status?: "success" | "warning";
   progress?: number;
+  cardBg: string;
+  borderColor: string;
+  textPrimary: string;
+  textSecondary: string;
+  textTertiary: string;
 }) {
   return (
-    <div className="bg-[#12122a] border border-white/5 rounded-xl p-5 hover:border-white/10 transition-all">
+    <div className={`${cardBg} border ${borderColor} rounded-xl p-5 hover:border-blue-500/20 transition-all`}>
       <div className="flex items-start justify-between mb-3">
         <div className={`w-10 h-10 bg-gradient-to-br ${gradient} rounded-xl flex items-center justify-center text-white`}>
           {icon}
         </div>
         {status && (
           <div className={`flex items-center gap-1.5 text-xs ${
-            status === "success" ? "text-green-400" : "text-yellow-400"
+            status === "success" ? "text-green-500" : "text-yellow-500"
           }`}>
             {status === "success" ? (
               <CheckCircle2 className="h-3.5 w-3.5" />
@@ -273,11 +333,11 @@ function StatCard({
           </div>
         )}
       </div>
-      <p className="text-sm text-gray-400 mb-1">{title}</p>
-      <p className="text-2xl font-bold text-white mb-1">{value}</p>
-      <p className="text-xs text-gray-500">{subtitle}</p>
+      <p className={`text-sm ${textSecondary} mb-1`}>{title}</p>
+      <p className={`text-2xl font-bold ${textPrimary} mb-1`}>{value}</p>
+      <p className={`text-xs ${textTertiary}`}>{subtitle}</p>
       {progress !== undefined && (
-        <div className="mt-3 h-1.5 bg-white/10 rounded-full overflow-hidden">
+        <div className="mt-3 h-1.5 bg-gray-200 dark:bg-white/10 rounded-full overflow-hidden">
           <div
             className={`h-full bg-gradient-to-r ${gradient} rounded-full transition-all`}
             style={{ width: `${Math.min(100, progress)}%` }}
@@ -295,6 +355,11 @@ function SetupCard({
   description,
   completed,
   step,
+  cardBg,
+  borderColor,
+  textPrimary,
+  textSecondary,
+  isDark,
 }: {
   href: string;
   icon: React.ReactNode;
@@ -302,14 +367,19 @@ function SetupCard({
   description: string;
   completed: boolean;
   step: number;
+  cardBg: string;
+  borderColor: string;
+  textPrimary: string;
+  textSecondary: string;
+  isDark: boolean;
 }) {
   return (
     <Link
       href={href}
-      className={`relative bg-[#12122a] border rounded-xl p-5 transition-all group ${
+      className={`relative ${cardBg} border rounded-xl p-5 transition-all group ${
         completed
           ? "border-green-500/30 hover:border-green-500/50"
-          : "border-white/5 hover:border-white/20"
+          : `${borderColor} hover:border-blue-500/30`
       }`}
     >
       {/* Step badge */}
@@ -319,19 +389,19 @@ function SetupCard({
             <CheckCircle2 className="h-4 w-4 text-white" />
           </div>
         ) : (
-          <div className="w-6 h-6 bg-gray-700 rounded-full flex items-center justify-center text-xs font-bold text-gray-400">
+          <div className={`w-6 h-6 ${isDark ? "bg-gray-700" : "bg-gray-200"} rounded-full flex items-center justify-center text-xs font-bold ${isDark ? "text-gray-400" : "text-gray-600"}`}>
             {step}
           </div>
         )}
       </div>
 
-      <div className={`mb-3 ${completed ? "text-green-400" : "text-gray-400 group-hover:text-white"} transition-colors`}>
+      <div className={`mb-3 ${completed ? "text-green-500" : `${textSecondary} group-hover:text-blue-500`} transition-colors`}>
         {icon}
       </div>
-      <h3 className={`font-medium mb-1 ${completed ? "text-green-400" : "text-white"}`}>
+      <h3 className={`font-medium mb-1 ${completed ? "text-green-500" : textPrimary}`}>
         {title}
       </h3>
-      <p className="text-sm text-gray-500">{description}</p>
+      <p className={`text-sm ${textSecondary}`}>{description}</p>
     </Link>
   );
 }
