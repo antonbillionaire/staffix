@@ -44,7 +44,6 @@ export async function POST(request: Request) {
 
     // Generate 6-digit verification code
     const verificationCode = generateVerificationCode();
-    const verificationExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     // Create user with business and trial subscription
     const user = await prisma.user.create({
@@ -54,7 +53,6 @@ export async function POST(request: Request) {
         password: hashedPassword,
         emailVerified: false,
         verificationToken: verificationCode, // Store 6-digit code
-        verificationExpires,
         businesses: {
           create: {
             name: businessName,
