@@ -8,6 +8,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 interface Service {
   id: string;
   name: string;
+  description: string | null;
   price: number;
   duration: number;
 }
@@ -24,6 +25,7 @@ export default function ServicesPage() {
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [formData, setFormData] = useState({
     name: "",
+    description: "",
     price: "",
     duration: "",
   });
@@ -52,12 +54,13 @@ export default function ServicesPage() {
       setEditingService(service);
       setFormData({
         name: service.name,
+        description: service.description || "",
         price: service.price.toString(),
         duration: service.duration.toString(),
       });
     } else {
       setEditingService(null);
-      setFormData({ name: "", price: "", duration: "" });
+      setFormData({ name: "", description: "", price: "", duration: "" });
     }
     setIsModalOpen(true);
   };
@@ -65,7 +68,7 @@ export default function ServicesPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingService(null);
-    setFormData({ name: "", price: "", duration: "" });
+    setFormData({ name: "", description: "", price: "", duration: "" });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -178,8 +181,13 @@ export default function ServicesPage() {
             <tbody className={`divide-y ${isDark ? "divide-white/5" : "divide-gray-200"}`}>
               {services.map((service) => (
                 <tr key={service.id} className={`${isDark ? "hover:bg-white/5" : "hover:bg-gray-50"}`}>
-                  <td className={`px-4 py-3 font-medium ${isDark ? "text-white" : "text-gray-900"}`}>
-                    {service.name}
+                  <td className={`px-4 py-3 ${isDark ? "text-white" : "text-gray-900"}`}>
+                    <div className="font-medium">{service.name}</div>
+                    {service.description && (
+                      <div className={`text-sm mt-0.5 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                        {service.description}
+                      </div>
+                    )}
                   </td>
                   <td className={`px-4 py-3 ${isDark ? "text-gray-300" : "text-gray-600"}`}>
                     {formatPrice(service.price)}
@@ -238,6 +246,21 @@ export default function ServicesPage() {
                   }
                   placeholder={t("servicesPage.serviceNamePlaceholder")}
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
+                  Описание
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                  placeholder="Опишите процедуру, что входит, особенности..."
+                  rows={3}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
                 />
               </div>
 

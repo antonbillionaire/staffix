@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     }
 
     const data = await request.json();
-    const { name, price, duration } = data;
+    const { name, price, duration, description } = data;
 
     if (!name || !price || !duration) {
       return NextResponse.json(
@@ -94,6 +94,7 @@ export async function POST(request: Request) {
     const service = await prisma.service.create({
       data: {
         name,
+        description: description || null,
         price: parseInt(price),
         duration: parseInt(duration),
         businessId: business.id,

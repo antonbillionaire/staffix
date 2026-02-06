@@ -30,7 +30,7 @@ export async function PUT(
 
     const { id } = await params;
     const data = await request.json();
-    const { name, role } = data;
+    const { name, role, photo } = data;
 
     const person = await prisma.staff.findUnique({
       where: { id },
@@ -46,6 +46,7 @@ export async function PUT(
       data: {
         name: name || undefined,
         role: role !== undefined ? role : undefined,
+        photo: photo !== undefined ? (photo || null) : undefined,
       },
     });
 

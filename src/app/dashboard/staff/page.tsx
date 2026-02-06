@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, X, User, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, X, User, Loader2, Camera } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -9,6 +9,7 @@ interface Staff {
   id: string;
   name: string;
   role: string;
+  photo: string | null;
 }
 
 export default function StaffPage() {
@@ -25,6 +26,7 @@ export default function StaffPage() {
   const [formData, setFormData] = useState({
     name: "",
     role: "",
+    photo: "",
   });
 
   // Загрузка сотрудников из базы данных
@@ -52,10 +54,11 @@ export default function StaffPage() {
       setFormData({
         name: person.name,
         role: person.role,
+        photo: person.photo || "",
       });
     } else {
       setEditingStaff(null);
-      setFormData({ name: "", role: "" });
+      setFormData({ name: "", role: "", photo: "" });
     }
     setIsModalOpen(true);
   };
@@ -63,7 +66,7 @@ export default function StaffPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingStaff(null);
-    setFormData({ name: "", role: "" });
+    setFormData({ name: "", role: "", photo: "" });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -155,9 +158,18 @@ export default function StaffPage() {
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`w-12 h-12 ${isDark ? "bg-blue-500/20" : "bg-blue-100"} rounded-full flex items-center justify-center`}>
-                    <User className={`h-6 w-6 ${isDark ? "text-blue-400" : "text-blue-600"}`} />
-                  </div>
+                  {person.photo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={person.photo}
+                      alt={person.name}
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className={`w-12 h-12 ${isDark ? "bg-blue-500/20" : "bg-blue-100"} rounded-full flex items-center justify-center`}>
+                      <User className={`h-6 w-6 ${isDark ? "text-blue-400" : "text-blue-600"}`} />
+                    </div>
+                  )}
                   <div>
                     <h3 className={`font-medium ${isDark ? "text-white" : "text-gray-900"}`}>{person.name}</h3>
                     <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>{person.role}</p>
@@ -230,6 +242,57 @@ export default function StaffPage() {
                   placeholder={t("staffPage.rolePlaceholder")}
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
                 />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
+                  Фото
+                </label>
+                <div className="flex items-center gap-3">
+                  {formData.photo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={formData.photo}
+                      alt="preview"
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className={`w-12 h-12 ${isDark ? "bg-white/5" : "bg-gray-100"} rounded-full flex items-center justify-center`}>
+                      <Camera className={`h-5 w-5 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
+                    </div>
+                  )}
+                  <label className={`cursor-pointer text-sm px-3 py-1.5 border rounded-lg ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}>
+                    Загрузить
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 500 * 1024) {
+                            alert("Файл слишком большой (макс. 500 KB)");
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            setFormData({ ...formData, photo: reader.result as string });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                  {formData.photo && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, photo: "" })}
+                      className="text-sm text-red-500 hover:text-red-400"
+                    >
+                      Удалить
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-3 pt-2">

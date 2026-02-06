@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     }
 
     const data = await request.json();
-    const { name, role } = data;
+    const { name, role, photo } = data;
 
     if (!name) {
       return NextResponse.json({ error: "Имя обязательно" }, { status: 400 });
@@ -74,6 +74,7 @@ export async function POST(request: Request) {
       data: {
         name,
         role: role || null,
+        photo: photo || null,
         businessId: business.id,
       },
     });

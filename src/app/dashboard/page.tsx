@@ -19,6 +19,15 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
+interface RecentBooking {
+  id: string;
+  clientName: string;
+  date: string;
+  serviceName: string | null;
+  staffName: string | null;
+  status: string;
+}
+
 interface DashboardData {
   business: {
     name: string;
@@ -35,6 +44,7 @@ interface DashboardData {
     totalClients: number;
     totalMessages: number;
   };
+  recentBookings: RecentBooking[];
 }
 
 export default function DashboardPage() {
@@ -54,9 +64,26 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch("/api/business");
-        if (res.ok) {
-          const result = await res.json();
+        const [bizRes, bookingsRes] = await Promise.all([
+          fetch("/api/business"),
+          fetch("/api/bookings"),
+        ]);
+
+        let recentBookings: RecentBooking[] = [];
+        if (bookingsRes.ok) {
+          const bookingsData = await bookingsRes.json();
+          recentBookings = (bookingsData.bookings || []).slice(0, 5).map((b: { id: string; clientName: string; date: string; serviceName: string | null; staffName: string | null; status: string }) => ({
+            id: b.id,
+            clientName: b.clientName,
+            date: b.date,
+            serviceName: b.serviceName,
+            staffName: b.staffName,
+            status: b.status,
+          }));
+        }
+
+        if (bizRes.ok) {
+          const result = await bizRes.json();
           if (result.business) {
             const sub = result.business.subscription;
             const daysLeft = sub ? Math.max(0, Math.ceil(
@@ -79,6 +106,7 @@ export default function DashboardPage() {
                 totalClients: result.stats?.totalClients || 0,
                 totalMessages: sub?.messagesUsed || 0,
               },
+              recentBookings,
             });
           }
         }
@@ -265,13 +293,36 @@ export default function DashboardPage() {
               {t("dashboard.allBookings")} →
             </Link>
           </div>
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <Calendar className={`h-12 w-12 ${isDark ? "text-gray-600" : "text-gray-400"} mb-3`} />
-            <p className={textSecondary}>{t("dashboard.noBookingsYet")}</p>
-            <p className={`text-sm ${textTertiary} mt-1`}>
-              {t("dashboard.bookingsWillAppear")}
-            </p>
-          </div>
+          {data?.recentBookings && data.recentBookings.length > 0 ? (
+            <div className="space-y-3">
+              {data.recentBookings.map((b) => (
+                <div key={b.id} className={`flex items-center justify-between py-2 border-b last:border-0 ${isDark ? "border-white/5" : "border-gray-100"}`}>
+                  <div>
+                    <p className={`font-medium text-sm ${textPrimary}`}>{b.clientName}</p>
+                    <p className={`text-xs ${textTertiary}`}>
+                      {b.serviceName || "Услуга"}{b.staffName ? ` · ${b.staffName}` : ""}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-sm ${textSecondary}`}>
+                      {new Date(b.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                    </p>
+                    <p className={`text-xs ${textTertiary}`}>
+                      {new Date(b.date).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Calendar className={`h-12 w-12 ${isDark ? "text-gray-600" : "text-gray-400"} mb-3`} />
+              <p className={textSecondary}>{t("dashboard.noBookingsYet")}</p>
+              <p className={`text-sm ${textTertiary} mt-1`}>
+                {t("dashboard.bookingsWillAppear")}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Activity feed */}
@@ -280,13 +331,34 @@ export default function DashboardPage() {
             <h3 className={`font-semibold ${textPrimary}`}>{t("dashboard.activity")}</h3>
             <span className={`text-sm ${textTertiary}`}>{t("dashboard.last7Days")}</span>
           </div>
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <TrendingUp className={`h-12 w-12 ${isDark ? "text-gray-600" : "text-gray-400"} mb-3`} />
-            <p className={textSecondary}>{t("dashboard.noDataPeriod")}</p>
-            <p className={`text-sm ${textTertiary} mt-1`}>
-              {t("dashboard.statsAfterActivation")}
-            </p>
-          </div>
+          {botConnected ? (
+            <div className="space-y-4">
+              <div className={`flex items-center justify-between py-2 border-b ${isDark ? "border-white/5" : "border-gray-100"}`}>
+                <span className={`text-sm ${textSecondary}`}>Сообщений</span>
+                <span className={`font-semibold ${textPrimary}`}>{data?.stats.totalMessages || 0}</span>
+              </div>
+              <div className={`flex items-center justify-between py-2 border-b ${isDark ? "border-white/5" : "border-gray-100"}`}>
+                <span className={`text-sm ${textSecondary}`}>Записей сегодня</span>
+                <span className={`font-semibold ${textPrimary}`}>{data?.stats.bookingsToday || 0}</span>
+              </div>
+              <div className={`flex items-center justify-between py-2 border-b ${isDark ? "border-white/5" : "border-gray-100"}`}>
+                <span className={`text-sm ${textSecondary}`}>Клиентов</span>
+                <span className={`font-semibold ${textPrimary}`}>{data?.stats.totalClients || 0}</span>
+              </div>
+              <div className={`flex items-center justify-between py-2`}>
+                <span className={`text-sm ${textSecondary}`}>Подписка</span>
+                <span className={`font-semibold ${textPrimary}`}>{data?.subscription.daysLeft} дн.</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <TrendingUp className={`h-12 w-12 ${isDark ? "text-gray-600" : "text-gray-400"} mb-3`} />
+              <p className={textSecondary}>{t("dashboard.noDataPeriod")}</p>
+              <p className={`text-sm ${textTertiary} mt-1`}>
+                {t("dashboard.statsAfterActivation")}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

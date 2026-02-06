@@ -121,6 +121,7 @@ model Business {
 model Service {
   id            String    @id @default(cuid())
   name          String
+  description   String?   // описание услуги
   price         Int
   duration      Int       // минуты
 
@@ -135,6 +136,7 @@ model Staff {
   id            String    @id @default(cuid())
   name          String
   role          String?
+  photo         String?   // base64 data URL или URL к фото
 
   businessId    String
   business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)

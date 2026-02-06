@@ -30,7 +30,7 @@ export async function PUT(
 
     const { id } = await params;
     const data = await request.json();
-    const { name, price, duration } = data;
+    const { name, price, duration, description } = data;
 
     // Verify service belongs to user's business
     const service = await prisma.service.findUnique({
@@ -46,6 +46,7 @@ export async function PUT(
       where: { id },
       data: {
         name: name || undefined,
+        description: description !== undefined ? (description || null) : undefined,
         price: price ? parseInt(price) : undefined,
         duration: duration ? parseInt(duration) : undefined,
       },
