@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Plus, Pencil, Trash2, X, User } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface Staff {
   id: number;
@@ -10,6 +12,10 @@ interface Staff {
 }
 
 export default function StaffPage() {
+  const { t } = useLanguage();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
   const [staff, setStaff] = useState<Staff[]>([
     { id: 1, name: "Анна", role: "Стилист" },
     { id: 2, name: "Мария", role: "Мастер маникюра" },
@@ -73,7 +79,7 @@ export default function StaffPage() {
   };
 
   const deletePerson = (id: number) => {
-    if (confirm("Удалить мастера?")) {
+    if (confirm(t("staffPage.deleteConfirm"))) {
       setStaff(staff.filter((s) => s.id !== id));
     }
   };
@@ -82,9 +88,9 @@ export default function StaffPage() {
     <div className="max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Мастера</h2>
-          <p className="text-sm text-gray-500">
-            Сотрудники, к которым можно записаться
+          <h2 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>{t("staffPage.title")}</h2>
+          <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            {t("staffPage.subtitle")}
           </p>
         </div>
         <button
@@ -92,45 +98,45 @@ export default function StaffPage() {
           className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
-          Добавить
+          {t("staffPage.add")}
         </button>
       </div>
 
       {/* Staff list */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {staff.length === 0 ? (
-          <div className="col-span-full bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
-            <p>Нет мастеров</p>
+          <div className={`col-span-full ${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border p-8 text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            <p>{t("staffPage.noStaff")}</p>
             <p className="text-sm mt-1">
-              Добавьте мастеров, чтобы клиенты могли выбрать к кому записаться
+              {t("staffPage.noStaffDesc")}
             </p>
           </div>
         ) : (
           staff.map((person) => (
             <div
               key={person.id}
-              className="bg-white rounded-lg border border-gray-200 p-4"
+              className={`${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border p-4`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                    <User className="h-6 w-6 text-blue-600" />
+                  <div className={`w-12 h-12 ${isDark ? "bg-blue-500/20" : "bg-blue-100"} rounded-full flex items-center justify-center`}>
+                    <User className={`h-6 w-6 ${isDark ? "text-blue-400" : "text-blue-600"}`} />
                   </div>
                   <div>
-                    <h3 className="font-medium text-gray-900">{person.name}</h3>
-                    <p className="text-sm text-gray-500">{person.role}</p>
+                    <h3 className={`font-medium ${isDark ? "text-white" : "text-gray-900"}`}>{person.name}</h3>
+                    <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>{person.role}</p>
                   </div>
                 </div>
                 <div className="flex gap-1">
                   <button
                     onClick={() => openModal(person)}
-                    className="text-gray-400 hover:text-blue-600 p-1"
+                    className={`${isDark ? "text-gray-500 hover:text-blue-400" : "text-gray-400 hover:text-blue-600"} p-1`}
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => deletePerson(person.id)}
-                    className="text-gray-400 hover:text-red-600 p-1"
+                    className={`${isDark ? "text-gray-500 hover:text-red-400" : "text-gray-400 hover:text-red-600"} p-1`}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -144,14 +150,14 @@ export default function StaffPage() {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <div className={`${isDark ? "bg-[#12122a]" : "bg-white"} rounded-lg p-6 w-full max-w-md mx-4`}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {editingStaff ? "Редактировать мастера" : "Новый мастер"}
+              <h3 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+                {editingStaff ? t("staffPage.editStaff") : t("staffPage.newStaff")}
               </h3>
               <button
                 onClick={closeModal}
-                className="text-gray-400 hover:text-gray-600"
+                className={`${isDark ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"}`}
               >
                 <X className="h-5 w-5" />
               </button>
@@ -159,8 +165,8 @@ export default function StaffPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Имя
+                <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
+                  {t("staffPage.name")}
                 </label>
                 <input
                   type="text"
@@ -169,14 +175,14 @@ export default function StaffPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  placeholder="Анна"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder={t("staffPage.namePlaceholder")}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Должность / Специализация
+                <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
+                  {t("staffPage.role")}
                 </label>
                 <input
                   type="text"
@@ -185,8 +191,8 @@ export default function StaffPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, role: e.target.value })
                   }
-                  placeholder="Стилист"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder={t("staffPage.rolePlaceholder")}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
                 />
               </div>
 
@@ -194,15 +200,15 @@ export default function StaffPage() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
+                  className={`flex-1 px-4 py-2 border rounded-lg font-medium ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
                 >
-                  Отмена
+                  {t("staffPage.cancel")}
                 </button>
                 <button
                   type="submit"
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
                 >
-                  {editingStaff ? "Сохранить" : "Добавить"}
+                  {editingStaff ? t("staffPage.save") : t("staffPage.add")}
                 </button>
               </div>
             </form>

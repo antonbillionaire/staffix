@@ -1,6 +1,8 @@
 "use client";
 
 import { Calendar, Clock, User, Phone } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface Booking {
   id: number;
@@ -14,6 +16,10 @@ interface Booking {
 }
 
 export default function BookingsPage() {
+  const { t, language } = useLanguage();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
   // В реальном приложении данные будут загружаться с API
   const bookings: Booking[] = [
     {
@@ -40,27 +46,28 @@ export default function BookingsPage() {
 
   const getStatusBadge = (status: Booking["status"]) => {
     const styles = {
-      pending: "bg-yellow-100 text-yellow-800",
-      confirmed: "bg-green-100 text-green-800",
-      completed: "bg-gray-100 text-gray-800",
-      cancelled: "bg-red-100 text-red-800",
+      pending: isDark ? "bg-yellow-500/20 text-yellow-400" : "bg-yellow-100 text-yellow-800",
+      confirmed: isDark ? "bg-green-500/20 text-green-400" : "bg-green-100 text-green-800",
+      completed: isDark ? "bg-gray-500/20 text-gray-400" : "bg-gray-100 text-gray-800",
+      cancelled: isDark ? "bg-red-500/20 text-red-400" : "bg-red-100 text-red-800",
     };
-    const labels = {
-      pending: "Ожидает",
-      confirmed: "Подтверждено",
-      completed: "Завершено",
-      cancelled: "Отменено",
+    const labelKeys = {
+      pending: "bookingsPage.pending",
+      confirmed: "bookingsPage.confirmed",
+      completed: "bookingsPage.completed",
+      cancelled: "bookingsPage.cancelled",
     };
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status]}`}>
-        {labels[status]}
+        {t(labelKeys[status])}
       </span>
     );
   };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString("ru-RU", {
+    const locale = language === "ru" ? "ru-RU" : language === "kz" ? "kk-KZ" : language === "uz" ? "uz-UZ" : "en-US";
+    return date.toLocaleDateString(locale, {
       weekday: "short",
       day: "numeric",
       month: "short",
@@ -70,54 +77,54 @@ export default function BookingsPage() {
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
-        <h2 className="text-lg font-semibold text-gray-900">Записи</h2>
-        <p className="text-sm text-gray-500">
-          Все записи клиентов через бота
+        <h2 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>{t("bookingsPage.title")}</h2>
+        <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+          {t("bookingsPage.subtitle")}
         </p>
       </div>
 
       {/* Bookings list */}
       <div className="space-y-4">
         {bookings.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
-            <Calendar className="h-12 w-12 mx-auto text-gray-300 mb-3" />
-            <p>Пока нет записей</p>
+          <div className={`${isDark ? "bg-[#12122a] border-white/5 text-gray-400" : "bg-white border-gray-200 text-gray-500"} rounded-lg border p-8 text-center`}>
+            <Calendar className={`h-12 w-12 mx-auto ${isDark ? "text-gray-600" : "text-gray-300"} mb-3`} />
+            <p>{t("bookingsPage.noBookings")}</p>
             <p className="text-sm mt-1">
-              Когда клиенты начнут записываться через бота, записи появятся здесь
+              {t("bookingsPage.noBookingsDesc")}
             </p>
           </div>
         ) : (
           bookings.map((booking) => (
             <div
               key={booking.id}
-              className="bg-white rounded-lg border border-gray-200 p-4"
+              className={`${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border p-4`}
             >
               <div className="flex items-start justify-between">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-gray-400" />
-                    <span className="font-medium text-gray-900">
+                    <User className={`h-4 w-4 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
+                    <span className={`font-medium ${isDark ? "text-white" : "text-gray-900"}`}>
                       {booking.clientName}
                     </span>
                     {getStatusBadge(booking.status)}
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Phone className="h-4 w-4 text-gray-400" />
+                  <div className={`flex items-center gap-2 text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                    <Phone className={`h-4 w-4 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
                     {booking.clientPhone}
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
                     <span className="font-medium">{booking.service}</span>
                     {" · "}
                     {booking.staff}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="flex items-center gap-1 text-gray-900 font-medium">
-                    <Calendar className="h-4 w-4 text-gray-400" />
+                  <div className={`flex items-center gap-1 font-medium ${isDark ? "text-white" : "text-gray-900"}`}>
+                    <Calendar className={`h-4 w-4 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
                     {formatDate(booking.date)}
                   </div>
-                  <div className="flex items-center gap-1 text-gray-600 mt-1">
-                    <Clock className="h-4 w-4 text-gray-400" />
+                  <div className={`flex items-center gap-1 mt-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                    <Clock className={`h-4 w-4 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
                     {booking.time}
                   </div>
                 </div>

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface Service {
   id: number;
@@ -11,6 +13,9 @@ interface Service {
 }
 
 export default function ServicesPage() {
+  const { t, language } = useLanguage();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const [services, setServices] = useState<Service[]>([
     { id: 1, name: "Стрижка женская", price: 100000, duration: 60 },
     { id: 2, name: "Стрижка мужская", price: 50000, duration: 30 },
@@ -78,22 +83,24 @@ export default function ServicesPage() {
   };
 
   const deleteService = (id: number) => {
-    if (confirm("Удалить услугу?")) {
+    if (confirm(t("servicesPage.deleteConfirm"))) {
       setServices(services.filter((s) => s.id !== id));
     }
   };
 
   const formatPrice = (price: number) => {
-    return price.toLocaleString("ru-RU") + " сум";
+    const locale = language === "ru" ? "ru-RU" : language === "kz" ? "kk-KZ" : language === "uz" ? "uz-UZ" : "en-US";
+    const currency = language === "en" ? "$" : language === "kz" ? " тг" : language === "uz" ? " so'm" : " сум";
+    return price.toLocaleString(locale) + currency;
   };
 
   return (
     <div className="max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Услуги</h2>
-          <p className="text-sm text-gray-500">
-            Услуги, которые бот предлагает клиентам
+          <h2 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>{t("servicesPage.title")}</h2>
+          <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            {t("servicesPage.subtitle")}
           </p>
         </div>
         <button
@@ -101,59 +108,59 @@ export default function ServicesPage() {
           className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
-          Добавить
+          {t("servicesPage.add")}
         </button>
       </div>
 
       {/* Services list */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className={`${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border overflow-hidden`}>
         {services.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            <p>Нет услуг</p>
+          <div className={`p-8 text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            <p>{t("servicesPage.noServices")}</p>
             <p className="text-sm mt-1">
-              Добавьте услуги, чтобы клиенты могли на них записываться
+              {t("servicesPage.noServicesDesc")}
             </p>
           </div>
         ) : (
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className={`${isDark ? "bg-white/5 border-white/5" : "bg-gray-50 border-gray-200"} border-b`}>
               <tr>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">
-                  Услуга
+                <th className={`text-left px-4 py-3 text-sm font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                  {t("servicesPage.service")}
                 </th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">
-                  Цена
+                <th className={`text-left px-4 py-3 text-sm font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                  {t("servicesPage.price")}
                 </th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">
-                  Длительность
+                <th className={`text-left px-4 py-3 text-sm font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                  {t("servicesPage.duration")}
                 </th>
-                <th className="text-right px-4 py-3 text-sm font-medium text-gray-500">
-                  Действия
+                <th className={`text-right px-4 py-3 text-sm font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                  {t("servicesPage.actions")}
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className={`divide-y ${isDark ? "divide-white/5" : "divide-gray-200"}`}>
               {services.map((service) => (
-                <tr key={service.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">
+                <tr key={service.id} className={`${isDark ? "hover:bg-white/5" : "hover:bg-gray-50"}`}>
+                  <td className={`px-4 py-3 font-medium ${isDark ? "text-white" : "text-gray-900"}`}>
                     {service.name}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">
+                  <td className={`px-4 py-3 ${isDark ? "text-gray-300" : "text-gray-600"}`}>
                     {formatPrice(service.price)}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {service.duration} мин
+                  <td className={`px-4 py-3 ${isDark ? "text-gray-300" : "text-gray-600"}`}>
+                    {service.duration} {t("servicesPage.minutes")}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => openModal(service)}
-                      className="text-gray-400 hover:text-blue-600 p-1"
+                      className={`${isDark ? "text-gray-500 hover:text-blue-400" : "text-gray-400 hover:text-blue-600"} p-1`}
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => deleteService(service.id)}
-                      className="text-gray-400 hover:text-red-600 p-1 ml-2"
+                      className={`${isDark ? "text-gray-500 hover:text-red-400" : "text-gray-400 hover:text-red-600"} p-1 ml-2`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -168,14 +175,14 @@ export default function ServicesPage() {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <div className={`${isDark ? "bg-[#12122a]" : "bg-white"} rounded-lg p-6 w-full max-w-md mx-4`}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {editingService ? "Редактировать услугу" : "Новая услуга"}
+              <h3 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+                {editingService ? t("servicesPage.editService") : t("servicesPage.newService")}
               </h3>
               <button
                 onClick={closeModal}
-                className="text-gray-400 hover:text-gray-600"
+                className={`${isDark ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"}`}
               >
                 <X className="h-5 w-5" />
               </button>
@@ -183,8 +190,8 @@ export default function ServicesPage() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Название услуги
+                <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
+                  {t("servicesPage.serviceName")}
                 </label>
                 <input
                   type="text"
@@ -193,14 +200,14 @@ export default function ServicesPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  placeholder="Стрижка женская"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder={t("servicesPage.serviceNamePlaceholder")}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Цена (сум)
+                <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
+                  {t("servicesPage.priceCurrency")}
                 </label>
                 <input
                   type="number"
@@ -211,13 +218,13 @@ export default function ServicesPage() {
                     setFormData({ ...formData, price: e.target.value })
                   }
                   placeholder="100000"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Длительность (минуты)
+                <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
+                  {t("servicesPage.durationMinutes")}
                 </label>
                 <input
                   type="number"
@@ -228,7 +235,7 @@ export default function ServicesPage() {
                     setFormData({ ...formData, duration: e.target.value })
                   }
                   placeholder="60"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
                 />
               </div>
 
@@ -236,15 +243,15 @@ export default function ServicesPage() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
+                  className={`flex-1 px-4 py-2 border rounded-lg font-medium ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
                 >
-                  Отмена
+                  {t("servicesPage.cancel")}
                 </button>
                 <button
                   type="submit"
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
                 >
-                  {editingService ? "Сохранить" : "Добавить"}
+                  {editingService ? t("servicesPage.save") : t("servicesPage.add")}
                 </button>
               </div>
             </form>

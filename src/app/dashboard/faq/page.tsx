@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Plus,
   Pencil,
@@ -32,6 +33,7 @@ interface Document {
 
 export default function FAQPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isDark = theme === "dark";
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -137,7 +139,7 @@ export default function FAQPage() {
   };
 
   const deleteFaq = async (id: string) => {
-    if (!confirm("Удалить вопрос?")) return;
+    if (!confirm(t("faqPage.deleteQuestionConfirm"))) return;
 
     try {
       const res = await fetch(`/api/faq/${id}`, { method: "DELETE" });
@@ -181,7 +183,7 @@ export default function FAQPage() {
   };
 
   const deleteDocument = async (id: string) => {
-    if (!confirm("Удалить документ?")) return;
+    if (!confirm(t("faqPage.deleteDocumentConfirm"))) return;
 
     try {
       const res = await fetch(`/api/documents/${id}`, { method: "DELETE" });
@@ -222,9 +224,9 @@ export default function FAQPage() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className={`text-lg font-semibold ${textPrimary}`}>Документы</h2>
+            <h2 className={`text-lg font-semibold ${textPrimary}`}>{t("faqPage.documents")}</h2>
             <p className={`text-sm ${textSecondary}`}>
-              Загрузите документы для обучения AI-бота
+              {t("faqPage.documentsDesc")}
             </p>
           </div>
           <div>
@@ -246,7 +248,7 @@ export default function FAQPage() {
               ) : (
                 <Upload className="h-4 w-4" />
               )}
-              Загрузить файл
+              {t("faqPage.uploadFile")}
             </button>
           </div>
         </div>
@@ -255,9 +257,9 @@ export default function FAQPage() {
           {documents.length === 0 ? (
             <div className="p-8 text-center">
               <FolderOpen className={`h-12 w-12 mx-auto mb-3 ${textSecondary}`} />
-              <p className={textSecondary}>Нет загруженных документов</p>
+              <p className={textSecondary}>{t("faqPage.noDocuments")}</p>
               <p className={`text-sm ${textSecondary} mt-1`}>
-                Загрузите PDF, DOC или TXT файлы для обучения бота
+                {t("faqPage.noDocumentsDesc")}
               </p>
             </div>
           ) : (
@@ -293,9 +295,9 @@ export default function FAQPage() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className={`text-lg font-semibold ${textPrimary}`}>Частые вопросы (FAQ)</h2>
+            <h2 className={`text-lg font-semibold ${textPrimary}`}>{t("faqPage.faq")}</h2>
             <p className={`text-sm ${textSecondary}`}>
-              Добавьте вопросы и ответы для AI-бота
+              {t("faqPage.faqDesc")}
             </p>
           </div>
           <button
@@ -303,7 +305,7 @@ export default function FAQPage() {
             className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 flex items-center gap-2"
           >
             <Plus className="h-4 w-4" />
-            Добавить
+            {t("faqPage.add")}
           </button>
         </div>
 
@@ -311,9 +313,9 @@ export default function FAQPage() {
           {faqs.length === 0 ? (
             <div className="p-8 text-center">
               <HelpCircle className={`h-12 w-12 mx-auto mb-3 ${textSecondary}`} />
-              <p className={textSecondary}>Нет вопросов</p>
+              <p className={textSecondary}>{t("faqPage.noQuestions")}</p>
               <p className={`text-sm ${textSecondary} mt-1`}>
-                Добавьте частые вопросы, чтобы бот мог на них отвечать
+                {t("faqPage.noQuestionsDesc")}
               </p>
             </div>
           ) : (
@@ -356,7 +358,7 @@ export default function FAQPage() {
           <div className={`${bgCard} rounded-xl border ${borderColor} p-6 w-full max-w-md mx-4`}>
             <div className="flex items-center justify-between mb-4">
               <h3 className={`text-lg font-semibold ${textPrimary}`}>
-                {editingFaq ? "Редактировать вопрос" : "Новый вопрос"}
+                {editingFaq ? t("faqPage.editQuestion") : t("faqPage.newQuestion")}
               </h3>
               <button
                 onClick={closeModal}
@@ -369,7 +371,7 @@ export default function FAQPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className={`block text-sm font-medium ${textSecondary} mb-1`}>
-                  Вопрос
+                  {t("faqPage.question")}
                 </label>
                 <input
                   type="text"
@@ -378,14 +380,14 @@ export default function FAQPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, question: e.target.value })
                   }
-                  placeholder="Есть ли парковка?"
+                  placeholder={t("faqPage.questionPlaceholder")}
                   className={`w-full px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${textPrimary}`}
                 />
               </div>
 
               <div>
                 <label className={`block text-sm font-medium ${textSecondary} mb-1`}>
-                  Ответ
+                  {t("faqPage.answer")}
                 </label>
                 <textarea
                   required
@@ -394,7 +396,7 @@ export default function FAQPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, answer: e.target.value })
                   }
-                  placeholder="Да, бесплатная парковка во дворе."
+                  placeholder={t("faqPage.answerPlaceholder")}
                   className={`w-full px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${textPrimary}`}
                 />
               </div>
@@ -405,13 +407,13 @@ export default function FAQPage() {
                   onClick={closeModal}
                   className={`flex-1 px-4 py-2 border ${inputBorder} rounded-lg font-medium ${textSecondary} hover:bg-white/5 transition-colors`}
                 >
-                  Отмена
+                  {t("faqPage.cancel")}
                 </button>
                 <button
                   type="submit"
                   className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
                 >
-                  {editingFaq ? "Сохранить" : "Добавить"}
+                  {editingFaq ? t("faqPage.save") : t("faqPage.add")}
                 </button>
               </div>
             </form>

@@ -17,8 +17,10 @@ import {
   Wand2,
   Image,
 } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function AIEmployeePage() {
+  const { t } = useLanguage();
   const [token, setToken] = useState("");
   const [savingToken, setSavingToken] = useState(false);
   const [tokenSaved, setTokenSaved] = useState(false);
@@ -55,39 +57,39 @@ export default function AIEmployeePage() {
   const promptTemplates = [
     {
       id: "salon",
-      name: "Салон красоты",
+      nameKey: "botPage.beautySalon",
       icon: "💇",
-      prompt: "Ты AI-сотрудник салона красоты. Помогай клиентам записаться на услуги, рассказывай о ценах и мастерах. Будь дружелюбным и предлагай подходящие услуги.",
+      promptKey: "botPage.templateSalon",
     },
     {
       id: "clinic",
-      name: "Медицинская клиника",
+      nameKey: "botPage.medicalClinic",
       icon: "🏥",
-      prompt: "Ты AI-ассистент медицинской клиники. Помогай записаться к врачам, объясняй подготовку к процедурам. Важно: не ставь диагнозы, направляй к специалистам.",
+      promptKey: "botPage.templateClinic",
     },
     {
       id: "restaurant",
-      name: "Ресторан/Кафе",
+      nameKey: "botPage.restaurant",
       icon: "🍽️",
-      prompt: "Ты AI-сотрудник ресторана. Помогай с бронированием столиков, рассказывай о меню и акциях. Рекомендуй блюда и напитки.",
+      promptKey: "botPage.templateRestaurant",
     },
     {
       id: "fitness",
-      name: "Фитнес-клуб",
+      nameKey: "botPage.fitnessClub",
       icon: "🏋️",
-      prompt: "Ты AI-консультант фитнес-клуба. Помогай с записью на тренировки, рассказывай об абонементах и тренерах. Мотивируй клиентов заниматься спортом.",
+      promptKey: "botPage.templateFitness",
     },
     {
       id: "auto",
-      name: "Автосервис",
+      nameKey: "botPage.autoService",
       icon: "🚗",
-      prompt: "Ты AI-консультант автосервиса. Помогай записаться на ТО и ремонт, объясняй виды услуг и примерные сроки. Спрашивай марку и модель автомобиля.",
+      promptKey: "botPage.templateAuto",
     },
     {
       id: "shop",
-      name: "Интернет-магазин",
+      nameKey: "botPage.onlineShop",
       icon: "🛒",
-      prompt: "Ты AI-консультант интернет-магазина. Помогай найти товары, рассказывай о характеристиках, наличии и доставке. Предлагай похожие товары.",
+      promptKey: "botPage.templateShop",
     },
   ];
 
@@ -133,7 +135,7 @@ export default function AIEmployeePage() {
 
   const handleSaveToken = async () => {
     if (!token.trim()) {
-      setTokenError("Введите токен бота");
+      setTokenError(t("botPage.enterToken"));
       return;
     }
 
@@ -149,13 +151,13 @@ export default function AIEmployeePage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Ошибка сохранения");
+        throw new Error(data.error || t("botPage.saveError"));
       }
 
       setTokenSaved(true);
       setTimeout(() => setTokenSaved(false), 3000);
     } catch (err) {
-      setTokenError(err instanceof Error ? err.message : "Ошибка сохранения токена");
+      setTokenError(err instanceof Error ? err.message : t("botPage.saveError"));
     } finally {
       setSavingToken(false);
     }
@@ -176,7 +178,7 @@ export default function AIEmployeePage() {
       });
 
       if (!res.ok) {
-        throw new Error("Ошибка сохранения");
+        throw new Error(t("botPage.saveError"));
       }
 
       setSettingsSaved(true);
@@ -214,7 +216,7 @@ export default function AIEmployeePage() {
 
         if (!res.ok) {
           const data = await res.json();
-          throw new Error(data.error || "Ошибка загрузки");
+          throw new Error(data.error || t("botPage.saveError"));
         }
 
         const data = await res.json();
@@ -222,7 +224,7 @@ export default function AIEmployeePage() {
       }
     } catch (error) {
       console.error("Upload error:", error);
-      setUploadError(error instanceof Error ? error.message : "Ошибка загрузки файла");
+      setUploadError(error instanceof Error ? error.message : t("botPage.saveError"));
     } finally {
       setUploading(false);
       // Reset input
@@ -246,8 +248,8 @@ export default function AIEmployeePage() {
     }
   };
 
-  const applyTemplate = (prompt: string) => {
-    setAiSettings({ ...aiSettings, rules: prompt });
+  const applyTemplate = (promptKey: string) => {
+    setAiSettings({ ...aiSettings, rules: t(promptKey) });
   };
 
   if (loading) {
@@ -276,18 +278,18 @@ export default function AIEmployeePage() {
           </div>
           <div>
             <h2 className="text-xl font-semibold text-white">
-              {botInfo.connected ? "AI-сотрудник активен" : "Активируйте AI-сотрудника"}
+              {botInfo.connected ? t("botPage.aiActive") : t("botPage.activateAI")}
             </h2>
             <p className="text-gray-400 text-sm">
               {botInfo.connected
-                ? `@${botInfo.username} готов отвечать клиентам`
-                : "Подключите Telegram бота, чтобы начать работу"}
+                ? `@${botInfo.username} ${t("botPage.readyToRespond")}`
+                : t("botPage.connectToStart")}
             </p>
           </div>
           {botInfo.connected && (
             <div className="ml-auto flex items-center gap-2">
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              <span className="text-green-400 text-sm font-medium">Онлайн 24/7</span>
+              <span className="text-green-400 text-sm font-medium">{t("botPage.online247")}</span>
             </div>
           )}
         </div>
@@ -298,7 +300,7 @@ export default function AIEmployeePage() {
         <div className="bg-[#12122a] rounded-xl border border-white/5 p-6">
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-yellow-400" />
-            Как создать Telegram бота?
+            {t("botPage.howToCreate")}
           </h3>
 
           <ol className="space-y-4 text-sm">
@@ -307,14 +309,14 @@ export default function AIEmployeePage() {
                 1
               </span>
               <div>
-                <p className="text-white font-medium">Откройте @BotFather в Telegram</p>
+                <p className="text-white font-medium">{t("botPage.step1")}</p>
                 <a
                   href="https://t.me/BotFather"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-400 hover:text-blue-300 inline-flex items-center gap-1 mt-1"
                 >
-                  Открыть BotFather <ExternalLink className="h-3 w-3" />
+                  {t("botPage.openBotFather")} <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
             </li>
@@ -324,7 +326,7 @@ export default function AIEmployeePage() {
                 2
               </span>
               <div>
-                <p className="text-white font-medium">Отправьте команду /newbot</p>
+                <p className="text-white font-medium">{t("botPage.step2")}</p>
                 <div className="mt-2 flex items-center gap-2">
                   <code className="bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg text-sm text-gray-300">/newbot</code>
                   <button
@@ -342,9 +344,9 @@ export default function AIEmployeePage() {
                 3
               </span>
               <div>
-                <p className="text-white font-medium">Придумайте название бота</p>
+                <p className="text-white font-medium">{t("botPage.step3")}</p>
                 <p className="text-gray-500 text-xs mt-1">
-                  Например: Салон красоты "Элегант"
+                  {t("botPage.step3Desc")}
                 </p>
               </div>
             </li>
@@ -354,9 +356,9 @@ export default function AIEmployeePage() {
                 4
               </span>
               <div>
-                <p className="text-white font-medium">Придумайте username бота</p>
+                <p className="text-white font-medium">{t("botPage.step4")}</p>
                 <p className="text-gray-500 text-xs mt-1">
-                  Username должен заканчиваться на bot (например: elegant_salon_bot)
+                  {t("botPage.step4Desc")}
                 </p>
               </div>
             </li>
@@ -366,9 +368,9 @@ export default function AIEmployeePage() {
                 5
               </span>
               <div>
-                <p className="text-white font-medium">Скопируйте токен и вставьте ниже</p>
+                <p className="text-white font-medium">{t("botPage.step5")}</p>
                 <p className="text-gray-500 text-xs mt-1">
-                  Токен выглядит так: 123456789:ABCdefGHIjklMNOpqrSTUvwxYZ
+                  {t("botPage.step5Desc")}
                 </p>
               </div>
             </li>
@@ -379,7 +381,7 @@ export default function AIEmployeePage() {
       {/* Token input */}
       <div className="bg-[#12122a] rounded-xl border border-white/5 p-6">
         <h3 className="text-lg font-semibold text-white mb-4">
-          {botInfo.connected ? "Подключенный бот" : "Токен бота"}
+          {botInfo.connected ? t("botPage.connectedBot") : t("botPage.botToken")}
         </h3>
 
         {tokenError && (
@@ -394,7 +396,7 @@ export default function AIEmployeePage() {
             <div className="flex items-center gap-3">
               <Check className="h-5 w-5 text-green-400" />
               <div>
-                <p className="text-green-400 font-medium">Бот успешно подключен</p>
+                <p className="text-green-400 font-medium">{t("botPage.botConnected")}</p>
                 <p className="text-gray-400 text-sm">@{botInfo.username}</p>
               </div>
             </div>
@@ -403,7 +405,7 @@ export default function AIEmployeePage() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Вставьте токен от BotFather
+                {t("botPage.pasteToken")}
               </label>
               <input
                 type="text"
@@ -422,17 +424,17 @@ export default function AIEmployeePage() {
               {savingToken ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Подключение...
+                  {t("botPage.connecting")}
                 </>
               ) : tokenSaved ? (
                 <>
                   <Check className="h-4 w-4" />
-                  Подключено!
+                  {t("botPage.connected")}
                 </>
               ) : (
                 <>
                   <Brain className="h-4 w-4" />
-                  Активировать AI-сотрудника
+                  {t("botPage.activateButton")}
                 </>
               )}
             </button>
@@ -444,22 +446,22 @@ export default function AIEmployeePage() {
       <div className="bg-[#12122a] rounded-xl border border-white/5 p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
           <Wand2 className="h-5 w-5 text-yellow-400" />
-          Шаблоны промптов
+          {t("botPage.promptTemplates")}
         </h3>
         <p className="text-gray-400 text-sm mb-4">
-          Выберите готовый шаблон для вашего типа бизнеса
+          {t("botPage.chooseTemplate")}
         </p>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {promptTemplates.map((template) => (
             <button
               key={template.id}
-              onClick={() => applyTemplate(template.prompt)}
+              onClick={() => applyTemplate(template.promptKey)}
               className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/50 rounded-xl text-left transition-all group"
             >
               <span className="text-2xl block mb-2">{template.icon}</span>
               <span className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">
-                {template.name}
+                {t(template.nameKey)}
               </span>
             </button>
           ))}
@@ -470,10 +472,10 @@ export default function AIEmployeePage() {
       <div className="bg-[#12122a] rounded-xl border border-white/5 p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
           <Upload className="h-5 w-5 text-green-400" />
-          База знаний
+          {t("botPage.knowledgeBase")}
         </h3>
         <p className="text-gray-400 text-sm mb-4">
-          Загрузите документы с информацией о вашем бизнесе (прайс-листы, FAQ, каталоги)
+          {t("botPage.uploadDocs")}
         </p>
 
         <label className="block">
@@ -488,14 +490,14 @@ export default function AIEmployeePage() {
             {uploading ? (
               <div className="flex flex-col items-center">
                 <Loader2 className="h-10 w-10 text-blue-400 animate-spin mb-3" />
-                <p className="text-gray-400">Загрузка...</p>
+                <p className="text-gray-400">{t("botPage.uploading")}</p>
               </div>
             ) : (
               <>
                 <Upload className="h-10 w-10 text-gray-500 mx-auto mb-3" />
-                <p className="text-white font-medium">Нажмите для загрузки файлов</p>
+                <p className="text-white font-medium">{t("botPage.clickToUpload")}</p>
                 <p className="text-gray-500 text-sm mt-1">
-                  PDF, DOC, DOCX, TXT, XLSX (до 10MB)
+                  {t("botPage.fileFormats")}
                 </p>
               </>
             )}
@@ -541,10 +543,10 @@ export default function AIEmployeePage() {
       <div className="bg-[#12122a] rounded-xl border border-white/5 p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
           <Image className="h-5 w-5 text-pink-400" />
-          Логотип бота
+          {t("botPage.botLogo")}
         </h3>
         <p className="text-gray-400 text-sm mb-4">
-          Загрузите логотип вашего бизнеса для аватара бота
+          {t("botPage.uploadLogo")}
         </p>
 
         <div className="flex items-center gap-6">
@@ -597,18 +599,18 @@ export default function AIEmployeePage() {
                 {uploadingLogo ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Загрузка...
+                    {t("botPage.uploading")}
                   </>
                 ) : (
                   <>
                     <Upload className="h-4 w-4" />
-                    Загрузить логотип
+                    {t("botPage.uploadLogoBtn")}
                   </>
                 )}
               </span>
             </label>
             <p className="text-xs text-gray-500 mt-2">
-              PNG, JPG до 2MB. Рекомендуемый размер: 512x512
+              {t("botPage.logoFormats")}
             </p>
           </div>
         </div>
@@ -618,20 +620,20 @@ export default function AIEmployeePage() {
       <div className="bg-[#12122a] rounded-xl border border-white/5 p-6">
         <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
           <Sliders className="h-5 w-5 text-purple-400" />
-          Настройки личности AI
+          {t("botPage.aiPersonality")}
         </h3>
 
         <div className="space-y-5">
           {/* Tone selection */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-3">
-              Стиль общения
+              {t("botPage.communicationStyle")}
             </label>
             <div className="grid grid-cols-3 gap-3">
               {[
-                { id: "friendly", name: "Дружелюбный", emoji: "😊" },
-                { id: "professional", name: "Профессиональный", emoji: "👔" },
-                { id: "casual", name: "Неформальный", emoji: "😎" },
+                { id: "friendly", nameKey: "botPage.friendly", emoji: "😊" },
+                { id: "professional", nameKey: "botPage.professional", emoji: "👔" },
+                { id: "casual", nameKey: "botPage.casual", emoji: "😎" },
               ].map((tone) => (
                 <button
                   key={tone.id}
@@ -643,7 +645,7 @@ export default function AIEmployeePage() {
                   }`}
                 >
                   <span className="text-2xl block mb-1">{tone.emoji}</span>
-                  <span className="text-sm">{tone.name}</span>
+                  <span className="text-sm">{t(tone.nameKey)}</span>
                 </button>
               ))}
             </div>
@@ -652,12 +654,12 @@ export default function AIEmployeePage() {
           {/* Welcome message */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Приветственное сообщение
+              {t("botPage.welcomeMessage")}
             </label>
             <textarea
               value={aiSettings.welcomeMessage}
               onChange={(e) => setAiSettings({ ...aiSettings, welcomeMessage: e.target.value })}
-              placeholder="Здравствуйте! Я AI-ассистент салона красоты. Чем могу помочь?"
+              placeholder={t("botPage.welcomePlaceholder")}
               rows={3}
               className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             />
@@ -666,17 +668,17 @@ export default function AIEmployeePage() {
           {/* Rules */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Особые инструкции для AI
+              {t("botPage.specialInstructions")}
             </label>
             <textarea
               value={aiSettings.rules}
               onChange={(e) => setAiSettings({ ...aiSettings, rules: e.target.value })}
-              placeholder="Например: Всегда предлагай записаться. Не обсуждай политику. При вопросах о ценах направляй в прайс-лист."
+              placeholder={t("botPage.instructionsPlaceholder")}
               rows={4}
               className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             />
             <p className="text-xs text-gray-500 mt-2">
-              Эти правила помогут AI лучше понимать, как отвечать клиентам
+              {t("botPage.rulesHelp")}
             </p>
           </div>
 
@@ -688,17 +690,17 @@ export default function AIEmployeePage() {
             {savingSettings ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Сохранение...
+                {t("botPage.saving")}
               </>
             ) : settingsSaved ? (
               <>
                 <Check className="h-4 w-4 text-green-400" />
-                Сохранено!
+                {t("botPage.saved")}
               </>
             ) : (
               <>
                 <Save className="h-4 w-4" />
-                Сохранить настройки
+                {t("botPage.saveSettings")}
               </>
             )}
           </button>

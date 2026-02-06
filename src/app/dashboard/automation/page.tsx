@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import UpgradePrompt from "@/components/UpgradePrompt";
 import {
@@ -38,6 +39,7 @@ interface Stats {
 
 export default function AutomationPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isDark = theme === "dark";
   const { canUseAutomations, needsUpgrade, loading: subscriptionLoading } = useSubscription();
 
@@ -102,7 +104,7 @@ export default function AutomationPage() {
       });
 
       if (res.ok) {
-        setSuccessMessage("Настройки сохранены!");
+        setSuccessMessage(t("automation.settingsSaved"));
         setTimeout(() => setSuccessMessage(""), 3000);
       }
     } catch (error) {
@@ -139,9 +141,9 @@ export default function AutomationPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-2xl font-bold ${textPrimary}`}>Автоматизация</h1>
+          <h1 className={`text-2xl font-bold ${textPrimary}`}>{t("automation.title")}</h1>
           <p className={textSecondary}>
-            Настройте автоматические напоминания, сбор отзывов и реактивацию клиентов
+            {t("automation.description")}
           </p>
         </div>
         <button
@@ -154,7 +156,7 @@ export default function AutomationPage() {
           ) : (
             <Save className="h-4 w-4" />
           )}
-          Сохранить
+          {t("common.save")}
         </button>
       </div>
 
@@ -175,7 +177,7 @@ export default function AutomationPage() {
             </div>
             <div>
               <p className={`text-2xl font-bold ${textPrimary}`}>{stats.remindersSent}</p>
-              <p className={`text-sm ${textSecondary}`}>Напоминаний отправлено</p>
+              <p className={`text-sm ${textSecondary}`}>{t("automation.remindersSent")}</p>
             </div>
           </div>
         </div>
@@ -186,7 +188,7 @@ export default function AutomationPage() {
             </div>
             <div>
               <p className={`text-2xl font-bold ${textPrimary}`}>{stats.reviewsCollected}</p>
-              <p className={`text-sm ${textSecondary}`}>Отзывов собрано</p>
+              <p className={`text-sm ${textSecondary}`}>{t("automation.reviewsCollected")}</p>
             </div>
           </div>
         </div>
@@ -197,7 +199,7 @@ export default function AutomationPage() {
             </div>
             <div>
               <p className={`text-2xl font-bold ${textPrimary}`}>{stats.clientsReactivated}</p>
-              <p className={`text-sm ${textSecondary}`}>Клиентов реактивировано</p>
+              <p className={`text-sm ${textSecondary}`}>{t("automation.clientsReactivated")}</p>
             </div>
           </div>
         </div>
@@ -210,8 +212,8 @@ export default function AutomationPage() {
             <Bell className="h-5 w-5 text-blue-500" />
           </div>
           <div>
-            <h2 className={`text-lg font-semibold ${textPrimary}`}>Напоминания о записи</h2>
-            <p className={`text-sm ${textSecondary}`}>Автоматические напоминания клиентам о предстоящих визитах</p>
+            <h2 className={`text-lg font-semibold ${textPrimary}`}>{t("automation.appointmentReminders")}</h2>
+            <p className={`text-sm ${textSecondary}`}>{t("automation.remindersDesc")}</p>
           </div>
         </div>
 
@@ -221,8 +223,8 @@ export default function AutomationPage() {
             <div className="flex items-center gap-3">
               <Clock className="h-5 w-5 text-blue-400" />
               <div>
-                <p className={`font-medium ${textPrimary}`}>За 24 часа</p>
-                <p className={`text-sm ${textSecondary}`}>Напоминание за сутки до визита</p>
+                <p className={`font-medium ${textPrimary}`}>{t("automation.24hours")}</p>
+                <p className={`text-sm ${textSecondary}`}>{t("automation.24hoursDesc")}</p>
               </div>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
@@ -241,8 +243,8 @@ export default function AutomationPage() {
             <div className="flex items-center gap-3">
               <Clock className="h-5 w-5 text-purple-400" />
               <div>
-                <p className={`font-medium ${textPrimary}`}>За 2 часа</p>
-                <p className={`text-sm ${textSecondary}`}>Напоминание за 2 часа до визита</p>
+                <p className={`font-medium ${textPrimary}`}>{t("automation.2hours")}</p>
+                <p className={`text-sm ${textSecondary}`}>{t("automation.2hoursDesc")}</p>
               </div>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
@@ -261,7 +263,7 @@ export default function AutomationPage() {
             <div className="flex items-start gap-2">
               <Info className="h-4 w-4 text-blue-400 mt-0.5" />
               <div className={`text-sm ${textSecondary}`}>
-                <p className="font-medium text-blue-400 mb-1">Пример сообщения:</p>
+                <p className="font-medium text-blue-400 mb-1">{t("automation.messageExample")}</p>
                 <p className="italic">
                   "Здравствуйте, Анна! 👋 Напоминаем о вашей записи: 📅 Завтра, 15 февраля в 14:00 💇 Стрижка женская. Ждём вас!"
                 </p>
@@ -278,8 +280,8 @@ export default function AutomationPage() {
             <Star className="h-5 w-5 text-yellow-500" />
           </div>
           <div>
-            <h2 className={`text-lg font-semibold ${textPrimary}`}>Сбор отзывов</h2>
-            <p className={`text-sm ${textSecondary}`}>Запрос отзыва после визита клиента</p>
+            <h2 className={`text-lg font-semibold ${textPrimary}`}>{t("automation.reviewCollection")}</h2>
+            <p className={`text-sm ${textSecondary}`}>{t("automation.reviewDesc")}</p>
           </div>
         </div>
 
@@ -289,8 +291,8 @@ export default function AutomationPage() {
             <div className="flex items-center gap-3">
               <MessageSquare className="h-5 w-5 text-yellow-400" />
               <div>
-                <p className={`font-medium ${textPrimary}`}>Запрашивать отзывы</p>
-                <p className={`text-sm ${textSecondary}`}>Отправлять запрос после визита</p>
+                <p className={`font-medium ${textPrimary}`}>{t("automation.requestReviews")}</p>
+                <p className={`text-sm ${textSecondary}`}>{t("automation.sendAfterVisit")}</p>
               </div>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
@@ -309,7 +311,7 @@ export default function AutomationPage() {
               {/* Delay hours */}
               <div className="p-4 rounded-xl border border-white/5 bg-white/5">
                 <label className={`block text-sm font-medium ${textPrimary} mb-2`}>
-                  Задержка перед отправкой (часов)
+                  {t("automation.delayHours")}
                 </label>
                 <input
                   type="number"
@@ -320,14 +322,14 @@ export default function AutomationPage() {
                   className={`w-full px-4 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 />
                 <p className={`text-xs ${textSecondary} mt-1`}>
-                  Рекомендуется 2-4 часа после визита
+                  {t("automation.recommended24")}
                 </p>
               </div>
 
               {/* Google link */}
               <div className="p-4 rounded-xl border border-white/5 bg-white/5">
                 <label className={`block text-sm font-medium ${textPrimary} mb-2`}>
-                  Ссылка на Google Maps (для отзывов)
+                  {t("automation.googleLink")}
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -353,7 +355,7 @@ export default function AutomationPage() {
               {/* 2GIS link */}
               <div className="p-4 rounded-xl border border-white/5 bg-white/5">
                 <label className={`block text-sm font-medium ${textPrimary} mb-2`}>
-                  Ссылка на 2GIS (для отзывов)
+                  {t("automation.2gisLink")}
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -383,7 +385,7 @@ export default function AutomationPage() {
             <div className="flex items-start gap-2">
               <Info className="h-4 w-4 text-yellow-400 mt-0.5" />
               <div className={`text-sm ${textSecondary}`}>
-                <p className="font-medium text-yellow-400 mb-1">Как это работает:</p>
+                <p className="font-medium text-yellow-400 mb-1">{t("automation.howItWorks")}</p>
                 <ul className="space-y-1 list-disc list-inside">
                   <li>Клиент получает сообщение с просьбой оценить визит (1-5 ⭐)</li>
                   <li>Оценки 4-5: предлагаем оставить отзыв на Google/2GIS</li>
@@ -403,8 +405,8 @@ export default function AutomationPage() {
             <UserCheck className="h-5 w-5 text-green-500" />
           </div>
           <div>
-            <h2 className={`text-lg font-semibold ${textPrimary}`}>Реактивация клиентов</h2>
-            <p className={`text-sm ${textSecondary}`}>Возвращаем клиентов, которые давно не были</p>
+            <h2 className={`text-lg font-semibold ${textPrimary}`}>{t("automation.clientReactivation")}</h2>
+            <p className={`text-sm ${textSecondary}`}>{t("automation.reactivationDesc")}</p>
           </div>
         </div>
 
@@ -414,8 +416,8 @@ export default function AutomationPage() {
             <div className="flex items-center gap-3">
               <Gift className="h-5 w-5 text-green-400" />
               <div>
-                <p className={`font-medium ${textPrimary}`}>Реактивация со скидкой</p>
-                <p className={`text-sm ${textSecondary}`}>Отправлять предложение со скидкой</p>
+                <p className={`font-medium ${textPrimary}`}>{t("automation.discountReactivation")}</p>
+                <p className={`text-sm ${textSecondary}`}>{t("automation.sendDiscountOffer")}</p>
               </div>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
@@ -434,7 +436,7 @@ export default function AutomationPage() {
               {/* Days */}
               <div className="p-4 rounded-xl border border-white/5 bg-white/5">
                 <label className={`block text-sm font-medium ${textPrimary} mb-2`}>
-                  Дней без визита
+                  {t("automation.daysWithoutVisit")}
                 </label>
                 <input
                   type="number"
@@ -445,14 +447,14 @@ export default function AutomationPage() {
                   className={`w-full px-4 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 />
                 <p className={`text-xs ${textSecondary} mt-1`}>
-                  Через сколько дней без визита отправлять сообщение
+                  {t("automation.daysWithoutVisitDesc")}
                 </p>
               </div>
 
               {/* Discount */}
               <div className="p-4 rounded-xl border border-white/5 bg-white/5">
                 <label className={`block text-sm font-medium ${textPrimary} mb-2`}>
-                  Размер скидки (%)
+                  {t("automation.discountSize")}
                 </label>
                 <input
                   type="number"
@@ -463,7 +465,7 @@ export default function AutomationPage() {
                   className={`w-full px-4 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 />
                 <p className={`text-xs ${textSecondary} mt-1`}>
-                  Скидка для клиентов которые давно не были
+                  {t("automation.discountForInactive")}
                 </p>
               </div>
             </>
