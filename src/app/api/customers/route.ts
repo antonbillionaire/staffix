@@ -95,10 +95,15 @@ export async function GET(request: NextRequest) {
       const clientBookings = bookingsByClient.get(telegramKey) || [];
       const clientReviews = reviewsByClient.get(telegramKey) || [];
 
-      const isActive = client.lastVisitDate
+      const hasRecentVisit = client.lastVisitDate
         ? new Date(client.lastVisitDate) > thirtyDaysAgo
         : false;
-      const isVip = client.totalVisits >= 5;
+      const hasRecentMessages = client.lastMessageAt
+        ? new Date(client.lastMessageAt) > thirtyDaysAgo
+        : false;
+      const hasBookings = clientBookings.length > 0;
+      const isActive = hasRecentVisit || hasRecentMessages || hasBookings;
+      const isVip = client.totalVisits >= 5 || clientBookings.length >= 5;
       const avgRating =
         clientReviews.length > 0
           ? clientReviews.reduce((sum, r) => sum + r.rating, 0) /

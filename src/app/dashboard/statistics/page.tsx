@@ -32,6 +32,8 @@ interface Stats {
   conversionRate: number;
   popularQuestions: { question: string; count: number }[];
   messagesByDay: { date: string; count: number }[];
+  // Trends (% change vs previous period)
+  trends?: { messages: number; bookings: number; clients: number };
   // Enhanced stats
   customerSegments?: { vip: number; active: number; inactive: number };
   bookingsByStatus?: { pending: number; confirmed: number; completed: number; cancelled: number };
@@ -165,10 +167,12 @@ export default function StatisticsPage() {
             <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center">
               <MessageSquare className="h-6 w-6 text-blue-500" />
             </div>
-            <div className="flex items-center gap-1 text-green-500 text-sm">
-              <TrendingUp className="h-4 w-4" />
-              +12%
-            </div>
+            {stats.trends && stats.trends.messages !== 0 && (
+              <div className={`flex items-center gap-1 text-sm ${stats.trends.messages > 0 ? "text-green-500" : "text-red-500"}`}>
+                {stats.trends.messages > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                {stats.trends.messages > 0 ? "+" : ""}{stats.trends.messages}%
+              </div>
+            )}
           </div>
           <p className={`text-3xl font-bold ${textPrimary} mt-4`}>{stats.totalMessages}</p>
           <p className={textSecondary}>Всего сообщений</p>
@@ -179,10 +183,12 @@ export default function StatisticsPage() {
             <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center">
               <Calendar className="h-6 w-6 text-green-500" />
             </div>
-            <div className="flex items-center gap-1 text-green-500 text-sm">
-              <TrendingUp className="h-4 w-4" />
-              +8%
-            </div>
+            {stats.trends && stats.trends.bookings !== 0 && (
+              <div className={`flex items-center gap-1 text-sm ${stats.trends.bookings > 0 ? "text-green-500" : "text-red-500"}`}>
+                {stats.trends.bookings > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                {stats.trends.bookings > 0 ? "+" : ""}{stats.trends.bookings}%
+              </div>
+            )}
           </div>
           <p className={`text-3xl font-bold ${textPrimary} mt-4`}>{stats.totalBookings}</p>
           <p className={textSecondary}>Записей</p>
@@ -193,10 +199,12 @@ export default function StatisticsPage() {
             <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center">
               <Users className="h-6 w-6 text-purple-500" />
             </div>
-            <div className="flex items-center gap-1 text-green-500 text-sm">
-              <TrendingUp className="h-4 w-4" />
-              +15%
-            </div>
+            {stats.trends && stats.trends.clients !== 0 && (
+              <div className={`flex items-center gap-1 text-sm ${stats.trends.clients > 0 ? "text-green-500" : "text-red-500"}`}>
+                {stats.trends.clients > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                {stats.trends.clients > 0 ? "+" : ""}{stats.trends.clients}%
+              </div>
+            )}
           </div>
           <p className={`text-3xl font-bold ${textPrimary} mt-4`}>{stats.totalClients}</p>
           <p className={textSecondary}>Клиентов</p>

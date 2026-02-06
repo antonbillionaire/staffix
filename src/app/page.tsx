@@ -99,11 +99,15 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#0a0a1a] text-white overflow-hidden">
-      {/* Animated background gradient */}
-      <div className="fixed inset-0 pointer-events-none">
+      {/* Animated background gradient - reduced on mobile for performance */}
+      <div className="fixed inset-0 pointer-events-none hidden md:block">
         <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-blue-500/20 rounded-full blur-[120px]" />
         <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-[120px]" />
         <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-cyan-500/10 rounded-full blur-[100px]" />
+      </div>
+      <div className="fixed inset-0 pointer-events-none md:hidden">
+        <div className="absolute top-0 left-1/4 w-[300px] h-[300px] bg-blue-500/15 rounded-full blur-[60px]" />
+        <div className="absolute bottom-0 right-1/4 w-[250px] h-[250px] bg-purple-500/15 rounded-full blur-[60px]" />
       </div>
 
       {/* Header */}

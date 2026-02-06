@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
 import {
   ArrowLeft,
@@ -70,10 +70,14 @@ export default function CustomerDetailPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<CustomerDetail | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const initialTab = searchParams.get("tab");
+  const bookingsRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
 
   // Theme-aware styles
   const isDark = theme === "dark";
@@ -87,6 +91,16 @@ export default function CustomerDetailPage({
   useEffect(() => {
     fetchCustomer();
   }, [id]);
+
+  // Auto-scroll to section when tab param is set
+  useEffect(() => {
+    if (!loading && data && initialTab) {
+      const ref = initialTab === "bookings" ? bookingsRef : initialTab === "messages" ? messagesRef : null;
+      if (ref?.current) {
+        ref.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  }, [loading, data, initialTab]);
 
   const fetchCustomer = async () => {
     try {
@@ -263,7 +277,7 @@ export default function CustomerDetailPage({
           </div>
 
           {/* Bookings */}
-          <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
+          <div ref={bookingsRef} className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
             <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>История записей</h2>
             {bookings.length === 0 ? (
               <p className={`${textTertiary} text-center py-4`}>Нет записей</p>
@@ -362,7 +376,7 @@ export default function CustomerDetailPage({
           </div>
 
           {/* Recent Messages */}
-          <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
+          <div ref={messagesRef} className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
             <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>Последние сообщения</h2>
             {!conversation || conversation.messages.length === 0 ? (
               <p className={`${textTertiary} text-center py-4`}>Нет сообщений</p>

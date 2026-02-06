@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -35,7 +36,7 @@ import {
   ChevronDown,
   type LucideIcon,
 } from "lucide-react";
-import ChatWidget from "@/components/ChatWidget";
+const ChatWidget = dynamic(() => import("@/components/ChatWidget"), { ssr: false });
 import TrialExpiredBanner from "@/components/TrialExpiredBanner";
 import { type PlanId, hasMenuAccess } from "@/lib/plans";
 
@@ -99,7 +100,12 @@ export default function DashboardLayout({
   useEffect(() => {
     const checkOnboarding = async () => {
       try {
-        const res = await fetch("/api/business");
+        // Fetch business data and unread messages in parallel
+        const [res, msgRes] = await Promise.all([
+          fetch("/api/business"),
+          fetch("/api/support/unread").catch(() => null),
+        ]);
+
         if (res.ok) {
           const data = await res.json();
           if (data.business) {
@@ -133,15 +139,10 @@ export default function DashboardLayout({
           return;
         }
 
-        // Fetch unread messages count
-        try {
-          const msgRes = await fetch("/api/support/unread");
-          if (msgRes.ok) {
-            const msgData = await msgRes.json();
-            setUnreadMessages(msgData.count || 0);
-          }
-        } catch {
-          // Ignore error for unread messages
+        // Process unread messages
+        if (msgRes?.ok) {
+          const msgData = await msgRes.json();
+          setUnreadMessages(msgData.count || 0);
         }
       } catch (error) {
         console.error("Error checking onboarding:", error);

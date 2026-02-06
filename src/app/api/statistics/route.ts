@@ -19,16 +19,20 @@ export async function GET(request: NextRequest) {
     // Calculate date range
     const now = new Date();
     let startDate: Date;
+    let prevStartDate: Date;
 
     switch (period) {
       case "week":
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        prevStartDate = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
         break;
       case "month":
         startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        prevStartDate = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
         break;
       default:
         startDate = new Date(0); // All time
+        prevStartDate = new Date(0);
     }
 
     // Find user's business
@@ -191,14 +195,79 @@ export async function GET(request: NextRequest) {
       ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
       : null;
 
+    // Calculate trends by comparing to previous period
+    const prevMessages = period !== "all" ? await prisma.message.count({
+      where: {
+        conversation: { businessId: business.id },
+        createdAt: { gte: prevStartDate, lt: startDate },
+      },
+    }) : 0;
+
+    const prevBookings = period !== "all" ? await prisma.booking.count({
+      where: {
+        businessId: business.id,
+        createdAt: { gte: prevStartDate, lt: startDate },
+      },
+    }) : 0;
+
+    const prevConversations = period !== "all" ? await prisma.conversation.findMany({
+      where: {
+        businessId: business.id,
+        createdAt: { gte: prevStartDate, lt: startDate },
+      },
+      select: { clientTelegramId: true },
+      distinct: ["clientTelegramId"],
+    }) : [];
+
+    const calcTrend = (current: number, previous: number) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return Math.round(((current - previous) / previous) * 100);
+    };
+
+    // Calculate average response time from message pairs
+    const recentConversations = await prisma.conversation.findMany({
+      where: { businessId: business.id },
+      include: {
+        messages: {
+          orderBy: { createdAt: "asc" },
+          take: 100,
+          where: { createdAt: { gte: startDate } },
+        },
+      },
+      take: 20,
+    });
+
+    let totalResponseMs = 0;
+    let responseCount = 0;
+    for (const conv of recentConversations) {
+      for (let i = 1; i < conv.messages.length; i++) {
+        if (conv.messages[i].role === "assistant" && conv.messages[i - 1].role === "user") {
+          const diff = new Date(conv.messages[i].createdAt).getTime() - new Date(conv.messages[i - 1].createdAt).getTime();
+          if (diff > 0 && diff < 300000) { // less than 5 minutes
+            totalResponseMs += diff;
+            responseCount++;
+          }
+        }
+      }
+    }
+    const avgResponseTime = responseCount > 0
+      ? Math.round(totalResponseMs / responseCount / 1000) // seconds
+      : 0;
+
     return NextResponse.json({
       totalMessages,
       totalBookings,
       totalClients: clients.length || totalClients,
-      avgResponseTime: 2, // Placeholder - would need actual timing data
+      avgResponseTime,
       conversionRate,
       popularQuestions,
       messagesByDay,
+      // Trends
+      trends: {
+        messages: calcTrend(totalMessages, prevMessages),
+        bookings: calcTrend(totalBookings, prevBookings),
+        clients: calcTrend(totalClients, prevConversations.length),
+      },
       // Enhanced CRM stats
       customerSegments,
       bookingsByStatus,

@@ -449,6 +449,30 @@ export async function createBooking(
       data: { totalBookings: { increment: 1 } },
     });
 
+    // Update client record: mark as active with visit
+    await prisma.client.upsert({
+      where: {
+        businessId_telegramId: {
+          businessId,
+          telegramId: clientTelegramId,
+        },
+      },
+      create: {
+        businessId,
+        telegramId: clientTelegramId,
+        name: clientName,
+        phone: clientPhone || null,
+        lastVisitDate: bookingDate,
+        totalVisits: 1,
+      },
+      update: {
+        name: clientName || undefined,
+        phone: clientPhone || undefined,
+        lastVisitDate: bookingDate,
+        totalVisits: { increment: 1 },
+      },
+    });
+
     // Send notification to business owner via Telegram (non-blocking)
     notifyBusinessOwner(businessId, clientName, serviceName, staffName, dateStr, time).catch(
       (err: unknown) => console.error("Failed to notify owner:", err)

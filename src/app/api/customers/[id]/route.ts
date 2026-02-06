@@ -73,10 +73,14 @@ export async function GET(
     // Calculate stats
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const isActive = client.lastVisitDate
+    const hasRecentVisit = client.lastVisitDate
       ? new Date(client.lastVisitDate) > thirtyDaysAgo
       : false;
-    const isVip = client.totalVisits >= 5;
+    const hasRecentMessages = client.lastMessageAt
+      ? new Date(client.lastMessageAt) > thirtyDaysAgo
+      : false;
+    const isActive = hasRecentVisit || hasRecentMessages || bookings.length > 0;
+    const isVip = client.totalVisits >= 5 || bookings.length >= 5;
 
     const avgRating =
       reviews.length > 0

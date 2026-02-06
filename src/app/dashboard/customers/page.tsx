@@ -298,18 +298,31 @@ export default function CustomersPage() {
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3 text-sm">
-                        <span className={`flex items-center gap-1 ${textSecondary}`}>
+                        <Link
+                          href={`/dashboard/customers/${customer.id}?tab=bookings`}
+                          className={`flex items-center gap-1 ${textSecondary} hover:text-blue-500 transition-colors`}
+                          title="Записи клиента"
+                        >
                           <Calendar className="h-3 w-3" />
                           {customer.bookingsCount}
-                        </span>
-                        <span className={`flex items-center gap-1 ${textSecondary}`}>
+                        </Link>
+                        <Link
+                          href={`/dashboard/customers/${customer.id}?tab=messages`}
+                          className={`flex items-center gap-1 ${textSecondary} hover:text-blue-500 transition-colors`}
+                          title="Сообщения клиента"
+                        >
                           <MessageSquare className="h-3 w-3" />
                           {customer.messagesCount}
-                        </span>
+                        </Link>
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <span className={textSecondary}>{customer.totalVisits} визитов</span>
+                      <Link
+                        href={`/dashboard/customers/${customer.id}?tab=bookings`}
+                        className={`${textSecondary} hover:text-blue-500 transition-colors`}
+                      >
+                        {customer.totalVisits} визитов
+                      </Link>
                     </td>
                     <td className="py-3 px-4">
                       {customer.avgRating ? (
