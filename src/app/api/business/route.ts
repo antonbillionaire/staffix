@@ -153,8 +153,8 @@ export async function PUT(request: Request) {
     if (aiRules !== undefined) updateData.aiRules = aiRules;
     if (botLogo !== undefined) updateData.botLogo = botLogo;
 
-    // Если передан новый токен бота - валидируем и регистрируем webhook
-    if (botToken && botToken !== existingBusiness.botToken) {
+    // Если передан токен бота - валидируем и регистрируем/перерегистрируем webhook
+    if (botToken) {
       // Валидация токена
       const validation = await validateBotToken(botToken);
       if (!validation.valid) {
@@ -164,7 +164,7 @@ export async function PUT(request: Request) {
         );
       }
 
-      // Регистрация webhook
+      // Всегда регистрируем webhook (на случай если он был сброшен)
       const webhookResult = await registerWebhook(botToken, existingBusiness.id);
       if (!webhookResult.success) {
         return NextResponse.json(

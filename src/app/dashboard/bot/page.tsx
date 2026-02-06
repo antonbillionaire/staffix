@@ -156,9 +156,19 @@ export default function AIEmployeePage() {
         body: JSON.stringify({ botToken: token }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const data = await res.json();
         throw new Error(data.error || t("botPage.saveError"));
+      }
+
+      // Обновляем UI с данными из ответа
+      if (data.business) {
+        setBotInfo({
+          connected: data.business.botActive || false,
+          username: data.business.botUsername || "",
+          name: data.business.name || "",
+        });
       }
 
       setTokenSaved(true);
