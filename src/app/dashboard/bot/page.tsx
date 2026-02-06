@@ -53,6 +53,9 @@ export default function AIEmployeePage() {
   const [botLogo, setBotLogo] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
+  // Selected template tracking
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+
   // Prompt templates
   const promptTemplates = [
     {
@@ -114,6 +117,10 @@ export default function AIEmployeePage() {
               welcomeMessage: data.business.welcomeMessage || "",
               rules: data.business.aiRules || "",
             });
+            // Load logo if exists
+            if (data.business.botLogo) {
+              setBotLogo(data.business.botLogo);
+            }
           }
         }
 
@@ -248,7 +255,8 @@ export default function AIEmployeePage() {
     }
   };
 
-  const applyTemplate = (promptKey: string) => {
+  const applyTemplate = (templateId: string, promptKey: string) => {
+    setSelectedTemplate(templateId);
     setAiSettings({ ...aiSettings, rules: t(promptKey) });
   };
 
@@ -456,13 +464,24 @@ export default function AIEmployeePage() {
           {promptTemplates.map((template) => (
             <button
               key={template.id}
-              onClick={() => applyTemplate(template.promptKey)}
-              className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/50 rounded-xl text-left transition-all group"
+              onClick={() => applyTemplate(template.id, template.promptKey)}
+              className={`p-4 border rounded-xl text-left transition-all group ${
+                selectedTemplate === template.id
+                  ? "bg-blue-500/20 border-blue-500/50 ring-2 ring-blue-500/30"
+                  : "bg-white/5 hover:bg-white/10 border-white/10 hover:border-blue-500/50"
+              }`}
             >
               <span className="text-2xl block mb-2">{template.icon}</span>
-              <span className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">
+              <span className={`text-sm font-medium transition-colors ${
+                selectedTemplate === template.id
+                  ? "text-blue-400"
+                  : "text-white group-hover:text-blue-400"
+              }`}>
                 {t(template.nameKey)}
               </span>
+              {selectedTemplate === template.id && (
+                <span className="block text-xs text-blue-400 mt-1">{t("botPage.selected") || "Выбрано"}</span>
+              )}
             </button>
           ))}
         </div>

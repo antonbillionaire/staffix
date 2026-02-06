@@ -339,18 +339,41 @@ async function generateAIResponse(
 
 export async function POST(request: NextRequest) {
   try {
-    // Получаем токен бота из URL параметра
+    // Получаем параметры из URL
     const { searchParams } = new URL(request.url);
-    const botToken = searchParams.get("token");
+    const businessId = searchParams.get("businessId");
+    const legacyToken = searchParams.get("token"); // Legacy support
 
-    if (!botToken) {
-      return NextResponse.json({ error: "No token provided" }, { status: 400 });
+    let business: { id: string; name: string; botToken: string } | null = null;
+    let botToken: string | null = null;
+
+    if (businessId) {
+      // New method: find by businessId
+      const foundBusiness = await prisma.business.findUnique({
+        where: { id: businessId },
+        select: { id: true, name: true, botToken: true },
+      });
+      if (foundBusiness?.botToken) {
+        business = { id: foundBusiness.id, name: foundBusiness.name, botToken: foundBusiness.botToken };
+        botToken = foundBusiness.botToken;
+      }
+    } else if (legacyToken) {
+      // Legacy method: find by token
+      const foundBusiness = await findBusinessByBotToken(legacyToken);
+      if (foundBusiness) {
+        const fullBusiness = await prisma.business.findUnique({
+          where: { id: foundBusiness.id },
+          select: { id: true, name: true, botToken: true },
+        });
+        if (fullBusiness?.botToken) {
+          business = { id: fullBusiness.id, name: fullBusiness.name, botToken: fullBusiness.botToken };
+          botToken = fullBusiness.botToken;
+        }
+      }
     }
 
-    // Находим бизнес по токену
-    const business = await findBusinessByBotToken(botToken);
-    if (!business) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    if (!business || !botToken) {
+      return NextResponse.json({ error: "Invalid business or token" }, { status: 401 });
     }
 
     const update: TelegramUpdate = await request.json();
