@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user with business and Pro subscription
+    // Create user with business and trial subscription (simplified for compatibility)
     const user = await prisma.user.create({
       data: {
         name,
@@ -75,45 +75,49 @@ export async function POST(request: NextRequest) {
                 messagesLimit: 1000,
                 messagesUsed: 47,
                 expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-                status: "active",
               },
-            },
-            services: {
-              create: [
-                { name: "Haircut", price: 25, duration: 30 },
-                { name: "Hair Coloring", price: 80, duration: 90 },
-                { name: "Manicure", price: 30, duration: 45 },
-                { name: "Pedicure", price: 40, duration: 60 },
-                { name: "Facial Treatment", price: 60, duration: 60 },
-              ],
-            },
-            staff: {
-              create: [
-                { name: "Anna", role: "Senior Stylist" },
-                { name: "Maria", role: "Nail Technician" },
-                { name: "John", role: "Colorist" },
-              ],
-            },
-            faqs: {
-              create: [
-                {
-                  question: "What are your working hours?",
-                  answer: "We are open Monday-Saturday 9:00 AM - 8:00 PM, Sunday 10:00 AM - 6:00 PM.",
-                },
-                {
-                  question: "Do you accept walk-ins?",
-                  answer: "Yes, we accept walk-ins but recommend booking in advance to ensure availability.",
-                },
-                {
-                  question: "What payment methods do you accept?",
-                  answer: "We accept cash, credit/debit cards, and mobile payments.",
-                },
-              ],
             },
           },
         },
       },
     });
+
+    // Add services, staff, faqs separately to avoid transaction issues
+    const business = await prisma.business.findFirst({
+      where: { userId: user.id },
+    });
+
+    if (business) {
+      await prisma.service.createMany({
+        data: [
+          { businessId: business.id, name: "Haircut", price: 25, duration: 30 },
+          { businessId: business.id, name: "Hair Coloring", price: 80, duration: 90 },
+          { businessId: business.id, name: "Manicure", price: 30, duration: 45 },
+        ],
+      });
+
+      await prisma.staff.createMany({
+        data: [
+          { businessId: business.id, name: "Anna", role: "Senior Stylist" },
+          { businessId: business.id, name: "Maria", role: "Nail Technician" },
+        ],
+      });
+
+      await prisma.fAQ.createMany({
+        data: [
+          {
+            businessId: business.id,
+            question: "What are your working hours?",
+            answer: "We are open Monday-Saturday 9:00 AM - 8:00 PM.",
+          },
+          {
+            businessId: business.id,
+            question: "Do you accept walk-ins?",
+            answer: "Yes, we accept walk-ins but recommend booking in advance.",
+          },
+        ],
+      });
+    }
 
     return NextResponse.json({
       message: "Demo user created successfully!",
