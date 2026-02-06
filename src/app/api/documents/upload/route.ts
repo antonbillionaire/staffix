@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-import { randomUUID } from "crypto";
 import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
@@ -78,22 +75,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = path.join(process.cwd(), "public", "uploads", business.id);
-    await mkdir(uploadsDir, { recursive: true });
-
-    // Generate unique filename
-    const ext = path.extname(file.name);
-    const uniqueFilename = `${randomUUID()}${ext}`;
-    const filePath = path.join(uploadsDir, uniqueFilename);
-
-    // Save file
+    // Read file into memory buffer (no filesystem writes - Vercel is read-only)
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    await writeFile(filePath, buffer);
 
-    // URL for accessing the file
-    const fileUrl = `/uploads/${business.id}/${uniqueFilename}`;
+    // For images (logo), convert to base64 data URL
+    const isImage = file.type.startsWith("image/");
+    let fileUrl = "";
+
+    if (isImage) {
+      // Store logo as base64 data URL
+      const base64 = buffer.toString("base64");
+      fileUrl = `data:${file.type};base64,${base64}`;
+    } else {
+      // For documents, we don't need to store the file - just the extracted text
+      fileUrl = `document://${file.name}`;
+    }
 
     // Extract text from file (for AI context)
     let extractedText: string | null = null;
