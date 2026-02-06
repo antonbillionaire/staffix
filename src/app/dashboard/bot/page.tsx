@@ -49,9 +49,6 @@ export default function AIEmployeePage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
-  // Logo upload
-  const [botLogo, setBotLogo] = useState<string | null>(null);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Selected template tracking
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
@@ -117,10 +114,6 @@ export default function AIEmployeePage() {
               welcomeMessage: data.business.welcomeMessage || "",
               rules: data.business.aiRules || "",
             });
-            // Load logo if exists
-            if (data.business.botLogo) {
-              setBotLogo(data.business.botLogo);
-            }
           }
         }
 
@@ -574,80 +567,21 @@ export default function AIEmployeePage() {
         )}
       </div>
 
-      {/* Logo upload */}
+      {/* Bot avatar instructions */}
       <div className="bg-[#12122a] rounded-xl border border-white/5 p-6">
-        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+        <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
           <Image className="h-5 w-5 text-pink-400" />
-          {t("botPage.botLogo")}
+          Аватарка бота
         </h3>
         <p className="text-gray-400 text-sm mb-4">
-          {t("botPage.uploadLogo")}
+          Чтобы установить аватарку бота в Telegram, используйте @BotFather:
         </p>
-
-        <div className="flex items-center gap-6">
-          {/* Preview */}
-          <div className="w-24 h-24 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
-            {botLogo ? (
-              <img src={botLogo} alt="Logo" className="w-full h-full object-cover" />
-            ) : (
-              <Brain className="h-10 w-10 text-gray-500" />
-            )}
-          </div>
-
-          {/* Upload button */}
-          <div className="flex-1">
-            <label className="block">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  setUploadingLogo(true);
-                  try {
-                    const formData = new FormData();
-                    formData.append("file", file);
-                    formData.append("type", "logo");
-                    const res = await fetch("/api/documents/upload", {
-                      method: "POST",
-                      body: formData,
-                    });
-                    if (res.ok) {
-                      const data = await res.json();
-                      setBotLogo(data.document.url);
-                      // Save logo URL to business
-                      await fetch("/api/business", {
-                        method: "PUT",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ botLogo: data.document.url }),
-                      });
-                    }
-                  } catch (error) {
-                    console.error("Logo upload error:", error);
-                  } finally {
-                    setUploadingLogo(false);
-                  }
-                }}
-                className="hidden"
-              />
-              <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/10 rounded-lg text-white text-sm font-medium cursor-pointer transition-colors">
-                {uploadingLogo ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t("botPage.uploading")}
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4" />
-                    {t("botPage.uploadLogoBtn")}
-                  </>
-                )}
-              </span>
-            </label>
-            <p className="text-xs text-gray-500 mt-2">
-              {t("botPage.logoFormats")}
-            </p>
-          </div>
+        <div className="bg-white/5 rounded-lg p-4 space-y-2 text-sm text-gray-300">
+          <p>1. Откройте <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">@BotFather</a> в Telegram</p>
+          <p>2. Отправьте <code className="bg-white/10 px-1.5 py-0.5 rounded text-blue-300">/mybots</code></p>
+          <p>3. Выберите вашего бота</p>
+          <p>4. Edit Bot → Edit Botpic</p>
+          <p>5. Отправьте картинку</p>
         </div>
       </div>
 
