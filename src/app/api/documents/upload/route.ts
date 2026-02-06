@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { PDFParse } from "pdf-parse";
-import mammoth from "mammoth";
-import * as XLSX from "xlsx";
+
+// No top-level imports for parsing libraries!
+// They are loaded dynamically to avoid crashes on Vercel
+// if native dependencies (canvas, etc.) are missing
 
 // Max file size: 10MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -100,41 +101,58 @@ export async function POST(request: NextRequest) {
       console.log(`[Document Upload] Parsing file: ${file.name}, type: ${file.type}, size: ${file.size}`);
 
       if (file.type === "text/plain") {
-        // TXT files - read directly
         extractedText = buffer.toString("utf-8");
         console.log(`[Document Upload] TXT parsed, length: ${extractedText.length}`);
+
       } else if (file.type === "application/pdf") {
-        // PDF files (pdf-parse v2 API)
-        const parser = new PDFParse({ data: buffer });
-        const textResult = await parser.getText();
-        extractedText = textResult.text;
-        await parser.destroy();
-        console.log(`[Document Upload] PDF parsed, length: ${extractedText?.length || 0}`);
+        try {
+          const { PDFParse } = await import("pdf-parse");
+          const parser = new PDFParse({ data: buffer });
+          const textResult = await parser.getText();
+          extractedText = textResult.text;
+          await parser.destroy();
+          console.log(`[Document Upload] PDF parsed, length: ${extractedText?.length || 0}`);
+        } catch (pdfErr) {
+          console.error(`[Document Upload] PDF parser unavailable:`, pdfErr);
+          parseError = "PDF парсер недоступен на сервере";
+        }
+
       } else if (
         file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
         file.type === "application/msword"
       ) {
-        // Word files (.docx, .doc)
-        const result = await mammoth.extractRawText({ buffer });
-        extractedText = result.value;
-        console.log(`[Document Upload] Word parsed, length: ${extractedText?.length || 0}`);
+        try {
+          const mammoth = await import("mammoth");
+          const result = await mammoth.extractRawText({ buffer });
+          extractedText = result.value;
+          console.log(`[Document Upload] Word parsed, length: ${extractedText?.length || 0}`);
+        } catch (docErr) {
+          console.error(`[Document Upload] Word parser unavailable:`, docErr);
+          parseError = "Word парсер недоступен на сервере";
+        }
+
       } else if (
         file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
         file.type === "application/vnd.ms-excel"
       ) {
-        // Excel files (.xlsx, .xls)
-        console.log(`[Document Upload] Starting Excel parsing...`);
-        const workbook = XLSX.read(buffer, { type: "buffer" });
-        console.log(`[Document Upload] Excel workbook loaded, sheets: ${workbook.SheetNames.join(", ")}`);
-        const texts: string[] = [];
-        for (const sheetName of workbook.SheetNames) {
-          const sheet = workbook.Sheets[sheetName];
-          const csv = XLSX.utils.sheet_to_csv(sheet);
-          texts.push(`=== ${sheetName} ===\n${csv}`);
-          console.log(`[Document Upload] Sheet "${sheetName}" extracted, ${csv.length} chars`);
+        try {
+          const XLSX = await import("xlsx");
+          console.log(`[Document Upload] Starting Excel parsing...`);
+          const workbook = XLSX.read(buffer, { type: "buffer" });
+          console.log(`[Document Upload] Excel workbook loaded, sheets: ${workbook.SheetNames.join(", ")}`);
+          const texts: string[] = [];
+          for (const sheetName of workbook.SheetNames) {
+            const sheet = workbook.Sheets[sheetName];
+            const csv = XLSX.utils.sheet_to_csv(sheet);
+            texts.push(`=== ${sheetName} ===\n${csv}`);
+          }
+          extractedText = texts.join("\n\n");
+          console.log(`[Document Upload] Excel parsed, total length: ${extractedText.length}`);
+        } catch (xlsErr) {
+          console.error(`[Document Upload] Excel parser unavailable:`, xlsErr);
+          parseError = "Excel парсер недоступен на сервере";
         }
-        extractedText = texts.join("\n\n");
-        console.log(`[Document Upload] Excel parsed, total length: ${extractedText.length}`);
+
       } else {
         console.log(`[Document Upload] Unsupported file type for parsing: ${file.type}`);
       }
@@ -142,7 +160,6 @@ export async function POST(request: NextRequest) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[Document Upload] Error parsing file ${file.name}:`, errorMessage);
       parseError = errorMessage;
-      // Continue without extracted text
     }
 
     // Create document record
