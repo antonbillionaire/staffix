@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { languages } from "@/lib/translations";
 import {
   Brain,
   LayoutDashboard,
@@ -29,14 +31,16 @@ import {
   UserCircle,
   Send,
   MessageSquare,
+  Globe,
+  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import ChatWidget from "@/components/ChatWidget";
 import TrialExpiredBanner from "@/components/TrialExpiredBanner";
-import { type PlanId, hasMenuAccess, getPlan } from "@/lib/plans";
+import { type PlanId, hasMenuAccess } from "@/lib/plans";
 
 interface NavItem {
-  name: string;
+  nameKey: string;
   href: string;
   icon: LucideIcon;
   requiredPlan?: PlanId;
@@ -44,20 +48,20 @@ interface NavItem {
 }
 
 const navigation: NavItem[] = [
-  { name: "Главная", href: "/dashboard", icon: LayoutDashboard },
-  { name: "AI-сотрудник", href: "/dashboard/bot", icon: Brain },
-  { name: "Каналы", href: "/dashboard/channels", icon: MessageSquare },
-  { name: "Статистика", href: "/dashboard/statistics", icon: BarChart3 },
-  { name: "Услуги", href: "/dashboard/services", icon: Scissors },
-  { name: "Команда", href: "/dashboard/staff", icon: Users },
-  { name: "База знаний", href: "/dashboard/faq", icon: FileText },
-  { name: "Записи", href: "/dashboard/bookings", icon: Calendar },
-  { name: "Клиенты", href: "/dashboard/customers", icon: UserCircle },
-  { name: "Рассылки", href: "/dashboard/broadcasts", icon: Send },
-  { name: "Автоматизация", href: "/dashboard/automation", icon: Zap },
-  { name: "Сообщения", href: "/dashboard/messages", icon: Mail },
-  { name: "Настройки", href: "/dashboard/settings", icon: Settings },
-  { name: "Помощь", href: "/dashboard/support", icon: HelpCircle },
+  { nameKey: "nav.dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { nameKey: "nav.aiEmployee", href: "/dashboard/bot", icon: Brain },
+  { nameKey: "nav.channels", href: "/dashboard/channels", icon: MessageSquare },
+  { nameKey: "nav.statistics", href: "/dashboard/statistics", icon: BarChart3 },
+  { nameKey: "nav.services", href: "/dashboard/services", icon: Scissors },
+  { nameKey: "nav.team", href: "/dashboard/staff", icon: Users },
+  { nameKey: "nav.knowledge", href: "/dashboard/faq", icon: FileText },
+  { nameKey: "nav.bookings", href: "/dashboard/bookings", icon: Calendar },
+  { nameKey: "nav.customers", href: "/dashboard/customers", icon: UserCircle },
+  { nameKey: "nav.broadcasts", href: "/dashboard/broadcasts", icon: Send },
+  { nameKey: "nav.automation", href: "/dashboard/automation", icon: Zap },
+  { nameKey: "nav.messages", href: "/dashboard/messages", icon: Mail },
+  { nameKey: "nav.settings", href: "/dashboard/settings", icon: Settings },
+  { nameKey: "nav.help", href: "/dashboard/support", icon: HelpCircle },
 ];
 
 export default function DashboardLayout({
@@ -68,7 +72,9 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { theme } = useTheme();
+  const { language, setLanguage, t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [businessName, setBusinessName] = useState("");
   const [unreadMessages, setUnreadMessages] = useState(0);
@@ -151,6 +157,8 @@ export default function DashboardLayout({
     await signOut({ callbackUrl: "/" });
   };
 
+  const currentLang = languages.find(l => l.id === language) || languages[0];
+
   if (loading) {
     return (
       <div className={`min-h-screen ${bgMain} flex items-center justify-center`}>
@@ -194,7 +202,7 @@ export default function DashboardLayout({
         {/* Business name */}
         {businessName && (
           <div className={`px-5 py-4 border-b ${borderColor} flex-shrink-0`}>
-            <p className={`text-xs ${textMuted} uppercase tracking-wider`}>Ваш бизнес</p>
+            <p className={`text-xs ${textMuted} uppercase tracking-wider`}>{t("sidebar.yourBusiness")}</p>
             <p className={`text-sm font-medium ${textPrimary} truncate mt-1`}>{businessName}</p>
           </div>
         )}
@@ -207,18 +215,19 @@ export default function DashboardLayout({
             const userPlan = subscription.plan as PlanId;
             const hasAccess = hasMenuAccess(userPlan, item.requiredPlan);
             const isLocked = !hasAccess;
+            const itemName = t(item.nameKey);
 
             // For locked items, show upgrade prompt instead of navigating
             if (isLocked) {
               return (
                 <Link
-                  key={item.name}
+                  key={item.nameKey}
                   href="/pricing"
                   onClick={() => setSidebarOpen(false)}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${textMuted} ${hoverBg} group`}
                 >
                   <item.icon className="h-5 w-5 opacity-50" />
-                  <span className="opacity-50">{item.name}</span>
+                  <span className="opacity-50">{itemName}</span>
                   {item.badge && (
                     <span className="ml-auto flex items-center gap-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                       <Lock className="h-3 w-3" />
@@ -231,7 +240,7 @@ export default function DashboardLayout({
 
             return (
               <Link
-                key={item.name}
+                key={item.nameKey}
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
@@ -241,7 +250,7 @@ export default function DashboardLayout({
                 }`}
               >
                 <item.icon className={`h-5 w-5 ${isActive ? 'text-blue-500' : ''}`} />
-                {item.name}
+                {itemName}
                 {isMessages && unreadMessages > 0 && (
                   <span className="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                     {unreadMessages}
@@ -259,14 +268,14 @@ export default function DashboardLayout({
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="h-4 w-4 text-yellow-400" />
               <span className={`text-sm font-medium ${textPrimary}`}>
-                {getPlan(subscription.plan as PlanId).name}
+                {t(`plan.${subscription.plan}`)}
               </span>
             </div>
 
             {/* Messages progress */}
             <div className="mb-3">
               <div className="flex justify-between text-xs mb-1">
-                <span className={textSecondary}>Сообщений</span>
+                <span className={textSecondary}>{t("sidebar.messages")}</span>
                 <span className={textPrimary}>{subscription.messagesUsed}/{subscription.messagesLimit}</span>
               </div>
               <div className={`h-1.5 ${isDark ? 'bg-white/10' : 'bg-gray-200'} rounded-full overflow-hidden`}>
@@ -279,7 +288,7 @@ export default function DashboardLayout({
 
             {subscription.plan === 'trial' && (
               <p className={`text-xs ${textSecondary} mb-3`}>
-                Осталось {subscription.daysLeft} дней
+                {t("sidebar.daysLeft", { days: subscription.daysLeft })}
               </p>
             )}
 
@@ -288,7 +297,7 @@ export default function DashboardLayout({
               className={`flex items-center justify-center gap-2 w-full py-2 ${isDark ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'} rounded-lg text-sm ${textPrimary} font-medium transition-colors`}
             >
               <CreditCard className="h-4 w-4" />
-              Выбрать тариф
+              {t("sidebar.choosePlan")}
             </Link>
           </div>
         </div>
@@ -300,7 +309,7 @@ export default function DashboardLayout({
             className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-medium ${textSecondary} ${hoverBg} transition-all`}
           >
             <LogOut className="h-5 w-5" />
-            Выйти
+            {t("nav.logout")}
           </button>
         </div>
       </aside>
@@ -308,17 +317,60 @@ export default function DashboardLayout({
       {/* Main content */}
       <div className="lg:pl-72">
         {/* Top bar */}
-        <header className={`sticky top-0 z-30 h-16 ${isDark ? 'bg-[#0a0a1a]/80' : 'bg-white/80'} backdrop-blur-xl border-b ${borderColor} flex items-center px-4 lg:px-8`}>
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className={`lg:hidden ${textSecondary} mr-4`}
-          >
-            <Menu className="h-6 w-6" />
-          </button>
-          <div>
+        <header className={`sticky top-0 z-30 h-16 ${isDark ? 'bg-[#0a0a1a]/80' : 'bg-white/80'} backdrop-blur-xl border-b ${borderColor} flex items-center justify-between px-4 lg:px-8`}>
+          <div className="flex items-center">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className={`lg:hidden ${textSecondary} mr-4`}
+            >
+              <Menu className="h-6 w-6" />
+            </button>
             <h1 className={`text-lg font-semibold ${textPrimary}`}>
-              {navigation.find((item) => item.href === pathname)?.name || "Панель управления"}
+              {t(navigation.find((item) => item.href === pathname)?.nameKey || "dashboard.title")}
             </h1>
+          </div>
+
+          {/* Language Selector */}
+          <div className="relative">
+            <button
+              onClick={() => setLangMenuOpen(!langMenuOpen)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg ${hoverBg} ${textSecondary} transition-colors`}
+            >
+              <Globe className="h-4 w-4" />
+              <span className="text-lg">{currentLang.flag}</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${langMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {langMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setLangMenuOpen(false)}
+                />
+                <div className={`absolute right-0 mt-2 w-48 ${bgSidebar} border ${borderColor} rounded-xl shadow-xl z-50 overflow-hidden`}>
+                  {languages.map((lang) => (
+                    <button
+                      key={lang.id}
+                      onClick={() => {
+                        setLanguage(lang.id);
+                        setLangMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-sm ${
+                        language === lang.id
+                          ? 'bg-blue-500/20 text-blue-500'
+                          : `${textSecondary} ${hoverBg}`
+                      } transition-colors`}
+                    >
+                      <span className="text-lg">{lang.flag}</span>
+                      <span>{lang.name}</span>
+                      {language === lang.id && (
+                        <span className="ml-auto text-blue-500">✓</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </header>
 
@@ -343,13 +395,16 @@ export default function DashboardLayout({
               <div className="flex-1">
                 <p className={`text-sm font-medium ${textPrimary}`}>
                   {subscription.messagesLimit - subscription.messagesUsed <= 10
-                    ? "Сообщения почти закончились!"
-                    : "Осталось мало сообщений"}
+                    ? t("warning.messagesAlmostOut")
+                    : t("warning.lowMessages")}
                 </p>
                 <p className={`text-xs ${textSecondary}`}>
-                  Осталось {subscription.messagesLimit - subscription.messagesUsed} из {subscription.messagesLimit} сообщений.{" "}
+                  {t("warning.remaining", {
+                    count: subscription.messagesLimit - subscription.messagesUsed,
+                    total: subscription.messagesLimit
+                  })}{" "}
                   <Link href="/pricing" className="text-blue-400 hover:text-blue-300">
-                    Обновить тариф
+                    {t("warning.upgradePlan")}
                   </Link>
                 </p>
               </div>
