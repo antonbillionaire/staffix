@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
-import pdfParse from "pdf-parse";
+import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 
@@ -97,15 +97,22 @@ export async function POST(request: NextRequest) {
 
     // Extract text from file (for AI context)
     let extractedText: string | null = null;
+    let parseError: string | null = null;
 
     try {
+      console.log(`[Document Upload] Parsing file: ${file.name}, type: ${file.type}, size: ${file.size}`);
+
       if (file.type === "text/plain") {
         // TXT files - read directly
         extractedText = buffer.toString("utf-8");
+        console.log(`[Document Upload] TXT parsed, length: ${extractedText.length}`);
       } else if (file.type === "application/pdf") {
-        // PDF files
-        const pdfData = await pdfParse(buffer);
-        extractedText = pdfData.text;
+        // PDF files (pdf-parse v2 API)
+        const parser = new PDFParse({ data: buffer });
+        const textResult = await parser.getText();
+        extractedText = textResult.text;
+        await parser.destroy();
+        console.log(`[Document Upload] PDF parsed, length: ${extractedText?.length || 0}`);
       } else if (
         file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
         file.type === "application/msword"
@@ -113,22 +120,31 @@ export async function POST(request: NextRequest) {
         // Word files (.docx, .doc)
         const result = await mammoth.extractRawText({ buffer });
         extractedText = result.value;
+        console.log(`[Document Upload] Word parsed, length: ${extractedText?.length || 0}`);
       } else if (
         file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
         file.type === "application/vnd.ms-excel"
       ) {
         // Excel files (.xlsx, .xls)
+        console.log(`[Document Upload] Starting Excel parsing...`);
         const workbook = XLSX.read(buffer, { type: "buffer" });
+        console.log(`[Document Upload] Excel workbook loaded, sheets: ${workbook.SheetNames.join(", ")}`);
         const texts: string[] = [];
         for (const sheetName of workbook.SheetNames) {
           const sheet = workbook.Sheets[sheetName];
           const csv = XLSX.utils.sheet_to_csv(sheet);
           texts.push(`=== ${sheetName} ===\n${csv}`);
+          console.log(`[Document Upload] Sheet "${sheetName}" extracted, ${csv.length} chars`);
         }
         extractedText = texts.join("\n\n");
+        console.log(`[Document Upload] Excel parsed, total length: ${extractedText.length}`);
+      } else {
+        console.log(`[Document Upload] Unsupported file type for parsing: ${file.type}`);
       }
-    } catch (parseError) {
-      console.error("Error parsing file:", parseError);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[Document Upload] Error parsing file ${file.name}:`, errorMessage);
+      parseError = errorMessage;
       // Continue without extracted text
     }
 
@@ -142,13 +158,20 @@ export async function POST(request: NextRequest) {
         size: file.size,
         businessId: business.id,
         extractedText: extractedText,
-        parsed: extractedText !== null,
+        parsed: extractedText !== null && extractedText.length > 0,
       },
     });
+
+    console.log(`[Document Upload] Document saved: ${document.id}, parsed: ${document.parsed}, textLength: ${extractedText?.length || 0}`);
 
     return NextResponse.json({
       success: true,
       document,
+      parsing: {
+        success: extractedText !== null && extractedText.length > 0,
+        textLength: extractedText?.length || 0,
+        error: parseError,
+      },
     });
   } catch (error) {
     console.error("Upload error:", error);

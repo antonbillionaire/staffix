@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Plus, Pencil, Trash2, X, Loader2 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 
 interface Service {
-  id: number;
+  id: string;
   name: string;
   price: number;
   duration: number;
@@ -16,11 +16,9 @@ export default function ServicesPage() {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const [services, setServices] = useState<Service[]>([
-    { id: 1, name: "Стрижка женская", price: 100000, duration: 60 },
-    { id: 2, name: "Стрижка мужская", price: 50000, duration: 30 },
-    { id: 3, name: "Маникюр", price: 80000, duration: 45 },
-  ]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
@@ -29,6 +27,25 @@ export default function ServicesPage() {
     price: "",
     duration: "",
   });
+
+  // Загрузка услуг из базы данных
+  const fetchServices = useCallback(async () => {
+    try {
+      const res = await fetch("/api/services");
+      if (res.ok) {
+        const data = await res.json();
+        setServices(data.services || []);
+      }
+    } catch (error) {
+      console.error("Error fetching services:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchServices();
+  }, [fetchServices]);
 
   const openModal = (service?: Service) => {
     if (service) {
@@ -51,40 +68,54 @@ export default function ServicesPage() {
     setFormData({ name: "", price: "", duration: "" });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
 
-    if (editingService) {
-      setServices(
-        services.map((s) =>
-          s.id === editingService.id
-            ? {
-                ...s,
-                name: formData.name,
-                price: parseInt(formData.price),
-                duration: parseInt(formData.duration),
-              }
-            : s
-        )
-      );
-    } else {
-      setServices([
-        ...services,
-        {
-          id: Date.now(),
-          name: formData.name,
-          price: parseInt(formData.price),
-          duration: parseInt(formData.duration),
-        },
-      ]);
+    try {
+      if (editingService) {
+        // Обновление существующей услуги
+        const res = await fetch(`/api/services/${editingService.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setServices(services.map((s) =>
+            s.id === editingService.id ? data.service : s
+          ));
+        }
+      } else {
+        // Создание новой услуги
+        const res = await fetch("/api/services", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setServices([...services, data.service]);
+        }
+      }
+    } catch (error) {
+      console.error("Error saving service:", error);
+    } finally {
+      setSaving(false);
+      closeModal();
     }
-
-    closeModal();
   };
 
-  const deleteService = (id: number) => {
+  const deleteService = async (id: string) => {
     if (confirm(t("servicesPage.deleteConfirm"))) {
-      setServices(services.filter((s) => s.id !== id));
+      try {
+        const res = await fetch(`/api/services/${id}`, { method: "DELETE" });
+        if (res.ok) {
+          setServices(services.filter((s) => s.id !== id));
+        }
+      } catch (error) {
+        console.error("Error deleting service:", error);
+      }
     }
   };
 
@@ -114,7 +145,12 @@ export default function ServicesPage() {
 
       {/* Services list */}
       <div className={`${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border overflow-hidden`}>
-        {services.length === 0 ? (
+        {loading ? (
+          <div className={`p-8 text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+            <p>Загрузка...</p>
+          </div>
+        ) : services.length === 0 ? (
           <div className={`p-8 text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}>
             <p>{t("servicesPage.noServices")}</p>
             <p className="text-sm mt-1">
@@ -249,8 +285,10 @@ export default function ServicesPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
+                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                   {editingService ? t("servicesPage.save") : t("servicesPage.add")}
                 </button>
               </div>

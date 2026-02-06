@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Pencil, Trash2, X, User } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Plus, Pencil, Trash2, X, User, Loader2 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 
 interface Staff {
-  id: number;
+  id: string;
   name: string;
   role: string;
 }
@@ -16,11 +16,9 @@ export default function StaffPage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
-  const [staff, setStaff] = useState<Staff[]>([
-    { id: 1, name: "Анна", role: "Стилист" },
-    { id: 2, name: "Мария", role: "Мастер маникюра" },
-    { id: 3, name: "Ольга", role: "Парикмахер" },
-  ]);
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
@@ -28,6 +26,25 @@ export default function StaffPage() {
     name: "",
     role: "",
   });
+
+  // Загрузка сотрудников из базы данных
+  const fetchStaff = useCallback(async () => {
+    try {
+      const res = await fetch("/api/staff");
+      if (res.ok) {
+        const data = await res.json();
+        setStaff(data.staff || []);
+      }
+    } catch (error) {
+      console.error("Error fetching staff:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStaff();
+  }, [fetchStaff]);
 
   const openModal = (person?: Staff) => {
     if (person) {
@@ -49,38 +66,52 @@ export default function StaffPage() {
     setFormData({ name: "", role: "" });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
 
-    if (editingStaff) {
-      setStaff(
-        staff.map((s) =>
-          s.id === editingStaff.id
-            ? {
-                ...s,
-                name: formData.name,
-                role: formData.role,
-              }
-            : s
-        )
-      );
-    } else {
-      setStaff([
-        ...staff,
-        {
-          id: Date.now(),
-          name: formData.name,
-          role: formData.role,
-        },
-      ]);
+    try {
+      if (editingStaff) {
+        const res = await fetch(`/api/staff/${editingStaff.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setStaff(staff.map((s) =>
+            s.id === editingStaff.id ? data.staff : s
+          ));
+        }
+      } else {
+        const res = await fetch("/api/staff", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setStaff([...staff, data.staff]);
+        }
+      }
+    } catch (error) {
+      console.error("Error saving staff:", error);
+    } finally {
+      setSaving(false);
+      closeModal();
     }
-
-    closeModal();
   };
 
-  const deletePerson = (id: number) => {
+  const deletePerson = async (id: string) => {
     if (confirm(t("staffPage.deleteConfirm"))) {
-      setStaff(staff.filter((s) => s.id !== id));
+      try {
+        const res = await fetch(`/api/staff/${id}`, { method: "DELETE" });
+        if (res.ok) {
+          setStaff(staff.filter((s) => s.id !== id));
+        }
+      } catch (error) {
+        console.error("Error deleting staff:", error);
+      }
     }
   };
 
@@ -104,7 +135,12 @@ export default function StaffPage() {
 
       {/* Staff list */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {staff.length === 0 ? (
+        {loading ? (
+          <div className={`col-span-full ${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border p-8 text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+            <p>Загрузка...</p>
+          </div>
+        ) : staff.length === 0 ? (
           <div className={`col-span-full ${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border p-8 text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}>
             <p>{t("staffPage.noStaff")}</p>
             <p className="text-sm mt-1">
@@ -206,8 +242,10 @@ export default function StaffPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
+                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                   {editingStaff ? t("staffPage.save") : t("staffPage.add")}
                 </button>
               </div>
