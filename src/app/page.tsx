@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Brain,
   MessageSquare,
@@ -15,35 +15,42 @@ import {
   ArrowRight,
   Sparkles,
   Quote,
+  Globe,
+  ChevronDown,
 } from "lucide-react";
-
-const industries = [
-  "салонов красоты",
-  "барбершопов",
-  "медицинских клиник",
-  "автосервисов",
-  "СПА-центров",
-  "вашего бизнеса",
-];
-
-const chatExamples = [
-  {
-    userMessage: "Здравствуйте, хочу записаться на стрижку на завтра",
-    botMessage: "Добрый день! 😊 С удовольствием запишу вас. На завтра есть свободные окна:\n\n• 10:00 — мастер Алексей\n• 14:30 — мастер Дмитрий\n• 17:00 — мастер Алексей\n\nКакое время вам удобно?",
-  },
-  {
-    userMessage: "Сколько стоит маникюр с покрытием?",
-    botMessage: "Рада помочь! 💅 У нас есть несколько вариантов:\n\n• Маникюр + обычный лак — 800 ₽\n• Маникюр + гель-лак — 1200 ₽\n• Маникюр + укрепление + гель — 1500 ₽\n\nЗаписать вас на процедуру?",
-  },
-  {
-    userMessage: "Какие услуги у вас есть для автомобиля?",
-    botMessage: "Добрый день! 🚗 В нашем автосервисе:\n\n• Диагностика — от 1000 ₽\n• Замена масла — от 1500 ₽\n• Шиномонтаж — от 2000 ₽\n• Ремонт ходовой — по диагностике\n\nЧто вас интересует?",
-  },
-];
+import { useLanguage } from "@/contexts/LanguageContext";
+import { languages } from "@/lib/translations";
 
 export default function Home() {
+  const { t, language, setLanguage } = useLanguage();
   const [industryIndex, setIndustryIndex] = useState(0);
   const [chatIndex, setChatIndex] = useState(0);
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const langMenuRef = useRef<HTMLDivElement>(null);
+
+  const industries = [
+    t("home.industry.beautySalons"),
+    t("home.industry.barbershops"),
+    t("home.industry.medicalClinics"),
+    t("home.industry.autoServices"),
+    t("home.industry.spaCenters"),
+    t("home.industry.yourBusiness"),
+  ];
+
+  const chatExamples = [
+    {
+      userMessage: t("home.chat1.user"),
+      botMessage: t("home.chat1.bot"),
+    },
+    {
+      userMessage: t("home.chat2.user"),
+      botMessage: t("home.chat2.bot"),
+    },
+    {
+      userMessage: t("home.chat3.user"),
+      botMessage: t("home.chat3.bot"),
+    },
+  ];
 
   // Rotate industries
   useEffect(() => {
@@ -51,7 +58,7 @@ export default function Home() {
       setIndustryIndex((prev) => (prev + 1) % industries.length);
     }, 2500);
     return () => clearInterval(interval);
-  }, []);
+  }, [industries.length]);
 
   // Rotate chat examples
   useEffect(() => {
@@ -59,7 +66,36 @@ export default function Home() {
       setChatIndex((prev) => (prev + 1) % chatExamples.length);
     }, 5000);
     return () => clearInterval(interval);
+  }, [chatExamples.length]);
+
+  // Close lang menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (langMenuRef.current && !langMenuRef.current.contains(event.target as Node)) {
+        setLangMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const currentLang = languages.find((l) => l.id === language);
+
+  const regularBotItems = [
+    t("home.regularBot.item1"),
+    t("home.regularBot.item2"),
+    t("home.regularBot.item3"),
+    t("home.regularBot.item4"),
+    t("home.regularBot.item5"),
+  ];
+
+  const aiEmployeeItems = [
+    t("home.aiEmployee.item1"),
+    t("home.aiEmployee.item2"),
+    t("home.aiEmployee.item3"),
+    t("home.aiEmployee.item4"),
+    t("home.aiEmployee.item5"),
+  ];
 
   return (
     <div className="min-h-screen bg-[#0a0a1a] text-white overflow-hidden">
@@ -81,27 +117,59 @@ export default function Home() {
           </div>
           <div className="hidden md:flex items-center gap-8">
             <Link href="#features" className="text-gray-300 hover:text-white transition-colors">
-              Возможности
+              {t("home.nav.features")}
             </Link>
             <Link href="#how-it-works" className="text-gray-300 hover:text-white transition-colors">
-              Как работает
+              {t("home.nav.howItWorks")}
             </Link>
             <Link href="#pricing" className="text-gray-300 hover:text-white transition-colors">
-              Тарифы
+              {t("home.nav.pricing")}
             </Link>
           </div>
           <div className="flex items-center gap-4">
+            {/* Language selector */}
+            <div className="relative" ref={langMenuRef}>
+              <button
+                onClick={() => setLangMenuOpen(!langMenuOpen)}
+                className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-white/5"
+              >
+                <Globe className="h-4 w-4" />
+                <span className="hidden sm:inline">{currentLang?.flag} {currentLang?.name}</span>
+                <span className="sm:hidden">{currentLang?.flag}</span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${langMenuOpen ? "rotate-180" : ""}`} />
+              </button>
+              {langMenuOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-[#12122a] border border-white/10 rounded-xl shadow-xl py-2 z-50">
+                  {languages.map((lang) => (
+                    <button
+                      key={lang.id}
+                      onClick={() => {
+                        setLanguage(lang.id);
+                        setLangMenuOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 flex items-center gap-3 hover:bg-white/5 transition-colors ${
+                        language === lang.id ? "text-blue-400" : "text-gray-300"
+                      }`}
+                    >
+                      <span>{lang.flag}</span>
+                      <span>{lang.name}</span>
+                      {language === lang.id && <Check className="h-4 w-4 ml-auto" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <Link
               href="/login"
               className="text-gray-300 hover:text-white transition-colors"
             >
-              Войти
+              {t("home.nav.login")}
             </Link>
             <Link
               href="/register"
               className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-5 py-2.5 rounded-xl font-medium hover:opacity-90 transition-opacity"
             >
-              Начать бесплатно
+              {t("home.nav.startFree")}
             </Link>
           </div>
         </nav>
@@ -113,20 +181,19 @@ export default function Home() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-2 mb-8 backdrop-blur-sm">
             <Sparkles className="h-4 w-4 text-yellow-400" />
-            <span className="text-sm text-gray-300">Новое поколение AI-сотрудников</span>
+            <span className="text-sm text-gray-300">{t("home.badge")}</span>
           </div>
 
           <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
-            AI-сотрудник для{" "}
+            {t("home.heroTitle")}{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-400">
               {industries[industryIndex]}
             </span>
           </h1>
 
           <p className="text-xl md:text-2xl text-gray-400 mb-10 max-w-3xl mx-auto leading-relaxed">
-            Не бот — полноценный <span className="text-white font-medium">цифровой сотрудник</span>,
-            который знает ваш бизнес, любит работать и доступен 24/7.
-            Настройте его под свои задачи за 5 минут.
+            {t("home.heroDesc1")} <span className="text-white font-medium">{t("home.heroDesc2")}</span>
+            {t("home.heroDesc3")}
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
@@ -134,20 +201,20 @@ export default function Home() {
               href="/register"
               className="group bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:opacity-90 transition-all flex items-center justify-center gap-2"
             >
-              Настроить своего сотрудника
+              {t("home.ctaPrimary")}
               <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link
               href="#features"
               className="bg-white/5 border border-white/10 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-white/10 transition-colors flex items-center justify-center gap-2 backdrop-blur-sm"
             >
-              Узнать больше
+              {t("home.ctaSecondary")}
               <ChevronRight className="h-5 w-5" />
             </Link>
           </div>
 
           <p className="text-sm text-gray-500">
-            ✨ 14 дней бесплатно
+            {t("home.trialNote")}
           </p>
         </div>
 
@@ -164,10 +231,10 @@ export default function Home() {
                   <Brain className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <p className="font-medium">AI-сотрудник</p>
+                  <p className="font-medium">{t("home.demoAiEmployee")}</p>
                   <p className="text-xs text-green-400 flex items-center gap-1">
                     <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                    Онлайн 24/7
+                    {t("home.demoOnline")}
                   </p>
                 </div>
               </div>
@@ -207,24 +274,24 @@ export default function Home() {
       {/* Reviews */}
       <section className="relative z-10 border-y border-white/5 bg-white/[0.02] py-16">
         <div className="container mx-auto px-4">
-          <h3 className="text-center text-lg text-gray-400 mb-8">Что говорят наши клиенты</h3>
+          <h3 className="text-center text-lg text-gray-400 mb-8">{t("home.reviewsTitle")}</h3>
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             <ReviewCard
-              text="AI-сотрудник экономит мне 3-4 часа в день. Клиенты получают ответы моментально, а я могу сосредоточиться на работе."
-              author="Анна К."
-              role="Владелец салона красоты"
+              text={t("home.review1.text")}
+              author={t("home.review1.author")}
+              role={t("home.review1.role")}
               rating={5}
             />
             <ReviewCard
-              text="Раньше пропускали много звонков ночью. Теперь AI отвечает 24/7 и записывает клиентов даже в 3 часа ночи!"
-              author="Дмитрий М."
-              role="Барбершоп «Бритва»"
+              text={t("home.review2.text")}
+              author={t("home.review2.author")}
+              role={t("home.review2.role")}
               rating={5}
             />
             <ReviewCard
-              text="Настроили за 10 минут. Загрузили прайс — и бот уже отвечает на вопросы о ценах. Магия!"
-              author="Елена С."
-              role="Медицинский центр"
+              text={t("home.review3.text")}
+              author={t("home.review3.author")}
+              role={t("home.review3.role")}
               rating={5}
             />
           </div>
@@ -236,11 +303,10 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold mb-6">
-              Почему <span className="text-gray-500 line-through">бот</span> — это прошлое?
+              {t("home.whyNotBot.title")} <span className="text-gray-500 line-through">{t("home.whyNotBot.bot")}</span> {t("home.whyNotBot.past")}
             </h2>
             <p className="text-xl text-gray-400">
-              Staffix — это не чат-бот с готовыми ответами. Это AI-сотрудник,
-              который думает, учится и работает как член вашей команды.
+              {t("home.whyNotBot.desc")}
             </p>
           </div>
 
@@ -251,16 +317,10 @@ export default function Home() {
                 <div className="w-10 h-10 bg-red-500/20 rounded-xl flex items-center justify-center">
                   <span className="text-red-400 text-xl">🤖</span>
                 </div>
-                <h3 className="text-xl font-semibold text-red-400">Обычный бот</h3>
+                <h3 className="text-xl font-semibold text-red-400">{t("home.regularBot")}</h3>
               </div>
               <ul className="space-y-4">
-                {[
-                  "Отвечает шаблонами",
-                  "Не знает ваш бизнес",
-                  "Раздражает клиентов",
-                  "Требует программиста",
-                  "Ограниченное использование",
-                ].map((item, i) => (
+                {regularBotItems.map((item, i) => (
                   <li key={i} className="flex items-center gap-3 text-gray-400">
                     <span className="text-red-400">✕</span>
                     {item}
@@ -276,17 +336,11 @@ export default function Home() {
                   <Brain className="h-5 w-5 text-white" />
                 </div>
                 <h3 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
-                  AI-сотрудник Staffix
+                  {t("home.aiEmployee")}
                 </h3>
               </div>
               <ul className="space-y-4">
-                {[
-                  "Понимает контекст и нюансы",
-                  "Изучает ваш бизнес за 5 минут",
-                  "Общается как человек",
-                  "Настраивается без кода",
-                  "Работает 24/7 без перерывов",
-                ].map((item, i) => (
+                {aiEmployeeItems.map((item, i) => (
                   <li key={i} className="flex items-center gap-3 text-gray-200">
                     <span className="text-green-400">✓</span>
                     {item}
@@ -303,48 +357,48 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold mb-6">
-              Что умеет ваш новый сотрудник?
+              {t("home.features.title")}
             </h2>
             <p className="text-xl text-gray-400">
-              Всё, что нужно для работы с клиентами — в одном AI
+              {t("home.features.subtitle")}
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
             <FeatureCard
               icon={<MessageSquare className="h-6 w-6" />}
-              title="Умное общение"
-              description="Отвечает на вопросы клиентов естественным языком, понимает контекст и помнит историю диалога"
+              title={t("home.feature1.title")}
+              description={t("home.feature1.desc")}
               gradient="from-blue-500 to-cyan-500"
             />
             <FeatureCard
               icon={<Calendar className="h-6 w-6" />}
-              title="Запись на услуги"
-              description="Записывает клиентов к мастерам, проверяет расписание, отправляет напоминания"
+              title={t("home.feature2.title")}
+              description={t("home.feature2.desc")}
               gradient="from-purple-500 to-pink-500"
             />
             <FeatureCard
               icon={<Clock className="h-6 w-6" />}
-              title="Режим 24/7"
-              description="Работает круглосуточно без выходных. Клиенты получают ответ мгновенно"
+              title={t("home.feature3.title")}
+              description={t("home.feature3.desc")}
               gradient="from-orange-500 to-red-500"
             />
             <FeatureCard
               icon={<Brain className="h-6 w-6" />}
-              title="Знает ваш бизнес"
-              description="Загрузите прайс-лист и FAQ — AI изучит и будет использовать в работе"
+              title={t("home.feature4.title")}
+              description={t("home.feature4.desc")}
               gradient="from-green-500 to-emerald-500"
             />
             <FeatureCard
               icon={<Shield className="h-6 w-6" />}
-              title="Ваш бренд"
-              description="Сотрудник общается от имени вашего бизнеса. Клиенты не видят платформу"
+              title={t("home.feature5.title")}
+              description={t("home.feature5.desc")}
               gradient="from-indigo-500 to-blue-500"
             />
             <FeatureCard
               icon={<Zap className="h-6 w-6" />}
-              title="Мультиязычность"
-              description="Общается на русском, узбекском и казахском языках"
+              title={t("home.feature6.title")}
+              description={t("home.feature6.desc")}
               gradient="from-yellow-500 to-orange-500"
             />
           </div>
@@ -356,33 +410,33 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold mb-6">
-              Настройте сотрудника за 5 минут
+              {t("home.howItWorks.title")}
             </h2>
             <p className="text-xl text-gray-400">
-              Без программистов, без сложных настроек
+              {t("home.howItWorks.subtitle")}
             </p>
           </div>
 
           <div className="grid md:grid-cols-4 gap-8 max-w-5xl mx-auto">
             <StepCard
               number="01"
-              title="Регистрация"
-              description="Войдите через Google или создайте аккаунт"
+              title={t("home.step1.title")}
+              description={t("home.step1.desc")}
             />
             <StepCard
               number="02"
-              title="Данные бизнеса"
-              description="Расскажите о услугах, ценах, часах работы"
+              title={t("home.step2.title")}
+              description={t("home.step2.desc")}
             />
             <StepCard
               number="03"
-              title="Обучение AI"
-              description="Загрузите прайс-лист или добавьте вручную"
+              title={t("home.step3.title")}
+              description={t("home.step3.desc")}
             />
             <StepCard
               number="04"
-              title="Запуск"
-              description="Подключите Telegram — сотрудник готов!"
+              title={t("home.step4.title")}
+              description={t("home.step4.desc")}
             />
           </div>
         </div>
@@ -393,10 +447,10 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold mb-6">
-              Простое ценообразование
+              {t("home.pricing.title")}
             </h2>
             <p className="text-xl text-gray-400">
-              Все функции на каждом плане. Платите только за сообщения.
+              {t("home.pricing.subtitle")}
             </p>
           </div>
 
@@ -404,64 +458,64 @@ export default function Home() {
             <PricingCard
               name="Starter"
               price="25"
-              period="/месяц"
-              description="Для начинающих"
+              period="/month"
+              description={t("home.pricing.starter")}
               features={[
-                "200 сообщений/месяц",
-                "Все функции",
-                "CRM и рассылки",
-                "Автоматизации",
+                `200 ${t("home.pricing.messages")}`,
+                t("home.pricing.allFeatures"),
+                t("home.pricing.crm"),
+                t("home.pricing.automation"),
               ]}
-              cta="Начать"
+              cta={t("home.pricing.start")}
               highlighted={false}
             />
             <PricingCard
               name="Pro"
               price="50"
-              period="/месяц"
-              description="Для малого бизнеса"
+              period="/month"
+              description={t("home.pricing.pro")}
               features={[
-                "1 000 сообщений/месяц",
-                "Все функции",
-                "CRM и рассылки",
-                "Автоматизации",
+                `1 000 ${t("home.pricing.messages")}`,
+                t("home.pricing.allFeatures"),
+                t("home.pricing.crm"),
+                t("home.pricing.automation"),
               ]}
-              cta="Выбрать"
+              cta={t("home.pricing.choose")}
               highlighted={true}
-              badge="Популярный"
+              badge={t("home.pricing.popular")}
             />
             <PricingCard
               name="Business"
               price="100"
-              period="/месяц"
-              description="Для растущих компаний"
+              period="/month"
+              description={t("home.pricing.business")}
               features={[
-                "3 000 сообщений/месяц",
-                "Все функции",
-                "CRM и рассылки",
-                "Автоматизации",
+                `3 000 ${t("home.pricing.messages")}`,
+                t("home.pricing.allFeatures"),
+                t("home.pricing.crm"),
+                t("home.pricing.automation"),
               ]}
-              cta="Выбрать"
+              cta={t("home.pricing.choose")}
               highlighted={false}
             />
             <PricingCard
               name="Enterprise"
               price="200"
-              period="/месяц"
-              description="Для крупного бизнеса"
+              period="/month"
+              description={t("home.pricing.enterprise")}
               features={[
-                "Безлимит сообщений",
-                "Все функции",
-                "CRM и рассылки",
-                "Автоматизации",
+                t("home.pricing.unlimited"),
+                t("home.pricing.allFeatures"),
+                t("home.pricing.crm"),
+                t("home.pricing.automation"),
               ]}
-              cta="Выбрать"
+              cta={t("home.pricing.choose")}
               highlighted={false}
             />
           </div>
 
           <p className="text-center text-gray-500 mt-8">
-            ✨ 14 дней бесплатно с 200 сообщениями. Отмена в любой момент.
+            {t("home.pricing.trialNote")}
           </p>
         </div>
       </section>
@@ -476,17 +530,16 @@ export default function Home() {
 
               <div className="relative bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-white/10 rounded-3xl p-12 backdrop-blur-sm">
                 <h2 className="text-3xl md:text-5xl font-bold mb-6">
-                  Готовы нанять AI-сотрудника?
+                  {t("home.cta.title")}
                 </h2>
                 <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
-                  Присоединяйтесь к сотням бизнесов, которые уже автоматизировали
-                  работу с клиентами с помощью Staffix
+                  {t("home.cta.desc")}
                 </p>
                 <Link
                   href="/register"
                   className="inline-flex items-center gap-2 bg-white text-gray-900 px-8 py-4 rounded-xl text-lg font-semibold hover:bg-gray-100 transition-colors"
                 >
-                  Настроить своего сотрудника
+                  {t("home.cta.button")}
                   <ChevronRight className="h-5 w-5" />
                 </Link>
               </div>
@@ -509,12 +562,12 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center gap-6 text-gray-500 text-sm">
-              <Link href="/privacy" className="hover:text-white transition-colors">Политика конфиденциальности</Link>
-              <Link href="/terms" className="hover:text-white transition-colors">Условия использования</Link>
-              <Link href="/contacts" className="hover:text-white transition-colors">Контакты</Link>
+              <Link href="/privacy" className="hover:text-white transition-colors">{t("home.footer.privacy")}</Link>
+              <Link href="/terms" className="hover:text-white transition-colors">{t("home.footer.terms")}</Link>
+              <Link href="/contacts" className="hover:text-white transition-colors">{t("home.footer.contacts")}</Link>
             </div>
             <p className="text-gray-600 text-sm">
-              © 2025 K-Bridge Co. LTD. Все права защищены.
+              {t("home.footer.copyright")}
             </p>
           </div>
         </div>
