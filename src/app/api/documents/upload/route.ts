@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
+import pdfParse from "pdf-parse";
+import mammoth from "mammoth";
+import * as XLSX from "xlsx";
 
 // Max file size: 10MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -95,11 +98,39 @@ export async function POST(request: NextRequest) {
     // Extract text from file (for AI context)
     let extractedText: string | null = null;
 
-    if (file.type === "text/plain") {
-      // For TXT files - read directly
-      extractedText = buffer.toString("utf-8");
+    try {
+      if (file.type === "text/plain") {
+        // TXT files - read directly
+        extractedText = buffer.toString("utf-8");
+      } else if (file.type === "application/pdf") {
+        // PDF files
+        const pdfData = await pdfParse(buffer);
+        extractedText = pdfData.text;
+      } else if (
+        file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        file.type === "application/msword"
+      ) {
+        // Word files (.docx, .doc)
+        const result = await mammoth.extractRawText({ buffer });
+        extractedText = result.value;
+      } else if (
+        file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+        file.type === "application/vnd.ms-excel"
+      ) {
+        // Excel files (.xlsx, .xls)
+        const workbook = XLSX.read(buffer, { type: "buffer" });
+        const texts: string[] = [];
+        for (const sheetName of workbook.SheetNames) {
+          const sheet = workbook.Sheets[sheetName];
+          const csv = XLSX.utils.sheet_to_csv(sheet);
+          texts.push(`=== ${sheetName} ===\n${csv}`);
+        }
+        extractedText = texts.join("\n\n");
+      }
+    } catch (parseError) {
+      console.error("Error parsing file:", parseError);
+      // Continue without extracted text
     }
-    // TODO: Add PDF/DOC extraction with external libraries (pdf-parse, mammoth)
 
     // Create document record
     const document = await prisma.document.create({
