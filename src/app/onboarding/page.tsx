@@ -30,6 +30,7 @@ const businessTypes = [
 
 const languages = [
   { id: "ru", name: "Русский", flag: "🇷🇺" },
+  { id: "en", name: "English", flag: "🇬🇧" },
   { id: "uz", name: "O'zbek", flag: "🇺🇿" },
   { id: "kz", name: "Қазақша", flag: "🇰🇿" },
 ];
