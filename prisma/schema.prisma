@@ -50,6 +50,33 @@ model Business {
   language      String    @default("ru") // ru, uz, kz, kg, tj, am, ge
   onboardingCompleted Boolean @default(false)
 
+  // ========================================
+  // AI LEARNING - Расширенный профиль бизнеса
+  // ========================================
+
+  // Детальная категория (spa, nail_salon, hair_salon, massage, etc.)
+  industryCategory  String?
+
+  // Город/регион для локальных рекомендаций
+  city              String?
+  country           String?   @default("UZ")
+
+  // Средний чек (для рекомендаций ценообразования)
+  averageCheck      Int?
+
+  // Целевая аудитория
+  // JSON: { "gender": "female", "ageRange": "25-45", "income": "medium" }
+  targetAudience    Json?
+
+  // AI-выученные инсайты о бизнесе
+  // JSON: { "popularServices": [...], "peakHours": [...], "commonQuestions": [...] }
+  aiInsights        Json?
+
+  // Статистика для обучения
+  totalConversations Int     @default(0)
+  totalBookings     Int       @default(0)
+  conversionRate    Float?    // % разговоров → записи
+
   // AI настройки
   aiTone        String?   // friendly, professional, casual
   aiRules       String?   // что можно/нельзя говорить
@@ -167,10 +194,38 @@ model Conversation {
 
   messages            Message[]
 
+  // ========================================
+  // AI MEMORY - Фаза 1
+  // ========================================
+
+  // AI-сгенерированное краткое содержание разговора
+  // Пример: "Клиент записался на массаж на 15 февраля, спрашивал про скидки"
+  summary             String?   @db.Text
+
+  // Тема/цель разговора
+  // booking, inquiry, complaint, feedback, other
+  topic               String?
+
+  // Результат разговора
+  // booked, answered, escalated, unresolved
+  outcome             String?
+
+  // Извлечённая важная информация
+  // JSON: { "bookedService": "массаж", "appointmentDate": "2025-02-15", "mentionedIssues": [] }
+  extractedInfo       Json?
+
+  // Количество сообщений (для триггера summarization)
+  messageCount        Int       @default(0)
+
+  // Флаг: нужно ли обновить summary
+  needsSummary        Boolean   @default(false)
+
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
   @@unique([businessId, clientTelegramId])
+  @@index([businessId, updatedAt])
+  @@index([needsSummary])
 }
 
 // Сообщения в диалогах
@@ -354,6 +409,37 @@ model Client {
   // Последняя реактивация
   lastReactivationSent DateTime?
 
+  // ========================================
+  // AI MEMORY - Фаза 1
+  // ========================================
+
+  // AI-сгенерированное краткое описание клиента
+  // Пример: "Постоянный клиент, предпочитает тайский массаж, приходит раз в 2 недели"
+  aiSummary         String?   @db.Text
+
+  // Предпочтения клиента (извлечённые AI из разговоров)
+  // JSON: { "preferredServices": ["тайский массаж"], "preferredTime": "утро", "allergies": ["орехи"] }
+  preferences       Json?
+
+  // Важные заметки (добавленные вручную или AI)
+  // Пример: "VIP клиент, всегда давать скидку 10%"
+  importantNotes    String?   @db.Text
+
+  // Настроение/тон общения с этим клиентом
+  // formal, friendly, casual
+  communicationStyle String?
+
+  // Теги для быстрой категоризации
+  // ["vip", "новенький", "проблемный"]
+  tags              String[]  @default([])
+
+  // Статистика общения
+  totalMessages     Int       @default(0)
+  lastMessageAt     DateTime?
+
+  // Когда последний раз обновлялся AI summary
+  summaryUpdatedAt  DateTime?
+
   businessId        String
   business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
@@ -362,6 +448,7 @@ model Client {
 
   @@unique([businessId, telegramId])
   @@index([businessId, lastVisitDate])
+  @@index([businessId, lastMessageAt])
 }
 
 // ========================================
