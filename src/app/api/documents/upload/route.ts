@@ -85,6 +85,15 @@ export async function POST(request: NextRequest) {
     // URL for accessing the file
     const fileUrl = `/uploads/${business.id}/${uniqueFilename}`;
 
+    // Extract text from file (for AI context)
+    let extractedText: string | null = null;
+
+    if (file.type === "text/plain") {
+      // For TXT files - read directly
+      extractedText = buffer.toString("utf-8");
+    }
+    // TODO: Add PDF/DOC extraction with external libraries (pdf-parse, mammoth)
+
     // Create document record
     const document = await prisma.document.create({
       data: {
@@ -94,6 +103,8 @@ export async function POST(request: NextRequest) {
         mimeType: file.type,
         size: file.size,
         businessId: business.id,
+        extractedText: extractedText,
+        parsed: extractedText !== null,
       },
     });
 

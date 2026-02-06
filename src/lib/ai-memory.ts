@@ -40,7 +40,9 @@ interface BusinessContext {
   aiTone: string | null;
   aiRules: string | null;
   services: Array<{ name: string; price: number; duration: number }>;
+  staff: Array<{ name: string; role: string | null }>;
   faqs: Array<{ question: string; answer: string }>;
+  documents: Array<{ name: string; extractedText: string | null }>;
 }
 
 // ========================================
@@ -143,7 +145,12 @@ export async function buildBusinessContext(
       where: { id: businessId },
       include: {
         services: { select: { name: true, price: true, duration: true } },
+        staff: { select: { name: true, role: true } },
         faqs: { select: { question: true, answer: true } },
+        documents: {
+          where: { parsed: true },
+          select: { name: true, extractedText: true }
+        },
       },
     });
 
@@ -160,7 +167,9 @@ export async function buildBusinessContext(
       aiTone: business.aiTone,
       aiRules: business.aiRules,
       services: business.services,
+      staff: business.staff,
       faqs: business.faqs,
+      documents: business.documents,
     };
   } catch (error) {
     console.error("Error building business context:", error);
@@ -197,16 +206,35 @@ export function buildSystemPrompt(
 ${
   business.services.length > 0
     ? business.services
-        .map((s) => `- ${s.name}: ${s.price} (${s.duration} мин)`)
+        .map((s) => `- ${s.name}: ${s.price} сум (${s.duration} мин)`)
         .join("\n")
-    : "Услуги не добавлены"
+    : "Услуги пока не добавлены в систему"
+}
+
+## Наши мастера/сотрудники:
+${
+  business.staff.length > 0
+    ? business.staff
+        .map((s) => `- ${s.name}${s.role ? ` (${s.role})` : ""}`)
+        .join("\n")
+    : "Сотрудники пока не добавлены"
 }
 
 ## Частые вопросы (FAQ):
 ${
   business.faqs.length > 0
     ? business.faqs.map((f) => `Q: ${f.question}\nA: ${f.answer}`).join("\n\n")
-    : "FAQ не добавлены"
+    : "FAQ пока не добавлены"
+}
+
+## Дополнительная информация из документов:
+${
+  business.documents.length > 0
+    ? business.documents
+        .filter((d) => d.extractedText)
+        .map((d) => `### ${d.name}:\n${d.extractedText}`)
+        .join("\n\n")
+    : ""
 }
 
 ## Стиль общения:
