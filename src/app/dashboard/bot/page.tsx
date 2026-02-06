@@ -232,8 +232,14 @@ export default function AIEmployeePage() {
         });
 
         if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || t("botPage.saveError"));
+          let errorMsg = t("botPage.saveError");
+          try {
+            const data = await res.json();
+            errorMsg = data.error || errorMsg;
+          } catch {
+            errorMsg = `Ошибка сервера (${res.status})`;
+          }
+          throw new Error(errorMsg);
         }
 
         const data = await res.json();

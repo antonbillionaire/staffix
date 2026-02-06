@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { cookies } from "next/headers";
 
 // No top-level imports for parsing libraries!
 // They are loaded dynamically to avoid crashes on Vercel
@@ -28,9 +29,24 @@ const ALLOWED_TYPES = [
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth: same pattern as business API (NextAuth + cookie fallback)
     const session = await auth();
+    let userId: string | undefined;
 
-    if (!session?.user?.id) {
+    if (session?.user?.email) {
+      const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+      });
+      userId = user?.id;
+    }
+
+    // Fallback to cookie-based auth
+    if (!userId) {
+      const cookieStore = await cookies();
+      userId = cookieStore.get("userId")?.value;
+    }
+
+    if (!userId) {
       return NextResponse.json(
         { error: "Не авторизован" },
         { status: 401 }
@@ -39,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     // Find user's business
     const business = await prisma.business.findFirst({
-      where: { userId: session.user.id },
+      where: { userId },
     });
 
     if (!business) {

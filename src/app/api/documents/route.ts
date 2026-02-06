@@ -1,22 +1,37 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { cookies } from "next/headers";
+
+// Helper: get user ID (NextAuth + cookie fallback)
+async function getUserId(): Promise<string | undefined> {
+  const session = await auth();
+
+  if (session?.user?.email) {
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+    });
+    if (user?.id) return user.id;
+  }
+
+  const cookieStore = await cookies();
+  return cookieStore.get("userId")?.value;
+}
 
 // GET - Fetch all documents for user's business
 export async function GET() {
   try {
-    const session = await auth();
+    const userId = await getUserId();
 
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json(
         { error: "Не авторизован" },
         { status: 401 }
       );
     }
 
-    // Find user's business
     const business = await prisma.business.findFirst({
-      where: { userId: session.user.id },
+      where: { userId },
     });
 
     if (!business) {
@@ -41,9 +56,9 @@ export async function GET() {
 // DELETE - Delete a document
 export async function DELETE(request: Request) {
   try {
-    const session = await auth();
+    const userId = await getUserId();
 
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json(
         { error: "Не авторизован" },
         { status: 401 }
@@ -59,9 +74,8 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Find user's business
     const business = await prisma.business.findFirst({
-      where: { userId: session.user.id },
+      where: { userId },
     });
 
     if (!business) {
