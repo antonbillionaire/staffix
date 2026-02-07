@@ -245,10 +245,17 @@ model Message {
 // Подписки
 model Subscription {
   id              String    @id @default(cuid())
-  plan            String    @default("trial") // trial, starter, business, pro
+  plan            String    @default("trial") // trial, starter, pro, business, enterprise
   messagesUsed    Int       @default(0)
-  messagesLimit   Int       @default(100)
+  messagesLimit   Int       @default(200)
   expiresAt       DateTime
+
+  // PayPro Global
+  payproOrderId        String?   // PayPro ORDER_ID
+  payproSubscriptionId String?   // PayPro SUBSCRIPTION_ID
+  payproCustomerId     String?   // PayPro CUSTOMER_ID
+  status               String    @default("active") // active, cancelled, suspended, expired
+  billingPeriod        String?   // monthly, yearly
 
   businessId      String    @unique
   business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)

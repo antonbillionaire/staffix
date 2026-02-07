@@ -66,7 +66,7 @@ function CheckoutContent() {
         throw new Error(data.error || "Ошибка создания оплаты");
       }
 
-      // Redirect to Lemon Squeezy checkout
+      // Redirect to PayPro Global checkout
       if (data.checkoutUrl) {
         window.location.href = data.checkoutUrl;
       } else {
@@ -237,10 +237,10 @@ function CheckoutContent() {
           </p>
         </div>
 
-        {/* Lemon Squeezy badge */}
+        {/* PayPro Global badge */}
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-500">
-            Безопасные платежи обрабатываются через Lemon Squeezy
+            Безопасные платежи обрабатываются через PayPro Global
           </p>
         </div>
       </main>

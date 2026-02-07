@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getPlan, type PlanId } from "@/lib/plans";
 
 // GET - Fetch current subscription
 export async function GET() {
@@ -35,85 +34,5 @@ export async function GET() {
   }
 }
 
-// POST - Create or update subscription
-export async function POST(request: NextRequest) {
-  try {
-    const session = await auth();
-
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Не авторизован" },
-        { status: 401 }
-      );
-    }
-
-    const { plan, billing } = await request.json();
-
-    if (!plan) {
-      return NextResponse.json(
-        { error: "Тарифный план обязателен" },
-        { status: 400 }
-      );
-    }
-
-    // Validate plan ID
-    const validPlans: PlanId[] = ["trial", "pro", "business"];
-    if (!validPlans.includes(plan as PlanId)) {
-      return NextResponse.json(
-        { error: "Недопустимый тарифный план" },
-        { status: 400 }
-      );
-    }
-
-    const planConfig = getPlan(plan as PlanId);
-
-    // Find user's business
-    const business = await prisma.business.findFirst({
-      where: { userId: session.user.id },
-    });
-
-    if (!business) {
-      return NextResponse.json(
-        { error: "Сначала создайте бизнес" },
-        { status: 400 }
-      );
-    }
-
-    // Calculate expiration date
-    const expiresAt = new Date();
-    if (billing === "yearly") {
-      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-    } else {
-      expiresAt.setMonth(expiresAt.getMonth() + 1);
-    }
-
-    // Upsert subscription
-    const subscription = await prisma.subscription.upsert({
-      where: { businessId: business.id },
-      update: {
-        plan: plan,
-        messagesLimit: planConfig.features.messagesLimit,
-        messagesUsed: 0, // Reset on new subscription
-        expiresAt,
-      },
-      create: {
-        businessId: business.id,
-        plan: plan,
-        messagesLimit: planConfig.features.messagesLimit,
-        messagesUsed: 0,
-        expiresAt,
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      subscription,
-    });
-  } catch (error) {
-    console.error("Subscription create error:", error);
-    return NextResponse.json(
-      { error: "Ошибка сервера" },
-      { status: 500 }
-    );
-  }
-}
+// POST is not allowed — subscriptions are activated only via PayPro webhook
+// Use /api/checkout to initiate payment, /api/subscription/manage to cancel/resume

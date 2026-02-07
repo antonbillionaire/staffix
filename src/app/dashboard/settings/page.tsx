@@ -53,7 +53,7 @@ export default function SettingsPage() {
     messagesLimit: 100,
     daysLeft: 14,
     expiresAt: "",
-    lemonSqueezySubscriptionId: null as string | null,
+    payproSubscriptionId: null as string | null,
   });
   const [subscriptionAction, setSubscriptionAction] = useState<"cancel" | "resume" | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
@@ -110,7 +110,7 @@ export default function SettingsPage() {
               messagesLimit: sub.messagesLimit,
               daysLeft: sub.daysLeft,
               expiresAt: sub.expiresAt,
-              lemonSqueezySubscriptionId: sub.lemonSqueezySubscriptionId,
+              payproSubscriptionId: sub.payproSubscriptionId,
             });
           }
         }
@@ -491,7 +491,7 @@ export default function SettingsPage() {
             </div>
 
             {/* Subscription management buttons */}
-            {subscription.lemonSqueezySubscriptionId && subscription.plan !== 'trial' && (
+            {subscription.payproSubscriptionId && subscription.plan !== 'trial' && (
               <div className="mt-4 pt-4 border-t border-white/10">
                 {subscription.status === 'active' && (
                   <button

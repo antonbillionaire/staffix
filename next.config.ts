@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
   },
   // Optimize server-only packages to not leak into client bundle
-  serverExternalPackages: ["@anthropic-ai/sdk", "pdf-parse", "mammoth", "xlsx", "stripe"],
+  serverExternalPackages: ["@anthropic-ai/sdk", "pdf-parse", "mammoth", "xlsx"],
 };
 
 export default nextConfig;
