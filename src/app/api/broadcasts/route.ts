@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { sendAutomationMessage } from "@/lib/automation";
 
 // Get broadcasts for business
 export async function GET(request: NextRequest) {
@@ -169,22 +170,60 @@ export async function POST(request: NextRequest) {
       })),
     });
 
-    // If sendNow, trigger immediate sending (in production, this would be a queue job)
+    // If sendNow, send via Telegram Bot API
     if (sendNow) {
-      // TODO: Implement actual Telegram sending via bot API
-      // For now, we'll simulate by updating status
+      // Get bot token for this business
+      const business = await prisma.business.findUnique({
+        where: { id: businessId },
+        select: { botToken: true },
+      });
+
+      if (!business?.botToken) {
+        return NextResponse.json(
+          { error: "Бот не настроен. Настройте Telegram бота в разделе AI-сотрудник." },
+          { status: 400 }
+        );
+      }
+
+      // Send to each client via Telegram
+      let sentCount = 0;
+      let failedCount = 0;
+
+      for (const client of clients) {
+        const result = await sendAutomationMessage(
+          business.botToken,
+          client.telegramId,
+          content
+        );
+
+        if (result.success) {
+          sentCount++;
+          await prisma.clientBroadcastDelivery.updateMany({
+            where: {
+              broadcastId: broadcast.id,
+              clientId: client.id,
+            },
+            data: { status: "sent", sentAt: new Date() },
+          });
+        } else {
+          failedCount++;
+          await prisma.clientBroadcastDelivery.updateMany({
+            where: {
+              broadcastId: broadcast.id,
+              clientId: client.id,
+            },
+            data: { status: "failed" },
+          });
+        }
+      }
+
+      // Update broadcast status
       await prisma.clientBroadcast.update({
         where: { id: broadcast.id },
         data: {
           status: "sent",
           sentAt: new Date(),
         },
-      });
-
-      // Simulate delivery status updates
-      await prisma.clientBroadcastDelivery.updateMany({
-        where: { broadcastId: broadcast.id },
-        data: { status: "sent", sentAt: new Date() },
       });
     }
 

@@ -101,9 +101,11 @@ export async function GET(request: NextRequest) {
       messagesByDayMap.set(dateStr, (messagesByDayMap.get(dateStr) || 0) + 1);
     });
 
+    // Show appropriate number of days based on period
+    const maxDays = period === "week" ? 7 : period === "month" ? 30 : 90;
     const messagesByDay = Array.from(messagesByDayMap.entries())
       .map(([date, count]) => ({ date, count }))
-      .slice(-7); // Last 7 days
+      .slice(-maxDays);
 
     // Get popular questions (messages from users)
     const userMessages = await prisma.message.findMany({
@@ -115,18 +117,45 @@ export async function GET(request: NextRequest) {
       select: { content: true },
     });
 
-    // Simple frequency analysis
-    const questionCounts = new Map<string, number>();
+    // Keyword-based grouping: normalize messages and group similar ones
+    const questionCounts = new Map<string, { display: string; count: number }>();
     userMessages.forEach((msg) => {
-      // Get first 50 chars as the "question"
-      const question = msg.content.substring(0, 50) + (msg.content.length > 50 ? "..." : "");
-      questionCounts.set(question, (questionCounts.get(question) || 0) + 1);
+      const text = msg.content.trim();
+      if (text.length < 3) return; // Skip very short messages like "Да", "Ок"
+
+      // Normalize: lowercase, remove punctuation, collapse whitespace
+      const normalized = text.toLowerCase()
+        .replace(/[.,!?;:()"\-—–…]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .substring(0, 80);
+
+      if (!normalized) return;
+
+      const existing = questionCounts.get(normalized);
+      if (existing) {
+        existing.count++;
+      } else {
+        // Keep original text as display, truncated
+        const display = text.length > 60 ? text.substring(0, 60) + "..." : text;
+        questionCounts.set(normalized, { display, count: 1 });
+      }
     });
 
-    const popularQuestions = Array.from(questionCounts.entries())
-      .map(([question, count]) => ({ question, count }))
+    const popularQuestions = Array.from(questionCounts.values())
+      .filter((q) => q.count >= 2) // Only show questions asked at least twice
+      .map(({ display, count }) => ({ question: display, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
+
+    // If no repeated questions, show top single ones
+    if (popularQuestions.length === 0) {
+      const topSingle = Array.from(questionCounts.values())
+        .map(({ display, count }) => ({ question: display, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+      popularQuestions.push(...topSingle);
+    }
 
     // Enhanced CRM stats
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);

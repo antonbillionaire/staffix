@@ -151,6 +151,21 @@ ${business.address ? `📍 ${business.address}` : ""}
             where: { id: booking.id },
             data: { reminder24hSent: true },
           });
+          // Track in ScheduledReminder for stats
+          await prisma.scheduledReminder.create({
+            data: {
+              type: "reminder_24h",
+              status: "sent",
+              scheduledFor: now,
+              sentAt: now,
+              clientTelegramId: booking.clientTelegramId,
+              clientName: booking.clientName,
+              serviceName: booking.service?.name,
+              appointmentDate: booking.date,
+              bookingId: booking.id,
+              businessId: business.id,
+            },
+          });
           results.sent++;
         } else {
           results.failed++;
@@ -183,6 +198,21 @@ ${business.address ? `📍 ${business.address}` : ""}
           await prisma.booking.update({
             where: { id: booking.id },
             data: { reminder2hSent: true },
+          });
+          // Track in ScheduledReminder for stats
+          await prisma.scheduledReminder.create({
+            data: {
+              type: "reminder_2h",
+              status: "sent",
+              scheduledFor: now,
+              sentAt: now,
+              clientTelegramId: booking.clientTelegramId,
+              clientName: booking.clientName,
+              serviceName: booking.service?.name,
+              appointmentDate: booking.date,
+              bookingId: booking.id,
+              businessId: business.id,
+            },
           });
           results.sent++;
         } else {
