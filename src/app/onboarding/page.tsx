@@ -2,44 +2,61 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { languages as appLanguages } from "@/lib/translations";
 import {
   Scissors,
   Stethoscope,
   Car,
-  Users,
   ArrowRight,
   ArrowLeft,
   Check,
   Loader2,
   Store,
   Upload,
-  FileText,
   X,
   Brain,
   Sparkles,
+  Truck,
+  SprayCanIcon,
+  PawPrint,
+  ShoppingCart,
+  Briefcase,
+  Dumbbell,
+  GraduationCap,
+  PartyPopper,
+  Droplets,
+  type LucideIcon,
 } from "lucide-react";
 
-const businessTypes = [
-  { id: "salon", name: "Салон красоты", icon: Scissors },
-  { id: "barbershop", name: "Барбершоп", icon: Scissors },
-  { id: "clinic", name: "Клиника / Медцентр", icon: Stethoscope },
-  { id: "auto_service", name: "Автосервис", icon: Car },
-  { id: "spa", name: "СПА / Массаж", icon: Users },
-  { id: "other", name: "Другое", icon: Store },
+interface BusinessType {
+  id: string;
+  nameKey: string;
+  icon: LucideIcon;
+}
+
+const businessTypes: BusinessType[] = [
+  { id: "salon", nameKey: "onboarding.type.salon", icon: Scissors },
+  { id: "barbershop", nameKey: "onboarding.type.barbershop", icon: Scissors },
+  { id: "clinic", nameKey: "onboarding.type.clinic", icon: Stethoscope },
+  { id: "spa", nameKey: "onboarding.type.spa", icon: Droplets },
+  { id: "fitness", nameKey: "onboarding.type.fitness", icon: Dumbbell },
+  { id: "auto_service", nameKey: "onboarding.type.autoService", icon: Car },
+  { id: "delivery", nameKey: "onboarding.type.delivery", icon: Truck },
+  { id: "cleaning", nameKey: "onboarding.type.cleaning", icon: SprayCanIcon },
+  { id: "pet_care", nameKey: "onboarding.type.petCare", icon: PawPrint },
+  { id: "online_shop", nameKey: "onboarding.type.onlineShop", icon: ShoppingCart },
+  { id: "professional", nameKey: "onboarding.type.professional", icon: Briefcase },
+  { id: "education", nameKey: "onboarding.type.education", icon: GraduationCap },
+  { id: "events", nameKey: "onboarding.type.events", icon: PartyPopper },
+  { id: "other", nameKey: "onboarding.type.other", icon: Store },
 ];
 
-const languages = [
-  { id: "ru", name: "Русский", flag: "🇷🇺" },
-  { id: "en", name: "English", flag: "🇬🇧" },
-  { id: "uz", name: "O'zbek", flag: "🇺🇿" },
-  { id: "kz", name: "Қазақша", flag: "🇰🇿" },
-];
-
-const staffCounts = [
-  { id: "1", name: "Только я" },
-  { id: "2-5", name: "2-5 человек" },
-  { id: "6-10", name: "6-10 человек" },
-  { id: "11+", name: "Больше 10" },
+const staffCountKeys = [
+  { id: "1", nameKey: "onboarding.staff.solo" },
+  { id: "2-5", nameKey: "onboarding.staff.small" },
+  { id: "6-10", nameKey: "onboarding.staff.medium" },
+  { id: "11+", nameKey: "onboarding.staff.large" },
 ];
 
 interface UploadedFile {
@@ -53,6 +70,7 @@ interface UploadedFile {
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -72,11 +90,11 @@ export default function OnboardingPage() {
 
   const handleNext = () => {
     if (step === 1 && !formData.businessType) {
-      setError("Выберите тип бизнеса");
+      setError(t("onboarding.error.selectType"));
       return;
     }
     if (step === 2 && !formData.businessName) {
-      setError("Введите название бизнеса");
+      setError(t("onboarding.error.enterName"));
       return;
     }
     setError("");
@@ -106,7 +124,6 @@ export default function OnboardingPage() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
 
-      // Check file type
       if (!allowedTypes.includes(file.type) &&
           !file.name.endsWith('.xlsx') &&
           !file.name.endsWith('.xls') &&
@@ -115,19 +132,17 @@ export default function OnboardingPage() {
         continue;
       }
 
-      // Check file size (10 MB max)
       if (file.size > 10 * 1024 * 1024) {
         setUploadedFiles(prev => [...prev, {
           name: file.name,
           size: file.size,
           type: file.type,
           status: "error",
-          error: "Файл слишком большой (макс. 10 MB)"
+          error: t("onboarding.error.fileTooLarge")
         }]);
         continue;
       }
 
-      // Add file with uploading status
       const tempId = `temp-${Date.now()}-${i}`;
       setUploadedFiles(prev => [...prev, {
         id: tempId,
@@ -137,38 +152,34 @@ export default function OnboardingPage() {
         status: "uploading"
       }]);
 
-      // Upload file
       try {
-        const formData = new FormData();
-        formData.append("file", file);
+        const fd = new FormData();
+        fd.append("file", file);
 
         const res = await fetch("/api/upload", {
           method: "POST",
-          body: formData,
+          body: fd,
         });
 
         const data = await res.json();
 
         if (res.ok && data.success) {
-          // Update file status to success
           setUploadedFiles(prev => prev.map(f =>
             f.id === tempId
               ? { ...f, id: data.document.id, status: "success" as const }
               : f
           ));
         } else {
-          // Update file status to error
           setUploadedFiles(prev => prev.map(f =>
             f.id === tempId
-              ? { ...f, status: "error" as const, error: data.error || "Ошибка загрузки" }
+              ? { ...f, status: "error" as const, error: data.error || t("onboarding.error.uploadFailed") }
               : f
           ));
         }
       } catch {
-        // Update file status to error
         setUploadedFiles(prev => prev.map(f =>
           f.id === tempId
-            ? { ...f, status: "error" as const, error: "Ошибка сети" }
+            ? { ...f, status: "error" as const, error: t("onboarding.error.networkError") }
             : f
         ));
       }
@@ -182,12 +193,11 @@ export default function OnboardingPage() {
   const removeFile = async (index: number) => {
     const file = uploadedFiles[index];
 
-    // If file was successfully uploaded, delete from server
     if (file.status === "success" && file.id && !file.id.startsWith("temp-")) {
       try {
         await fetch(`/api/upload?id=${file.id}`, { method: "DELETE" });
       } catch {
-        // Ignore delete errors, just remove from UI
+        // Ignore delete errors
       }
     }
 
@@ -213,12 +223,12 @@ export default function OnboardingPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Ошибка сохранения");
+        throw new Error(data.error || t("onboarding.error.saveFailed"));
       }
 
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка сохранения");
+      setError(err instanceof Error ? err.message : t("onboarding.error.saveFailed"));
       setSaving(false);
     }
   };
@@ -270,40 +280,40 @@ export default function OnboardingPage() {
         {step === 1 && (
           <div>
             <h2 className="text-2xl font-bold text-white mb-2">
-              Какой у вас бизнес?
+              {t("onboarding.step1.title")}
             </h2>
             <p className="text-gray-400 mb-6">
-              Это поможет настроить AI-сотрудника под ваши потребности
+              {t("onboarding.step1.subtitle")}
             </p>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {businessTypes.map((type) => {
                 const Icon = type.icon;
                 return (
                   <button
                     key={type.id}
                     onClick={() => setFormData({ ...formData, businessType: type.id })}
-                    className={`p-4 rounded-xl border-2 transition-all ${
+                    className={`p-3 sm:p-4 rounded-xl border-2 transition-all ${
                       formData.businessType === type.id
                         ? "border-blue-500 bg-blue-500/10"
                         : "border-white/10 hover:border-white/20 bg-white/5"
                     }`}
                   >
                     <Icon
-                      className={`h-8 w-8 mx-auto mb-2 ${
+                      className={`h-7 w-7 mx-auto mb-2 ${
                         formData.businessType === type.id
                           ? "text-blue-400"
                           : "text-gray-400"
                       }`}
                     />
                     <p
-                      className={`text-sm font-medium ${
+                      className={`text-xs sm:text-sm font-medium ${
                         formData.businessType === type.id
                           ? "text-blue-400"
                           : "text-gray-300"
                       }`}
                     >
-                      {type.name}
+                      {t(type.nameKey)}
                     </p>
                   </button>
                 );
@@ -316,16 +326,16 @@ export default function OnboardingPage() {
         {step === 2 && (
           <div>
             <h2 className="text-2xl font-bold text-white mb-2">
-              Расскажите о бизнесе
+              {t("onboarding.step2.title")}
             </h2>
             <p className="text-gray-400 mb-6">
-              Эта информация будет доступна вашим клиентам
+              {t("onboarding.step2.subtitle")}
             </p>
 
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Название бизнеса *
+                  {t("onboarding.step2.businessName")} *
                 </label>
                 <input
                   type="text"
@@ -333,14 +343,14 @@ export default function OnboardingPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, businessName: e.target.value })
                   }
-                  placeholder="Салон красоты 'Звезда'"
+                  placeholder={t("onboarding.step2.businessNamePlaceholder")}
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Телефон
+                  {t("onboarding.step2.phone")}
                 </label>
                 <input
                   type="tel"
@@ -355,7 +365,7 @@ export default function OnboardingPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Адрес
+                  {t("onboarding.step2.address")}
                 </label>
                 <input
                   type="text"
@@ -363,17 +373,17 @@ export default function OnboardingPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, address: e.target.value })
                   }
-                  placeholder="г. Ташкент, ул. Навои, 10"
+                  placeholder={t("onboarding.step2.addressPlaceholder")}
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-3">
-                  Сколько сотрудников?
+                  {t("onboarding.step2.staffCount")}
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {staffCounts.map((count) => (
+                  {staffCountKeys.map((count) => (
                     <button
                       key={count.id}
                       onClick={() =>
@@ -385,7 +395,7 @@ export default function OnboardingPage() {
                           : "border-white/10 text-gray-400 hover:border-white/20"
                       }`}
                     >
-                      {count.name}
+                      {t(count.nameKey)}
                     </button>
                   ))}
                 </div>
@@ -398,23 +408,22 @@ export default function OnboardingPage() {
         {step === 3 && (
           <div>
             <h2 className="text-2xl font-bold text-white mb-2">
-              Загрузите документы
+              {t("onboarding.step3.title")}
             </h2>
             <p className="text-gray-400 mb-6">
-              Прайс-лист, меню услуг, FAQ — AI изучит их и будет использовать в работе
+              {t("onboarding.step3.subtitle")}
             </p>
 
-            {/* Upload area */}
             <div
               onClick={() => fileInputRef.current?.click()}
               className="border-2 border-dashed border-white/20 rounded-xl p-8 text-center cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 transition-all"
             >
               <Upload className="h-12 w-12 mx-auto text-gray-500 mb-4" />
               <p className="text-gray-300 font-medium">
-                Нажмите для загрузки или перетащите файлы
+                {t("onboarding.step3.clickToUpload")}
               </p>
               <p className="text-sm text-gray-500 mt-2">
-                PDF, Excel, Word, изображения (до 10 MB)
+                {t("onboarding.step3.fileFormats")}
               </p>
               <input
                 ref={fileInputRef}
@@ -426,10 +435,9 @@ export default function OnboardingPage() {
               />
             </div>
 
-            {/* Uploaded files list */}
             {uploadedFiles.length > 0 && (
               <div className="mt-6 space-y-3">
-                <p className="text-sm font-medium text-gray-300">Загруженные файлы:</p>
+                <p className="text-sm font-medium text-gray-300">{t("onboarding.step3.uploadedFiles")}:</p>
                 {uploadedFiles.map((file, index) => (
                   <div
                     key={file.id || index}
@@ -453,7 +461,7 @@ export default function OnboardingPage() {
                         <p className="text-sm font-medium text-white">{file.name}</p>
                         <p className="text-xs text-gray-500">
                           {file.status === "uploading"
-                            ? "Загрузка..."
+                            ? t("onboarding.step3.uploading")
                             : file.status === "error"
                             ? file.error
                             : formatFileSize(file.size)}
@@ -474,7 +482,7 @@ export default function OnboardingPage() {
             )}
 
             <p className="mt-4 text-sm text-gray-500">
-              Можно пропустить этот шаг и загрузить документы позже
+              {t("onboarding.step3.skipNote")}
             </p>
           </div>
         )}
@@ -483,14 +491,14 @@ export default function OnboardingPage() {
         {step === 4 && (
           <div>
             <h2 className="text-2xl font-bold text-white mb-2">
-              Выберите язык
+              {t("onboarding.step4.title")}
             </h2>
             <p className="text-gray-400 mb-6">
-              На этом языке будет общаться AI-сотрудник с вашими клиентами
+              {t("onboarding.step4.subtitle")}
             </p>
 
-            <div className="grid grid-cols-3 gap-4">
-              {languages.map((lang) => (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {appLanguages.map((lang) => (
                 <button
                   key={lang.id}
                   onClick={() => setFormData({ ...formData, language: lang.id })}
@@ -524,58 +532,57 @@ export default function OnboardingPage() {
                 <Check className="h-8 w-8 text-white" />
               </div>
               <h2 className="text-2xl font-bold text-white mb-2">
-                Всё готово!
+                {t("onboarding.step5.title")}
               </h2>
               <p className="text-gray-400">
-                Проверьте данные и нажмите "Начать работу"
+                {t("onboarding.step5.subtitle")}
               </p>
             </div>
 
             <div className="bg-white/5 rounded-xl p-6 space-y-3">
               <div className="flex justify-between">
-                <span className="text-gray-500">Тип бизнеса:</span>
+                <span className="text-gray-500">{t("onboarding.step5.businessType")}:</span>
                 <span className="text-white font-medium">
-                  {businessTypes.find((t) => t.id === formData.businessType)?.name}
+                  {t(businessTypes.find((bt) => bt.id === formData.businessType)?.nameKey || "")}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Название:</span>
+                <span className="text-gray-500">{t("onboarding.step5.name")}:</span>
                 <span className="text-white font-medium">{formData.businessName}</span>
               </div>
               {formData.phone && (
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Телефон:</span>
+                  <span className="text-gray-500">{t("onboarding.step2.phone")}:</span>
                   <span className="text-white font-medium">{formData.phone}</span>
                 </div>
               )}
               {formData.address && (
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Адрес:</span>
+                  <span className="text-gray-500">{t("onboarding.step2.address")}:</span>
                   <span className="text-white font-medium">{formData.address}</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-gray-500">Документы:</span>
+                <span className="text-gray-500">{t("onboarding.step5.documents")}:</span>
                 <span className="text-white font-medium">
                   {uploadedFiles.filter(f => f.status === "success").length > 0
-                    ? `${uploadedFiles.filter(f => f.status === "success").length} файл(ов)`
-                    : "Не загружены"}
+                    ? `${uploadedFiles.filter(f => f.status === "success").length} ${t("onboarding.step5.filesCount")}`
+                    : t("onboarding.step5.notUploaded")}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Язык:</span>
+                <span className="text-gray-500">{t("onboarding.step5.language")}:</span>
                 <span className="text-white font-medium">
-                  {languages.find((l) => l.id === formData.language)?.flag}{" "}
-                  {languages.find((l) => l.id === formData.language)?.name}
+                  {appLanguages.find((l) => l.id === formData.language)?.flag}{" "}
+                  {appLanguages.find((l) => l.id === formData.language)?.name}
                 </span>
               </div>
             </div>
 
-            {/* Trial info */}
             <div className="mt-6 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl p-4 flex items-center gap-3">
               <Sparkles className="h-5 w-5 text-yellow-400 flex-shrink-0" />
               <p className="text-sm text-gray-300">
-                У вас <span className="text-white font-medium">14 дней бесплатного</span> использования AI-сотрудника
+                {t("onboarding.step5.trialInfo")}
               </p>
             </div>
           </div>
@@ -596,7 +603,7 @@ export default function OnboardingPage() {
               className="flex items-center gap-2 px-6 py-3 text-gray-400 hover:text-white transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
-              Назад
+              {t("onboarding.back")}
             </button>
           ) : (
             <div />
@@ -607,7 +614,7 @@ export default function OnboardingPage() {
               onClick={handleNext}
               className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 transition-all"
             >
-              Далее
+              {t("onboarding.next")}
               <ArrowRight className="h-4 w-4" />
             </button>
           ) : (
@@ -619,11 +626,11 @@ export default function OnboardingPage() {
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Сохранение...
+                  {t("onboarding.saving")}
                 </>
               ) : (
                 <>
-                  Начать работу
+                  {t("onboarding.start")}
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
