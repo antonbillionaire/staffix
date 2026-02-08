@@ -61,6 +61,9 @@ model Business {
   city              String?
   country           String?   @default("UZ")
 
+  // Часовой пояс бизнеса (IANA формат)
+  timezone          String    @default("Asia/Tashkent")
+
   // Средний чек (для рекомендаций ценообразования)
   averageCheck      Int?
 

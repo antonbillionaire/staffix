@@ -4,7 +4,7 @@
  */
 
 import { prisma } from "./prisma";
-import { localToUTC, getTimezoneOffset } from "./automation";
+import { localToUTC } from "./automation";
 
 // ========================================
 // TYPES
@@ -140,10 +140,10 @@ export async function checkAvailability(
   // Load business info
   const business = await prisma.business.findUnique({
     where: { id: businessId },
-    select: { workingHours: true, country: true },
+    select: { workingHours: true, timezone: true },
   });
 
-  const country = business?.country ?? null;
+  const tz = business?.timezone ?? null;
 
   // Parse the target date (using local midnight for working hours parsing)
   const targetDate = new Date(dateStr + "T00:00:00Z");
@@ -190,8 +190,8 @@ export async function checkAvailability(
   }
 
   // Get all bookings for this date (convert local day boundaries to UTC)
-  const dayStart = localToUTC(dateStr, "00:00", country);
-  const dayEnd = localToUTC(dateStr, "23:59", country);
+  const dayStart = localToUTC(dateStr, "00:00", tz);
+  const dayEnd = localToUTC(dateStr, "23:59", tz);
 
   const existingBookings = await prisma.booking.findMany({
     where: {
@@ -224,14 +224,14 @@ export async function checkAvailability(
       (currentHour === hours.endHour && currentMinute < hours.endMinute)
     ) {
       const timeStr = `${currentHour.toString().padStart(2, "0")}:${currentMinute.toString().padStart(2, "0")}`;
-      const slotStart = localToUTC(dateStr, timeStr, country);
+      const slotStart = localToUTC(dateStr, timeStr, tz);
 
       const slotEnd = new Date(slotStart);
       slotEnd.setMinutes(slotEnd.getMinutes() + serviceDuration);
 
       // Check if slot end exceeds working hours
       const workEndStr = `${hours.endHour.toString().padStart(2, "0")}:${hours.endMinute.toString().padStart(2, "0")}`;
-      const workEnd = localToUTC(dateStr, workEndStr, country);
+      const workEnd = localToUTC(dateStr, workEndStr, tz);
 
       if (slotEnd > workEnd) {
         break;
@@ -349,14 +349,15 @@ export async function createBooking(
   clientPhone?: string
 ): Promise<BookingResult> {
   try {
-    // Get business country for timezone
+    // Get business timezone
     const businessInfo = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { country: true },
+      select: { timezone: true },
     });
+    const tz = businessInfo?.timezone ?? null;
 
     // Parse date and time (convert from business local time to UTC)
-    const bookingDate = localToUTC(dateStr, time, businessInfo?.country ?? null);
+    const bookingDate = localToUTC(dateStr, time, tz);
     if (isNaN(bookingDate.getTime())) {
       return { success: false, error: "Некорректная дата или время" };
     }
@@ -404,8 +405,8 @@ export async function createBooking(
         businessId,
         status: { in: ["pending", "confirmed"] },
         date: {
-          gte: localToUTC(dateStr, "00:00", businessInfo?.country ?? null),
-          lte: localToUTC(dateStr, "23:59", businessInfo?.country ?? null),
+          gte: localToUTC(dateStr, "00:00", tz),
+          lte: localToUTC(dateStr, "23:59", tz),
         },
         ...(actualStaffId ? { staffId: actualStaffId } : {}),
       },

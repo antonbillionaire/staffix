@@ -150,7 +150,7 @@ export async function PUT(request: Request) {
     }
 
     const data = await request.json();
-    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, botLogo } = data;
+    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, botLogo, timezone } = data;
 
     // Найти бизнес пользователя
     const existingBusiness = await prisma.business.findFirst({
@@ -175,6 +175,7 @@ export async function PUT(request: Request) {
     if (welcomeMessage !== undefined) updateData.welcomeMessage = welcomeMessage;
     if (aiRules !== undefined) updateData.aiRules = aiRules;
     if (botLogo !== undefined) updateData.botLogo = botLogo;
+    if (timezone !== undefined) updateData.timezone = timezone;
 
     // Если передан токен бота - валидируем и регистрируем/перерегистрируем webhook
     if (botToken) {

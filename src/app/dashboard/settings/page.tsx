@@ -18,7 +18,9 @@ import {
   XCircle,
   RefreshCw,
   Calendar,
+  Clock,
 } from "lucide-react";
+import { TIMEZONES } from "@/lib/timezones";
 
 export default function SettingsPage() {
   const { data: session } = useSession();
@@ -34,6 +36,11 @@ export default function SettingsPage() {
     name: "",
     email: "",
   });
+
+  // Business timezone
+  const [timezone, setTimezone] = useState("Asia/Tashkent");
+  const [timezoneSaving, setTimezoneSaving] = useState(false);
+  const [timezoneSaved, setTimezoneSaved] = useState(false);
 
   // Notification settings
   const [notifications, setNotifications] = useState({
@@ -94,6 +101,19 @@ export default function SettingsPage() {
         }
       } catch (err) {
         console.error("Error loading settings:", err);
+      }
+
+      // Load business timezone
+      try {
+        const res = await fetch("/api/business");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.business?.timezone) {
+            setTimezone(data.business.timezone);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading business:", err);
       }
 
       // Load subscription info
@@ -162,6 +182,30 @@ export default function SettingsPage() {
       });
     } catch (err) {
       console.error("Error saving theme:", err);
+    }
+  };
+
+  // Save timezone
+  const handleSaveTimezone = async (tz: string) => {
+    setTimezone(tz);
+    setTimezoneSaving(true);
+    setTimezoneSaved(false);
+
+    try {
+      const res = await fetch("/api/business", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timezone: tz }),
+      });
+
+      if (!res.ok) throw new Error("Ошибка сохранения");
+
+      setTimezoneSaved(true);
+      setTimeout(() => setTimezoneSaved(false), 3000);
+    } catch (err) {
+      console.error("Error saving timezone:", err);
+    } finally {
+      setTimezoneSaving(false);
     }
   };
 
@@ -355,6 +399,38 @@ export default function SettingsPage() {
               )}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Timezone section - visible in Profile tab */}
+      {activeTab === "profile" && (
+        <div className={`${bgCard} rounded-xl border ${borderColor} p-6 mt-4`}>
+          <div className="flex items-center gap-2 mb-4">
+            <Clock className="h-5 w-5 text-blue-500" />
+            <h3 className={`text-lg font-medium ${textPrimary}`}>Часовой пояс</h3>
+            {timezoneSaved && (
+              <span className="text-green-500 text-sm flex items-center gap-1">
+                <Check className="h-3 w-3" /> Сохранено
+              </span>
+            )}
+            {timezoneSaving && (
+              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+            )}
+          </div>
+          <p className={`text-sm ${textSecondary} mb-4`}>
+            Используется для расчёта времени записей и отправки напоминаний
+          </p>
+          <select
+            value={timezone}
+            onChange={(e) => handleSaveTimezone(e.target.value)}
+            className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+          >
+            {TIMEZONES.map((tz) => (
+              <option key={tz.value} value={tz.value}>
+                {tz.label}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 

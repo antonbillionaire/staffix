@@ -575,13 +575,13 @@ async function handleCallbackQuery(
 
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { service: true, business: { select: { country: true, address: true } } },
+      include: { service: true, business: { select: { timezone: true, address: true } } },
     });
 
     if (booking && messageId) {
       await editMessageText(
         botToken, chatId, messageId,
-        `✅ Запись подтверждена!\n\n📅 ${formatDateRu(booking.date, booking.business?.country)}\n${booking.service ? `💇 ${booking.service.name}` : ""}${booking.business?.address ? `\n📍 ${booking.business.address}` : ""}\n\nЖдём вас! 💜`
+        `✅ Запись подтверждена!\n\n📅 ${formatDateRu(booking.date, booking.business?.timezone)}\n${booking.service ? `💇 ${booking.service.name}` : ""}${booking.business?.address ? `\n📍 ${booking.business.address}` : ""}\n\nЖдём вас! 💜`
       );
     }
     return;

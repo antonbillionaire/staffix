@@ -4,35 +4,106 @@ import { prisma } from "@/lib/prisma";
 // TIMEZONE HELPERS
 // ===========================================
 
-// UTC offset in minutes for business countries
+// UTC offset in minutes for IANA timezone names
+// Covering CIS, Korea, and major world timezones
 const TIMEZONE_OFFSETS: Record<string, number> = {
-  UZ: 300,  // UTC+5 Asia/Tashkent
-  KZ: 360,  // UTC+6 Asia/Almaty
-  KR: 540,  // UTC+9 Asia/Seoul
-  RU: 180,  // UTC+3 Europe/Moscow (default for Russia)
-  KG: 360,  // UTC+6 Asia/Bishkek
-  TJ: 300,  // UTC+5 Asia/Dushanbe
-  AM: 240,  // UTC+4 Asia/Yerevan
-  GE: 240,  // UTC+4 Asia/Tbilisi
-  US: -300, // UTC-5 America/New_York (default for US)
-  GB: 0,    // UTC+0 Europe/London
+  // CIS & Central Asia
+  "Asia/Tashkent": 300,      // UTC+5 Узбекистан
+  "Asia/Almaty": 300,        // UTC+5 Казахстан (с 2024 — единый UTC+5)
+  "Asia/Bishkek": 360,       // UTC+6 Кыргызстан
+  "Asia/Dushanbe": 300,      // UTC+5 Таджикистан
+  "Asia/Ashgabat": 300,      // UTC+5 Туркменистан
+  "Asia/Baku": 240,          // UTC+4 Азербайджан
+  "Asia/Yerevan": 240,       // UTC+4 Армения
+  "Asia/Tbilisi": 240,       // UTC+4 Грузия
+
+  // Россия (11 зон)
+  "Europe/Kaliningrad": 120, // UTC+2
+  "Europe/Moscow": 180,      // UTC+3
+  "Europe/Samara": 240,      // UTC+4
+  "Asia/Yekaterinburg": 300, // UTC+5
+  "Asia/Omsk": 360,          // UTC+6
+  "Asia/Novosibirsk": 420,   // UTC+7
+  "Asia/Krasnoyarsk": 420,   // UTC+7
+  "Asia/Irkutsk": 480,       // UTC+8
+  "Asia/Yakutsk": 540,       // UTC+9
+  "Asia/Vladivostok": 600,   // UTC+10
+  "Asia/Kamchatka": 720,     // UTC+12
+
+  // Корея, Япония, Китай
+  "Asia/Seoul": 540,         // UTC+9
+  "Asia/Tokyo": 540,         // UTC+9
+  "Asia/Shanghai": 480,      // UTC+8
+
+  // Ближний Восток
+  "Asia/Dubai": 240,         // UTC+4
+  "Asia/Riyadh": 180,        // UTC+3
+  "Asia/Istanbul": 180,      // UTC+3
+
+  // Европа
+  "Europe/London": 0,        // UTC+0
+  "Europe/Berlin": 60,       // UTC+1
+  "Europe/Paris": 60,        // UTC+1
+  "Europe/Kiev": 120,        // UTC+2
+
+  // Америка
+  "America/New_York": -300,  // UTC-5
+  "America/Chicago": -360,   // UTC-6
+  "America/Denver": -420,    // UTC-7
+  "America/Los_Angeles": -480, // UTC-8
 };
 
-// Get timezone offset in minutes for a country
-export function getTimezoneOffset(country: string | null): number {
-  return TIMEZONE_OFFSETS[country || "UZ"] ?? 300; // Default to Tashkent
+// Default timezone for country (used when business has no timezone set)
+const COUNTRY_DEFAULT_TZ: Record<string, string> = {
+  UZ: "Asia/Tashkent",
+  KZ: "Asia/Almaty",
+  KR: "Asia/Seoul",
+  RU: "Europe/Moscow",
+  KG: "Asia/Bishkek",
+  TJ: "Asia/Dushanbe",
+  TM: "Asia/Ashgabat",
+  AZ: "Asia/Baku",
+  AM: "Asia/Yerevan",
+  GE: "Asia/Tbilisi",
+  TR: "Asia/Istanbul",
+  AE: "Asia/Dubai",
+  US: "America/New_York",
+  GB: "Europe/London",
+  DE: "Europe/Berlin",
+  UA: "Europe/Kiev",
+  CN: "Asia/Shanghai",
+  JP: "Asia/Tokyo",
+};
+
+// List of all timezones for UI selector
+export const TIMEZONES = Object.entries(TIMEZONE_OFFSETS).map(([tz, offset]) => {
+  const sign = offset >= 0 ? "+" : "-";
+  const h = Math.floor(Math.abs(offset) / 60);
+  const m = Math.abs(offset) % 60;
+  const label = `UTC${sign}${h}${m ? `:${m.toString().padStart(2, "0")}` : ""} — ${tz.split("/")[1]?.replace(/_/g, " ") || tz}`;
+  return { value: tz, label, offset };
+}).sort((a, b) => a.offset - b.offset);
+
+// Get default timezone for a country
+export function getDefaultTimezone(country: string | null): string {
+  return COUNTRY_DEFAULT_TZ[country || "UZ"] || "Asia/Tashkent";
+}
+
+// Get timezone offset in minutes from IANA timezone name
+export function getTimezoneOffset(timezone: string | null): number {
+  return TIMEZONE_OFFSETS[timezone || "Asia/Tashkent"] ?? 300;
 }
 
 // Convert UTC date to local time for display
-export function toLocalTime(utcDate: Date, country: string | null): Date {
-  const offsetMs = getTimezoneOffset(country) * 60 * 1000;
+export function toLocalTime(utcDate: Date, timezone: string | null): Date {
+  const offsetMs = getTimezoneOffset(timezone) * 60 * 1000;
   return new Date(utcDate.getTime() + offsetMs);
 }
 
 // Convert local time string to UTC Date for storage
-// e.g., "2025-02-07" + "17:00" in Tashkent → UTC Date
-export function localToUTC(dateStr: string, time: string, country: string | null): Date {
-  const offsetMinutes = getTimezoneOffset(country);
+// e.g., "2025-02-07" + "17:00" in Asia/Tashkent → UTC Date
+export function localToUTC(dateStr: string, time: string, timezone: string | null): Date {
+  const offsetMinutes = getTimezoneOffset(timezone);
   const utcDate = new Date(`${dateStr}T${time}:00Z`);
   utcDate.setMinutes(utcDate.getMinutes() - offsetMinutes);
   return utcDate;
@@ -129,11 +200,7 @@ export async function processReminders() {
         ],
       },
     },
-    select: {
-      id: true,
-      botToken: true,
-      address: true,
-      country: true,
+    include: {
       automationSettings: true,
       bookings: {
         where: {
@@ -168,7 +235,7 @@ export async function processReminders() {
         const message = `Здравствуйте, ${booking.clientName}! 👋
 
 Напоминаем о вашей записи:
-📅 Завтра, ${formatDateRu(booking.date, business.country)}
+📅 Завтра, ${formatDateRu(booking.date, business.timezone)}
 ${booking.service ? `💇 ${booking.service.name}` : ""}
 ${business.address ? `📍 ${business.address}` : ""}
 
@@ -225,7 +292,7 @@ ${business.address ? `📍 ${business.address}` : ""}
       ) {
         const message = `До вашего визита осталось 2 часа! ⏰
 
-📅 Сегодня, ${formatDateRu(booking.date, business.country)}
+📅 Сегодня, ${formatDateRu(booking.date, business.timezone)}
 ${booking.service ? `💇 ${booking.service.name}` : ""}
 ${business.address ? `📍 ${business.address}` : ""}
 
