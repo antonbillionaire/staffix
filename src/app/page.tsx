@@ -461,28 +461,36 @@ export default function Home() {
           <div className="grid md:grid-cols-4 gap-6 max-w-6xl mx-auto">
             <PricingCard
               name="Starter"
-              price="25"
+              price="20"
               period="/month"
               description={t("home.pricing.starter")}
               features={[
                 `200 ${t("home.pricing.messages")}`,
-                t("home.pricing.allFeatures"),
+                t("home.pricing.ai247"),
+                t("home.pricing.onlineBooking"),
                 t("home.pricing.crm"),
-                t("home.pricing.automation"),
+                t("home.pricing.broadcasts"),
+                t("home.pricing.reminders"),
+                t("home.pricing.reviews"),
+                t("home.pricing.analytics"),
               ]}
               cta={t("home.pricing.start")}
               highlighted={false}
             />
             <PricingCard
               name="Pro"
-              price="50"
+              price="45"
               period="/month"
               description={t("home.pricing.pro")}
               features={[
                 `1 000 ${t("home.pricing.messages")}`,
-                t("home.pricing.allFeatures"),
+                t("home.pricing.ai247"),
+                t("home.pricing.onlineBooking"),
                 t("home.pricing.crm"),
-                t("home.pricing.automation"),
+                t("home.pricing.broadcasts"),
+                t("home.pricing.reminders"),
+                t("home.pricing.reviews"),
+                t("home.pricing.analytics"),
               ]}
               cta={t("home.pricing.choose")}
               highlighted={true}
@@ -490,28 +498,36 @@ export default function Home() {
             />
             <PricingCard
               name="Business"
-              price="100"
+              price="95"
               period="/month"
               description={t("home.pricing.business")}
               features={[
                 `3 000 ${t("home.pricing.messages")}`,
-                t("home.pricing.allFeatures"),
+                t("home.pricing.ai247"),
+                t("home.pricing.onlineBooking"),
                 t("home.pricing.crm"),
-                t("home.pricing.automation"),
+                t("home.pricing.broadcasts"),
+                t("home.pricing.reminders"),
+                t("home.pricing.reviews"),
+                t("home.pricing.analytics"),
               ]}
               cta={t("home.pricing.choose")}
               highlighted={false}
             />
             <PricingCard
               name="Enterprise"
-              price="200"
+              price="180"
               period="/month"
               description={t("home.pricing.enterprise")}
               features={[
                 t("home.pricing.unlimited"),
-                t("home.pricing.allFeatures"),
+                t("home.pricing.ai247"),
+                t("home.pricing.onlineBooking"),
                 t("home.pricing.crm"),
-                t("home.pricing.automation"),
+                t("home.pricing.broadcasts"),
+                t("home.pricing.reminders"),
+                t("home.pricing.reviews"),
+                t("home.pricing.analytics"),
               ]}
               cta={t("home.pricing.choose")}
               highlighted={false}
