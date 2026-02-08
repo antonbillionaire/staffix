@@ -3,6 +3,7 @@ import {
   processReminders,
   processReviewRequests,
   processReactivation,
+  processSubscriptionReminders,
 } from "@/lib/automation";
 
 // Vercel Cron secret for security
@@ -19,10 +20,11 @@ export async function GET(request: Request) {
     console.log("[CRON] Starting automation jobs...");
 
     // Run all automation tasks in parallel
-    const [remindersResult, reviewsResult, reactivationResult] = await Promise.allSettled([
+    const [remindersResult, reviewsResult, reactivationResult, subscriptionResult] = await Promise.allSettled([
       processReminders(),
       processReviewRequests(),
       processReactivation(),
+      processSubscriptionReminders(),
     ]);
 
     const results = {
@@ -39,6 +41,10 @@ export async function GET(request: Request) {
         reactivationResult.status === "fulfilled"
           ? reactivationResult.value
           : { error: reactivationResult.reason },
+      subscriptionReminders:
+        subscriptionResult.status === "fulfilled"
+          ? subscriptionResult.value
+          : { error: subscriptionResult.reason },
     };
 
     console.log("[CRON] Automation jobs completed:", results);

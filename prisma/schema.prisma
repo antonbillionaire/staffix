@@ -250,7 +250,7 @@ model Subscription {
   id              String    @id @default(cuid())
   plan            String    @default("trial") // trial, starter, pro, business, enterprise
   messagesUsed    Int       @default(0)
-  messagesLimit   Int       @default(200)
+  messagesLimit   Int       @default(100)
   expiresAt       DateTime
 
   // PayPro Global
@@ -259,6 +259,11 @@ model Subscription {
   payproCustomerId     String?   // PayPro CUSTOMER_ID
   status               String    @default("active") // active, cancelled, suspended, expired
   billingPeriod        String?   // monthly, yearly
+
+  // Expiry reminder tracking
+  reminder7dSent       Boolean   @default(false)
+  reminder3dSent       Boolean   @default(false)
+  reminder1dSent       Boolean   @default(false)
 
   businessId      String    @unique
   business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)

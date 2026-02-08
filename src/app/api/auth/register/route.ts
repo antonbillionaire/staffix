@@ -60,7 +60,7 @@ export async function POST(request: Request) {
             subscription: {
               create: {
                 plan: "trial",
-                messagesLimit: 200,
+                messagesLimit: 100,
                 expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days
               },
             },

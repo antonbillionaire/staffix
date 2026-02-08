@@ -104,6 +104,91 @@ export async function sendVerificationEmail(
   }
 }
 
+// Send subscription expiry reminder email
+export async function sendSubscriptionReminder(
+  email: string,
+  name: string,
+  planName: string,
+  daysLeft: number
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    if (!resend) {
+      console.log(`[DEV] Subscription reminder for ${email}: ${daysLeft} days left`);
+      return { success: true };
+    }
+
+    const urgency = daysLeft <= 1 ? "last" : daysLeft <= 3 ? "urgent" : "normal";
+    const urgencyColor = urgency === "last" ? "#ef4444" : urgency === "urgent" ? "#f59e0b" : "#3b82f6";
+    const daysText = daysLeft <= 1
+      ? "Сегодня последний день"
+      : `Осталось ${daysLeft} ${daysLeft <= 4 ? "дня" : "дней"}`;
+    const subject = daysLeft <= 1
+      ? `Подписка Staffix истекает сегодня!`
+      : `Подписка Staffix: осталось ${daysLeft} ${daysLeft <= 4 ? "дня" : "дней"}`;
+
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #0a0a1a; margin: 0; padding: 40px 20px;">
+          <div style="max-width: 480px; margin: 0 auto; background: linear-gradient(135deg, #12122a 0%, #1a1a3a 100%); border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); overflow: hidden;">
+            <div style="padding: 32px 32px 24px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.05);">
+              <div style="display: inline-block; width: 48px; height: 48px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border-radius: 12px; margin-bottom: 16px;">
+                <span style="font-size: 24px; line-height: 48px;">🤖</span>
+              </div>
+              <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0;">Staffix</h1>
+            </div>
+            <div style="padding: 32px;">
+              <p style="color: #9ca3af; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                Здравствуйте, <span style="color: #ffffff; font-weight: 500;">${name}</span>!
+              </p>
+              <div style="background: ${urgencyColor}15; border: 1px solid ${urgencyColor}40; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 24px;">
+                <p style="font-size: 20px; font-weight: 700; color: ${urgencyColor}; margin: 0 0 4px;">${daysText}</p>
+                <p style="font-size: 14px; color: #9ca3af; margin: 0;">План: ${planName}</p>
+              </div>
+              <p style="color: #9ca3af; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">
+                ${daysLeft <= 1
+                  ? "Чтобы не потерять доступ к AI-сотруднику, CRM и автоматизациям — продлите подписку сейчас."
+                  : "Продлите подписку, чтобы ваш AI-сотрудник продолжал работать без перебоев."}
+              </p>
+              <a href="https://www.staffix.io/pricing" style="display: block; text-align: center; padding: 14px 24px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px;">
+                Продлить подписку
+              </a>
+            </div>
+            <div style="padding: 24px 32px; background: rgba(0,0,0,0.2); text-align: center;">
+              <p style="color: #4b5563; font-size: 12px; margin: 0;">
+                © 2025 Staffix. AI-сотрудник для вашего бизнеса.
+              </p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    if (error) {
+      console.error("Subscription reminder email error:", error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Subscription reminder error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Ошибка отправки email",
+    };
+  }
+}
+
 // Send support ticket notification to admin
 export async function sendSupportTicketNotification(
   ticketId: string,

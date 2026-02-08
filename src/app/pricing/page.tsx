@@ -14,6 +14,16 @@ import {
   Shield,
   ArrowLeft,
   Plus,
+  CalendarCheck,
+  Bot,
+  Star,
+  BarChart3,
+  Send,
+  FileText,
+  Image,
+  UserCog,
+  BookOpen,
+  RefreshCw,
 } from "lucide-react";
 import { PLANS, MESSAGE_PACKS } from "@/lib/plans";
 
@@ -36,6 +46,22 @@ export default function PricingPage() {
   const handleSelectPlan = (planId: string) => {
     router.push(`/checkout?plan=${planId}&billing=${billingPeriod}`);
   };
+
+  // Comprehensive feature list for "All plans include" section
+  const allFeatures = [
+    { icon: Bot, title: "AI-сотрудник 24/7", desc: "Умный бот отвечает клиентам, консультирует и записывает на приём — даже ночью" },
+    { icon: CalendarCheck, title: "Онлайн-запись", desc: "Клиенты записываются через бота — автоматический подбор свободного времени" },
+    { icon: Users, title: "CRM-система", desc: "Полная база клиентов с историей визитов, контактами и сегментацией" },
+    { icon: Send, title: "Рассылки", desc: "Массовые рассылки по сегментам: VIP, активные, неактивные клиенты" },
+    { icon: Zap, title: "Автоматические напоминания", desc: "Напоминания за 24 часа и за 2 часа до визита — снижение неявок" },
+    { icon: Star, title: "Сбор отзывов", desc: "Автоматический запрос отзыва после визита с интеграцией Google и 2GIS" },
+    { icon: RefreshCw, title: "Реактивация клиентов", desc: "Автоматические скидки для клиентов, которые давно не приходили" },
+    { icon: BarChart3, title: "Аналитика", desc: "Статистика по сообщениям, записям, клиентам, конверсиям и выручке" },
+    { icon: UserCog, title: "Управление командой", desc: "Добавляйте сотрудников, назначайте записи, отслеживайте загрузку" },
+    { icon: Shield, title: "Управление услугами", desc: "Каталог услуг с ценами, длительностью и описанием" },
+    { icon: BookOpen, title: "База знаний", desc: "Загрузите прайсы, FAQ — AI будет отвечать на основе ваших документов" },
+    { icon: Image, title: "Брендинг", desc: "Свой логотип и приветственное сообщение для бота" },
+  ];
 
   return (
     <div className="min-h-screen bg-[#0a0a1a] relative overflow-hidden">
@@ -71,10 +97,10 @@ export default function PricingPage() {
         {/* Title */}
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Простое ценообразование
+            Выберите план для вашего бизнеса
           </h1>
           <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-            Все функции доступны на каждом плане. Платите только за количество сообщений.
+            Все функции доступны на каждом плане. Платите только за количество сообщений AI-сотрудника.
           </p>
         </div>
 
@@ -86,8 +112,11 @@ export default function PricingPage() {
                 <Sparkles className="h-5 w-5 text-green-400" />
                 <span className="text-green-400 font-semibold">Бесплатный пробный период</span>
               </div>
-              <p className="text-white text-lg mb-4">
-                14 дней бесплатно с 200 сообщениями и всеми функциями
+              <p className="text-white text-lg mb-1">
+                14 дней бесплатно — 100 сообщений и все функции
+              </p>
+              <p className="text-gray-400 text-sm mb-4">
+                Без привязки карты. Начните за 2 минуты.
               </p>
               <Link
                 href="/register"
@@ -163,6 +192,9 @@ export default function PricingPage() {
                 {billingPeriod === "yearly" && plan.yearlyPrice > 0 && (
                   <p className="text-sm text-gray-500 mt-1">
                     ${plan.yearlyPrice} в год
+                    <span className="text-green-400 ml-2">
+                      экономия ${plan.monthlyPrice * 12 - plan.yearlyPrice}
+                    </span>
                   </p>
                 )}
               </div>
@@ -173,7 +205,7 @@ export default function PricingPage() {
                   <MessageSquare className="h-5 w-5 text-blue-400" />
                   <span className="text-blue-400 font-semibold">
                     {plan.features.messagesLimit >= 999999
-                      ? "Безлимит"
+                      ? "Безлимит сообщений"
                       : `${plan.features.messagesLimit.toLocaleString()} сообщений`}
                   </span>
                 </div>
@@ -232,48 +264,51 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* Features section */}
+        {/* Comprehensive features section */}
         <div className="bg-[#12122a] rounded-2xl border border-white/5 p-8 md:p-12">
-          <h2 className="text-2xl font-bold text-white text-center mb-8">
-            Все планы включают
-          </h2>
-          <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="flex flex-col items-center text-center p-4">
-              <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mb-4">
-                <MessageSquare className="h-6 w-6 text-blue-400" />
-              </div>
-              <h3 className="font-medium text-white mb-2">Telegram бот</h3>
-              <p className="text-sm text-gray-400">AI-сотрудник в Telegram</p>
-            </div>
-            <div className="flex flex-col items-center text-center p-4">
-              <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center mb-4">
-                <Users className="h-6 w-6 text-purple-400" />
-              </div>
-              <h3 className="font-medium text-white mb-2">Встроенная CRM</h3>
-              <p className="text-sm text-gray-400">База клиентов и рассылки</p>
-            </div>
-            <div className="flex flex-col items-center text-center p-4">
-              <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center mb-4">
-                <Zap className="h-6 w-6 text-green-400" />
-              </div>
-              <h3 className="font-medium text-white mb-2">Автоматизации</h3>
-              <p className="text-sm text-gray-400">Напоминания и отзывы</p>
-            </div>
-            <div className="flex flex-col items-center text-center p-4">
-              <div className="w-12 h-12 bg-yellow-500/10 rounded-xl flex items-center justify-center mb-4">
-                <Shield className="h-6 w-6 text-yellow-400" />
-              </div>
-              <h3 className="font-medium text-white mb-2">Аналитика</h3>
-              <p className="text-sm text-gray-400">Полная статистика</p>
-            </div>
+          <div className="text-center mb-10">
+            <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
+              Все планы включают полный набор функций
+            </h2>
+            <p className="text-gray-400 max-w-xl mx-auto">
+              Единственная разница между планами — количество сообщений AI-сотрудника в месяц
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {allFeatures.map((feature, idx) => {
+              const Icon = feature.icon;
+              return (
+                <div key={idx} className="flex gap-4 p-4 rounded-xl bg-white/[0.02] hover:bg-white/[0.04] transition-colors">
+                  <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Icon className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-white mb-1">{feature.title}</h3>
+                    <p className="text-sm text-gray-400 leading-relaxed">{feature.desc}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {!isLoggedIn && (
-          <p className="text-center text-gray-500 mt-8">
-            💳 Оплата после пробного периода. Отмена в любой момент.
-          </p>
-        )}
+        {/* FAQ / Trust section */}
+        <div className="mt-16 text-center space-y-4">
+          <div className="flex items-center justify-center gap-6 flex-wrap">
+            <div className="flex items-center gap-2 text-gray-400">
+              <FileText className="h-4 w-4" />
+              <span className="text-sm">Отмена в любой момент</span>
+            </div>
+            <div className="flex items-center gap-2 text-gray-400">
+              <Shield className="h-4 w-4" />
+              <span className="text-sm">Безопасная оплата через PayPro Global</span>
+            </div>
+            <div className="flex items-center gap-2 text-gray-400">
+              <MessageSquare className="h-4 w-4" />
+              <span className="text-sm">Поддержка 24/7</span>
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   );

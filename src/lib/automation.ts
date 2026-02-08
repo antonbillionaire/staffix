@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { sendSubscriptionReminder } from "@/lib/email";
 
 // ===========================================
 // TIMEZONE HELPERS
@@ -551,6 +552,96 @@ export async function processReactivation() {
       } else {
         results.failed++;
         results.errors.push(`Reactivation for client ${client.id}: ${result.error}`);
+      }
+    }
+  }
+
+  return results;
+}
+
+// ===========================================
+// НАПОМИНАНИЯ ОБ ОКОНЧАНИИ ПОДПИСКИ
+// ===========================================
+
+export async function processSubscriptionReminders() {
+  const now = new Date();
+  const results = { sent: 0, failed: 0, errors: [] as string[] };
+
+  // Find all active subscriptions that are expiring within 7 days
+  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  const subscriptions = await prisma.subscription.findMany({
+    where: {
+      status: "active",
+      expiresAt: { lte: sevenDaysFromNow, gt: now },
+    },
+    include: {
+      business: {
+        include: {
+          user: { select: { email: true, name: true, notifyTrialEnding: true } },
+        },
+      },
+    },
+  });
+
+  for (const sub of subscriptions) {
+    const user = sub.business?.user;
+    if (!user?.email || !user.notifyTrialEnding) continue;
+
+    const msLeft = sub.expiresAt.getTime() - now.getTime();
+    const daysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
+
+    if (daysLeft <= 0) continue;
+
+    const planName = sub.plan === "trial" ? "Пробный период"
+      : sub.plan === "starter" ? "Starter"
+      : sub.plan === "pro" ? "Pro"
+      : sub.plan === "business" ? "Business"
+      : sub.plan === "enterprise" ? "Enterprise"
+      : sub.plan;
+
+    // 7-day reminder (days 4-7)
+    if (daysLeft <= 7 && daysLeft > 3 && !sub.reminder7dSent) {
+      const result = await sendSubscriptionReminder(user.email, user.name, planName, daysLeft);
+      if (result.success) {
+        await prisma.subscription.update({
+          where: { id: sub.id },
+          data: { reminder7dSent: true },
+        });
+        results.sent++;
+      } else {
+        results.failed++;
+        results.errors.push(`7d reminder for ${user.email}: ${result.error}`);
+      }
+    }
+
+    // 3-day reminder (days 2-3)
+    if (daysLeft <= 3 && daysLeft > 1 && !sub.reminder3dSent) {
+      const result = await sendSubscriptionReminder(user.email, user.name, planName, daysLeft);
+      if (result.success) {
+        await prisma.subscription.update({
+          where: { id: sub.id },
+          data: { reminder3dSent: true },
+        });
+        results.sent++;
+      } else {
+        results.failed++;
+        results.errors.push(`3d reminder for ${user.email}: ${result.error}`);
+      }
+    }
+
+    // Last day reminder
+    if (daysLeft <= 1 && !sub.reminder1dSent) {
+      const result = await sendSubscriptionReminder(user.email, user.name, planName, daysLeft);
+      if (result.success) {
+        await prisma.subscription.update({
+          where: { id: sub.id },
+          data: { reminder1dSent: true },
+        });
+        results.sent++;
+      } else {
+        results.failed++;
+        results.errors.push(`1d reminder for ${user.email}: ${result.error}`);
       }
     }
   }
