@@ -52,7 +52,8 @@ export async function POST(request: Request) {
         email,
         password: hashedPassword,
         emailVerified: false,
-        verificationToken: verificationCode, // Store 6-digit code
+        verificationToken: verificationCode,
+        verificationExpires: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
         businesses: {
           create: {
             name: businessName,
