@@ -20,7 +20,6 @@ import {
   BarChart3,
   Send,
   FileText,
-  Image,
   UserCog,
   BookOpen,
   RefreshCw,
@@ -60,7 +59,6 @@ export default function PricingPage() {
     { icon: UserCog, title: "Управление командой", desc: "Добавляйте сотрудников, назначайте записи, отслеживайте загрузку" },
     { icon: Shield, title: "Управление услугами", desc: "Каталог услуг с ценами, длительностью и описанием" },
     { icon: BookOpen, title: "База знаний", desc: "Загрузите прайсы, FAQ — AI будет отвечать на основе ваших документов" },
-    { icon: Image, title: "Брендинг", desc: "Свой логотип и приветственное сообщение для бота" },
   ];
 
   return (
