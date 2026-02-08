@@ -1,5 +1,43 @@
 import { prisma } from "@/lib/prisma";
 
+// ===========================================
+// TIMEZONE HELPERS
+// ===========================================
+
+// UTC offset in minutes for business countries
+const TIMEZONE_OFFSETS: Record<string, number> = {
+  UZ: 300,  // UTC+5 Asia/Tashkent
+  KZ: 360,  // UTC+6 Asia/Almaty
+  KR: 540,  // UTC+9 Asia/Seoul
+  RU: 180,  // UTC+3 Europe/Moscow (default for Russia)
+  KG: 360,  // UTC+6 Asia/Bishkek
+  TJ: 300,  // UTC+5 Asia/Dushanbe
+  AM: 240,  // UTC+4 Asia/Yerevan
+  GE: 240,  // UTC+4 Asia/Tbilisi
+  US: -300, // UTC-5 America/New_York (default for US)
+  GB: 0,    // UTC+0 Europe/London
+};
+
+// Get timezone offset in minutes for a country
+export function getTimezoneOffset(country: string | null): number {
+  return TIMEZONE_OFFSETS[country || "UZ"] ?? 300; // Default to Tashkent
+}
+
+// Convert UTC date to local time for display
+export function toLocalTime(utcDate: Date, country: string | null): Date {
+  const offsetMs = getTimezoneOffset(country) * 60 * 1000;
+  return new Date(utcDate.getTime() + offsetMs);
+}
+
+// Convert local time string to UTC Date for storage
+// e.g., "2025-02-07" + "17:00" in Tashkent → UTC Date
+export function localToUTC(dateStr: string, time: string, country: string | null): Date {
+  const offsetMinutes = getTimezoneOffset(country);
+  const utcDate = new Date(`${dateStr}T${time}:00Z`);
+  utcDate.setMinutes(utcDate.getMinutes() - offsetMinutes);
+  return utcDate;
+}
+
 // Отправить сообщение клиенту через бота бизнеса
 export async function sendAutomationMessage(
   botToken: string,
@@ -51,16 +89,17 @@ export async function sendAutomationMessage(
   }
 }
 
-// Форматировать дату на русском
-export function formatDateRu(date: Date): string {
+// Форматировать дату на русском (конвертирует UTC → локальное время бизнеса)
+export function formatDateRu(date: Date, country?: string | null): string {
   const months = [
     "января", "февраля", "марта", "апреля", "мая", "июня",
     "июля", "августа", "сентября", "октября", "ноября", "декабря"
   ];
-  const day = date.getDate();
-  const month = months[date.getMonth()];
-  const hours = date.getHours().toString().padStart(2, "0");
-  const minutes = date.getMinutes().toString().padStart(2, "0");
+  const local = toLocalTime(date, country ?? null);
+  const day = local.getUTCDate();
+  const month = months[local.getUTCMonth()];
+  const hours = local.getUTCHours().toString().padStart(2, "0");
+  const minutes = local.getUTCMinutes().toString().padStart(2, "0");
   return `${day} ${month} в ${hours}:${minutes}`;
 }
 
@@ -90,7 +129,11 @@ export async function processReminders() {
         ],
       },
     },
-    include: {
+    select: {
+      id: true,
+      botToken: true,
+      address: true,
+      country: true,
       automationSettings: true,
       bookings: {
         where: {
@@ -125,7 +168,7 @@ export async function processReminders() {
         const message = `Здравствуйте, ${booking.clientName}! 👋
 
 Напоминаем о вашей записи:
-📅 Завтра, ${formatDateRu(booking.date)}
+📅 Завтра, ${formatDateRu(booking.date, business.country)}
 ${booking.service ? `💇 ${booking.service.name}` : ""}
 ${business.address ? `📍 ${business.address}` : ""}
 
@@ -182,7 +225,7 @@ ${business.address ? `📍 ${business.address}` : ""}
       ) {
         const message = `До вашего визита осталось 2 часа! ⏰
 
-📅 Сегодня, ${formatDateRu(booking.date)}
+📅 Сегодня, ${formatDateRu(booking.date, business.country)}
 ${booking.service ? `💇 ${booking.service.name}` : ""}
 ${business.address ? `📍 ${business.address}` : ""}
 

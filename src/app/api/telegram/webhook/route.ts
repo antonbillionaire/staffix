@@ -24,6 +24,7 @@ import {
   getClientBookings,
   cancelBooking,
 } from "@/lib/booking-tools";
+import { formatDateRu } from "@/lib/automation";
 
 // ========================================
 // ТИПЫ
@@ -50,6 +51,22 @@ interface TelegramUpdate {
       first_name: string;
       last_name?: string;
     };
+  };
+  callback_query?: {
+    id: string;
+    from: {
+      id: number;
+      first_name: string;
+      last_name?: string;
+      username?: string;
+    };
+    message?: {
+      message_id: number;
+      chat: {
+        id: number;
+      };
+    };
+    data?: string;
   };
 }
 
@@ -489,6 +506,218 @@ async function generateAIResponse(
 }
 
 // ========================================
+// CALLBACK QUERY HELPERS
+// ========================================
+
+async function answerCallbackQuery(
+  botToken: string,
+  callbackQueryId: string,
+  text?: string
+): Promise<void> {
+  try {
+    await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        callback_query_id: callbackQueryId,
+        text: text || "",
+      }),
+    });
+  } catch {
+    // Ignore
+  }
+}
+
+async function editMessageText(
+  botToken: string,
+  chatId: number,
+  messageId: number,
+  text: string
+): Promise<void> {
+  try {
+    await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        text,
+        parse_mode: "HTML",
+      }),
+    });
+  } catch {
+    // Ignore
+  }
+}
+
+async function handleCallbackQuery(
+  botToken: string,
+  businessId: string,
+  callbackQuery: NonNullable<TelegramUpdate["callback_query"]>
+): Promise<void> {
+  const data = callbackQuery.data || "";
+  const chatId = callbackQuery.message?.chat?.id;
+  const messageId = callbackQuery.message?.message_id;
+  const telegramId = BigInt(callbackQuery.from.id);
+
+  if (!chatId) return;
+
+  // ---- CONFIRM BOOKING ----
+  if (data.startsWith("confirm_")) {
+    const bookingId = data.replace("confirm_", "");
+
+    await prisma.booking.update({
+      where: { id: bookingId },
+      data: { status: "confirmed" },
+    });
+
+    await answerCallbackQuery(botToken, callbackQuery.id, "Запись подтверждена!");
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { service: true, business: { select: { country: true, address: true } } },
+    });
+
+    if (booking && messageId) {
+      await editMessageText(
+        botToken, chatId, messageId,
+        `✅ Запись подтверждена!\n\n📅 ${formatDateRu(booking.date, booking.business?.country)}\n${booking.service ? `💇 ${booking.service.name}` : ""}${booking.business?.address ? `\n📍 ${booking.business.address}` : ""}\n\nЖдём вас! 💜`
+      );
+    }
+    return;
+  }
+
+  // ---- CANCEL BOOKING ----
+  if (data.startsWith("cancel_")) {
+    const bookingId = data.replace("cancel_", "");
+
+    const result = await cancelBooking(bookingId, telegramId);
+
+    if (result.success) {
+      await answerCallbackQuery(botToken, callbackQuery.id, "Запись отменена");
+      if (messageId) {
+        await editMessageText(
+          botToken, chatId, messageId,
+          "❌ Запись отменена.\n\nЕсли хотите записаться снова — просто напишите!"
+        );
+      }
+    } else {
+      await answerCallbackQuery(botToken, callbackQuery.id, result.error || "Ошибка отмены");
+    }
+    return;
+  }
+
+  // ---- RESCHEDULE BOOKING ----
+  if (data.startsWith("reschedule_")) {
+    const bookingId = data.replace("reschedule_", "");
+
+    // Cancel old booking
+    await cancelBooking(bookingId, telegramId);
+
+    await answerCallbackQuery(botToken, callbackQuery.id, "Запись отменена для переноса");
+
+    if (messageId) {
+      await editMessageText(
+        botToken, chatId, messageId,
+        "📅 Предыдущая запись отменена.\n\nНапишите мне новую дату и время, и я запишу вас заново!"
+      );
+    }
+    return;
+  }
+
+  // ---- RATE BOOKING ----
+  if (data.startsWith("rate_")) {
+    const parts = data.split("_"); // rate_bookingId_rating
+    const bookingId = parts[1];
+    const rating = parseInt(parts[2]);
+
+    if (rating >= 1 && rating <= 5) {
+      // Save review
+      const booking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+      });
+
+      if (booking) {
+        await prisma.review.create({
+          data: {
+            rating,
+            clientTelegramId: telegramId,
+            clientName: booking.clientName,
+            bookingId: booking.id,
+            businessId,
+          },
+        });
+      }
+
+      const stars = "⭐".repeat(rating);
+      await answerCallbackQuery(botToken, callbackQuery.id, `Спасибо за оценку: ${stars}`);
+
+      if (messageId) {
+        if (rating >= 4) {
+          // Good rating — ask for text review
+          const business = await prisma.business.findUnique({
+            where: { id: businessId },
+            include: { automationSettings: true },
+          });
+
+          let reviewLinks = "";
+          if (business?.automationSettings?.reviewGoogleLink) {
+            reviewLinks += `\n\n<a href="${business.automationSettings.reviewGoogleLink}">📝 Оставить отзыв в Google</a>`;
+          }
+          if (business?.automationSettings?.review2gisLink) {
+            reviewLinks += `\n<a href="${business.automationSettings.review2gisLink}">📝 Оставить отзыв в 2GIS</a>`;
+          }
+
+          await editMessageText(
+            botToken, chatId, messageId,
+            `Спасибо за оценку ${stars}! Мы рады, что вам понравилось! 💜${reviewLinks}`
+          );
+        } else {
+          // Low rating
+          await editMessageText(
+            botToken, chatId, messageId,
+            `Спасибо за оценку ${stars}. Нам жаль, что вам не всё понравилось. Мы учтём ваши замечания и постараемся стать лучше! 🙏`
+          );
+        }
+      }
+    }
+    return;
+  }
+
+  // ---- UNSUBSCRIBE ----
+  if (data.startsWith("unsubscribe_")) {
+    const clientId = data.replace("unsubscribe_", "");
+
+    await prisma.client.update({
+      where: { id: clientId },
+      data: { isBlocked: true },
+    });
+
+    await answerCallbackQuery(botToken, callbackQuery.id, "Вы отписаны от рассылок");
+    if (messageId) {
+      await editMessageText(
+        botToken, chatId, messageId,
+        "Вы отписаны от рассылок. Если захотите снова получать сообщения — просто напишите нам!"
+      );
+    }
+    return;
+  }
+
+  // ---- BOOK NEW (from reactivation) ----
+  if (data === "book_new" || data.startsWith("book_promo_")) {
+    await answerCallbackQuery(botToken, callbackQuery.id);
+    await sendTelegramMessage(
+      botToken, chatId,
+      "Отлично! На какую дату и время вы хотите записаться? Напишите, и я подберу свободное время! 📅"
+    );
+    return;
+  }
+
+  // Unknown callback — just acknowledge
+  await answerCallbackQuery(botToken, callbackQuery.id);
+}
+
+// ========================================
 // WEBHOOK HANDLER
 // ========================================
 
@@ -532,6 +761,12 @@ export async function POST(request: NextRequest) {
     }
 
     const update: TelegramUpdate = await request.json();
+
+    // Обработка нажатий на inline-кнопки
+    if (update.callback_query) {
+      await handleCallbackQuery(botToken, business.id, update.callback_query);
+      return NextResponse.json({ ok: true });
+    }
 
     // Обрабатываем только текстовые сообщения
     if (!update.message?.text && !update.message?.contact) {
