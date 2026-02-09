@@ -26,6 +26,8 @@ import {
   HelpCircle,
   Mail,
   BarChart3,
+  BookOpen,
+  PlayCircle,
   AlertTriangle,
   Zap,
   Lock,
@@ -261,6 +263,28 @@ export default function DashboardLayout({
               </Link>
             );
           })}
+
+          {/* Resources section */}
+          <div className={`mt-4 pt-4 border-t ${borderColor}`}>
+            <p className={`px-4 mb-2 text-xs font-medium uppercase tracking-wider ${textMuted}`}>
+              {t("nav.resources")}
+            </p>
+            {[
+              { nameKey: "nav.docs", href: "/docs", icon: FileText },
+              { nameKey: "nav.tutorials", href: "/tutorials", icon: PlayCircle },
+              { nameKey: "nav.publicFaq", href: "/faq", icon: BookOpen },
+            ].map((item) => (
+              <Link
+                key={item.nameKey}
+                href={item.href}
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${textSecondary} ${hoverBg}`}
+              >
+                <item.icon className="h-4 w-4" />
+                {t(item.nameKey)}
+              </Link>
+            ))}
+          </div>
         </nav>
 
         {/* Subscription card - fixed at bottom */}

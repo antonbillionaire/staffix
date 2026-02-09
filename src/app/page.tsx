@@ -129,6 +129,12 @@ export default function Home() {
             <Link href="#pricing" className="text-gray-300 hover:text-white transition-colors">
               {t("home.nav.pricing")}
             </Link>
+            <Link href="/docs" className="text-gray-300 hover:text-white transition-colors">
+              {t("home.nav.docs")}
+            </Link>
+            <Link href="/faq" className="text-gray-300 hover:text-white transition-colors">
+              {t("home.nav.faq")}
+            </Link>
           </div>
           <div className="flex items-center gap-4">
             {/* Language selector */}
@@ -581,7 +587,11 @@ export default function Home() {
                 <p className="text-xs text-gray-500">by K-Bridge Co. LTD</p>
               </div>
             </div>
-            <div className="flex items-center gap-6 text-gray-500 text-sm">
+            <div className="flex items-center gap-6 text-gray-500 text-sm flex-wrap">
+              <Link href="/docs" className="hover:text-white transition-colors">{t("home.footer.docs")}</Link>
+              <Link href="/faq" className="hover:text-white transition-colors">{t("home.footer.faq")}</Link>
+              <Link href="/tutorials" className="hover:text-white transition-colors">{t("home.footer.tutorials")}</Link>
+              <Link href="/consultation" className="hover:text-white transition-colors">{t("home.footer.consultation")}</Link>
               <Link href="/privacy" className="hover:text-white transition-colors">{t("home.footer.privacy")}</Link>
               <Link href="/terms" className="hover:text-white transition-colors">{t("home.footer.terms")}</Link>
               <Link href="/contacts" className="hover:text-white transition-colors">{t("home.footer.contacts")}</Link>
