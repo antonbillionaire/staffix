@@ -5,6 +5,7 @@
 
 import { prisma } from "./prisma";
 import { localToUTC } from "./automation";
+import { sendBookingNotification } from "./notifications";
 
 // ========================================
 // TYPES
@@ -169,7 +170,7 @@ export async function checkAvailability(
     }
   }
 
-  // Load staff members
+  // Load staff members (with their schedules)
   let staffMembers: Array<{ id: string; name: string }>;
   if (staffId) {
     const staff = await prisma.staff.findUnique({
@@ -189,6 +190,15 @@ export async function checkAvailability(
     staffMembers = [{ id: "__any__", name: "Любой мастер" }];
   }
 
+  // Load staff schedules for this day of the week
+  const dayOfWeek = targetDate.getUTCDay(); // 0=Sun ... 6=Sat
+  const staffIds = staffMembers.filter((s) => s.id !== "__any__").map((s) => s.id);
+  const staffSchedules = staffIds.length > 0
+    ? await prisma.staffSchedule.findMany({
+        where: { staffId: { in: staffIds }, dayOfWeek },
+      })
+    : [];
+
   // Get all bookings for this date (convert local day boundaries to UTC)
   const dayStart = localToUTC(dateStr, "00:00", tz);
   const dayEnd = localToUTC(dateStr, "23:59", tz);
@@ -207,6 +217,30 @@ export async function checkAvailability(
   const results: AvailabilityResult[] = [];
 
   for (const staffMember of staffMembers) {
+    // Check staff-specific schedule for this day
+    const staffSchedule = staffSchedules.find((s) => s.staffId === staffMember.id);
+
+    // If staff has a schedule and it's a day off, skip
+    if (staffSchedule && !staffSchedule.isWorkday) {
+      results.push({
+        date: dateStr,
+        staffName: staffMember.name,
+        staffId: staffMember.id,
+        serviceName,
+        serviceDuration,
+        availableSlots: [], // Day off — no slots
+      });
+      continue;
+    }
+
+    // Determine working hours: staff schedule > business hours
+    let staffHours = hours; // default from business
+    if (staffSchedule && staffSchedule.isWorkday) {
+      const [sh, sm] = staffSchedule.startTime.split(":").map(Number);
+      const [eh, em] = staffSchedule.endTime.split(":").map(Number);
+      staffHours = { startHour: sh, startMinute: sm, endHour: eh, endMinute: em };
+    }
+
     // Filter bookings for this staff member
     const staffBookings = staffMember.id === "__any__"
       ? existingBookings
@@ -216,12 +250,12 @@ export async function checkAvailability(
     const availableSlots: string[] = [];
 
     // Iterate through the day in 30-min increments
-    let currentHour = hours.startHour;
-    let currentMinute = hours.startMinute;
+    let currentHour = staffHours.startHour;
+    let currentMinute = staffHours.startMinute;
 
     while (
-      currentHour < hours.endHour ||
-      (currentHour === hours.endHour && currentMinute < hours.endMinute)
+      currentHour < staffHours.endHour ||
+      (currentHour === staffHours.endHour && currentMinute < staffHours.endMinute)
     ) {
       const timeStr = `${currentHour.toString().padStart(2, "0")}:${currentMinute.toString().padStart(2, "0")}`;
       const slotStart = localToUTC(dateStr, timeStr, tz);
@@ -230,7 +264,7 @@ export async function checkAvailability(
       slotEnd.setMinutes(slotEnd.getMinutes() + serviceDuration);
 
       // Check if slot end exceeds working hours
-      const workEndStr = `${hours.endHour.toString().padStart(2, "0")}:${hours.endMinute.toString().padStart(2, "0")}`;
+      const workEndStr = `${staffHours.endHour.toString().padStart(2, "0")}:${staffHours.endMinute.toString().padStart(2, "0")}`;
       const workEnd = localToUTC(dateStr, workEndStr, tz);
 
       if (slotEnd > workEnd) {
@@ -245,7 +279,6 @@ export async function checkAvailability(
         const bookingEnd = new Date(bookingStart);
         bookingEnd.setMinutes(bookingEnd.getMinutes() + bookingDuration);
 
-        // Check overlap: slot overlaps booking if slotStart < bookingEnd AND slotEnd > bookingStart
         if (slotStart < bookingEnd && slotEnd > bookingStart) {
           hasConflict = true;
           break;
@@ -304,31 +337,31 @@ export async function getStaffList(businessId: string) {
 }
 
 // ========================================
-// NOTIFY BUSINESS OWNER
+// NOTIFY BUSINESS (via Telegram + Dashboard)
 // ========================================
 
-async function notifyBusinessOwner(
+async function notifyBooking(
   businessId: string,
+  type: "new_booking" | "cancellation",
   clientName: string,
   serviceName: string,
   staffName: string,
   date: string,
-  time: string
+  time: string,
+  bookingId: string,
+  staffId?: string | null,
+  clientPhone?: string | null
 ): Promise<void> {
-  const business = await prisma.business.findUnique({
-    where: { id: businessId },
-    select: { botToken: true, userId: true, user: { select: { email: true } } },
-  });
-
-  if (!business?.botToken) return;
-
-  // Find owner's Telegram chat ID from conversations (owner might have messaged the bot)
-  // For now, we use the business owner's user record
-  // The notification is sent to the bot's own chat - the owner sees it in the bot's admin
-  // Alternative: send to a specific admin chat ID stored in business settings
-
-  // Log the booking for dashboard visibility
-  console.log(`[Booking Notification] New booking: ${clientName} -> ${serviceName} with ${staffName} on ${date} at ${time}`);
+  sendBookingNotification(businessId, type, {
+    clientName,
+    clientPhone,
+    serviceName,
+    staffName,
+    date,
+    time,
+    bookingId,
+    staffId,
+  }).catch((err) => console.error("Notification error:", err));
 }
 
 // ========================================
@@ -485,10 +518,8 @@ export async function createBooking(
       },
     });
 
-    // Send notification to business owner via Telegram (non-blocking)
-    notifyBusinessOwner(businessId, clientName, serviceName, staffName, dateStr, time).catch(
-      (err: unknown) => console.error("Failed to notify owner:", err)
-    );
+    // Send notification to business owner and staff via Telegram + Dashboard (non-blocking)
+    notifyBooking(businessId, "new_booking", clientName, serviceName, staffName, dateStr, time, booking.id, actualStaffId, clientPhone);
 
     return {
       success: true,
@@ -550,6 +581,10 @@ export async function cancelBooking(
   try {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
+      include: {
+        service: { select: { name: true } },
+        staff: { select: { id: true, name: true } },
+      },
     });
 
     if (!booking) {
@@ -564,6 +599,17 @@ export async function cancelBooking(
       where: { id: bookingId },
       data: { status: "cancelled" },
     });
+
+    // Send cancellation notification
+    const bookingDate = new Date(booking.date);
+    const dateStr = bookingDate.toISOString().split("T")[0];
+    const timeStr = bookingDate.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+    notifyBooking(
+      booking.businessId, "cancellation",
+      booking.clientName, booking.service?.name || "Услуга",
+      booking.staff?.name || "Любой мастер", dateStr, timeStr,
+      bookingId, booking.staff?.id, booking.clientPhone
+    );
 
     return { success: true };
   } catch (error) {

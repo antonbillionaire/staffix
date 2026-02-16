@@ -52,6 +52,12 @@ export default function SettingsPage() {
   const [notificationsSaving, setNotificationsSaving] = useState(false);
   const [notificationsSaved, setNotificationsSaved] = useState(false);
 
+  // Owner Telegram for notifications
+  const [ownerTelegram, setOwnerTelegram] = useState("");
+  const [ownerTelegramConnected, setOwnerTelegramConnected] = useState(false);
+  const [ownerTelegramSaving, setOwnerTelegramSaving] = useState(false);
+  const [ownerTelegramSaved, setOwnerTelegramSaved] = useState(false);
+
   // Subscription info
   const [subscription, setSubscription] = useState({
     plan: "trial",
@@ -103,13 +109,19 @@ export default function SettingsPage() {
         console.error("Error loading settings:", err);
       }
 
-      // Load business timezone
+      // Load business timezone + owner telegram
       try {
         const res = await fetch("/api/business");
         if (res.ok) {
           const data = await res.json();
           if (data.business?.timezone) {
             setTimezone(data.business.timezone);
+          }
+          if (data.business?.ownerTelegramUsername) {
+            setOwnerTelegram(data.business.ownerTelegramUsername);
+          }
+          if (data.business?.ownerTelegramChatId) {
+            setOwnerTelegramConnected(true);
           }
         }
       } catch (err) {
@@ -753,6 +765,71 @@ export default function SettingsPage() {
           <p className={`text-xs ${textSecondary} mt-4`}>
             Уведомления будут отправляться на ваш email ({profileData.email})
           </p>
+
+          {/* Telegram notifications section */}
+          <div className={`mt-8 pt-6 border-t ${borderColor}`}>
+            <h4 className={`text-base font-medium ${textPrimary} mb-2`}>Telegram-уведомления</h4>
+            <p className={`text-sm ${textSecondary} mb-4`}>
+              Получайте уведомления о записях прямо в Telegram
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className={`block text-sm font-medium ${textSecondary} mb-1`}>
+                  Ваш Telegram username
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={ownerTelegram}
+                    onChange={(e) => setOwnerTelegram(e.target.value)}
+                    placeholder="@your_username"
+                    className={`flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputBg} ${inputBorder} ${isDark ? "text-white placeholder-gray-500" : ""}`}
+                  />
+                  <button
+                    onClick={async () => {
+                      setOwnerTelegramSaving(true);
+                      setOwnerTelegramSaved(false);
+                      try {
+                        const res = await fetch("/api/business", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ ownerTelegramUsername: ownerTelegram }),
+                        });
+                        if (res.ok) {
+                          setOwnerTelegramSaved(true);
+                          setTimeout(() => setOwnerTelegramSaved(false), 3000);
+                        }
+                      } catch (err) {
+                        console.error("Error saving telegram:", err);
+                      } finally {
+                        setOwnerTelegramSaving(false);
+                      }
+                    }}
+                    disabled={ownerTelegramSaving}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {ownerTelegramSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : ownerTelegramSaved ? <Check className="h-3 w-3" /> : null}
+                    {ownerTelegramSaved ? "Сохранено" : "Сохранить"}
+                  </button>
+                </div>
+              </div>
+
+              <div className={`flex items-center gap-2 p-3 rounded-lg ${isDark ? "bg-white/5" : "bg-gray-50"}`}>
+                <span className={`w-2 h-2 rounded-full ${ownerTelegramConnected ? "bg-green-400" : isDark ? "bg-gray-600" : "bg-gray-400"}`} />
+                <span className={`text-sm ${ownerTelegramConnected ? "text-green-400" : textSecondary}`}>
+                  {ownerTelegramConnected
+                    ? "Подключено — уведомления приходят в Telegram"
+                    : "Не подключено — напишите /start вашему боту Staffix"}
+                </span>
+              </div>
+
+              <p className={`text-xs ${textSecondary}`}>
+                После сохранения username напишите /start вашему бизнес-боту в Telegram.
+                Бот автоматически свяжет ваш аккаунт и начнёт отправлять уведомления.
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </div>

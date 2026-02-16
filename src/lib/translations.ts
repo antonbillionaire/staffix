@@ -308,6 +308,29 @@ export const translations: Record<Language, Record<string, string>> = {
     "staffPage.cancel": "Отмена",
     "staffPage.save": "Сохранить",
     "staffPage.deleteConfirm": "Удалить мастера?",
+    "staffPage.telegram": "Telegram",
+    "staffPage.telegramPlaceholder": "@username",
+    "staffPage.telegramHint": "Мастер должен написать /start вашему боту, чтобы получать уведомления",
+    "staffPage.notifications": "Уведомления включены",
+    "staffPage.connected": "Подключён",
+    "staffPage.notConnected": "Не подключён",
+    "staffPage.schedule": "Расписание",
+    "staffPage.scheduleTitle": "Расписание",
+    "staffPage.dayOff": "Выходной",
+
+    // Calendar
+    "nav.calendar": "Календарь",
+    "calendar.title": "Календарь",
+    "calendar.allStaff": "Все мастера",
+    "calendar.week": "Неделя",
+    "calendar.month": "Месяц",
+    "calendar.today": "Сегодня",
+    "calendar.bookingDetails": "Детали записи",
+
+    // Notifications
+    "notifications.title": "Уведомления",
+    "notifications.markAllRead": "Прочитать все",
+    "notifications.empty": "Нет уведомлений",
 
     // FAQ Page
     "faqPage.documents": "Документы",
@@ -898,6 +921,29 @@ export const translations: Record<Language, Record<string, string>> = {
     "staffPage.cancel": "Cancel",
     "staffPage.save": "Save",
     "staffPage.deleteConfirm": "Delete team member?",
+    "staffPage.telegram": "Telegram",
+    "staffPage.telegramPlaceholder": "@username",
+    "staffPage.telegramHint": "The team member should write /start to your bot to receive notifications",
+    "staffPage.notifications": "Notifications enabled",
+    "staffPage.connected": "Connected",
+    "staffPage.notConnected": "Not connected",
+    "staffPage.schedule": "Schedule",
+    "staffPage.scheduleTitle": "Schedule",
+    "staffPage.dayOff": "Day off",
+
+    // Calendar
+    "nav.calendar": "Calendar",
+    "calendar.title": "Calendar",
+    "calendar.allStaff": "All staff",
+    "calendar.week": "Week",
+    "calendar.month": "Month",
+    "calendar.today": "Today",
+    "calendar.bookingDetails": "Booking details",
+
+    // Notifications
+    "notifications.title": "Notifications",
+    "notifications.markAllRead": "Mark all as read",
+    "notifications.empty": "No notifications",
 
     // FAQ Page
     "faqPage.documents": "Documents",
@@ -1488,6 +1534,29 @@ export const translations: Record<Language, Record<string, string>> = {
     "staffPage.cancel": "Bekor qilish",
     "staffPage.save": "Saqlash",
     "staffPage.deleteConfirm": "Ustani o'chirishni xohlaysizmi?",
+    "staffPage.telegram": "Telegram",
+    "staffPage.telegramPlaceholder": "@username",
+    "staffPage.telegramHint": "Usta bildirishnomalar olish uchun botingizga /start yozishi kerak",
+    "staffPage.notifications": "Bildirishnomalar yoqilgan",
+    "staffPage.connected": "Ulangan",
+    "staffPage.notConnected": "Ulanmagan",
+    "staffPage.schedule": "Ish jadvali",
+    "staffPage.scheduleTitle": "Ish jadvali",
+    "staffPage.dayOff": "Dam olish kuni",
+
+    // Calendar
+    "nav.calendar": "Kalendar",
+    "calendar.title": "Kalendar",
+    "calendar.allStaff": "Barcha ustalar",
+    "calendar.week": "Hafta",
+    "calendar.month": "Oy",
+    "calendar.today": "Bugun",
+    "calendar.bookingDetails": "Band qilish tafsilotlari",
+
+    // Notifications
+    "notifications.title": "Bildirishnomalar",
+    "notifications.markAllRead": "Hammasini o'qilgan deb belgilash",
+    "notifications.empty": "Bildirishnomalar yo'q",
 
     // FAQ Page
     "faqPage.documents": "Hujjatlar",
@@ -2078,6 +2147,29 @@ export const translations: Record<Language, Record<string, string>> = {
     "staffPage.cancel": "Болдырмау",
     "staffPage.save": "Сақтау",
     "staffPage.deleteConfirm": "Шеберді жою керек пе?",
+    "staffPage.telegram": "Telegram",
+    "staffPage.telegramPlaceholder": "@username",
+    "staffPage.telegramHint": "Шебер хабарландыру алу үшін ботыңызға /start жазуы керек",
+    "staffPage.notifications": "Хабарландырулар қосулы",
+    "staffPage.connected": "Қосылған",
+    "staffPage.notConnected": "Қосылмаған",
+    "staffPage.schedule": "Жұмыс кестесі",
+    "staffPage.scheduleTitle": "Жұмыс кестесі",
+    "staffPage.dayOff": "Демалыс күні",
+
+    // Calendar
+    "nav.calendar": "Күнтізбе",
+    "calendar.title": "Күнтізбе",
+    "calendar.allStaff": "Барлық шеберлер",
+    "calendar.week": "Апта",
+    "calendar.month": "Ай",
+    "calendar.today": "Бүгін",
+    "calendar.bookingDetails": "Жазба мәліметтері",
+
+    // Notifications
+    "notifications.title": "Хабарландырулар",
+    "notifications.markAllRead": "Барлығын оқылды деп белгілеу",
+    "notifications.empty": "Хабарландырулар жоқ",
 
     // FAQ Page
     "faqPage.documents": "Құжаттар",

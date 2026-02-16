@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, X, User, Loader2, Camera } from "lucide-react";
+import { Plus, Pencil, Trash2, X, User, Loader2, Camera, CalendarDays, MessageCircle } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -10,10 +10,31 @@ interface Staff {
   name: string;
   role: string;
   photo: string | null;
+  telegramUsername: string | null;
+  telegramChatId: string | null;
+  notificationsEnabled: boolean;
 }
 
+interface ScheduleDay {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  isWorkday: boolean;
+}
+
+const DAY_NAMES_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+const DAY_NAMES_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sun
+
+const DEFAULT_SCHEDULE: ScheduleDay[] = DAY_ORDER.map((day) => ({
+  dayOfWeek: day,
+  startTime: "09:00",
+  endTime: "18:00",
+  isWorkday: day >= 1 && day <= 5, // Mon-Fri by default
+}));
+
 export default function StaffPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
@@ -27,9 +48,19 @@ export default function StaffPage() {
     name: "",
     role: "",
     photo: "",
+    telegramUsername: "",
+    notificationsEnabled: true,
   });
 
-  // Загрузка сотрудников из базы данных
+  // Schedule modal
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  const [scheduleStaffId, setScheduleStaffId] = useState<string | null>(null);
+  const [scheduleStaffName, setScheduleStaffName] = useState("");
+  const [schedule, setSchedule] = useState<ScheduleDay[]>(DEFAULT_SCHEDULE);
+  const [savingSchedule, setSavingSchedule] = useState(false);
+
+  const dayNames = language === "en" ? DAY_NAMES_EN : DAY_NAMES_RU;
+
   const fetchStaff = useCallback(async () => {
     try {
       const res = await fetch("/api/staff");
@@ -55,10 +86,12 @@ export default function StaffPage() {
         name: person.name,
         role: person.role,
         photo: person.photo || "",
+        telegramUsername: person.telegramUsername || "",
+        notificationsEnabled: person.notificationsEnabled,
       });
     } else {
       setEditingStaff(null);
-      setFormData({ name: "", role: "", photo: "" });
+      setFormData({ name: "", role: "", photo: "", telegramUsername: "", notificationsEnabled: true });
     }
     setIsModalOpen(true);
   };
@@ -66,7 +99,7 @@ export default function StaffPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingStaff(null);
-    setFormData({ name: "", role: "", photo: "" });
+    setFormData({ name: "", role: "", photo: "", telegramUsername: "", notificationsEnabled: true });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -116,6 +149,58 @@ export default function StaffPage() {
         console.error("Error deleting staff:", error);
       }
     }
+  };
+
+  // Schedule functions
+  const openSchedule = async (person: Staff) => {
+    setScheduleStaffId(person.id);
+    setScheduleStaffName(person.name);
+    setIsScheduleOpen(true);
+
+    try {
+      const res = await fetch(`/api/staff/${person.id}/schedule`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.schedule && data.schedule.length > 0) {
+          const merged = DAY_ORDER.map((day) => {
+            const existing = data.schedule.find((s: ScheduleDay) => s.dayOfWeek === day);
+            return existing || { dayOfWeek: day, startTime: "09:00", endTime: "18:00", isWorkday: day >= 1 && day <= 5 };
+          });
+          setSchedule(merged);
+        } else {
+          setSchedule([...DEFAULT_SCHEDULE]);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading schedule:", error);
+      setSchedule([...DEFAULT_SCHEDULE]);
+    }
+  };
+
+  const saveSchedule = async () => {
+    if (!scheduleStaffId) return;
+    setSavingSchedule(true);
+
+    try {
+      const res = await fetch(`/api/staff/${scheduleStaffId}/schedule`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ schedule }),
+      });
+      if (res.ok) {
+        setIsScheduleOpen(false);
+      }
+    } catch (error) {
+      console.error("Error saving schedule:", error);
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
+
+  const updateScheduleDay = (dayOfWeek: number, field: string, value: string | boolean) => {
+    setSchedule(schedule.map((d) =>
+      d.dayOfWeek === dayOfWeek ? { ...d, [field]: value } : d
+    ));
   };
 
   return (
@@ -177,6 +262,13 @@ export default function StaffPage() {
                 </div>
                 <div className="flex gap-1">
                   <button
+                    onClick={() => openSchedule(person)}
+                    className={`${isDark ? "text-gray-500 hover:text-purple-400" : "text-gray-400 hover:text-purple-600"} p-1`}
+                    title={t("staffPage.schedule")}
+                  >
+                    <CalendarDays className="h-4 w-4" />
+                  </button>
+                  <button
                     onClick={() => openModal(person)}
                     className={`${isDark ? "text-gray-500 hover:text-blue-400" : "text-gray-400 hover:text-blue-600"} p-1`}
                   >
@@ -190,15 +282,28 @@ export default function StaffPage() {
                   </button>
                 </div>
               </div>
+              {/* Telegram status */}
+              {person.telegramUsername && (
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/5">
+                  <MessageCircle className="h-3.5 w-3.5 text-blue-400" />
+                  <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                    {person.telegramUsername}
+                  </span>
+                  <span className={`ml-auto text-xs flex items-center gap-1 ${person.telegramChatId ? "text-green-400" : isDark ? "text-gray-600" : "text-gray-400"}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${person.telegramChatId ? "bg-green-400" : isDark ? "bg-gray-600" : "bg-gray-400"}`} />
+                    {person.telegramChatId ? t("staffPage.connected") : t("staffPage.notConnected")}
+                  </span>
+                </div>
+              )}
             </div>
           ))
         )}
       </div>
 
-      {/* Modal */}
+      {/* Staff Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className={`${isDark ? "bg-[#12122a]" : "bg-white"} rounded-lg p-6 w-full max-w-md mx-4`}>
+          <div className={`${isDark ? "bg-[#12122a]" : "bg-white"} rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto`}>
             <div className="flex items-center justify-between mb-4">
               <h3 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
                 {editingStaff ? t("staffPage.editStaff") : t("staffPage.newStaff")}
@@ -244,6 +349,40 @@ export default function StaffPage() {
                 />
               </div>
 
+              {/* Telegram Username */}
+              <div>
+                <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
+                  Telegram
+                </label>
+                <input
+                  type="text"
+                  value={formData.telegramUsername}
+                  onChange={(e) =>
+                    setFormData({ ...formData, telegramUsername: e.target.value })
+                  }
+                  placeholder="@username"
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
+                />
+                <p className={`text-xs mt-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                  {t("staffPage.telegramHint")}
+                </p>
+              </div>
+
+              {/* Notifications toggle */}
+              <div className="flex items-center justify-between">
+                <label className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                  {t("staffPage.notifications")}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, notificationsEnabled: !formData.notificationsEnabled })}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${formData.notificationsEnabled ? "bg-blue-600" : isDark ? "bg-white/10" : "bg-gray-300"}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${formData.notificationsEnabled ? "translate-x-5" : ""}`} />
+                </button>
+              </div>
+
+              {/* Photo */}
               <div>
                 <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
                   Фото
@@ -313,6 +452,89 @@ export default function StaffPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Modal */}
+      {isScheduleOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className={`${isDark ? "bg-[#12122a]" : "bg-white"} rounded-lg p-6 w-full max-w-lg mx-4`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+                {t("staffPage.scheduleTitle")} — {scheduleStaffName}
+              </h3>
+              <button
+                onClick={() => setIsScheduleOpen(false)}
+                className={`${isDark ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"}`}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {DAY_ORDER.map((dayIdx) => {
+                const day = schedule.find((d) => d.dayOfWeek === dayIdx);
+                if (!day) return null;
+                return (
+                  <div key={dayIdx} className={`flex items-center gap-3 p-2 rounded-lg ${isDark ? "bg-white/5" : "bg-gray-50"}`}>
+                    <span className={`w-8 text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                      {dayNames[dayIdx]}
+                    </span>
+
+                    {/* Workday toggle */}
+                    <button
+                      type="button"
+                      onClick={() => updateScheduleDay(dayIdx, "isWorkday", !day.isWorkday)}
+                      className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${day.isWorkday ? "bg-blue-600" : isDark ? "bg-white/10" : "bg-gray-300"}`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${day.isWorkday ? "translate-x-5" : ""}`} />
+                    </button>
+
+                    {day.isWorkday ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <input
+                          type="time"
+                          value={day.startTime}
+                          onChange={(e) => updateScheduleDay(dayIdx, "startTime", e.target.value)}
+                          className={`px-2 py-1 text-sm border rounded ${isDark ? "bg-white/5 border-white/10 text-white" : "border-gray-300"}`}
+                        />
+                        <span className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>—</span>
+                        <input
+                          type="time"
+                          value={day.endTime}
+                          onChange={(e) => updateScheduleDay(dayIdx, "endTime", e.target.value)}
+                          className={`px-2 py-1 text-sm border rounded ${isDark ? "bg-white/5 border-white/10 text-white" : "border-gray-300"}`}
+                        />
+                      </div>
+                    ) : (
+                      <span className={`text-sm ${isDark ? "text-gray-600" : "text-gray-400"}`}>
+                        {t("staffPage.dayOff")}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-3 mt-4">
+              <button
+                type="button"
+                onClick={() => setIsScheduleOpen(false)}
+                className={`flex-1 px-4 py-2 border rounded-lg font-medium ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+              >
+                {t("staffPage.cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={saveSchedule}
+                disabled={savingSchedule}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {savingSchedule && <Loader2 className="h-4 w-4 animate-spin" />}
+                {t("staffPage.save")}
+              </button>
+            </div>
           </div>
         </div>
       )}

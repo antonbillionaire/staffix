@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -16,7 +16,8 @@ async function getUserId(): Promise<string | null> {
 }
 
 // GET - fetch bookings for current business
-export async function GET() {
+// Query params: startDate, endDate, staffId
+export async function GET(request: NextRequest) {
   try {
     const userId = await getUserId();
     if (!userId) {
@@ -32,14 +33,34 @@ export async function GET() {
       return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
     }
 
+    // Parse query params for calendar filtering
+    const { searchParams } = new URL(request.url);
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
+    const staffId = searchParams.get("staffId");
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = { businessId: business.id };
+
+    if (startDate && endDate) {
+      where.date = {
+        gte: new Date(startDate),
+        lte: new Date(endDate + "T23:59:59.999Z"),
+      };
+    }
+
+    if (staffId) {
+      where.staffId = staffId;
+    }
+
     const bookings = await prisma.booking.findMany({
-      where: { businessId: business.id },
+      where,
       include: {
         service: { select: { name: true, price: true, duration: true } },
-        staff: { select: { name: true } },
+        staff: { select: { id: true, name: true } },
       },
       orderBy: { date: "desc" },
-      take: 100,
+      take: startDate ? 500 : 100,
     });
 
     // Serialize BigInt clientTelegramId to string
@@ -53,6 +74,7 @@ export async function GET() {
       serviceName: b.service?.name || null,
       servicePrice: b.service?.price || null,
       serviceDuration: b.service?.duration || null,
+      staffId: b.staff?.id || null,
       staffName: b.staff?.name || null,
       createdAt: b.createdAt.toISOString(),
     }));

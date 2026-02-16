@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     }
 
     const data = await request.json();
-    const { name, role, photo } = data;
+    const { name, role, photo, telegramUsername, notificationsEnabled } = data;
 
     if (!name) {
       return NextResponse.json({ error: "Имя обязательно" }, { status: 400 });
@@ -75,6 +75,8 @@ export async function POST(request: Request) {
         name,
         role: role || null,
         photo: photo || null,
+        telegramUsername: telegramUsername || null,
+        notificationsEnabled: notificationsEnabled !== undefined ? notificationsEnabled : true,
         businessId: business.id,
       },
     });

@@ -15,6 +15,7 @@ import {
   Scissors,
   Users,
   Calendar,
+  CalendarDays,
   LogOut,
   Menu,
   X,
@@ -36,6 +37,7 @@ import {
   MessageSquare,
   Globe,
   ChevronDown,
+  Bell,
   type LucideIcon,
 } from "lucide-react";
 const ChatWidget = dynamic(() => import("@/components/ChatWidget"), { ssr: false });
@@ -59,6 +61,7 @@ const navigation: NavItem[] = [
   { nameKey: "nav.team", href: "/dashboard/staff", icon: Users },
   { nameKey: "nav.knowledge", href: "/dashboard/faq", icon: FileText },
   { nameKey: "nav.bookings", href: "/dashboard/bookings", icon: Calendar },
+  { nameKey: "nav.calendar", href: "/dashboard/calendar", icon: CalendarDays },
   { nameKey: "nav.customers", href: "/dashboard/customers", icon: UserCircle },
   { nameKey: "nav.broadcasts", href: "/dashboard/broadcasts", icon: Send },
   { nameKey: "nav.automation", href: "/dashboard/automation", icon: Zap },
@@ -81,6 +84,11 @@ export default function DashboardLayout({
   const [loading, setLoading] = useState(true);
   const [businessName, setBusinessName] = useState("");
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [notifMenuOpen, setNotifMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Array<{
+    id: string; type: string; title: string; message: string; isRead: boolean; createdAt: string;
+  }>>([]);
   const [subscription, setSubscription] = useState({
     plan: "trial",
     messagesUsed: 0,
@@ -154,6 +162,20 @@ export default function DashboardLayout({
     };
 
     checkOnboarding();
+
+    // Fetch unread notifications count
+    const fetchNotifCount = async () => {
+      try {
+        const res = await fetch("/api/notifications/unread");
+        if (res.ok) {
+          const data = await res.json();
+          setUnreadNotifications(data.count || 0);
+        }
+      } catch {}
+    };
+    fetchNotifCount();
+    const notifInterval = setInterval(fetchNotifCount, 30000);
+    return () => clearInterval(notifInterval);
   }, [router]);
 
   const handleLogout = async () => {
@@ -355,6 +377,101 @@ export default function DashboardLayout({
             </h1>
           </div>
 
+          <div className="flex items-center gap-2">
+          {/* Notifications Bell */}
+          <div className="relative">
+            <button
+              onClick={async () => {
+                setNotifMenuOpen(!notifMenuOpen);
+                if (!notifMenuOpen) {
+                  try {
+                    const res = await fetch("/api/notifications");
+                    if (res.ok) {
+                      const data = await res.json();
+                      setNotifications(data.notifications || []);
+                    }
+                  } catch {}
+                }
+              }}
+              className={`relative p-2 rounded-lg ${hoverBg} ${textSecondary} transition-colors`}
+            >
+              <Bell className="h-5 w-5" />
+              {unreadNotifications > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                  {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                </span>
+              )}
+            </button>
+
+            {notifMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setNotifMenuOpen(false)} />
+                <div className={`absolute right-0 mt-2 w-80 ${bgSidebar} border ${borderColor} rounded-xl shadow-xl z-50 overflow-hidden`}>
+                  <div className={`flex items-center justify-between px-4 py-3 border-b ${borderColor}`}>
+                    <span className={`text-sm font-medium ${textPrimary}`}>{t("notifications.title")}</span>
+                    {unreadNotifications > 0 && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            await fetch("/api/notifications", {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ markAll: true }),
+                            });
+                            setUnreadNotifications(0);
+                            setNotifications(notifications.map(n => ({ ...n, isRead: true })));
+                          } catch {}
+                        }}
+                        className="text-xs text-blue-500 hover:text-blue-400"
+                      >
+                        {t("notifications.markAllRead")}
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <p className={`text-sm ${textMuted} text-center py-6`}>{t("notifications.empty")}</p>
+                    ) : (
+                      notifications.slice(0, 10).map((notif) => (
+                        <div
+                          key={notif.id}
+                          onClick={async () => {
+                            if (!notif.isRead) {
+                              try {
+                                await fetch("/api/notifications", {
+                                  method: "PUT",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ id: notif.id }),
+                                });
+                                setNotifications(notifications.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
+                                setUnreadNotifications(Math.max(0, unreadNotifications - 1));
+                              } catch {}
+                            }
+                          }}
+                          className={`px-4 py-3 border-b ${borderColor} cursor-pointer ${hoverBg} transition-colors ${!notif.isRead ? (isDark ? 'bg-blue-500/5' : 'bg-blue-50') : ''}`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="text-sm mt-0.5">
+                              {notif.type === "new_booking" ? "📅" : notif.type === "cancellation" ? "❌" : "🔄"}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-medium ${textPrimary} truncate`}>{notif.title}</p>
+                              <p className={`text-xs ${textMuted} mt-0.5 line-clamp-2`}>{notif.message.replace(/<[^>]*>/g, '')}</p>
+                              <p className={`text-[10px] ${textMuted} mt-1`}>
+                                {new Date(notif.createdAt).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                              </p>
+                            </div>
+                            {!notif.isRead && <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Language Selector */}
           <div className="relative">
             <button
@@ -396,6 +513,7 @@ export default function DashboardLayout({
                 </div>
               </>
             )}
+          </div>
           </div>
         </header>
 

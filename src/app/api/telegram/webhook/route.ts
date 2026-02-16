@@ -24,6 +24,7 @@ import {
   getClientBookings,
   cancelBooking,
 } from "@/lib/booking-tools";
+import { sendBookingNotification } from "@/lib/notifications";
 import { formatDateRu } from "@/lib/automation";
 
 // ========================================
@@ -575,7 +576,11 @@ async function handleCallbackQuery(
 
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { service: true, business: { select: { timezone: true, address: true } } },
+      include: {
+        service: true,
+        staff: { select: { id: true, name: true } },
+        business: { select: { timezone: true, address: true } },
+      },
     });
 
     if (booking && messageId) {
@@ -583,6 +588,21 @@ async function handleCallbackQuery(
         botToken, chatId, messageId,
         `✅ Запись подтверждена!\n\n📅 ${formatDateRu(booking.date, booking.business?.timezone)}\n${booking.service ? `💇 ${booking.service.name}` : ""}${booking.business?.address ? `\n📍 ${booking.business.address}` : ""}\n\nЖдём вас! 💜`
       );
+
+      // Notify owner and staff about confirmation
+      const bookingDate = new Date(booking.date);
+      const dateStr = bookingDate.toISOString().split("T")[0];
+      const timeStr = bookingDate.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+      sendBookingNotification(businessId, "new_booking", {
+        clientName: booking.clientName,
+        clientPhone: booking.clientPhone,
+        serviceName: booking.service?.name || "Услуга",
+        staffName: booking.staff?.name || "Любой мастер",
+        date: dateStr,
+        time: timeStr,
+        bookingId,
+        staffId: booking.staff?.id,
+      }).catch((err) => console.error("Confirm notification error:", err));
     }
     return;
   }
@@ -813,7 +833,65 @@ export async function POST(request: NextRequest) {
 
     // Команда /start
     if (userMessage === "/start") {
-      // Загружаем приветственное сообщение бизнеса
+      const senderUsername = message.from.username?.toLowerCase().replace("@", "") || "";
+
+      // Проверяем: это мастер подключается к уведомлениям?
+      if (senderUsername) {
+        // Ищем среди всех мастеров этого бизнеса
+        const allStaff = await prisma.staff.findMany({
+          where: { businessId: business.id, telegramUsername: { not: null } },
+          select: { id: true, name: true, telegramUsername: true },
+        });
+
+        const matchedStaff = allStaff.find(
+          (s) => s.telegramUsername?.toLowerCase().replace("@", "") === senderUsername
+        );
+
+        if (matchedStaff) {
+          await prisma.staff.update({
+            where: { id: matchedStaff.id },
+            data: { telegramChatId: BigInt(chatId) },
+          });
+
+          await sendTelegramMessage(
+            botToken,
+            chatId,
+            `✅ ${matchedStaff.name}, вы подключены к уведомлениям!\n\nТеперь вы будете получать новые записи клиентов сюда.`
+          );
+          return NextResponse.json({ ok: true });
+        }
+
+        // Проверяем: это владелец подключается?
+        const businessData = await prisma.business.findUnique({
+          where: { id: business.id },
+          select: { ownerTelegramUsername: true, name: true, welcomeMessage: true },
+        });
+
+        const ownerUsername = businessData?.ownerTelegramUsername?.toLowerCase().replace("@", "") || "";
+        if (ownerUsername && ownerUsername === senderUsername) {
+          await prisma.business.update({
+            where: { id: business.id },
+            data: { ownerTelegramChatId: BigInt(chatId) },
+          });
+
+          await sendTelegramMessage(
+            botToken,
+            chatId,
+            `✅ Вы подключены как администратор!\n\nВсе уведомления о записях, отменах и новых клиентах будут приходить сюда.`
+          );
+          return NextResponse.json({ ok: true });
+        }
+
+        // Обычный клиент — показываем приветствие
+        const welcomeMsg =
+          businessData?.welcomeMessage ||
+          `Здравствуйте! 👋 Добро пожаловать в ${businessData?.name || "нашу компанию"}!\n\nЯ AI-помощник и готов ответить на ваши вопросы о наших услугах, ценах и помочь с записью.\n\nЧем могу помочь?`;
+
+        await sendTelegramMessage(botToken, chatId, welcomeMsg);
+        return NextResponse.json({ ok: true });
+      }
+
+      // Нет username — обычный клиент
       const businessData = await prisma.business.findUnique({
         where: { id: business.id },
         select: { welcomeMessage: true, name: true },

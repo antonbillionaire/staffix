@@ -91,6 +91,10 @@ model Business {
   botActive     Boolean   @default(false)
   botLogo       String?   // URL к логотипу бота
 
+  // Telegram уведомления владельца
+  ownerTelegramUsername String?  // @username владельца для уведомлений
+  ownerTelegramChatId   BigInt?  // автоматически при /start
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -111,6 +115,9 @@ model Business {
   scheduledReminders ScheduledReminder[]
   reviews            Review[]
   clients            Client[]
+
+  // Уведомления
+  notifications      Notification[]
 
   // Рассылки клиентам
   clientBroadcasts   ClientBroadcast[]
@@ -141,10 +148,16 @@ model Staff {
   role          String?
   photo         String?   // base64 data URL или URL к фото
 
+  // Telegram уведомления
+  telegramUsername      String?   // @elena_master (владелец заполняет в дашборде)
+  telegramChatId        BigInt?   // автоматически сохраняется когда мастер пишет /start боту
+  notificationsEnabled  Boolean   @default(true)
+
   businessId    String
   business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   bookings      Booking[]
+  schedule      StaffSchedule[]
 }
 
 // FAQ / База знаний
@@ -823,4 +836,45 @@ model ClientBroadcastDelivery {
 
   @@index([broadcastId, status])
   @@index([clientId])
+}
+
+// ========================================
+// УВЕДОМЛЕНИЯ (Dashboard bell + Telegram)
+// ========================================
+
+model Notification {
+  id          String   @id @default(cuid())
+
+  type        String   // new_booking, cancellation, reschedule, new_review, new_client
+  title       String
+  message     String
+  isRead      Boolean  @default(false)
+  metadata    Json?    // { bookingId, clientName, staffName, etc. }
+
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@index([businessId, isRead])
+  @@index([businessId, createdAt])
+}
+
+// ========================================
+// РАСПИСАНИЕ МАСТЕРОВ
+// ========================================
+
+model StaffSchedule {
+  id        String  @id @default(cuid())
+
+  dayOfWeek Int     // 0=Воскресенье, 1=Понедельник ... 6=Суббота
+  startTime String  // "09:00"
+  endTime   String  // "18:00"
+  isWorkday Boolean @default(true)
+
+  staffId   String
+  staff     Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([staffId, dayOfWeek])
+  @@index([staffId])
 }
