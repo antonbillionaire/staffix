@@ -27,8 +27,10 @@ interface Stats {
   };
   subscriptions: {
     trial: number;
+    starter: number;
     pro: number;
     business: number;
+    enterprise: number;
   };
   activity: {
     newUsersToday: number;
@@ -98,8 +100,10 @@ export default function AdminDashboard() {
   const getPlanBadge = (plan: string) => {
     const badges: Record<string, { bg: string; text: string; label: string }> = {
       trial: { bg: "bg-blue-500/10", text: "text-blue-400", label: "Trial" },
+      starter: { bg: "bg-teal-500/10", text: "text-teal-400", label: "Starter" },
       pro: { bg: "bg-purple-500/10", text: "text-purple-400", label: "Pro" },
       business: { bg: "bg-green-500/10", text: "text-green-400", label: "Business" },
+      enterprise: { bg: "bg-amber-500/10", text: "text-amber-400", label: "Enterprise" },
       no_subscription: { bg: "bg-gray-500/10", text: "text-gray-400", label: "Нет" },
     };
     const badge = badges[plan] || badges.no_subscription;
@@ -132,7 +136,7 @@ export default function AdminDashboard() {
           title="MRR"
           value={`$${stats.overview.mrr}`}
           icon={<DollarSign className="h-5 w-5" />}
-          change={`${stats.subscriptions.pro + stats.subscriptions.business} платных`}
+          change={`${stats.subscriptions.starter + stats.subscriptions.pro + stats.subscriptions.business + stats.subscriptions.enterprise} платных`}
           changeType="positive"
           gradient="from-green-500 to-emerald-500"
         />
@@ -168,17 +172,31 @@ export default function AdminDashboard() {
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full bg-teal-500" />
+                <span className="text-gray-400">Starter ($20/мес)</span>
+              </div>
+              <span className="text-white font-medium">{stats.subscriptions.starter}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full bg-purple-500" />
-                <span className="text-gray-400">Pro ($50/мес)</span>
+                <span className="text-gray-400">Pro ($45/мес)</span>
               </div>
               <span className="text-white font-medium">{stats.subscriptions.pro}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full bg-green-500" />
-                <span className="text-gray-400">Business ($100/мес)</span>
+                <span className="text-gray-400">Business ($95/мес)</span>
               </div>
               <span className="text-white font-medium">{stats.subscriptions.business}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full bg-amber-500" />
+                <span className="text-gray-400">Enterprise ($180/мес)</span>
+              </div>
+              <span className="text-white font-medium">{stats.subscriptions.enterprise}</span>
             </div>
           </div>
         </div>

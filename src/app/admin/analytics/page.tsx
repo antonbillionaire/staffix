@@ -381,17 +381,31 @@ export default function AdminAnalyticsPage() {
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full bg-teal-500" />
+                <span className="text-gray-400">Starter ($20/мес)</span>
+              </div>
+              <span className="text-white font-medium">{data.subscriptions.byPlan.starter || 0}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full bg-purple-500" />
-                <span className="text-gray-400">Pro ($50/мес)</span>
+                <span className="text-gray-400">Pro ($45/мес)</span>
               </div>
               <span className="text-white font-medium">{data.subscriptions.byPlan.pro || 0}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full bg-green-500" />
-                <span className="text-gray-400">Business ($100/мес)</span>
+                <span className="text-gray-400">Business ($95/мес)</span>
               </div>
               <span className="text-white font-medium">{data.subscriptions.byPlan.business || 0}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full bg-amber-500" />
+                <span className="text-gray-400">Enterprise ($180/мес)</span>
+              </div>
+              <span className="text-white font-medium">{data.subscriptions.byPlan.enterprise || 0}</span>
             </div>
             <div className="pt-4 border-t border-white/5">
               <div className="flex items-center justify-between text-sm">

@@ -106,7 +106,7 @@ export default function BookingsPage() {
             {t("bookingsPage.subtitle")}
           </p>
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           {(["upcoming", "all", "past"] as const).map((f) => (
             <button
               key={f}
@@ -138,7 +138,7 @@ export default function BookingsPage() {
               key={booking.id}
               className={`${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border p-4`}
             >
-              <div className="flex items-start justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <User className={`h-4 w-4 ${isDark ? "text-gray-500" : "text-gray-400"}`} />

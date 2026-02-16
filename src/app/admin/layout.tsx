@@ -27,7 +27,6 @@ const adminNav = [
   { name: "Рассылки", href: "/admin/broadcasts", icon: Mail },
   { name: "Автоматизации", href: "/admin/automations", icon: Zap },
   { name: "Аналитика", href: "/admin/analytics", icon: TrendingUp },
-  { name: "Настройки", href: "/admin/settings", icon: Settings },
 ];
 
 export default function AdminLayout({

@@ -164,8 +164,10 @@ export default function AdminUserDetailPage({
 
     const badges: Record<string, { bg: string; text: string; label: string; border: string }> = {
       trial: { bg: "bg-blue-500/10", text: "text-blue-400", border: "border-blue-500/30", label: "Trial" },
+      starter: { bg: "bg-teal-500/10", text: "text-teal-400", border: "border-teal-500/30", label: "Starter" },
       pro: { bg: "bg-purple-500/10", text: "text-purple-400", border: "border-purple-500/30", label: "Pro" },
       business: { bg: "bg-green-500/10", text: "text-green-400", border: "border-green-500/30", label: "Business" },
+      enterprise: { bg: "bg-amber-500/10", text: "text-amber-400", border: "border-amber-500/30", label: "Enterprise" },
     };
     const badge = badges[plan] || { bg: "bg-gray-500/10", text: "text-gray-400", border: "border-gray-500/30", label: plan };
     return (
@@ -510,6 +512,13 @@ export default function AdminUserDetailPage({
                 <p className="text-xs text-gray-500 mb-3">Изменить план</p>
                 <div className="grid grid-cols-2 gap-2">
                   <button
+                    onClick={() => performAction("upgrade_plan", { plan: "starter" })}
+                    disabled={actionLoading !== null}
+                    className="flex items-center justify-center gap-2 px-3 py-2 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 rounded-lg text-teal-400 text-sm transition-colors disabled:opacity-50"
+                  >
+                    Starter
+                  </button>
+                  <button
                     onClick={() => performAction("upgrade_plan", { plan: "pro" })}
                     disabled={actionLoading !== null}
                     className="flex items-center justify-center gap-2 px-3 py-2 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-lg text-purple-400 text-sm transition-colors disabled:opacity-50"
@@ -524,6 +533,13 @@ export default function AdminUserDetailPage({
                   >
                     <Zap className="h-4 w-4" />
                     Business
+                  </button>
+                  <button
+                    onClick={() => performAction("upgrade_plan", { plan: "enterprise" })}
+                    disabled={actionLoading !== null}
+                    className="flex items-center justify-center gap-2 px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-amber-400 text-sm transition-colors disabled:opacity-50"
+                  >
+                    Enterprise
                   </button>
                 </div>
               </div>

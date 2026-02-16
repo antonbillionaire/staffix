@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/admin";
+import { PLANS } from "@/lib/plans";
 
 export async function GET() {
   try {
@@ -26,8 +27,10 @@ export async function GET() {
       totalBusinesses,
       activeSubscriptions,
       trialUsers,
+      starterUsers,
       proUsers,
       businessUsers,
+      enterpriseUsers,
       newUsersToday,
       newUsersThisMonth,
       totalMessages,
@@ -52,6 +55,11 @@ export async function GET() {
         where: { plan: "trial" },
       }),
 
+      // Starter users
+      prisma.subscription.count({
+        where: { plan: "starter" },
+      }),
+
       // Pro users
       prisma.subscription.count({
         where: { plan: "pro" },
@@ -60,6 +68,11 @@ export async function GET() {
       // Business users
       prisma.subscription.count({
         where: { plan: "business" },
+      }),
+
+      // Enterprise users
+      prisma.subscription.count({
+        where: { plan: "enterprise" },
       }),
 
       // New users today
@@ -96,11 +109,14 @@ export async function GET() {
       }),
     ]);
 
-    // Calculate MRR (Monthly Recurring Revenue)
-    const mrr = (proUsers * 50) + (businessUsers * 100);
+    // Calculate MRR (Monthly Recurring Revenue) using plans.ts prices
+    const mrr = (starterUsers * PLANS.starter.monthlyPrice) +
+                (proUsers * PLANS.pro.monthlyPrice) +
+                (businessUsers * PLANS.business.monthlyPrice) +
+                (enterpriseUsers * PLANS.enterprise.monthlyPrice);
 
     // Calculate conversion rate (trial to paid)
-    const paidUsers = proUsers + businessUsers;
+    const paidUsers = starterUsers + proUsers + businessUsers + enterpriseUsers;
     const conversionRate = totalUsers > 0
       ? Math.round((paidUsers / totalUsers) * 100)
       : 0;
@@ -115,8 +131,10 @@ export async function GET() {
       },
       subscriptions: {
         trial: trialUsers,
+        starter: starterUsers,
         pro: proUsers,
         business: businessUsers,
+        enterprise: enterpriseUsers,
       },
       activity: {
         newUsersToday,

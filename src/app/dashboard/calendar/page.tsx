@@ -243,8 +243,9 @@ export default function CalendarPage() {
       {/* Week View */}
       {view === "week" && (
         <div className={`${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border overflow-hidden`}>
+         <div className="overflow-x-auto">
           {/* Day headers */}
-          <div className="grid grid-cols-8 border-b border-white/5">
+          <div className="grid grid-cols-8 border-b border-white/5 min-w-[700px]">
             <div className={`p-2 text-xs ${isDark ? "text-gray-600" : "text-gray-400"}`} />
             {weekDates.map((date, i) => {
               const isToday = formatDateKey(date) === formatDateKey(new Date());
@@ -262,7 +263,7 @@ export default function CalendarPage() {
           {/* Time grid */}
           <div className="max-h-[600px] overflow-y-auto">
             {timeSlots.map((time) => (
-              <div key={time} className="grid grid-cols-8 min-h-[40px]">
+              <div key={time} className="grid grid-cols-8 min-h-[40px] min-w-[700px]">
                 <div className={`p-1 text-[10px] text-right pr-2 ${isDark ? "text-gray-600" : "text-gray-400"} border-r ${isDark ? "border-white/5" : "border-gray-200"}`}>
                   {time}
                 </div>
@@ -300,6 +301,7 @@ export default function CalendarPage() {
               </div>
             ))}
           </div>
+         </div>
         </div>
       )}
 

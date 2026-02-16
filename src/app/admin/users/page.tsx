@@ -127,8 +127,10 @@ export default function AdminUsersPage() {
 
     const badges: Record<string, { bg: string; text: string; label: string }> = {
       trial: { bg: "bg-blue-500/10", text: "text-blue-400", label: "Trial" },
+      starter: { bg: "bg-teal-500/10", text: "text-teal-400", label: "Starter" },
       pro: { bg: "bg-purple-500/10", text: "text-purple-400", label: "Pro" },
       business: { bg: "bg-green-500/10", text: "text-green-400", label: "Business" },
+      enterprise: { bg: "bg-amber-500/10", text: "text-amber-400", label: "Enterprise" },
     };
     const badge = badges[plan] || { bg: "bg-gray-500/10", text: "text-gray-400", label: plan };
     return (
@@ -205,8 +207,10 @@ export default function AdminUsersPage() {
               >
                 <option value="all">Все планы</option>
                 <option value="trial">Trial</option>
+                <option value="starter">Starter</option>
                 <option value="pro">Pro</option>
                 <option value="business">Business</option>
+                <option value="enterprise">Enterprise</option>
               </select>
             </div>
             <div>

@@ -477,22 +477,24 @@ export default function StaffPage() {
                 const day = schedule.find((d) => d.dayOfWeek === dayIdx);
                 if (!day) return null;
                 return (
-                  <div key={dayIdx} className={`flex items-center gap-3 p-2 rounded-lg ${isDark ? "bg-white/5" : "bg-gray-50"}`}>
-                    <span className={`w-8 text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                      {dayNames[dayIdx]}
-                    </span>
+                  <div key={dayIdx} className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-2 rounded-lg ${isDark ? "bg-white/5" : "bg-gray-50"}`}>
+                    <div className="flex items-center gap-3">
+                      <span className={`w-8 text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                        {dayNames[dayIdx]}
+                      </span>
 
-                    {/* Workday toggle */}
-                    <button
-                      type="button"
-                      onClick={() => updateScheduleDay(dayIdx, "isWorkday", !day.isWorkday)}
-                      className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${day.isWorkday ? "bg-blue-600" : isDark ? "bg-white/10" : "bg-gray-300"}`}
-                    >
-                      <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${day.isWorkday ? "translate-x-5" : ""}`} />
-                    </button>
+                      {/* Workday toggle */}
+                      <button
+                        type="button"
+                        onClick={() => updateScheduleDay(dayIdx, "isWorkday", !day.isWorkday)}
+                        className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${day.isWorkday ? "bg-blue-600" : isDark ? "bg-white/10" : "bg-gray-300"}`}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${day.isWorkday ? "translate-x-5" : ""}`} />
+                      </button>
+                    </div>
 
                     {day.isWorkday ? (
-                      <div className="flex items-center gap-2 flex-1">
+                      <div className="flex items-center gap-2 flex-1 pl-11 sm:pl-0">
                         <input
                           type="time"
                           value={day.startTime}
