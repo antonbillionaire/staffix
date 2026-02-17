@@ -18,12 +18,14 @@ import {
   Shield,
   Zap,
   CreditCard,
+  Target,
 } from "lucide-react";
 
 const adminNav = [
   { name: "Дашборд", href: "/admin", icon: LayoutDashboard },
   { name: "Клиенты", href: "/admin/users", icon: Users },
   { name: "Подписки", href: "/admin/subscriptions", icon: CreditCard },
+  { name: "Лиды", href: "/admin/sales-leads", icon: Target },
   { name: "Рассылки", href: "/admin/broadcasts", icon: Mail },
   { name: "Автоматизации", href: "/admin/automations", icon: Zap },
   { name: "Аналитика", href: "/admin/analytics", icon: TrendingUp },

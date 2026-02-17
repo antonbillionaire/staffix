@@ -861,6 +861,47 @@ model Notification {
 }
 
 // ========================================
+// SALES BOT — Лиды от бота продаж Staffix
+// ========================================
+
+model SalesLead {
+  id                String    @id @default(cuid())
+
+  // Контакты
+  telegramId        BigInt?
+  telegramUsername   String?
+  telegramChatId    BigInt?   @unique
+  instagramId       String?   @unique
+  whatsappPhone     String?   @unique
+
+  // Профиль
+  name              String?
+  businessName      String?
+  businessType      String?
+  phone             String?
+  email             String?
+
+  // Канал
+  channel           String    @default("telegram") // telegram, instagram, whatsapp
+
+  // Воронка
+  stage             String    @default("new") // new, interested, demo_requested, trial_started, converted, lost
+
+  // Контекст
+  painPoints        String[]  @default([])
+  objections        String[]  @default([])
+  recommendedPlan   String?
+  notes             String?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([stage])
+  @@index([channel])
+  @@index([createdAt])
+}
+
+// ========================================
 // РАСПИСАНИЕ МАСТЕРОВ
 // ========================================
 
