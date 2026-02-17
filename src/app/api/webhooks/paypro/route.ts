@@ -8,6 +8,7 @@ import {
   verifyIP,
   IPN_TYPES,
 } from "@/lib/paypro";
+import { notifyNewPayment } from "@/lib/admin-notify";
 
 export async function POST(request: NextRequest) {
   try {
@@ -100,6 +101,13 @@ export async function POST(request: NextRequest) {
         });
 
         console.log(`PayPro: Activated ${planId} plan for business ${business.id}`);
+
+        // Notify admin about payment
+        const user = await prisma.user.findUnique({ where: { id: ipn.userId! } });
+        if (user) {
+          const price = billingPeriod === "yearly" ? planConfig.yearlyPrice : planConfig.monthlyPrice;
+          notifyNewPayment(user.name, user.email, planConfig.name, price).catch(() => {});
+        }
         break;
       }
 

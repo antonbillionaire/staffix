@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendVerificationEmail } from "@/lib/email";
+import { notifyEmailVerified } from "@/lib/admin-notify";
 
 // Generate 6-digit verification code
 function generateVerificationCode(): string {
@@ -63,6 +64,9 @@ export async function POST(request: NextRequest) {
         verificationExpires: null,
       },
     });
+
+    // Notify admin
+    notifyEmailVerified(user.name, user.email).catch(() => {});
 
     return NextResponse.json({
       message: "Email успешно подтверждён",

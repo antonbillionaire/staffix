@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendVerificationEmail } from "@/lib/email";
+import { notifyNewRegistration } from "@/lib/admin-notify";
 import bcrypt from "bcryptjs";
 
 // Generate 6-digit verification code
@@ -74,6 +75,9 @@ export async function POST(request: Request) {
 
     // Remove password from response
     const { password: _, verificationToken: __, ...userWithoutPassword } = user;
+
+    // Notify admin about new registration (non-blocking)
+    notifyNewRegistration(name, email, businessName).catch(() => {});
 
     // Send verification email
     const emailResult = await sendVerificationEmail(email, verificationCode, name);
