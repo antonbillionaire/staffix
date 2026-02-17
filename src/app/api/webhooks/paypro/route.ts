@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getPlan, type PlanId } from "@/lib/plans";
+import { getPlan, MESSAGE_PACKS, type PlanId } from "@/lib/plans";
 import {
   parseIPN,
   verifyHash,
@@ -60,6 +60,29 @@ export async function POST(request: NextRequest) {
     switch (ipn.ipnTypeId) {
       // Initial payment successful
       case IPN_TYPES.ORDER_CHARGED: {
+        // Check if this is a message pack purchase
+        if (ipn.packId) {
+          const pack = MESSAGE_PACKS.find((p) => p.id === ipn.packId);
+          if (pack && business.subscription) {
+            await prisma.subscription.update({
+              where: { id: business.subscription.id },
+              data: {
+                messagesLimit: {
+                  increment: pack.messages,
+                },
+              },
+            });
+            console.log(`PayPro: Added ${pack.messages} messages (${ipn.packId}) for business ${business.id}`);
+
+            const user = await prisma.user.findUnique({ where: { id: ipn.userId! } });
+            if (user) {
+              notifyNewPayment(user.name, user.email, pack.name, pack.price).catch(() => {});
+            }
+          }
+          break;
+        }
+
+        // Subscription purchase
         const planId = (ipn.planId || "pro") as PlanId;
         const billingPeriod = ipn.billingPeriod || "monthly";
         const planConfig = getPlan(planId);
@@ -211,6 +234,90 @@ export async function POST(request: NextRequest) {
         });
 
         console.log(`PayPro: Refund processed for business ${business.id}`);
+        break;
+      }
+
+      // Chargeback — same as refund, deactivate subscription
+      case IPN_TYPES.ORDER_CHARGED_BACK: {
+        if (!business.subscription) break;
+
+        await prisma.subscription.update({
+          where: { id: business.subscription.id },
+          data: {
+            status: "expired",
+            plan: "trial",
+            messagesLimit: 200,
+            payproSubscriptionId: null,
+          },
+        });
+
+        console.log(`PayPro: Chargeback for business ${business.id}`);
+        break;
+      }
+
+      // Partial refund — keep subscription active, just log
+      case IPN_TYPES.ORDER_PARTIALLY_REFUNDED: {
+        console.log(`PayPro: Partial refund for business ${business.id}, order ${ipn.orderId}`);
+        break;
+      }
+
+      // Trial charge — trial converted to paid, same as ORDER_CHARGED
+      case IPN_TYPES.TRIAL_CHARGE: {
+        const planId = (ipn.planId || "pro") as PlanId;
+        const billingPeriod = ipn.billingPeriod || "monthly";
+        const planConfig = getPlan(planId);
+
+        const expiresAt = new Date();
+        if (billingPeriod === "yearly") {
+          expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+        } else {
+          expiresAt.setMonth(expiresAt.getMonth() + 1);
+        }
+
+        await prisma.subscription.upsert({
+          where: { businessId: business.id },
+          update: {
+            plan: planId,
+            messagesLimit: planConfig.features.messagesLimit,
+            messagesUsed: 0,
+            expiresAt,
+            status: "active",
+            billingPeriod,
+            payproOrderId: ipn.orderId,
+            payproSubscriptionId: ipn.subscriptionId || null,
+            payproCustomerId: ipn.customerId || null,
+          },
+          create: {
+            businessId: business.id,
+            plan: planId,
+            messagesLimit: planConfig.features.messagesLimit,
+            messagesUsed: 0,
+            expiresAt,
+            status: "active",
+            billingPeriod,
+            payproOrderId: ipn.orderId,
+            payproSubscriptionId: ipn.subscriptionId || null,
+            payproCustomerId: ipn.customerId || null,
+          },
+        });
+
+        console.log(`PayPro: Trial charge → activated ${planId} for business ${business.id}`);
+
+        const trialUser = await prisma.user.findUnique({ where: { id: ipn.userId! } });
+        if (trialUser) {
+          const price = billingPeriod === "yearly" ? planConfig.yearlyPrice : planConfig.monthlyPrice;
+          notifyNewPayment(trialUser.name, trialUser.email, planConfig.name, price).catch(() => {});
+        }
+        break;
+      }
+
+      // Informational events — just log
+      case IPN_TYPES.ORDER_CHARGEBACK_WON:
+      case IPN_TYPES.ORDER_CUSTOMER_INFO_CHANGED:
+      case IPN_TYPES.ORDER_ON_WAITING:
+      case IPN_TYPES.SUBSCRIPTION_PAYMENT_INFO_CHANGED:
+      case IPN_TYPES.LICENSE_REQUEST: {
+        console.log(`PayPro: Info event ${ipn.ipnTypeName} for business ${business.id}`);
         break;
       }
 

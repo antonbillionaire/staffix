@@ -23,6 +23,8 @@ import {
   UserCog,
   BookOpen,
   RefreshCw,
+  Loader2,
+  ShoppingCart,
 } from "lucide-react";
 import { PLANS, MESSAGE_PACKS } from "@/lib/plans";
 
@@ -30,6 +32,7 @@ export default function PricingPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("monthly");
+  const [packLoading, setPackLoading] = useState<string | null>(null);
 
   // Check if user is logged in
   const isLoggedIn = status === "authenticated" && !!session;
@@ -43,7 +46,34 @@ export default function PricingPage() {
   ];
 
   const handleSelectPlan = (planId: string) => {
+    if (!isLoggedIn) {
+      router.push(`/register?callbackUrl=${encodeURIComponent(`/checkout?plan=${planId}&billing=${billingPeriod}`)}`);
+      return;
+    }
     router.push(`/checkout?plan=${planId}&billing=${billingPeriod}`);
+  };
+
+  const handleBuyPack = async (packId: string) => {
+    if (!isLoggedIn) {
+      router.push("/register");
+      return;
+    }
+    setPackLoading(packId);
+    try {
+      const res = await fetch("/api/checkout/pack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packId }),
+      });
+      const data = await res.json();
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      }
+    } catch {
+      // ignore
+    } finally {
+      setPackLoading(null);
+    }
   };
 
   // Comprehensive feature list for "All plans include" section
@@ -254,9 +284,23 @@ export default function PricingPage() {
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-1">{pack.name}</h3>
                 <p className="text-3xl font-bold text-white mb-1">${pack.price}</p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-500 mb-4">
                   ${pack.pricePerMessage.toFixed(2)} за сообщение
                 </p>
+                <button
+                  onClick={() => handleBuyPack(pack.id)}
+                  disabled={packLoading === pack.id}
+                  className="w-full py-2 rounded-lg bg-blue-600/20 text-blue-400 font-medium hover:bg-blue-600/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {packLoading === pack.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <ShoppingCart className="h-4 w-4" />
+                      Купить
+                    </>
+                  )}
+                </button>
               </div>
             ))}
           </div>

@@ -45,6 +45,61 @@ export function getProductId(planId: PlanId, billingPeriod: "monthly" | "yearly"
   return PRODUCT_IDS[key] || "";
 }
 
+// Get PayPro product ID for a message pack
+export function getPackProductId(packId: string): string {
+  return PACK_PRODUCT_IDS[packId] || "";
+}
+
+// Build checkout URL for a message pack (one-time purchase)
+export function buildPackCheckoutUrl(params: {
+  productId: string;
+  email?: string;
+  firstName?: string;
+  userId: string;
+  packId: string;
+  language?: string;
+  currency?: string;
+}): string {
+  const url = new URL(PAYPRO_CHECKOUT_BASE_URL);
+
+  url.searchParams.set("products[1][id]", params.productId);
+
+  if (params.email) {
+    url.searchParams.set("billing-email", params.email);
+  }
+  if (params.firstName) {
+    url.searchParams.set("billing-first-name", params.firstName);
+  }
+
+  const langMap: Record<string, string> = {
+    ru: "RU",
+    en: "EN",
+    uz: "EN",
+    kz: "RU",
+  };
+  url.searchParams.set("language", langMap[params.language || "ru"] || "EN");
+
+  if (params.currency) {
+    url.searchParams.set("currency", params.currency);
+  }
+
+  // Custom parameters
+  url.searchParams.set("x-userId", params.userId);
+  url.searchParams.set("x-packId", params.packId);
+  url.searchParams.set("x-billingPeriod", "one-time");
+
+  // Success URL
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
+  url.searchParams.set("success-url", `${appUrl}/dashboard?payment=success`);
+
+  if (PAYPRO_TEST_MODE) {
+    url.searchParams.set("use-test-mode", "true");
+    url.searchParams.set("secret-key", PAYPRO_IPN_SECRET_KEY);
+  }
+
+  return url.toString();
+}
+
 // Build checkout URL for a subscription
 export function buildCheckoutUrl(params: {
   productId: string;
@@ -89,6 +144,10 @@ export function buildCheckoutUrl(params: {
   url.searchParams.set("x-planId", params.planId);
   url.searchParams.set("x-billingPeriod", params.billingPeriod);
 
+  // Success/cancel URLs
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
+  url.searchParams.set("success-url", params.successUrl || `${appUrl}/dashboard?payment=success`);
+
   // Test mode
   if (PAYPRO_TEST_MODE) {
     url.searchParams.set("use-test-mode", "true");
@@ -111,6 +170,12 @@ export const IPN_TYPES = {
   SUBSCRIPTION_RENEWED: "9",
   SUBSCRIPTION_TERMINATED: "10",
   SUBSCRIPTION_FINISHED: "11",
+  LICENSE_REQUEST: "12",
+  TRIAL_CHARGE: "13",
+  ORDER_CHARGEBACK_WON: "14",
+  ORDER_CUSTOMER_INFO_CHANGED: "15",
+  ORDER_ON_WAITING: "17",
+  SUBSCRIPTION_PAYMENT_INFO_CHANGED: "21",
 } as const;
 
 // Parsed IPN data from PayPro webhook
@@ -137,6 +202,7 @@ export interface PayProIPN {
   userId: string;
   planId: string;
   billingPeriod: string;
+  packId: string;
 }
 
 // Parse IPN form data into typed object
@@ -173,6 +239,7 @@ export function parseIPN(formData: URLSearchParams): PayProIPN {
     userId: customMap.get("userId") || "",
     planId: customMap.get("planId") || "",
     billingPeriod: customMap.get("billingPeriod") || "",
+    packId: customMap.get("packId") || "",
   };
 }
 

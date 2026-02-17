@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
@@ -50,8 +51,20 @@ interface DashboardData {
 export default function DashboardPage() {
   const { theme } = useTheme();
   const { t } = useLanguage();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("payment") === "success") {
+      setShowPaymentSuccess(true);
+      // Remove query param from URL without reload
+      window.history.replaceState({}, "", "/dashboard");
+      const timer = setTimeout(() => setShowPaymentSuccess(false), 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
 
   // Theme-aware styles
   const isDark = theme === "dark";
@@ -132,6 +145,23 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      {/* Payment success banner */}
+      {showPaymentSuccess && (
+        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+          <CheckCircle2 className="h-6 w-6 text-green-400 flex-shrink-0" />
+          <div>
+            <p className="text-green-400 font-semibold">Оплата прошла успешно!</p>
+            <p className={`text-sm ${textSecondary}`}>Ваша подписка активирована. Спасибо за покупку!</p>
+          </div>
+          <button
+            onClick={() => setShowPaymentSuccess(false)}
+            className="ml-auto text-gray-400 hover:text-white"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
       {/* Welcome header */}
       <div>
         <h1 className={`text-2xl font-bold ${textPrimary} mb-2`}>
