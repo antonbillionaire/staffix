@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
       planId,
       billingPeriod,
       language: business.language || "ru",
+      currency: "USD",
     });
 
     return NextResponse.json({ checkoutUrl });

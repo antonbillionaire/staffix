@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
       userId: session.user.id,
       packId,
       language: business.language || "ru",
+      currency: "USD",
     });
 
     return NextResponse.json({ checkoutUrl });
