@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -33,9 +33,24 @@ export default function PricingPage() {
   const { data: session, status } = useSession();
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("monthly");
   const [packLoading, setPackLoading] = useState<string | null>(null);
+  const [userHasSubscription, setUserHasSubscription] = useState(false);
 
   // Check if user is logged in
   const isLoggedIn = status === "authenticated" && !!session;
+
+  // Check if logged-in user already has a subscription (to hide trial banner)
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetch("/api/business")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.business?.subscription) {
+            setUserHasSubscription(true);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isLoggedIn]);
 
   // Convert PLANS object to array for rendering (exclude trial from main cards)
   const paidPlans = [
@@ -132,8 +147,8 @@ export default function PricingPage() {
           </p>
         </div>
 
-        {/* Trial banner - only show for non-logged-in users */}
-        {!isLoggedIn && (
+        {/* Trial banner - only show for non-logged-in users who don't have a subscription */}
+        {!isLoggedIn && !userHasSubscription && (
           <div className="max-w-3xl mx-auto mb-12">
             <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 rounded-2xl p-6 text-center">
               <div className="flex items-center justify-center gap-2 mb-2">

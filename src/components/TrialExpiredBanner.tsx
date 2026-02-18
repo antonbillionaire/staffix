@@ -61,14 +61,14 @@ export default function TrialExpiredBanner({ daysOverdue = 0 }: TrialExpiredBann
         {/* CTA buttons */}
         <div className="flex flex-col sm:flex-row gap-2 md:flex-shrink-0">
           <Link
-            href="/checkout?plan=pro&billing=monthly"
+            href="/pricing"
             className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-xl hover:opacity-90 transition-all text-sm"
           >
             <CreditCard className="h-4 w-4" />
             Pro ${proPlan.monthlyPrice}/мес
           </Link>
           <Link
-            href="/checkout?plan=pro&billing=yearly"
+            href="/pricing"
             className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
               isDark
                 ? "bg-white/10 text-white hover:bg-white/20"
