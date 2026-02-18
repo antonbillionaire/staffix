@@ -17,6 +17,8 @@ const PAYPRO_API_BASE_URL = "https://store.payproglobal.com/api";
 const PAYPRO_IPS = [
   "198.199.123.239",
   "157.230.8.40",
+  "2604:a880:400:d0::1843:7001",
+  "2604:a880:400:d1::b6c:c001",
 ];
 
 // Product ID mapping: plan + billing period → PayPro Product ID
