@@ -2,6 +2,14 @@
   "buildCommand": "prisma generate && prisma db push && next build",
   "installCommand": "npm install",
   "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "staffix.io" }],
+      "destination": "https://www.staffix.io/:path*",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/api/telegram/(.*)",
