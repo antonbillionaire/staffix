@@ -12,8 +12,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   cookies: {
     sessionToken: {
+      name: `__Secure-authjs.session-token`,
       options: {
-        maxAge: 30 * 24 * 60 * 60, // 30 days — persistent cookie, not session cookie
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+        maxAge: 30 * 24 * 60 * 60, // 30 days — persistent cookie, survives browser close
       },
     },
   },
