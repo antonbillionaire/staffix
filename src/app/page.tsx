@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
+import { useSession } from "next-auth/react";
 import {
   Brain,
   MessageSquare,
@@ -23,6 +25,15 @@ import { languages } from "@/lib/translations";
 
 export default function Home() {
   const { t, language, setLanguage } = useLanguage();
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  // Redirect logged-in users to dashboard
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.replace("/dashboard");
+    }
+  }, [status, router]);
   const [industryIndex, setIndustryIndex] = useState(0);
   const [chatIndex, setChatIndex] = useState(0);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
