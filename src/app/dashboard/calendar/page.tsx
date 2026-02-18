@@ -176,13 +176,13 @@ export default function CalendarPage() {
   return (
     <div className="max-w-6xl">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
           <h2 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
             {t("calendar.title")}
           </h2>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Staff filter */}
           {staffList.length > 0 && (
             <select
@@ -213,15 +213,17 @@ export default function CalendarPage() {
           </div>
 
           {/* Navigation */}
-          <button onClick={() => navigateWeek(-1)} className={`p-1.5 rounded-lg ${isDark ? "hover:bg-white/5 text-gray-400" : "hover:bg-gray-100 text-gray-600"}`}>
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <button onClick={goToToday} className={`px-3 py-1.5 text-sm rounded-lg ${isDark ? "text-gray-300 hover:bg-white/5" : "text-gray-700 hover:bg-gray-100"}`}>
-            {t("calendar.today")}
-          </button>
-          <button onClick={() => navigateWeek(1)} className={`p-1.5 rounded-lg ${isDark ? "hover:bg-white/5 text-gray-400" : "hover:bg-gray-100 text-gray-600"}`}>
-            <ChevronRight className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button onClick={() => navigateWeek(-1)} className={`p-1.5 rounded-lg ${isDark ? "hover:bg-white/5 text-gray-400" : "hover:bg-gray-100 text-gray-600"}`}>
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button onClick={goToToday} className={`px-3 py-1.5 text-sm rounded-lg ${isDark ? "text-gray-300 hover:bg-white/5" : "text-gray-700 hover:bg-gray-100"}`}>
+              {t("calendar.today")}
+            </button>
+            <button onClick={() => navigateWeek(1)} className={`p-1.5 rounded-lg ${isDark ? "hover:bg-white/5 text-gray-400" : "hover:bg-gray-100 text-gray-600"}`}>
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -264,7 +266,7 @@ export default function CalendarPage() {
           <div className="max-h-[600px] overflow-y-auto">
             {timeSlots.map((time) => (
               <div key={time} className="grid grid-cols-8 min-h-[40px] min-w-[700px]">
-                <div className={`p-1 text-[10px] text-right pr-2 ${isDark ? "text-gray-600" : "text-gray-400"} border-r ${isDark ? "border-white/5" : "border-gray-200"}`}>
+                <div className={`p-1 text-[11px] text-right pr-2 ${isDark ? "text-gray-600" : "text-gray-400"} border-r ${isDark ? "border-white/5" : "border-gray-200"}`}>
                   {time}
                 </div>
                 {weekDates.map((date, dayIdx) => {
