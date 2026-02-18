@@ -207,10 +207,10 @@ export interface PayProIPN {
 
 // Parse IPN form data into typed object
 export function parseIPN(formData: URLSearchParams): PayProIPN {
-  // Parse custom fields: "x-userId=abc;x-planId=pro"
+  // Parse custom fields: "x-userId=abc,x-planId=pro" (PayPro uses comma separator)
   const customFields = formData.get("ORDER_CUSTOM_FIELDS") || "";
   const customMap = new Map<string, string>();
-  customFields.split(";").forEach((pair) => {
+  customFields.split(/[,;]/).forEach((pair) => {
     const [key, value] = pair.split("=");
     if (key && value) {
       customMap.set(key.replace("x-", ""), value);
