@@ -13,14 +13,15 @@ export async function sendInstagramMessage(
   text: string
 ): Promise<boolean> {
   const accessToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
-  if (!accessToken) {
-    console.error("Meta API: FACEBOOK_PAGE_ACCESS_TOKEN not set");
+  const igUserId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
+  if (!accessToken || !igUserId) {
+    console.error("Meta API: FACEBOOK_PAGE_ACCESS_TOKEN or INSTAGRAM_BUSINESS_ACCOUNT_ID not set");
     return false;
   }
 
   try {
     const response = await fetch(
-      `https://graph.facebook.com/v21.0/me/messages`,
+      `https://graph.facebook.com/v21.0/${igUserId}/messages`,
       {
         method: "POST",
         headers: {
