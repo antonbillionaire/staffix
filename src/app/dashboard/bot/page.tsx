@@ -598,7 +598,7 @@ export default function AIEmployeePage() {
             <label className="block text-sm font-medium text-gray-300 mb-3">
               {t("botPage.communicationStyle")}
             </label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               {[
                 { id: "friendly", nameKey: "botPage.friendly", emoji: "😊" },
                 { id: "professional", nameKey: "botPage.professional", emoji: "👔" },
@@ -607,14 +607,14 @@ export default function AIEmployeePage() {
                 <button
                   key={tone.id}
                   onClick={() => setAiSettings({ ...aiSettings, tone: tone.id })}
-                  className={`p-4 rounded-xl border text-center transition-all ${
+                  className={`p-2 sm:p-4 rounded-xl border text-center transition-all ${
                     aiSettings.tone === tone.id
                       ? "bg-blue-500/20 border-blue-500/50 text-white"
                       : "bg-white/5 border-white/10 text-gray-400 hover:border-white/20"
                   }`}
                 >
-                  <span className="text-2xl block mb-1">{tone.emoji}</span>
-                  <span className="text-sm">{t(tone.nameKey)}</span>
+                  <span className="text-xl sm:text-2xl block mb-1">{tone.emoji}</span>
+                  <span className="text-[10px] sm:text-sm leading-tight break-words">{t(tone.nameKey)}</span>
                 </button>
               ))}
             </div>

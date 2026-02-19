@@ -341,7 +341,10 @@ export default function CalendarPage() {
                   const dateKey = formatDateKey(date);
                   const dayBookings = (bookingsByDate[dateKey] || []).filter((b) => {
                     const bTimeStr = formatBusinessTime(b.date, businessTimezone);
-                    return bTimeStr === time;
+                    const [bH, bM] = bTimeStr.split(":").map(Number);
+                    const slotMin = bM < 30 ? "00" : "30";
+                    const slotTime = `${String(bH).padStart(2, "0")}:${slotMin}`;
+                    return slotTime === time;
                   });
 
                   return (

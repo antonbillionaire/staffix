@@ -43,10 +43,13 @@ export async function GET(request: NextRequest) {
     const where: any = { businessId: business.id };
 
     if (startDate && endDate) {
-      where.date = {
-        gte: new Date(startDate),
-        lte: new Date(endDate + "T23:59:59.999Z"),
-      };
+      // Extend range by 1 day on each side to account for timezone offset
+      // (e.g. UTC+5: "2026-02-16" in business TZ = 2026-02-15T19:00Z in UTC)
+      const gte = new Date(startDate + "T00:00:00Z");
+      gte.setUTCDate(gte.getUTCDate() - 1);
+      const lte = new Date(endDate + "T23:59:59.999Z");
+      lte.setUTCDate(lte.getUTCDate() + 1);
+      where.date = { gte, lte };
     }
 
     if (staffId) {

@@ -147,8 +147,8 @@ export default function PricingPage() {
           </p>
         </div>
 
-        {/* Trial banner - only show for non-logged-in users who don't have a subscription */}
-        {!isLoggedIn && !userHasSubscription && (
+        {/* Trial banner - only show for non-logged-in users (hide while session is loading) */}
+        {status === "unauthenticated" && !userHasSubscription && (
           <div className="max-w-3xl mx-auto mb-12">
             <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 rounded-2xl p-6 text-center">
               <div className="flex items-center justify-center gap-2 mb-2">

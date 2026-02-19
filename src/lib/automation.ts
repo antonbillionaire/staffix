@@ -345,6 +345,19 @@ export async function processReviewRequests() {
   const now = new Date();
   const results = { sent: 0, failed: 0, errors: [] as string[] };
 
+  // Auto-complete past confirmed bookings (appointment time has passed)
+  try {
+    await prisma.booking.updateMany({
+      where: {
+        status: "confirmed",
+        date: { lt: now },
+      },
+      data: { status: "completed" },
+    });
+  } catch {
+    // Non-critical, continue
+  }
+
   // Получаем все бизнесы с включенным сбором отзывов
   const businesses = await prisma.business.findMany({
     where: {
@@ -359,6 +372,7 @@ export async function processReviewRequests() {
       bookings: {
         where: {
           status: "completed",
+          date: { lt: now },
           clientTelegramId: { not: null },
           reviewRequested: false,
         },

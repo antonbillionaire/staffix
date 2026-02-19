@@ -55,6 +55,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+  const [businessTimezone, setBusinessTimezone] = useState("Asia/Tashkent");
 
   useEffect(() => {
     if (searchParams.get("payment") === "success") {
@@ -85,6 +86,7 @@ export default function DashboardPage() {
         let recentBookings: RecentBooking[] = [];
         if (bookingsRes.ok) {
           const bookingsData = await bookingsRes.json();
+          if (bookingsData.timezone) setBusinessTimezone(bookingsData.timezone);
           recentBookings = (bookingsData.bookings || []).slice(0, 5).map((b: { id: string; clientName: string; date: string; serviceName: string | null; staffName: string | null; status: string }) => ({
             id: b.id,
             clientName: b.clientName,
@@ -335,10 +337,10 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-right">
                     <p className={`text-sm ${textSecondary}`}>
-                      {new Date(b.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                      {new Date(b.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short", timeZone: businessTimezone })}
                     </p>
                     <p className={`text-xs ${textTertiary}`}>
-                      {new Date(b.date).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(b.date).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: businessTimezone })}
                     </p>
                   </div>
                 </div>
