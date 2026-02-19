@@ -22,10 +22,61 @@ interface StaffMember {
   name: string;
 }
 
+// UTC offsets in minutes (must match server-side automation.ts)
+const TIMEZONE_OFFSETS: Record<string, number> = {
+  "Asia/Tashkent": 300, "Asia/Almaty": 300, "Asia/Bishkek": 360,
+  "Asia/Dushanbe": 300, "Asia/Ashgabat": 300, "Asia/Baku": 240,
+  "Asia/Yerevan": 240, "Asia/Tbilisi": 240,
+  "Europe/Kaliningrad": 120, "Europe/Moscow": 180, "Europe/Samara": 240,
+  "Asia/Yekaterinburg": 300, "Asia/Omsk": 360, "Asia/Novosibirsk": 420,
+  "Asia/Krasnoyarsk": 420, "Asia/Irkutsk": 480, "Asia/Yakutsk": 540,
+  "Asia/Vladivostok": 600, "Asia/Kamchatka": 720,
+  "Asia/Seoul": 540, "Asia/Tokyo": 540, "Asia/Shanghai": 480,
+  "Asia/Dubai": 240, "Asia/Riyadh": 180, "Asia/Istanbul": 180,
+  "Europe/London": 0, "Europe/Berlin": 60, "Europe/Paris": 60, "Europe/Kiev": 120,
+  "America/New_York": -300, "America/Chicago": -360, "America/Denver": -420, "America/Los_Angeles": -480,
+};
+
+function utcToBusinessTime(utcDateStr: string, timezone: string): Date {
+  const utcDate = new Date(utcDateStr);
+  const offsetMs = (TIMEZONE_OFFSETS[timezone] ?? 300) * 60 * 1000;
+  return new Date(utcDate.getTime() + offsetMs);
+}
+
+function formatBusinessTime(utcDateStr: string, timezone: string): string {
+  const local = utcToBusinessTime(utcDateStr, timezone);
+  return `${String(local.getUTCHours()).padStart(2, "0")}:${String(local.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+function formatBusinessDate(utcDateStr: string, timezone: string): string {
+  const local = utcToBusinessTime(utcDateStr, timezone);
+  return `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, "0")}-${String(local.getUTCDate()).padStart(2, "0")}`;
+}
+
 const STAFF_COLORS = [
-  "bg-blue-500", "bg-purple-500", "bg-green-500", "bg-orange-500",
-  "bg-pink-500", "bg-cyan-500", "bg-yellow-500", "bg-red-500",
+  { bg: "bg-blue-500", border: "border-blue-400", light: "bg-blue-500/20 text-blue-300" },
+  { bg: "bg-purple-500", border: "border-purple-400", light: "bg-purple-500/20 text-purple-300" },
+  { bg: "bg-green-500", border: "border-green-400", light: "bg-green-500/20 text-green-300" },
+  { bg: "bg-orange-500", border: "border-orange-400", light: "bg-orange-500/20 text-orange-300" },
+  { bg: "bg-pink-500", border: "border-pink-400", light: "bg-pink-500/20 text-pink-300" },
+  { bg: "bg-cyan-500", border: "border-cyan-400", light: "bg-cyan-500/20 text-cyan-300" },
+  { bg: "bg-yellow-500", border: "border-yellow-400", light: "bg-yellow-500/20 text-yellow-300" },
+  { bg: "bg-red-500", border: "border-red-400", light: "bg-red-500/20 text-red-300" },
 ];
+
+const STAFF_COLORS_LIGHT = [
+  { bg: "bg-blue-500", border: "border-blue-300", light: "bg-blue-100 text-blue-700" },
+  { bg: "bg-purple-500", border: "border-purple-300", light: "bg-purple-100 text-purple-700" },
+  { bg: "bg-green-500", border: "border-green-300", light: "bg-green-100 text-green-700" },
+  { bg: "bg-orange-500", border: "border-orange-300", light: "bg-orange-100 text-orange-700" },
+  { bg: "bg-pink-500", border: "border-pink-300", light: "bg-pink-100 text-pink-700" },
+  { bg: "bg-cyan-500", border: "border-cyan-300", light: "bg-cyan-100 text-cyan-700" },
+  { bg: "bg-yellow-500", border: "border-yellow-300", light: "bg-yellow-100 text-yellow-700" },
+  { bg: "bg-red-500", border: "border-red-300", light: "bg-red-100 text-red-700" },
+];
+
+const NO_STAFF_COLOR = { bg: "bg-gray-500", border: "border-gray-400", light: "bg-gray-500/20 text-gray-300" };
+const NO_STAFF_COLOR_LIGHT = { bg: "bg-gray-500", border: "border-gray-300", light: "bg-gray-100 text-gray-600" };
 
 const DAY_NAMES_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const DAY_NAMES_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -35,7 +86,7 @@ const MONTH_NAMES_EN = ["January", "February", "March", "April", "May", "June", 
 function getWeekDates(date: Date): Date[] {
   const d = new Date(date);
   const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Monday start
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   const monday = new Date(d.setDate(diff));
   const dates: Date[] = [];
   for (let i = 0; i < 7; i++) {
@@ -62,15 +113,18 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<CalendarBooking | null>(null);
   const [staffFilter, setStaffFilter] = useState<string | null>(null);
+  const [businessTimezone, setBusinessTimezone] = useState("Asia/Tashkent");
 
   const dayNames = language === "en" ? DAY_NAMES_EN : DAY_NAMES_RU;
   const monthNames = language === "en" ? MONTH_NAMES_EN : MONTH_NAMES_RU;
   const weekDates = getWeekDates(currentDate);
 
-  const getStaffColor = (staffId: string | null): string => {
-    if (!staffId) return "bg-gray-500";
+  const getStaffColor = (staffId: string | null) => {
+    if (!staffId) return isDark ? NO_STAFF_COLOR : NO_STAFF_COLOR_LIGHT;
     const idx = staffList.findIndex((s) => s.id === staffId);
-    return STAFF_COLORS[idx % STAFF_COLORS.length] || "bg-gray-500";
+    if (idx < 0) return isDark ? NO_STAFF_COLOR : NO_STAFF_COLOR_LIGHT;
+    const colors = isDark ? STAFF_COLORS : STAFF_COLORS_LIGHT;
+    return colors[idx % colors.length];
   };
 
   const fetchData = useCallback(async () => {
@@ -99,6 +153,7 @@ export default function CalendarPage() {
       if (bookingsRes.ok) {
         const data = await bookingsRes.json();
         setBookings(data.bookings || []);
+        if (data.timezone) setBusinessTimezone(data.timezone);
       }
       if (staffRes.ok) {
         const data = await staffRes.json();
@@ -135,14 +190,20 @@ export default function CalendarPage() {
     return `${String(hour).padStart(2, "0")}:${min}`;
   });
 
-  // Group bookings by date for week view
+  // Group bookings by date (in business timezone) for week view
   const bookingsByDate: Record<string, CalendarBooking[]> = {};
   bookings.forEach((b) => {
     if (b.status === "cancelled") return;
-    const dateKey = b.date.split("T")[0];
+    const dateKey = formatBusinessDate(b.date, businessTimezone);
     if (!bookingsByDate[dateKey]) bookingsByDate[dateKey] = [];
     bookingsByDate[dateKey].push(b);
   });
+
+  // Timezone label for display
+  const tzOffset = TIMEZONE_OFFSETS[businessTimezone] ?? 300;
+  const tzSign = tzOffset >= 0 ? "+" : "-";
+  const tzH = Math.floor(Math.abs(tzOffset) / 60);
+  const tzLabel = `UTC${tzSign}${tzH}`;
 
   // Month view: get calendar grid
   const getMonthGrid = () => {
@@ -181,6 +242,9 @@ export default function CalendarPage() {
           <h2 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
             {t("calendar.title")}
           </h2>
+          <p className={`text-xs mt-0.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+            {businessTimezone.split("/")[1]?.replace(/_/g, " ")} ({tzLabel})
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* Staff filter */}
@@ -232,13 +296,17 @@ export default function CalendarPage() {
 
       {/* Staff legend */}
       {staffList.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {staffList.map((s, i) => (
-            <span key={s.id} className="flex items-center gap-1.5 text-xs">
-              <span className={`w-2.5 h-2.5 rounded-full ${STAFF_COLORS[i % STAFF_COLORS.length]}`} />
-              <span className={isDark ? "text-gray-400" : "text-gray-600"}>{s.name}</span>
-            </span>
-          ))}
+        <div className="flex flex-wrap gap-3 mb-4">
+          {staffList.map((s, i) => {
+            const colors = isDark ? STAFF_COLORS : STAFF_COLORS_LIGHT;
+            const color = colors[i % colors.length];
+            return (
+              <span key={s.id} className="flex items-center gap-1.5 text-xs">
+                <span className={`w-3 h-3 rounded-full ${color.bg}`} />
+                <span className={isDark ? "text-gray-300" : "text-gray-600"}>{s.name}</span>
+              </span>
+            );
+          })}
         </div>
       )}
 
@@ -272,8 +340,7 @@ export default function CalendarPage() {
                 {weekDates.map((date, dayIdx) => {
                   const dateKey = formatDateKey(date);
                   const dayBookings = (bookingsByDate[dateKey] || []).filter((b) => {
-                    const bTime = new Date(b.date);
-                    const bTimeStr = `${String(bTime.getUTCHours()).padStart(2, "0")}:${String(bTime.getUTCMinutes()).padStart(2, "0")}`;
+                    const bTimeStr = formatBusinessTime(b.date, businessTimezone);
                     return bTimeStr === time;
                   });
 
@@ -285,15 +352,20 @@ export default function CalendarPage() {
                       {dayBookings.map((b) => {
                         const dur = b.serviceDuration || 60;
                         const heightSlots = Math.max(1, Math.ceil(dur / 30));
+                        const color = getStaffColor(b.staffId);
                         return (
                           <button
                             key={b.id}
                             onClick={() => setSelectedBooking(b)}
-                            className={`absolute inset-x-0.5 top-0.5 ${getStaffColor(b.staffId)} text-white text-[10px] rounded px-1 py-0.5 leading-tight overflow-hidden z-10 hover:opacity-80 transition-opacity`}
+                            className={`absolute inset-x-0.5 top-0.5 ${color.bg} text-white text-[10px] rounded px-1 py-0.5 leading-tight overflow-hidden z-10 hover:opacity-80 transition-opacity`}
                             style={{ height: `${heightSlots * 40 - 4}px` }}
                           >
                             <div className="font-medium truncate">{b.clientName}</div>
                             {heightSlots > 1 && <div className="truncate opacity-80">{b.serviceName}</div>}
+                            {heightSlots > 1 && b.staffName && <div className="truncate opacity-70">{b.staffName}</div>}
+                            {heightSlots <= 1 && b.staffName && (
+                              <div className="truncate opacity-70">{b.staffName}</div>
+                            )}
                           </button>
                         );
                       })}
@@ -341,11 +413,15 @@ export default function CalendarPage() {
                   <div className={`text-sm mb-1 ${isToday ? "bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center" : isDark ? "text-gray-400" : "text-gray-600"}`}>
                     {date.getDate()}
                   </div>
-                  {dayBookings.slice(0, 3).map((b) => (
-                    <div key={b.id} className={`${getStaffColor(b.staffId)} text-white text-[9px] rounded px-1 py-0.5 mb-0.5 truncate`}>
-                      {b.clientName}
-                    </div>
-                  ))}
+                  {dayBookings.slice(0, 3).map((b) => {
+                    const color = getStaffColor(b.staffId);
+                    const timeStr = formatBusinessTime(b.date, businessTimezone);
+                    return (
+                      <div key={b.id} className={`${color.bg} text-white text-[9px] rounded px-1 py-0.5 mb-0.5 truncate`}>
+                        {timeStr} {b.clientName}
+                      </div>
+                    );
+                  })}
                   {dayBookings.length > 3 && (
                     <div className={`text-[9px] ${isDark ? "text-gray-500" : "text-gray-400"}`}>
                       +{dayBookings.length - 3}
@@ -391,15 +467,18 @@ export default function CalendarPage() {
               {selectedBooking.staffName && (
                 <div className="flex items-center gap-2">
                   <User className={`h-4 w-4 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
-                  <span className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>{selectedBooking.staffName}</span>
+                  <span className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                    {selectedBooking.staffName}
+                  </span>
+                  {selectedBooking.staffId && (
+                    <span className={`w-2.5 h-2.5 rounded-full ${getStaffColor(selectedBooking.staffId).bg}`} />
+                  )}
                 </div>
               )}
               <div className="flex items-center gap-2">
                 <Clock className={`h-4 w-4 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
                 <span className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                  {new Date(selectedBooking.date).toLocaleString("ru-RU", {
-                    weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
-                  })}
+                  {formatBusinessDate(selectedBooking.date, businessTimezone).split("-").reverse().join(".")} {formatBusinessTime(selectedBooking.date, businessTimezone)}
                 </span>
               </div>
             </div>

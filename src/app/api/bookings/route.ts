@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     const business = await prisma.business.findFirst({
       where: { userId },
-      select: { id: true },
+      select: { id: true, timezone: true },
     });
 
     if (!business) {
@@ -96,6 +96,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       bookings: serialized,
       stats: { bookingsToday, upcomingCount, total: bookings.length },
+      timezone: business.timezone || "Asia/Tashkent",
     });
   } catch (error) {
     console.error("Error fetching bookings:", error);

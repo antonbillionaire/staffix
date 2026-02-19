@@ -18,6 +18,47 @@ interface Booking {
   createdAt: string;
 }
 
+// UTC offsets in minutes (must match server-side automation.ts)
+const TIMEZONE_OFFSETS: Record<string, number> = {
+  "Asia/Tashkent": 300, "Asia/Almaty": 300, "Asia/Bishkek": 360,
+  "Asia/Dushanbe": 300, "Asia/Ashgabat": 300, "Asia/Baku": 240,
+  "Asia/Yerevan": 240, "Asia/Tbilisi": 240,
+  "Europe/Kaliningrad": 120, "Europe/Moscow": 180, "Europe/Samara": 240,
+  "Asia/Yekaterinburg": 300, "Asia/Omsk": 360, "Asia/Novosibirsk": 420,
+  "Asia/Krasnoyarsk": 420, "Asia/Irkutsk": 480, "Asia/Yakutsk": 540,
+  "Asia/Vladivostok": 600, "Asia/Kamchatka": 720,
+  "Asia/Seoul": 540, "Asia/Tokyo": 540, "Asia/Shanghai": 480,
+  "Asia/Dubai": 240, "Asia/Riyadh": 180, "Asia/Istanbul": 180,
+  "Europe/London": 0, "Europe/Berlin": 60, "Europe/Paris": 60, "Europe/Kiev": 120,
+  "America/New_York": -300, "America/Chicago": -360, "America/Denver": -420, "America/Los_Angeles": -480,
+};
+
+function utcToBusinessTime(utcDateStr: string, timezone: string): Date {
+  const utcDate = new Date(utcDateStr);
+  const offsetMs = (TIMEZONE_OFFSETS[timezone] ?? 300) * 60 * 1000;
+  return new Date(utcDate.getTime() + offsetMs);
+}
+
+function formatBizDate(utcDateStr: string, timezone: string, locale: string): string {
+  const local = utcToBusinessTime(utcDateStr, timezone);
+  const months: Record<string, string[]> = {
+    "ru-RU": ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"],
+    "en-US": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+  };
+  const days: Record<string, string[]> = {
+    "ru-RU": ["вс", "пн", "вт", "ср", "чт", "пт", "сб"],
+    "en-US": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+  };
+  const m = months[locale] || months["ru-RU"];
+  const d = days[locale] || days["ru-RU"];
+  return `${d[local.getUTCDay()]}, ${local.getUTCDate()} ${m[local.getUTCMonth()]}`;
+}
+
+function formatBizTime(utcDateStr: string, timezone: string): string {
+  const local = utcToBusinessTime(utcDateStr, timezone);
+  return `${String(local.getUTCHours()).padStart(2, "0")}:${String(local.getUTCMinutes()).padStart(2, "0")}`;
+}
+
 export default function BookingsPage() {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
@@ -26,6 +67,9 @@ export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "upcoming" | "past">("upcoming");
+  const [businessTimezone, setBusinessTimezone] = useState("Asia/Tashkent");
+
+  const locale = language === "en" ? "en-US" : language === "kz" ? "ru-RU" : language === "uz" ? "ru-RU" : "ru-RU";
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -33,6 +77,7 @@ export default function BookingsPage() {
       if (res.ok) {
         const data = await res.json();
         setBookings(data.bookings || []);
+        if (data.timezone) setBusinessTimezone(data.timezone);
       }
     } catch (error) {
       console.error("Error fetching bookings:", error);
@@ -70,21 +115,6 @@ export default function BookingsPage() {
         {t(labelKeys[status])}
       </span>
     );
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const locale = language === "ru" ? "ru-RU" : language === "kz" ? "kk-KZ" : language === "uz" ? "uz-UZ" : "en-US";
-    return date.toLocaleDateString(locale, {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-    });
-  };
-
-  const formatTime = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
   };
 
   if (loading) {
@@ -173,11 +203,11 @@ export default function BookingsPage() {
                 <div className="text-right">
                   <div className={`flex items-center gap-1 font-medium ${isDark ? "text-white" : "text-gray-900"}`}>
                     <Calendar className={`h-4 w-4 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
-                    {formatDate(booking.date)}
+                    {formatBizDate(booking.date, businessTimezone, locale)}
                   </div>
                   <div className={`flex items-center gap-1 mt-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
                     <Clock className={`h-4 w-4 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
-                    {formatTime(booking.date)}
+                    {formatBizTime(booking.date, businessTimezone)}
                   </div>
                 </div>
               </div>
