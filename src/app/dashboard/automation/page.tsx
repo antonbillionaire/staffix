@@ -338,7 +338,7 @@ export default function AutomationPage() {
                     type="url"
                     value={settings.reviewGoogleLink}
                     onChange={(e) => setSettings({ ...settings, reviewGoogleLink: e.target.value })}
-                    placeholder="https://g.page/r/..."
+                    placeholder="https://maps.google.com/..."
                     className={`flex-1 px-4 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   />
                   {settings.reviewGoogleLink && (
@@ -352,6 +352,9 @@ export default function AutomationPage() {
                     </a>
                   )}
                 </div>
+                <p className={`text-xs ${textSecondary} mt-2`}>
+                  Найдите свой бизнес на Google Maps → скопируйте URL из адресной строки → вставьте сюда
+                </p>
               </div>
 
               {/* 2GIS link */}
@@ -378,6 +381,9 @@ export default function AutomationPage() {
                     </a>
                   )}
                 </div>
+                <p className={`text-xs ${textSecondary} mt-2`}>
+                  Найдите свой бизнес в 2GIS → скопируйте URL страницы → вставьте сюда
+                </p>
               </div>
 
               {/* Yandex Maps link */}
@@ -404,6 +410,9 @@ export default function AutomationPage() {
                     </a>
                   )}
                 </div>
+                <p className={`text-xs ${textSecondary} mt-2`}>
+                  Найдите свой бизнес на Яндекс.Картах → скопируйте URL страницы → вставьте сюда
+                </p>
               </div>
             </>
           )}
