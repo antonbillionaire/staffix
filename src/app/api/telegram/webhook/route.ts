@@ -962,12 +962,12 @@ export async function POST(request: NextRequest) {
           } else {
             await sendTelegramMessage(botToken, chatId, replyText);
           }
-        } else if (pendingReview.rating <= 2) {
-          // Low rating — empathy + notify owner
-          await sendTelegramMessage(
-            botToken, chatId,
-            `Спасибо, что рассказали нам об этом. 🙏\n\nМы обязательно разберёмся с ситуацией и свяжемся с вами, если потребуется. Нам важно, чтобы каждый визит был на высшем уровне.`
-          );
+        } else {
+          // 3 stars or less — empathy + notify owner
+          const clientMsg = pendingReview.rating <= 2
+            ? `Спасибо, что рассказали нам об этом. 🙏\n\nМы обязательно разберёмся с ситуацией и свяжемся с вами, если потребуется. Нам важно, чтобы каждый визит был на высшем уровне.`
+            : `Спасибо за честный отзыв! 🙏\n\nМы всегда стремимся стать лучше и обязательно обратим внимание на ваши слова.`;
+          await sendTelegramMessage(botToken, chatId, clientMsg);
 
           // Notify business owner
           const ownerChatId = bizOwner?.ownerTelegramChatId;
@@ -976,18 +976,14 @@ export async function POST(request: NextRequest) {
             const bookingInfo = pendingReview.bookingId
               ? ` (запись #${pendingReview.bookingId.slice(-6)})`
               : "";
+            const emoji = pendingReview.rating <= 2 ? "⚠️" : "📝";
+            const label = pendingReview.rating <= 2 ? "Низкая оценка" : "Средняя оценка";
             await sendTelegramMessage(
               botToken,
               Number(ownerChatId),
-              `⚠️ Низкая оценка от клиента!\n\nКлиент: ${pendingReview.clientName || "Неизвестен"}\nОценка: ${stars}\nКомментарий: "${userMessage}"${bookingInfo}\n\nРекомендуем связаться с клиентом и разобрать ситуацию.`
+              `${emoji} ${label} от клиента!\n\nКлиент: ${pendingReview.clientName || "Неизвестен"}\nОценка: ${stars}\nКомментарий: "${userMessage}"${bookingInfo}\n\nРекомендуем связаться с клиентом и уточнить детали.`
             );
           }
-        } else {
-          // 3 stars — neutral
-          await sendTelegramMessage(
-            botToken, chatId,
-            `Спасибо за честный отзыв! 🙏 Мы всегда стараемся стать лучше.`
-          );
         }
 
         return NextResponse.json({ ok: true });
