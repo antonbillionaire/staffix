@@ -5,6 +5,8 @@ import { getSalesSystemPrompt } from "@/lib/sales-bot/system-prompt";
 import {
   sendInstagramMessage,
   sendPrivateReply,
+  markMessageSeen,
+  showTypingIndicator,
   verifyMetaWebhook,
 } from "@/lib/sales-bot/meta-api";
 
@@ -121,6 +123,10 @@ export async function POST(request: NextRequest) {
         if (!senderId || !messageText) continue;
 
         await upsertLead(senderId, "instagram_dm");
+
+        // UX: mark as seen immediately, then show typing while generating
+        await markMessageSeen(senderId);
+        await showTypingIndicator(senderId);
 
         const aiResponse = await generateAIResponse(
           messageText,

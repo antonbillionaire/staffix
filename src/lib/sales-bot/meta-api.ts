@@ -49,6 +49,48 @@ export async function sendInstagramMessage(
 }
 
 // ========================================
+// INSTAGRAM SENDER ACTIONS (UX)
+// ========================================
+
+/**
+ * Show typing indicator or mark message as seen.
+ * Call markSeen first, then typingOn, then send message.
+ * sender_action: "typing_on" | "typing_off" | "mark_seen"
+ */
+async function sendSenderAction(
+  recipientId: string,
+  senderAction: "typing_on" | "typing_off" | "mark_seen"
+): Promise<void> {
+  const accessToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+  const pageId = process.env.FACEBOOK_PAGE_ID || process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
+  if (!accessToken || !pageId) return;
+
+  try {
+    await fetch(`https://graph.facebook.com/v21.0/${pageId}/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        recipient: { id: recipientId },
+        sender_action: senderAction,
+      }),
+    });
+  } catch {
+    // Non-critical, ignore errors
+  }
+}
+
+export async function markMessageSeen(recipientId: string): Promise<void> {
+  await sendSenderAction(recipientId, "mark_seen");
+}
+
+export async function showTypingIndicator(recipientId: string): Promise<void> {
+  await sendSenderAction(recipientId, "typing_on");
+}
+
+// ========================================
 // INSTAGRAM COMMENT PRIVATE REPLY API
 // ========================================
 
