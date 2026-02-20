@@ -49,6 +49,87 @@ export async function sendInstagramMessage(
 }
 
 // ========================================
+// INSTAGRAM COMMENT PRIVATE REPLY API
+// ========================================
+
+/**
+ * Send a private DM reply to someone who commented on an Instagram post/ad/Reel.
+ * Docs: https://developers.facebook.com/docs/messenger-platform/instagram/features/private-replies
+ *
+ * Requirements:
+ * - instagram_manage_comments + pages_messaging permissions
+ * - Advanced Access (App Review)
+ * - Must be sent within 7 days of the comment
+ * - Only ONE private reply per comment allowed
+ * - After the person replies, a 24h conversation window opens
+ */
+export async function sendPrivateReply(
+  commentId: string,
+  text: string
+): Promise<boolean> {
+  const accessToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+  const pageId = process.env.FACEBOOK_PAGE_ID || process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
+  if (!accessToken || !pageId) {
+    console.error("Meta API: FACEBOOK_PAGE_ACCESS_TOKEN or FACEBOOK_PAGE_ID not set");
+    return false;
+  }
+
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/v21.0/${pageId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          recipient: { comment_id: commentId },
+          message: { text },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error("Meta API: Private reply error:", error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("Meta API: Private reply error:", error);
+    return false;
+  }
+}
+
+/**
+ * Subscribe a Facebook Page to Instagram webhook events.
+ * Call this once after connecting a new Page/account.
+ * fields: "messages,comments,live_comments"
+ */
+export async function subscribePageToWebhooks(
+  pageId: string,
+  pageAccessToken: string,
+  fields = "messages,comments,live_comments"
+): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/v21.0/${pageId}/subscribed_apps?subscribed_fields=${fields}&access_token=${pageAccessToken}`,
+      { method: "POST" }
+    );
+    if (!response.ok) {
+      const error = await response.json();
+      console.error("Meta API: subscribePageToWebhooks error:", error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("Meta API: subscribePageToWebhooks error:", error);
+    return false;
+  }
+}
+
+// ========================================
 // WHATSAPP BUSINESS API
 // ========================================
 
