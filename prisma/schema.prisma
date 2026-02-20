@@ -351,6 +351,7 @@ model AutomationSettings {
   reviewDelayHours      Int       @default(2)    // через сколько часов после визита
   reviewGoogleLink      String?                  // ссылка на Google отзывы
   review2gisLink        String?                  // ссылка на 2GIS отзывы
+  reviewYandexLink      String?                  // ссылка на Яндекс.Карты отзывы
 
   // Реактивация клиентов
   reactivationEnabled   Boolean   @default(true)

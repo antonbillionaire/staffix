@@ -26,6 +26,7 @@ interface AutomationSettings {
   reviewDelayHours: number;
   reviewGoogleLink: string;
   review2gisLink: string;
+  reviewYandexLink: string;
   reactivationEnabled: boolean;
   reactivationDays: number;
   reactivationDiscount: number;
@@ -52,6 +53,7 @@ export default function AutomationPage() {
     reviewDelayHours: 2,
     reviewGoogleLink: "",
     review2gisLink: "",
+    reviewYandexLink: "",
     reactivationEnabled: true,
     reactivationDays: 30,
     reactivationDiscount: 10,
@@ -377,6 +379,32 @@ export default function AutomationPage() {
                   )}
                 </div>
               </div>
+
+              {/* Yandex Maps link */}
+              <div className="p-4 rounded-xl border border-white/5 bg-white/5">
+                <label className={`block text-sm font-medium ${textPrimary} mb-2`}>
+                  Яндекс.Карты (ссылка на отзывы)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={settings.reviewYandexLink}
+                    onChange={(e) => setSettings({ ...settings, reviewYandexLink: e.target.value })}
+                    placeholder="https://yandex.ru/maps/org/..."
+                    className={`flex-1 px-4 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  />
+                  {settings.reviewYandexLink && (
+                    <a
+                      href={settings.reviewYandexLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
+                    >
+                      <ExternalLink className="h-5 w-5 text-gray-400" />
+                    </a>
+                  )}
+                </div>
+              </div>
             </>
           )}
 
@@ -388,7 +416,7 @@ export default function AutomationPage() {
                 <p className="font-medium text-yellow-400 mb-1">{t("automation.howItWorks")}</p>
                 <ul className="space-y-1 list-disc list-inside">
                   <li>Клиент получает сообщение с просьбой оценить визит (1-5 ⭐)</li>
-                  <li>Оценки 4-5: предлагаем оставить отзыв на Google/2GIS</li>
+                  <li>Оценки 4-5: предлагаем оставить отзыв на Google/2GIS/Яндекс.Карты</li>
                   <li>Оценки 1-3: просим описать проблему (негатив не уходит в публику!)</li>
                   <li>Вы получаете уведомление о каждом отзыве</li>
                 </ul>

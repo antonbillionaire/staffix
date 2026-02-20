@@ -100,6 +100,33 @@ async function sendTelegramMessage(
   }
 }
 
+async function sendTelegramMessageWithButtons(
+  botToken: string,
+  chatId: number,
+  text: string,
+  buttons: { text: string; url: string }[][]
+): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${botToken}/sendMessage`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard: buttons },
+        }),
+      }
+    );
+    return response.ok;
+  } catch (error) {
+    console.error("Error sending Telegram message with buttons:", error);
+    return false;
+  }
+}
+
 async function sendTypingAction(
   botToken: string,
   chatId: number
@@ -652,12 +679,12 @@ async function handleCallbackQuery(
     const rating = parseInt(parts[2]);
 
     if (rating >= 1 && rating <= 5) {
-      // Save review
       const booking = await prisma.booking.findUnique({
         where: { id: bookingId },
       });
 
       if (booking) {
+        // Save review draft (without comment yet)
         await prisma.review.create({
           data: {
             rating,
@@ -673,32 +700,11 @@ async function handleCallbackQuery(
       await answerCallbackQuery(botToken, callbackQuery.id, `Спасибо за оценку: ${stars}`);
 
       if (messageId) {
-        if (rating >= 4) {
-          // Good rating — ask for text review
-          const business = await prisma.business.findUnique({
-            where: { id: businessId },
-            include: { automationSettings: true },
-          });
-
-          let reviewLinks = "";
-          if (business?.automationSettings?.reviewGoogleLink) {
-            reviewLinks += `\n\n<a href="${business.automationSettings.reviewGoogleLink}">📝 Оставить отзыв в Google</a>`;
-          }
-          if (business?.automationSettings?.review2gisLink) {
-            reviewLinks += `\n<a href="${business.automationSettings.review2gisLink}">📝 Оставить отзыв в 2GIS</a>`;
-          }
-
-          await editMessageText(
-            botToken, chatId, messageId,
-            `Спасибо за оценку ${stars}! Мы рады, что вам понравилось! 💜${reviewLinks}`
-          );
-        } else {
-          // Low rating
-          await editMessageText(
-            botToken, chatId, messageId,
-            `Спасибо за оценку ${stars}. Нам жаль, что вам не всё понравилось. Мы учтём ваши замечания и постараемся стать лучше! 🙏`
-          );
-        }
+        // Always ask for a text comment regardless of rating
+        const prompt = rating >= 4
+          ? `Спасибо за оценку ${stars}! Мы очень рады! 💜\n\nРасскажите подробнее — что понравилось больше всего? Ваш отзыв поможет нам стать ещё лучше:`
+          : `Спасибо за оценку ${stars}.\n\nНам очень важно понять, что пошло не так. Пожалуйста, расскажите подробнее:`;
+        await editMessageText(botToken, chatId, messageId, prompt);
       }
     }
     return;
@@ -905,8 +911,91 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    // ---- PENDING REVIEW COMMENT ----
+    // Check if user recently rated (review without comment in last 15 min)
+    if (userMessage && !userMessage.startsWith("/")) {
+      const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
+      const pendingReview = await prisma.review.findFirst({
+        where: {
+          clientTelegramId: telegramId,
+          businessId: business.id,
+          comment: null,
+          createdAt: { gte: fifteenMinsAgo },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (pendingReview) {
+        // Save the comment
+        await prisma.review.update({
+          where: { id: pendingReview.id },
+          data: { comment: userMessage as string },
+        });
+
+        // Fetch settings and owner info in parallel
+        const [bizSettings, bizOwner] = await Promise.all([
+          prisma.automationSettings.findUnique({ where: { businessId: business.id } }),
+          prisma.business.findUnique({
+            where: { id: business.id },
+            select: { ownerTelegramChatId: true },
+          }),
+        ]);
+
+        if (pendingReview.rating >= 4) {
+          // High rating — ask to post publicly
+          const buttons: { text: string; url: string }[] = [];
+          if (bizSettings?.reviewGoogleLink) {
+            buttons.push({ text: "📝 Google Maps", url: bizSettings.reviewGoogleLink! });
+          }
+          if (bizSettings?.review2gisLink) {
+            buttons.push({ text: "📝 2GIS", url: bizSettings.review2gisLink! });
+          }
+          const yandexLink = (bizSettings as Record<string, unknown>)?.reviewYandexLink as string | null | undefined;
+          if (yandexLink) {
+            buttons.push({ text: "📝 Яндекс.Карты", url: yandexLink });
+          }
+
+          const replyText = `Спасибо за ваш отзыв! 💜\n\nЕсли хотите помочь нам — поделитесь мнением на одной из платформ. Это займёт 1 минуту и очень поможет нашему бизнесу! 🙏`;
+
+          if (buttons.length > 0) {
+            await sendTelegramMessageWithButtons(botToken, chatId, replyText, [buttons]);
+          } else {
+            await sendTelegramMessage(botToken, chatId, replyText);
+          }
+        } else if (pendingReview.rating <= 2) {
+          // Low rating — empathy + notify owner
+          await sendTelegramMessage(
+            botToken, chatId,
+            `Спасибо, что рассказали нам об этом. 🙏\n\nМы обязательно разберёмся с ситуацией и свяжемся с вами, если потребуется. Нам важно, чтобы каждый визит был на высшем уровне.`
+          );
+
+          // Notify business owner
+          const ownerChatId = bizOwner?.ownerTelegramChatId;
+          if (ownerChatId) {
+            const stars = "⭐".repeat(pendingReview.rating);
+            const bookingInfo = pendingReview.bookingId
+              ? ` (запись #${pendingReview.bookingId.slice(-6)})`
+              : "";
+            await sendTelegramMessage(
+              botToken,
+              Number(ownerChatId),
+              `⚠️ Низкая оценка от клиента!\n\nКлиент: ${pendingReview.clientName || "Неизвестен"}\nОценка: ${stars}\nКомментарий: "${userMessage}"${bookingInfo}\n\nРекомендуем связаться с клиентом и разобрать ситуацию.`
+            );
+          }
+        } else {
+          // 3 stars — neutral
+          await sendTelegramMessage(
+            botToken, chatId,
+            `Спасибо за честный отзыв! 🙏 Мы всегда стараемся стать лучше.`
+          );
+        }
+
+        return NextResponse.json({ ok: true });
+      }
+    }
+
     // Проверяем лимит сообщений
-    const { allowed, remaining, plan } = await checkMessageLimit(business.id);
+    const { allowed, plan } = await checkMessageLimit(business.id);
 
     if (!allowed) {
       let errorMsg =
