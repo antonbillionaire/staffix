@@ -15,6 +15,7 @@ import {
   Upload,
   X,
   CheckCircle,
+  Trash2,
 } from "lucide-react";
 
 interface Campaign {
@@ -59,6 +60,7 @@ export default function AdminOutreachPage() {
   const [csvFileName, setCsvFileName] = useState("");
   const [showTemplate, setShowTemplate] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const fetchCampaigns = async () => {
@@ -110,7 +112,9 @@ export default function AdminOutreachPage() {
       const lines = text.split(/\r?\n/).filter(Boolean);
       if (lines.length < 2) return;
 
-      const headers = parseCSVLine(lines[0]);
+      // Strip UTF-8 BOM if present (Excel saves CSV with BOM)
+      const firstLine = lines[0].replace(/^\uFEFF/, "");
+      const headers = parseCSVLine(firstLine).map((h) => h.toLowerCase().trim());
       const rows = lines.slice(1).map((line) => {
         const vals = parseCSVLine(line);
         const row: Record<string, string> = {};
@@ -161,6 +165,19 @@ export default function AdminOutreachPage() {
     navigator.clipboard.writeText(DM_TEMPLATE);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDeleteCampaign = async (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm("Удалить кампанию со всеми лидами? Это действие нельзя отменить.")) return;
+    setDeletingId(id);
+    try {
+      await fetch(`/api/admin/outreach/${id}`, { method: "DELETE" });
+      setCampaigns((prev) => prev.filter((c) => c.id !== id));
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -334,7 +351,20 @@ export default function AdminOutreachPage() {
                   </div>
                   <p className="text-xs text-gray-500">{formatDate(c.createdAt)}</p>
                 </div>
-                <ChevronRight className="h-5 w-5 text-gray-600 flex-shrink-0 mt-0.5" />
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={(e) => handleDeleteCampaign(c.id, e)}
+                    disabled={deletingId === c.id}
+                    className="p-1.5 hover:bg-red-500/20 rounded-lg text-gray-600 hover:text-red-400 transition-colors"
+                    title="Удалить кампанию"
+                  >
+                    {deletingId === c.id
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : <Trash2 className="h-4 w-4" />
+                    }
+                  </button>
+                  <ChevronRight className="h-5 w-5 text-gray-600" />
+                </div>
               </div>
 
               {/* Stats row */}

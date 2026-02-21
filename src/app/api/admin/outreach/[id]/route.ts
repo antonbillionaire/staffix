@@ -55,3 +55,21 @@ export async function GET(
     return NextResponse.json({ error: "Ошибка сервера" }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.email || !isAdmin(session.user.email)) {
+      return NextResponse.json({ error: "Доступ запрещён" }, { status: 403 });
+    }
+    const { id } = await params;
+    await prisma.outreachCampaign.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Outreach campaign DELETE error:", error);
+    return NextResponse.json({ error: "Ошибка сервера" }, { status: 500 });
+  }
+}

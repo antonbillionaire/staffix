@@ -362,7 +362,13 @@ export default function CampaignDetailPage({
                           )}
                           {activeTab === "instagram" && lead.instagram && (
                             <a
-                              href={`https://instagram.com/${lead.instagram.replace("@", "")}`}
+                              href={
+                                lead.instagram.startsWith("http")
+                                  ? lead.instagram
+                                  : lead.instagram.includes("instagram.com/")
+                                  ? `https://${lead.instagram}`
+                                  : `https://instagram.com/${lead.instagram.replace("@", "")}`
+                              }
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center gap-1 text-pink-400 text-xs hover:text-pink-300"
@@ -421,14 +427,14 @@ export default function CampaignDetailPage({
                             <button
                               onClick={() => handleUpdateStatus(lead.id, "sent")}
                               disabled={updatingId === lead.id}
-                              className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg text-xs text-blue-400 transition-colors disabled:opacity-50"
+                              className="flex items-center gap-1 px-2.5 py-1.5 bg-white/5 hover:bg-blue-500/20 border border-white/10 hover:border-blue-500/30 rounded-lg text-xs text-gray-400 hover:text-blue-400 transition-colors disabled:opacity-50"
                             >
                               {updatingId === lead.id ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                               ) : (
                                 <CheckCircle className="h-3.5 w-3.5" />
                               )}
-                              Отправлено
+                              Отметить
                             </button>
                           )}
 
