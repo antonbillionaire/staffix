@@ -64,7 +64,7 @@ export async function GET(request: Request) {
             userEmail: user.email,
             success: result.success,
             error: result.error || null,
-            details: result.details || {},
+            details: JSON.parse(JSON.stringify(result.details || {})),
           },
         });
 
