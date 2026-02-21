@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendVerificationEmail } from "@/lib/email";
+import { sendVerificationEmail, sendWelcomeEmail } from "@/lib/email";
 import { notifyEmailVerified } from "@/lib/admin-notify";
 
 // Generate 6-digit verification code
@@ -67,6 +67,9 @@ export async function POST(request: NextRequest) {
 
     // Notify admin
     notifyEmailVerified(user.name, user.email).catch(() => {});
+
+    // Send welcome onboarding email
+    sendWelcomeEmail(user.email, user.name).catch(() => {});
 
     return NextResponse.json({
       message: "Email успешно подтверждён",

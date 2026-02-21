@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -18,6 +18,9 @@ import {
   UserX,
   Crown,
   RefreshCw,
+  Send,
+  X,
+  ChevronDown,
 } from "lucide-react";
 
 interface User {
@@ -65,6 +68,78 @@ export default function AdminUsersPage() {
   const [planFilter, setPlanFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
+
+  // Email modal
+  const [emailModal, setEmailModal] = useState<{ user: User } | null>(null);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailResult, setEmailResult] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Dropdown menu
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const openEmailModal = (user: User) => {
+    setEmailModal({ user });
+    setEmailSubject("");
+    setEmailBody("");
+    setEmailResult(null);
+  };
+
+  const sendEmail = async () => {
+    if (!emailModal || !emailSubject || !emailBody) return;
+    setSendingEmail(true);
+    setEmailResult(null);
+    try {
+      const res = await fetch("/api/admin/users/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: emailModal.user.id,
+          email: emailModal.user.email,
+          name: emailModal.user.name,
+          subject: emailSubject,
+          body: emailBody,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEmailResult({ type: "success", text: "Письмо отправлено" });
+        setTimeout(() => setEmailModal(null), 1500);
+      } else {
+        setEmailResult({ type: "error", text: data.error || "Ошибка отправки" });
+      }
+    } catch {
+      setEmailResult({ type: "error", text: "Ошибка сервера" });
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const changePlan = async (userId: string, newPlan: string) => {
+    setOpenDropdown(null);
+    try {
+      await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "upgrade_plan", data: { plan: newPlan } }),
+      });
+      fetchUsers();
+    } catch (error) {
+      console.error("Error changing plan:", error);
+    }
+  };
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -347,19 +422,37 @@ export default function AdminUsersPage() {
                         >
                           <ExternalLink className="h-4 w-4" />
                         </Link>
-                        <a
-                          href={`mailto:${user.email}`}
+                        <button
+                          onClick={() => openEmailModal(user)}
                           className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
-                          title="Написать"
+                          title="Написать письмо"
                         >
                           <Mail className="h-4 w-4" />
-                        </a>
-                        <button
-                          className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
-                          title="Ещё"
-                        >
-                          <MoreVertical className="h-4 w-4" />
                         </button>
+                        <div className="relative" ref={openDropdown === user.id ? dropdownRef : null}>
+                          <button
+                            onClick={() => setOpenDropdown(openDropdown === user.id ? null : user.id)}
+                            className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
+                            title="Действия"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                          {openDropdown === user.id && (
+                            <div className="absolute right-0 top-8 z-20 bg-[#1a1a3a] border border-white/10 rounded-xl shadow-xl w-48 py-1">
+                              <p className="px-3 py-2 text-xs text-gray-500 font-medium uppercase tracking-wider">Сменить план</p>
+                              {["trial", "starter", "pro", "business", "enterprise"].map((plan) => (
+                                <button
+                                  key={plan}
+                                  onClick={() => changePlan(user.id, plan)}
+                                  className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors capitalize flex items-center gap-2"
+                                >
+                                  <Crown className="h-3 w-3 text-yellow-500" />
+                                  {plan.charAt(0).toUpperCase() + plan.slice(1)}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -394,6 +487,65 @@ export default function AdminUsersPage() {
           </div>
         )}
       </div>
+      {/* Email Modal */}
+      {emailModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#12122a] border border-white/10 rounded-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-white/5">
+              <div>
+                <h2 className="text-lg font-bold text-white">Написать письмо</h2>
+                <p className="text-sm text-gray-400 mt-0.5">{emailModal.user.email}</p>
+              </div>
+              <button onClick={() => setEmailModal(null)} className="p-2 hover:bg-white/10 rounded-lg text-gray-400">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Тема</label>
+                <input
+                  type="text"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  placeholder="Тема письма..."
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Сообщение</label>
+                <textarea
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                  placeholder={`Здравствуйте, ${emailModal.user.name}!`}
+                  rows={5}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                />
+              </div>
+              {emailResult && (
+                <div className={`p-3 rounded-xl text-sm ${emailResult.type === "success" ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}>
+                  {emailResult.text}
+                </div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setEmailModal(null)}
+                  className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-gray-300 font-medium"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={sendEmail}
+                  disabled={sendingEmail || !emailSubject || !emailBody}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white font-medium rounded-xl hover:opacity-90 disabled:opacity-50"
+                >
+                  {sendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  Отправить
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

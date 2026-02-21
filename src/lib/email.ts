@@ -266,6 +266,119 @@ export async function sendSupportTicketNotification(
   }
 }
 
+// Send welcome onboarding email after email verification
+export async function sendWelcomeEmail(
+  email: string,
+  name: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    if (!resend) {
+      console.log(`[DEV] Welcome email for ${email}`);
+      return { success: true };
+    }
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
+
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: "Добро пожаловать в Staffix! Запустите AI-сотрудника за 5 минут",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #0a0a1a; margin: 0; padding: 40px 20px;">
+          <div style="max-width: 560px; margin: 0 auto; background: linear-gradient(135deg, #12122a 0%, #1a1a3a 100%); border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); overflow: hidden;">
+
+            <!-- Header -->
+            <div style="padding: 32px 32px 24px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.05); background: linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(139,92,246,0.1) 100%);">
+              <div style="display: inline-block; width: 56px; height: 56px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border-radius: 16px; margin-bottom: 16px; text-align: center; line-height: 56px; font-size: 28px;">🤖</div>
+              <h1 style="color: #ffffff; font-size: 26px; font-weight: 700; margin: 0 0 8px;">Добро пожаловать!</h1>
+              <p style="color: #9ca3af; font-size: 15px; margin: 0;">Staffix готов к запуску, ${name}</p>
+            </div>
+
+            <!-- Content -->
+            <div style="padding: 32px;">
+              <p style="color: #9ca3af; font-size: 15px; line-height: 1.7; margin: 0 0 28px;">
+                Email подтверждён ✅<br>
+                У вас есть <strong style="color: #fff;">14 дней бесплатного доступа</strong>. Запустите AI-сотрудника прямо сейчас — это займёт 5 минут.
+              </p>
+
+              <!-- Steps -->
+              <div style="margin-bottom: 28px;">
+                <p style="color: #ffffff; font-size: 15px; font-weight: 600; margin: 0 0 16px;">Как запустить за 5 шагов:</p>
+
+                ${[
+                  ["1", "#3b82f6", "Создайте Telegram-бота", "Откройте Telegram, напишите @BotFather, отправьте /newbot — получите токен."],
+                  ["2", "#8b5cf6", "Добавьте токен в Staffix", "В дашборде → Настройки бота → вставьте токен → нажмите «Подключить»."],
+                  ["3", "#06b6d4", "Добавьте услуги", "Раздел «Услуги» → добавьте название, цену и длительность каждой услуги."],
+                  ["4", "#10b981", "Добавьте мастеров", "Раздел «Сотрудники» → добавьте мастеров и настройте их расписание."],
+                  ["5", "#f59e0b", "Протестируйте бота", "Напишите вашему боту в Telegram: «Хочу записаться» — AI всё сделает сам."],
+                ].map(([num, color, title, desc]) => `
+                  <div style="display: flex; gap: 16px; margin-bottom: 16px; align-items: flex-start;">
+                    <div style="flex-shrink: 0; width: 32px; height: 32px; background: ${color}20; border: 1px solid ${color}40; border-radius: 50%; text-align: center; line-height: 32px; font-size: 14px; font-weight: 700; color: ${color};">${num}</div>
+                    <div>
+                      <p style="color: #ffffff; font-size: 14px; font-weight: 600; margin: 4px 0 4px;">${title}</p>
+                      <p style="color: #6b7280; font-size: 13px; margin: 0; line-height: 1.5;">${desc}</p>
+                    </div>
+                  </div>
+                `).join("")}
+              </div>
+
+              <!-- CTA Button -->
+              <a href="${appUrl}/dashboard" style="display: block; text-align: center; padding: 16px 24px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; margin-bottom: 24px;">
+                Открыть дашборд →
+              </a>
+
+              <!-- Tips -->
+              <div style="background: rgba(59,130,246,0.05); border: 1px solid rgba(59,130,246,0.15); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                <p style="color: #60a5fa; font-size: 13px; font-weight: 600; margin: 0 0 12px;">💡 Советы для максимальной эффективности:</p>
+                <ul style="color: #9ca3af; font-size: 13px; line-height: 1.8; margin: 0; padding-left: 20px;">
+                  <li>Заполните раздел «FAQ» — бот будет отвечать на частые вопросы клиентов</li>
+                  <li>Включите автоматические напоминания — снизит неявки на 40–60%</li>
+                  <li>Добавьте ссылки на Google Maps и 2GIS для сбора отзывов</li>
+                  <li>Укажите часовой пояс, чтобы записи создавались правильно</li>
+                </ul>
+              </div>
+
+              <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 0;">
+                Есть вопросы? Напишите нам — <a href="mailto:support@staffix.io" style="color: #60a5fa;">support@staffix.io</a><br>
+                Или в Telegram: <a href="https://t.me/staffix_support" style="color: #60a5fa;">@staffix_support</a>
+              </p>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding: 20px 32px; background: rgba(0,0,0,0.2); text-align: center; border-top: 1px solid rgba(255,255,255,0.05);">
+              <p style="color: #4b5563; font-size: 12px; margin: 0;">
+                © 2025 Staffix — AI-сотрудник для вашего бизнеса<br>
+                <a href="${appUrl}" style="color: #6b7280;">staffix.io</a>
+              </p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    if (error) {
+      console.error("Welcome email error:", error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Welcome email service error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Ошибка отправки",
+    };
+  }
+}
+
 // Send Telegram notification with retry
 export async function sendTelegramNotification(
   message: string
