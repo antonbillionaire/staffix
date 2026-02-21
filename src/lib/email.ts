@@ -379,6 +379,82 @@ export async function sendWelcomeEmail(
   }
 }
 
+// Send broadcast email to a user
+export async function sendBroadcastEmail(
+  email: string,
+  name: string,
+  businessName: string,
+  plan: string,
+  subject: string,
+  content: string,
+  attachments?: Array<{ filename: string; content: string }>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    if (!resend) {
+      console.log(`[DEV] Broadcast email for ${email}`);
+      return { success: true };
+    }
+
+    // Replace template variables
+    const processedContent = content
+      .replace(/\{\{name\}\}/g, name || "Пользователь")
+      .replace(/\{\{business\}\}/g, businessName || "")
+      .replace(/\{\{plan\}\}/g, plan || "trial");
+
+    const sendParams: Parameters<typeof resend.emails.send>[0] = {
+      from: FROM_EMAIL,
+      to: email,
+      subject,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #0a0a1a; margin: 0; padding: 40px 20px;">
+          <div style="max-width: 520px; margin: 0 auto; background: linear-gradient(135deg, #12122a 0%, #1a1a3a 100%); border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); overflow: hidden;">
+            <div style="padding: 28px 32px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: center;">
+              <span style="font-size: 20px; font-weight: 700; color: #fff;">Staffix</span>
+            </div>
+            <div style="padding: 32px;">
+              <p style="color: #9ca3af; font-size: 15px; line-height: 1.6; margin: 0 0 16px;">
+                Здравствуйте, <strong style="color: #fff;">${name}</strong>!
+              </p>
+              <div style="color: #d1d5db; font-size: 15px; line-height: 1.8; white-space: pre-wrap;">${processedContent}</div>
+            </div>
+            <div style="padding: 20px 32px; background: rgba(0,0,0,0.2); text-align: center;">
+              <p style="color: #4b5563; font-size: 12px; margin: 0;">© 2025 Staffix — staffix.io</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    if (attachments && attachments.length > 0) {
+      sendParams.attachments = attachments.map((att) => ({
+        filename: att.filename,
+        content: att.content,
+      }));
+    }
+
+    const { error } = await resend.emails.send(sendParams);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Ошибка отправки",
+    };
+  }
+}
+
 // Send Telegram notification with retry
 export async function sendTelegramNotification(
   message: string

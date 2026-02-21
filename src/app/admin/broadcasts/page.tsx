@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Loader2,
   Plus,
@@ -18,6 +18,8 @@ import {
   Eye,
   MousePointer,
   Calendar,
+  Paperclip,
+  X,
 } from "lucide-react";
 
 interface Broadcast {
@@ -68,6 +70,12 @@ const STATUS_OPTIONS = [
   { id: "expiring", name: "Истекают скоро" },
 ];
 
+interface Attachment {
+  filename: string;
+  content: string; // base64
+  size: number;
+}
+
 export default function AdminBroadcastsPage() {
   const [loading, setLoading] = useState(true);
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
@@ -75,6 +83,10 @@ export default function AdminBroadcastsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // File attachments
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -91,6 +103,41 @@ export default function AdminBroadcastsPage() {
   useEffect(() => {
     fetchBroadcasts();
   }, []);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3MB per file
+
+    files.forEach((file) => {
+      if (file.size > MAX_FILE_SIZE) {
+        setMessage({ type: "error", text: `Файл ${file.name} слишком большой (макс. 3MB)` });
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(",")[1];
+        setAttachments((prev) => [
+          ...prev,
+          { filename: file.name, content: base64, size: file.size },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   const fetchBroadcasts = async () => {
     try {
@@ -116,7 +163,10 @@ export default function AdminBroadcastsPage() {
       const res = await fetch("/api/admin/broadcasts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          attachments: attachments.length > 0 ? attachments : undefined,
+        }),
       });
 
       const data = await res.json();
@@ -139,6 +189,7 @@ export default function AdminBroadcastsPage() {
           sendNow: true,
           scheduledFor: "",
         });
+        setAttachments([]);
         fetchBroadcasts();
       } else {
         setMessage({ type: "error", text: data.error || "Ошибка создания" });
@@ -465,6 +516,53 @@ export default function AdminBroadcastsPage() {
                   Доступные переменные: {"{{name}}"}, {"{{business}}"}, {"{{plan}}"}
                 </p>
               </div>
+
+              {/* File attachments (email only) */}
+              {formData.channel === "email" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Прикрепить файлы
+                  </label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.xlsx,.csv,.txt"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-gray-400 hover:border-white/20 hover:text-gray-300 transition-colors text-sm"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                    Прикрепить файл
+                  </button>
+                  {attachments.length > 0 && (
+                    <div className="mt-2 space-y-1.5">
+                      {attachments.map((att, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded-lg"
+                        >
+                          <Paperclip className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
+                          <span className="text-sm text-gray-300 flex-1 truncate">{att.filename}</span>
+                          <span className="text-xs text-gray-500">{formatFileSize(att.size)}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeAttachment(i)}
+                            className="p-0.5 hover:text-red-400 text-gray-500 transition-colors"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">Макс. 3MB на файл</p>
+                </div>
+              )}
 
               {/* Target audience */}
               <div className="grid grid-cols-2 gap-4">

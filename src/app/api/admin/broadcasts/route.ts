@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/admin";
+import { sendBroadcastEmail } from "@/lib/email";
 
 export async function GET() {
   try {
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
       targetStatus,
       scheduledFor,
       sendNow,
+      attachments,
     } = body;
 
     if (!name || !content || !channel) {
@@ -129,23 +131,73 @@ export async function POST(request: NextRequest) {
         })),
       });
 
-      // TODO: Actually send the emails/messages
-      // For now, just mark as sent
+      // Send emails in batches to avoid rate limits
+      let delivered = 0;
+      const BATCH_SIZE = 5;
+
+      for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+        const batch = recipients.slice(i, i + BATCH_SIZE);
+
+        await Promise.all(
+          batch.map(async (u) => {
+            const business = u.businesses[0];
+            const plan = business?.subscription?.plan || "trial";
+            const businessName = business?.name || "";
+
+            try {
+              if (channel === "email") {
+                const emailSubject = subject || name;
+                const result = await sendBroadcastEmail(
+                  u.email,
+                  u.name || "Пользователь",
+                  businessName,
+                  plan,
+                  emailSubject,
+                  content,
+                  attachments
+                );
+
+                if (result.success) {
+                  delivered++;
+                  await prisma.broadcastDelivery.updateMany({
+                    where: { broadcastId: broadcast.id, userId: u.id },
+                    data: { status: "sent", sentAt: new Date() },
+                  });
+                } else {
+                  await prisma.broadcastDelivery.updateMany({
+                    where: { broadcastId: broadcast.id, userId: u.id },
+                    data: { status: "failed", error: result.error },
+                  });
+                }
+              } else {
+                // telegram / in_app — mark as sent (actual delivery handled separately)
+                delivered++;
+                await prisma.broadcastDelivery.updateMany({
+                  where: { broadcastId: broadcast.id, userId: u.id },
+                  data: { status: "sent", sentAt: new Date() },
+                });
+              }
+            } catch {
+              await prisma.broadcastDelivery.updateMany({
+                where: { broadcastId: broadcast.id, userId: u.id },
+                data: { status: "failed", error: "Unexpected error" },
+              });
+            }
+          })
+        );
+
+        // Small delay between batches
+        if (i + BATCH_SIZE < recipients.length) {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+      }
+
       await prisma.broadcast.update({
         where: { id: broadcast.id },
         data: {
           status: "sent",
           sentAt: new Date(),
-          delivered: recipients.length,
-        },
-      });
-
-      // Update delivery statuses
-      await prisma.broadcastDelivery.updateMany({
-        where: { broadcastId: broadcast.id },
-        data: {
-          status: "sent",
-          sentAt: new Date(),
+          delivered,
         },
       });
     }
