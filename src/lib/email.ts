@@ -455,6 +455,109 @@ export async function sendBroadcastEmail(
   }
 }
 
+// Outreach email — холодное письмо для новых лидов
+export async function sendOutreachEmail(
+  to: string,
+  businessName: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    if (!resend) {
+      console.log(`[DEV] Outreach email for ${to} (${businessName})`);
+      return { success: true };
+    }
+
+    const subject = `Автоматизация фронт-офиса для ${businessName} — Staffix`;
+
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f7; margin: 0; padding: 40px 20px;">
+          <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden;">
+
+            <!-- Header -->
+            <div style="padding: 24px 32px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 18px; font-weight: 700; color: #111827; letter-spacing: -0.3px;">Staffix</span>
+            </div>
+
+            <!-- Body -->
+            <div style="padding: 32px;">
+              <p style="color: #374151; font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Добрый день!</p>
+
+              <p style="color: #374151; font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+                Меня зовут Антон, я основатель Staffix — платформы для автоматизации фронт-офиса для бизнесов в сфере услуг.
+              </p>
+
+              <p style="color: #374151; font-size: 15px; line-height: 1.7; margin: 0 0 20px;">
+                Управление записями, консультациями и клиентской базой — это то, что требует постоянного внимания и занимает значительную часть ресурсов любого сервисного бизнеса.
+              </p>
+
+              <!-- Feature block -->
+              <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px 24px; margin-bottom: 24px;">
+                <p style="color: #111827; font-size: 15px; font-weight: 600; margin: 0 0 12px;">Staffix — это ИИ-сотрудник, который:</p>
+                <ul style="color: #374151; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 20px;">
+                  <li>Работает 24/7, не болеет и не увольняется</li>
+                  <li>Быстро обучается на основе данных вашего бизнеса</li>
+                  <li>Автоматизирует консультации, запись на посещение и ведение CRM</li>
+                  <li>Функционирует на самом современном ИИ-движке</li>
+                </ul>
+              </div>
+
+              <!-- CTA -->
+              <div style="text-align: center; margin-bottom: 24px;">
+                <a href="https://staffix.io" style="display: inline-block; background: linear-gradient(135deg, #f97316, #ea580c); color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 8px;">
+                  Попробовать Staffix бесплатно
+                </a>
+              </div>
+
+              <!-- Offer -->
+              <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 16px 20px; margin-bottom: 24px;">
+                <p style="color: #92400e; font-size: 14px; font-weight: 600; margin: 0 0 4px;">Специальное предложение</p>
+                <p style="color: #78350f; font-size: 14px; line-height: 1.6; margin: 0;">
+                  14 дней пробного периода бесплатно + ещё 30 дней в подарок за обратную связь о работе системы.
+                </p>
+              </div>
+
+              <p style="color: #374151; font-size: 14px; line-height: 1.6; margin: 0;">
+                С уважением,<br>
+                <strong>Антон</strong><br>
+                Основатель Staffix
+              </p>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding: 20px 32px; background: #f9fafb; border-top: 1px solid #f3f4f6; text-align: center;">
+              <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+                <a href="https://staffix.io" style="color: #f97316; text-decoration: none;">staffix.io</a> — AI-сотрудник для вашего бизнеса
+              </p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Ошибка отправки",
+    };
+  }
+}
+
 // Send Telegram notification with retry
 export async function sendTelegramNotification(
   message: string

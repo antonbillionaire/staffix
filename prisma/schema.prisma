@@ -903,6 +903,54 @@ model SalesLead {
 }
 
 // ========================================
+// OUTREACH CAMPAIGNS — Исходящие кампании
+// ========================================
+
+model OutreachCampaign {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  status      String   @default("active") // active, completed, paused
+
+  leads       OutreachLead[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model OutreachLead {
+  id            String   @id @default(cuid())
+
+  campaignId    String
+  campaign      OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  // Business info (from CSV)
+  businessName  String
+  category      String?
+  city          String?
+  website       String?
+
+  // Contact info
+  email         String?
+  telegram      String?
+  instagram     String?
+  whatsapp      String?
+
+  // Outreach tracking
+  outreachChannel String  // email | telegram | instagram
+  status          String  @default("pending") // pending | sent | replied | registered | paying
+  sentAt          DateTime?
+  repliedAt       DateTime?
+  notes           String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([campaignId, status])
+  @@index([campaignId, outreachChannel])
+}
+
+// ========================================
 // РАСПИСАНИЕ МАСТЕРОВ
 // ========================================
 
