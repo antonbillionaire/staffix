@@ -167,9 +167,7 @@ export default function AdminOutreachPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDeleteCampaign = async (id: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleDeleteCampaign = async (id: string) => {
     if (!confirm("Удалить кампанию со всеми лидами? Это действие нельзя отменить.")) return;
     setDeletingId(id);
     try {
@@ -336,84 +334,86 @@ export default function AdminOutreachPage() {
       ) : (
         <div className="space-y-4">
           {campaigns.map((c) => (
-            <Link
-              key={c.id}
-              href={`/admin/outreach/${c.id}`}
-              className="block bg-[#12122a] border border-white/5 hover:border-orange-500/30 rounded-xl p-5 transition-colors"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold text-white truncate">{c.name}</h3>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(c.status)}`}>
-                      {c.status === "active" ? "Активна" : c.status === "completed" ? "Завершена" : "Пауза"}
-                    </span>
+            // Wrapper div — delete button is a sibling of Link, not nested inside
+            <div key={c.id} className="relative group">
+              <Link
+                href={`/admin/outreach/${c.id}`}
+                className="block bg-[#12122a] border border-white/5 hover:border-orange-500/30 rounded-xl p-5 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-4 pr-8">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-white truncate">{c.name}</h3>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(c.status)}`}>
+                        {c.status === "active" ? "Активна" : c.status === "completed" ? "Завершена" : "Пауза"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500">{formatDate(c.createdAt)}</p>
                   </div>
-                  <p className="text-xs text-gray-500">{formatDate(c.createdAt)}</p>
+                  <ChevronRight className="h-5 w-5 text-gray-500 flex-shrink-0 mt-0.5" />
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <button
-                    onClick={(e) => handleDeleteCampaign(c.id, e)}
-                    disabled={deletingId === c.id}
-                    className="p-1.5 hover:bg-red-500/20 rounded-lg text-gray-600 hover:text-red-400 transition-colors"
-                    title="Удалить кампанию"
-                  >
-                    {deletingId === c.id
-                      ? <Loader2 className="h-4 w-4 animate-spin" />
-                      : <Trash2 className="h-4 w-4" />
-                    }
-                  </button>
-                  <ChevronRight className="h-5 w-5 text-gray-600" />
-                </div>
-              </div>
 
-              {/* Stats row */}
-              <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-white/3 rounded-lg p-3">
-                  <p className="text-xs text-gray-500">Всего</p>
-                  <p className="text-xl font-bold text-white">{c.stats.total}</p>
+                {/* Stats row */}
+                <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-white/3 rounded-lg p-3">
+                    <p className="text-xs text-gray-500">Всего</p>
+                    <p className="text-xl font-bold text-white">{c.stats.total}</p>
+                  </div>
+                  <div className="bg-white/3 rounded-lg p-3">
+                    <p className="text-xs text-gray-500">Отправлено</p>
+                    <p className="text-xl font-bold text-green-400">
+                      {c.stats.sent}
+                      <span className="text-sm text-gray-500 font-normal ml-1">
+                        ({c.stats.total > 0 ? Math.round((c.stats.sent / c.stats.total) * 100) : 0}%)
+                      </span>
+                    </p>
+                  </div>
+                  <div className="bg-white/3 rounded-lg p-3">
+                    <p className="text-xs text-gray-500">Ответили</p>
+                    <p className="text-xl font-bold text-cyan-400">{c.stats.replied}</p>
+                  </div>
+                  <div className="bg-white/3 rounded-lg p-3">
+                    <p className="text-xs text-gray-500">Регистрации</p>
+                    <p className="text-xl font-bold text-emerald-400">{c.stats.registered}</p>
+                  </div>
                 </div>
-                <div className="bg-white/3 rounded-lg p-3">
-                  <p className="text-xs text-gray-500">Отправлено</p>
-                  <p className="text-xl font-bold text-green-400">
-                    {c.stats.sent}
-                    <span className="text-sm text-gray-500 font-normal ml-1">
-                      ({c.stats.total > 0 ? Math.round((c.stats.sent / c.stats.total) * 100) : 0}%)
-                    </span>
-                  </p>
-                </div>
-                <div className="bg-white/3 rounded-lg p-3">
-                  <p className="text-xs text-gray-500">Ответили</p>
-                  <p className="text-xl font-bold text-cyan-400">{c.stats.replied}</p>
-                </div>
-                <div className="bg-white/3 rounded-lg p-3">
-                  <p className="text-xs text-gray-500">Зарегистрировались</p>
-                  <p className="text-xl font-bold text-emerald-400">{c.stats.registered}</p>
-                </div>
-              </div>
 
-              {/* Channel breakdown */}
-              <div className="mt-3 flex gap-3 flex-wrap">
-                {c.stats.byChannel.email != null && (
-                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                    <Mail className="h-3.5 w-3.5 text-blue-400" />
-                    Email: {c.stats.byChannel.email}
-                  </div>
-                )}
-                {c.stats.byChannel.telegram != null && (
-                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                    <Send className="h-3.5 w-3.5 text-sky-400" />
-                    Telegram: {c.stats.byChannel.telegram}
-                  </div>
-                )}
-                {c.stats.byChannel.instagram != null && (
-                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                    <Instagram className="h-3.5 w-3.5 text-pink-400" />
-                    Instagram: {c.stats.byChannel.instagram}
-                  </div>
-                )}
-              </div>
-            </Link>
+                {/* Channel breakdown */}
+                <div className="mt-3 flex gap-3 flex-wrap">
+                  {c.stats.byChannel.email != null && (
+                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                      <Mail className="h-3.5 w-3.5 text-blue-400" />
+                      Email: {c.stats.byChannel.email}
+                    </div>
+                  )}
+                  {c.stats.byChannel.telegram != null && (
+                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                      <Send className="h-3.5 w-3.5 text-sky-400" />
+                      Telegram: {c.stats.byChannel.telegram}
+                    </div>
+                  )}
+                  {c.stats.byChannel.instagram != null && (
+                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                      <Instagram className="h-3.5 w-3.5 text-pink-400" />
+                      Instagram: {c.stats.byChannel.instagram}
+                    </div>
+                  )}
+                </div>
+              </Link>
+
+              {/* Delete button — outside Link to avoid nested interactive elements */}
+              <button
+                onClick={() => handleDeleteCampaign(c.id)}
+                disabled={deletingId === c.id}
+                className="absolute top-4 right-12 p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/20 transition-colors opacity-0 group-hover:opacity-100"
+                title="Удалить кампанию"
+              >
+                {deletingId === c.id
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <Trash2 className="h-4 w-4" />
+                }
+              </button>
+            </div>
           ))}
         </div>
       )}
