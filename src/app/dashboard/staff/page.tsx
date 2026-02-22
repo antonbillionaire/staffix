@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, X, User, Loader2, Camera, CalendarDays, MessageCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, X, User, Loader2, Camera, CalendarDays, MessageCircle, BedDouble } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -22,6 +22,15 @@ interface ScheduleDay {
   isWorkday: boolean;
 }
 
+interface TimeOff {
+  id: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  notes: string | null;
+  createdBy: string;
+}
+
 const DAY_NAMES_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 const DAY_NAMES_EN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Mon-Sun
@@ -32,6 +41,25 @@ const DEFAULT_SCHEDULE: ScheduleDay[] = DAY_ORDER.map((day) => ({
   endTime: "18:00",
   isWorkday: day >= 1 && day <= 5, // Mon-Fri by default
 }));
+
+const REASON_LABELS: Record<string, string> = {
+  vacation: "Отпуск",
+  sick: "Больничный",
+  personal: "Личные обстоятельства",
+  other: "Другое",
+};
+
+const REASON_COLORS: Record<string, string> = {
+  vacation: "text-blue-400 bg-blue-400/10",
+  sick: "text-red-400 bg-red-400/10",
+  personal: "text-yellow-400 bg-yellow-400/10",
+  other: "text-gray-400 bg-gray-400/10",
+};
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" });
+}
 
 export default function StaffPage() {
   const { t, language } = useLanguage();
@@ -58,6 +86,20 @@ export default function StaffPage() {
   const [scheduleStaffName, setScheduleStaffName] = useState("");
   const [schedule, setSchedule] = useState<ScheduleDay[]>(DEFAULT_SCHEDULE);
   const [savingSchedule, setSavingSchedule] = useState(false);
+
+  // Time-off modal
+  const [isTimeOffOpen, setIsTimeOffOpen] = useState(false);
+  const [timeOffStaffId, setTimeOffStaffId] = useState<string | null>(null);
+  const [timeOffStaffName, setTimeOffStaffName] = useState("");
+  const [timeOffs, setTimeOffs] = useState<TimeOff[]>([]);
+  const [loadingTimeOffs, setLoadingTimeOffs] = useState(false);
+  const [savingTimeOff, setSavingTimeOff] = useState(false);
+  const [timeOffForm, setTimeOffForm] = useState({
+    startDate: "",
+    endDate: "",
+    reason: "vacation",
+    notes: "",
+  });
 
   const dayNames = language === "en" ? DAY_NAMES_EN : DAY_NAMES_RU;
 
@@ -203,6 +245,73 @@ export default function StaffPage() {
     ));
   };
 
+  // Time-off functions
+  const openTimeOff = async (person: Staff) => {
+    setTimeOffStaffId(person.id);
+    setTimeOffStaffName(person.name);
+    setIsTimeOffOpen(true);
+    setTimeOffForm({ startDate: "", endDate: "", reason: "vacation", notes: "" });
+    setLoadingTimeOffs(true);
+
+    try {
+      const res = await fetch(`/api/staff/${person.id}/time-off`);
+      if (res.ok) {
+        const data = await res.json();
+        setTimeOffs(data.timeOffs || []);
+      }
+    } catch (error) {
+      console.error("Error loading time-offs:", error);
+    } finally {
+      setLoadingTimeOffs(false);
+    }
+  };
+
+  const saveTimeOff = async () => {
+    if (!timeOffStaffId || !timeOffForm.startDate || !timeOffForm.endDate) return;
+    setSavingTimeOff(true);
+
+    try {
+      const res = await fetch(`/api/staff/${timeOffStaffId}/time-off`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(timeOffForm),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTimeOffs((prev) => [...prev, data.timeOff].sort(
+          (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+        ));
+        setTimeOffForm({ startDate: "", endDate: "", reason: "vacation", notes: "" });
+      }
+    } catch (error) {
+      console.error("Error saving time-off:", error);
+    } finally {
+      setSavingTimeOff(false);
+    }
+  };
+
+  const deleteTimeOff = async (timeOffId: string) => {
+    if (!timeOffStaffId) return;
+
+    try {
+      const res = await fetch(`/api/staff/${timeOffStaffId}/time-off/${timeOffId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setTimeOffs((prev) => prev.filter((t) => t.id !== timeOffId));
+      }
+    } catch (error) {
+      console.error("Error deleting time-off:", error);
+    }
+  };
+
+  // Count upcoming time-offs for badge
+  const getUpcomingTimeOffCount = (staffId: string) => {
+    // We don't preload per-staff counts on page load — just use badge from staff card state
+    return 0; // Badges shown only inside modal
+  };
+  void getUpcomingTimeOffCount; // suppress unused warning
+
   return (
     <div className="max-w-4xl">
       <div className="flex items-center justify-between mb-6">
@@ -264,9 +373,16 @@ export default function StaffPage() {
                   <button
                     onClick={() => openSchedule(person)}
                     className={`${isDark ? "text-gray-500 hover:text-purple-400" : "text-gray-400 hover:text-purple-600"} p-1`}
-                    title={t("staffPage.schedule")}
+                    title="Расписание"
                   >
                     <CalendarDays className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => openTimeOff(person)}
+                    className={`${isDark ? "text-gray-500 hover:text-orange-400" : "text-gray-400 hover:text-orange-600"} p-1`}
+                    title="Отпуска и больничные"
+                  >
+                    <BedDouble className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => openModal(person)}
@@ -535,6 +651,172 @@ export default function StaffPage() {
               >
                 {savingSchedule && <Loader2 className="h-4 w-4 animate-spin" />}
                 {t("staffPage.save")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Time-Off Modal */}
+      {isTimeOffOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className={`${isDark ? "bg-[#12122a]" : "bg-white"} rounded-lg p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto`}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+                  Отпуска и больничные
+                </h3>
+                <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>{timeOffStaffName}</p>
+              </div>
+              <button
+                onClick={() => setIsTimeOffOpen(false)}
+                className={`${isDark ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"}`}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Add new time-off form */}
+            <div className={`rounded-lg p-4 mb-4 ${isDark ? "bg-white/5" : "bg-gray-50"}`}>
+              <h4 className={`text-sm font-medium mb-3 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                Добавить период
+              </h4>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-xs mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                      Начало
+                    </label>
+                    <input
+                      type="date"
+                      value={timeOffForm.startDate}
+                      onChange={(e) => setTimeOffForm({ ...timeOffForm, startDate: e.target.value })}
+                      className={`w-full px-2 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white" : "border-gray-300"}`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-xs mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                      Конец
+                    </label>
+                    <input
+                      type="date"
+                      value={timeOffForm.endDate}
+                      onChange={(e) => setTimeOffForm({ ...timeOffForm, endDate: e.target.value })}
+                      min={timeOffForm.startDate}
+                      className={`w-full px-2 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white" : "border-gray-300"}`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block text-xs mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                    Причина
+                  </label>
+                  <select
+                    value={timeOffForm.reason}
+                    onChange={(e) => setTimeOffForm({ ...timeOffForm, reason: e.target.value })}
+                    className={`w-full px-2 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? "bg-[#12122a] border-white/10 text-white" : "border-gray-300 bg-white"}`}
+                  >
+                    <option value="vacation">Отпуск</option>
+                    <option value="sick">Больничный</option>
+                    <option value="personal">Личные обстоятельства</option>
+                    <option value="other">Другое</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className={`block text-xs mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                    Примечание (необязательно)
+                  </label>
+                  <input
+                    type="text"
+                    value={timeOffForm.notes}
+                    onChange={(e) => setTimeOffForm({ ...timeOffForm, notes: e.target.value })}
+                    placeholder="Например: поездка в другой город"
+                    className={`w-full px-2 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
+                  />
+                </div>
+
+                <button
+                  onClick={saveTimeOff}
+                  disabled={savingTimeOff || !timeOffForm.startDate || !timeOffForm.endDate}
+                  className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {savingTimeOff && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Добавить период
+                </button>
+              </div>
+            </div>
+
+            {/* Existing time-offs */}
+            <div>
+              <h4 className={`text-sm font-medium mb-3 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                Запланированные периоды
+              </h4>
+
+              {loadingTimeOffs ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                </div>
+              ) : timeOffs.length === 0 ? (
+                <p className={`text-sm text-center py-4 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                  Нет запланированных периодов
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {timeOffs.map((t) => {
+                    const isPast = new Date(t.endDate) < new Date();
+                    return (
+                      <div
+                        key={t.id}
+                        className={`flex items-center justify-between p-3 rounded-lg ${
+                          isPast
+                            ? isDark ? "bg-white/3 opacity-50" : "bg-gray-50 opacity-60"
+                            : isDark ? "bg-white/5" : "bg-gray-50"
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${REASON_COLORS[t.reason] || REASON_COLORS.other}`}>
+                              {REASON_LABELS[t.reason] || t.reason}
+                            </span>
+                            {isPast && (
+                              <span className={`text-xs ${isDark ? "text-gray-600" : "text-gray-400"}`}>
+                                прошёл
+                              </span>
+                            )}
+                          </div>
+                          <p className={`text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
+                            {formatDate(t.startDate)}
+                            {t.startDate !== t.endDate && ` — ${formatDate(t.endDate)}`}
+                          </p>
+                          {t.notes && (
+                            <p className={`text-xs mt-0.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                              {t.notes}
+                            </p>
+                          )}
+                        </div>
+                        {!isPast && (
+                          <button
+                            onClick={() => deleteTimeOff(t.id)}
+                            className={`ml-3 p-1.5 rounded ${isDark ? "text-gray-600 hover:text-red-400 hover:bg-red-400/10" : "text-gray-400 hover:text-red-600 hover:bg-red-50"} flex-shrink-0`}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-white/5">
+              <button
+                onClick={() => setIsTimeOffOpen(false)}
+                className={`w-full px-4 py-2 border rounded-lg font-medium text-sm ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+              >
+                Закрыть
               </button>
             </div>
           </div>

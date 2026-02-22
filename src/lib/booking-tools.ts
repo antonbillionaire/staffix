@@ -199,6 +199,19 @@ export async function checkAvailability(
       })
     : [];
 
+  // Load time-offs that overlap with this date
+  const dateStart = new Date(dateStr + "T00:00:00.000Z");
+  const dateEnd = new Date(dateStr + "T23:59:59.999Z");
+  const staffTimeOffs = staffIds.length > 0
+    ? await prisma.staffTimeOff.findMany({
+        where: {
+          staffId: { in: staffIds },
+          startDate: { lte: dateEnd },
+          endDate: { gte: dateStart },
+        },
+      })
+    : [];
+
   // Get all bookings for this date (convert local day boundaries to UTC)
   const dayStart = localToUTC(dateStr, "00:00", tz);
   const dayEnd = localToUTC(dateStr, "23:59", tz);
@@ -217,6 +230,20 @@ export async function checkAvailability(
   const results: AvailabilityResult[] = [];
 
   for (const staffMember of staffMembers) {
+    // Check if staff has a time-off (vacation/sick) on this date
+    const hasTimeOff = staffTimeOffs.some((t) => t.staffId === staffMember.id);
+    if (hasTimeOff) {
+      results.push({
+        date: dateStr,
+        staffName: staffMember.name,
+        staffId: staffMember.id,
+        serviceName,
+        serviceDuration,
+        availableSlots: [], // On time-off — no slots
+      });
+      continue;
+    }
+
     // Check staff-specific schedule for this day
     const staffSchedule = staffSchedules.find((s) => s.staffId === staffMember.id);
 

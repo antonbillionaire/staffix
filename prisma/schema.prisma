@@ -158,6 +158,7 @@ model Staff {
 
   bookings      Booking[]
   schedule      StaffSchedule[]
+  timeOffs      StaffTimeOff[]
 }
 
 // FAQ / База знаний
@@ -967,4 +968,28 @@ model StaffSchedule {
 
   @@unique([staffId, dayOfWeek])
   @@index([staffId])
+}
+
+// Отгулы, отпуска, больничные мастеров
+model StaffTimeOff {
+  id        String   @id @default(cuid())
+
+  startDate DateTime // начало (полночь UTC)
+  endDate   DateTime // конец включительно (полночь UTC)
+
+  // vacation | sick | personal | other
+  reason    String   @default("vacation")
+  notes     String?
+
+  // owner = владелец добавил | master = мастер сам сообщил
+  createdBy String   @default("owner")
+
+  staffId   String
+  staff     Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([staffId, startDate])
+  @@index([staffId, endDate])
 }
