@@ -28,6 +28,8 @@ import {
 import { sendBookingNotification } from "@/lib/notifications";
 import { formatDateRu } from "@/lib/automation";
 import { dispatchCrmEvent } from "@/lib/crm-integrations";
+import { salesToolDefinitions, executeSalesTool } from "@/lib/sales-tools";
+import { buildSalesSystemPrompt, isSalesMode } from "@/lib/sales-prompt";
 
 // ========================================
 // ТИПЫ
@@ -423,10 +425,42 @@ async function generateAIResponse(
     // 2. Загружаем контекст клиента (AI Memory!)
     const clientContext = await buildClientContext(businessId, telegramId);
 
-    // 3. Строим системный промпт с учётом памяти
-    const systemPrompt = buildSystemPrompt(businessContext, clientContext);
+    // 3. Определяем режим бота: продажи или запись
+    const salesMode = isSalesMode(businessContext.businessType);
 
-    // 4. Получаем историю разговора
+    // 4. Строим системный промпт
+    let systemPrompt: string;
+    if (salesMode) {
+      // Режим магазина: продажи, заказы, товары
+      const salesClientCtx = clientContext
+        ? {
+            name: clientContext.name,
+            totalOrders: clientContext.totalVisits, // используем totalVisits как счётчик заказов
+            lastOrderDate: clientContext.lastVisitDate,
+            tags: clientContext.tags,
+            importantNotes: clientContext.importantNotes,
+          }
+        : null;
+      systemPrompt = buildSalesSystemPrompt(
+        {
+          name: businessContext.name,
+          businessType: businessContext.businessType,
+          phone: businessContext.phone,
+          address: businessContext.address,
+          workingHours: businessContext.workingHours,
+          welcomeMessage: businessContext.welcomeMessage,
+          aiTone: businessContext.aiTone,
+          aiRules: businessContext.aiRules,
+          language: "ru",
+        },
+        salesClientCtx
+      );
+    } else {
+      // Режим сервисного бизнеса: запись к мастеру
+      systemPrompt = buildSystemPrompt(businessContext, clientContext);
+    }
+
+    // 5. Получаем историю разговора
     const conversation = await getOrCreateConversation(
       businessId,
       telegramId,
@@ -446,16 +480,22 @@ async function generateAIResponse(
     // 6. Вызываем Claude API с tools
     const anthropic = new Anthropic({ apiKey });
 
+    // Выбираем tools в зависимости от режима
+    const activeTools = salesMode ? salesToolDefinitions : bookingToolDefinitions;
+
     // Сегодняшняя дата для контекста
     const today = new Date().toISOString().split("T")[0];
-    const systemWithDate = systemPrompt + `\n\nСегодняшняя дата: ${today}. Используй инструменты для работы с записями.`;
+    const systemHint = salesMode
+      ? `\n\nСегодня: ${today}. Используй инструменты для поиска товаров и оформления заказов.`
+      : `\n\nСегодняшняя дата: ${today}. Используй инструменты для работы с записями.`;
+    const systemWithDate = systemPrompt + systemHint;
 
     let response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1024,
       system: systemWithDate,
       messages: recentMessages,
-      tools: bookingToolDefinitions,
+      tools: activeTools,
     });
 
     // 7. Обрабатываем tool_use в цикле (до 5 итераций)
@@ -482,12 +522,20 @@ async function generateAIResponse(
 
       for (const block of toolUseBlocks) {
         if (block.type === "tool_use") {
-          const result = await handleToolCall(
-            block.name,
-            block.input as Record<string, string>,
-            businessId,
-            telegramId
-          );
+          // Роутим к нужному диспетчеру в зависимости от режима
+          const result = salesMode
+            ? await executeSalesTool(
+                block.name,
+                block.input as Record<string, unknown>,
+                businessId,
+                telegramId
+              )
+            : await handleToolCall(
+                block.name,
+                block.input as Record<string, string>,
+                businessId,
+                telegramId
+              );
 
           toolResults.push({
             type: "tool_result",
@@ -510,7 +558,7 @@ async function generateAIResponse(
           max_tokens: 1024,
           system: systemWithDate,
           messages: recentMessages,
-          tools: bookingToolDefinitions,
+          tools: activeTools,
         });
       } catch (apiError) {
         // If API fails after successful tool execution, build response from tool results

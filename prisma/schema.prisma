@@ -129,6 +129,10 @@ model Business {
 
   // CRM интеграции
   crmIntegrations    CrmIntegration[]
+
+  // Продажи (магазины, e-commerce)
+  products           Product[]
+  orders             Order[]
 }
 
 // Услуги
@@ -996,6 +1000,103 @@ model StaffTimeOff {
 
   @@index([staffId, startDate])
   @@index([staffId, endDate])
+}
+
+// ========================================
+// ПРОДАЖИ — Товары и Заказы (для магазинов и e-commerce)
+// ========================================
+
+// Товары / продукты бизнеса
+model Product {
+  id          String    @id @default(cuid())
+
+  name        String
+  description String?   @db.Text
+
+  price       Int       // цена в местной валюте (тиины/копейки/тенге)
+  oldPrice    Int?      // старая цена (для отображения скидки)
+
+  // Наличие
+  stock       Int?      // null = не ограничено; 0 = нет в наличии
+  sku         String?   // артикул
+
+  // Категоризация
+  category    String?
+  tags        String[]  @default([])
+
+  // Медиа
+  imageUrl    String?
+
+  isActive    Boolean   @default(true)
+
+  businessId  String
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  orderItems  OrderItem[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([businessId, isActive])
+  @@index([businessId, category])
+}
+
+// Заказы клиентов
+model Order {
+  id              String      @id @default(cuid())
+
+  // Человекочитаемый номер: #1001, #1002...
+  orderNumber     Int
+
+  // Данные клиента (snapshot на момент заказа)
+  clientName      String
+  clientPhone     String?
+  clientAddress   String?     // для доставки
+  clientTelegramId BigInt?
+  clientNotes     String?     // пожелания клиента
+
+  // Позиции заказа
+  items           OrderItem[]
+
+  // Финансы
+  totalPrice      Int         // итоговая сумма
+
+  // Статус: new | confirmed | processing | shipped | delivered | cancelled
+  status          String      @default("new")
+
+  // Оплата
+  paymentMethod   String?     // cash | card | online | crypto
+  isPaid          Boolean     @default(false)
+
+  // Уведомления
+  notifiedOwner   Boolean     @default(false)
+
+  businessId      String
+  business        Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([businessId, orderNumber])
+  @@index([businessId, status])
+  @@index([businessId, createdAt])
+  @@index([businessId, clientTelegramId])
+}
+
+// Позиции заказа
+model OrderItem {
+  id          String    @id @default(cuid())
+
+  // Snapshot данных товара (на случай изменения цены)
+  name        String
+  price       Int
+  quantity    Int       @default(1)
+
+  orderId     String
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId   String?
+  product     Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
 }
 
 // Rate limiting — защита от брутфорса

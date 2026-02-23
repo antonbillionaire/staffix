@@ -30,6 +30,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.resources": "Ресурсы",
     "nav.logout": "Выйти",
     "nav.integrations": "Интеграции",
+    "nav.products": "Каталог",
+    "nav.orders": "Заказы",
 
     // Sidebar
     "sidebar.yourBusiness": "Ваш бизнес",
@@ -644,6 +646,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.resources": "Resources",
     "nav.logout": "Log out",
     "nav.integrations": "Integrations",
+    "nav.products": "Catalog",
+    "nav.orders": "Orders",
 
     // Sidebar
     "sidebar.yourBusiness": "Your business",
@@ -1258,6 +1262,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.resources": "Resurslar",
     "nav.logout": "Chiqish",
     "nav.integrations": "Integratsiyalar",
+    "nav.products": "Katalog",
+    "nav.orders": "Buyurtmalar",
 
     // Sidebar
     "sidebar.yourBusiness": "Sizning biznesingiz",
@@ -1872,6 +1878,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.resources": "Ресурстар",
     "nav.logout": "Шығу",
     "nav.integrations": "Интеграциялар",
+    "nav.products": "Каталог",
+    "nav.orders": "Тапсырыстар",
 
     // Sidebar
     "sidebar.yourBusiness": "Сіздің бизнесіңіз",
