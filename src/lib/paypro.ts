@@ -276,11 +276,17 @@ export function verifySignature(ipn: PayProIPN): boolean {
 
 // Verify IP is from PayPro
 export function verifyIP(ip: string): boolean {
-  // In test mode, allow any IP
-  if (PAYPRO_TEST_MODE) return true;
-
   // Strip IPv6 prefix
   const cleanIp = ip.replace("::ffff:", "");
+
+  // In test mode: still verify IP but log a warning if bypassed
+  if (PAYPRO_TEST_MODE) {
+    if (!PAYPRO_IPS.includes(cleanIp)) {
+      console.warn(`PayPro test mode: request from non-whitelisted IP ${cleanIp} — allowed for testing only`);
+    }
+    return true;
+  }
+
   return PAYPRO_IPS.includes(cleanIp);
 }
 

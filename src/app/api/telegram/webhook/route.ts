@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 import {
   buildClientContext,
   buildBusinessContext,
@@ -436,16 +437,12 @@ async function generateAIResponse(
 
       for (const block of toolUseBlocks) {
         if (block.type === "tool_use") {
-          console.log(`[Webhook] Tool call: ${block.name}`, JSON.stringify(block.input));
-
           const result = await handleToolCall(
             block.name,
             block.input as Record<string, string>,
             businessId,
             telegramId
           );
-
-          console.log(`[Webhook] Tool result for ${block.name}:`, result.substring(0, 200));
 
           toolResults.push({
             type: "tool_result",
@@ -784,6 +781,12 @@ export async function POST(request: NextRequest) {
 
     if (!business || !botToken) {
       return NextResponse.json({ error: "Invalid business or token" }, { status: 401 });
+    }
+
+    // Rate limiting: 30 сообщений в минуту на бизнес (защита от flood)
+    const rlResult = await rateLimit(`tg-webhook:${business.id}`, 30, 1);
+    if (!rlResult.allowed) {
+      return NextResponse.json({ ok: true }); // Telegram ожидает 200, даже при отклонении
     }
 
     // Читаем тело один раз

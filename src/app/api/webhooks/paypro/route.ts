@@ -26,7 +26,8 @@ export async function POST(request: NextRequest) {
     const formData = new URLSearchParams(body);
     const ipn = parseIPN(formData);
 
-    console.log(`PayPro IPN: type=${ipn.ipnTypeName} order=${ipn.orderId} sub=${ipn.subscriptionId} user=${ipn.userId} plan=${ipn.planId}`);
+    // Log minimal non-sensitive info only
+    console.log(`PayPro IPN: type=${ipn.ipnTypeName} status=${ipn.orderStatus}`);
 
     // Verify HASH
     if (!verifyHash(ipn)) {

@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { randomBytes } from "crypto";
 
 // GET - получить данные бизнеса текущего пользователя
 export async function GET() {
   try {
-    // Try NextAuth session first
+    // NextAuth session only — cookie fallback removed (security fix)
     const session = await auth();
     let userId: string | undefined;
 
@@ -16,12 +15,6 @@ export async function GET() {
         where: { email: session.user.email },
       });
       userId = user?.id;
-    }
-
-    // Fallback to cookie-based auth
-    if (!userId) {
-      const cookieStore = await cookies();
-      userId = cookieStore.get("userId")?.value;
     }
 
     if (!userId) {
@@ -132,7 +125,7 @@ async function registerWebhook(
 // PUT - обновить данные бизнеса
 export async function PUT(request: Request) {
   try {
-    // Try NextAuth session first
+    // NextAuth session only — cookie fallback removed (security fix)
     const session = await auth();
     let userId: string | undefined;
 
@@ -141,12 +134,6 @@ export async function PUT(request: Request) {
         where: { email: session.user.email },
       });
       userId = user?.id;
-    }
-
-    // Fallback to cookie-based auth
-    if (!userId) {
-      const cookieStore = await cookies();
-      userId = cookieStore.get("userId")?.value;
     }
 
     if (!userId) {
