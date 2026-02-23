@@ -447,6 +447,8 @@ export default function DashboardLayout({
                                 setUnreadNotifications(Math.max(0, unreadNotifications - 1));
                               } catch {}
                             }
+                            setNotifMenuOpen(false);
+                            router.push("/dashboard/notifications");
                           }}
                           className={`px-4 py-3 border-b ${borderColor} cursor-pointer ${hoverBg} transition-colors ${!notif.isRead ? (isDark ? 'bg-blue-500/5' : 'bg-blue-50') : ''}`}
                         >
