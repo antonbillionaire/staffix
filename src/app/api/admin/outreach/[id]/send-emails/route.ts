@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/admin";
 import { sendOutreachEmail } from "@/lib/email";
 
+export const maxDuration = 300; // Vercel Pro: up to 5 minutes
+
 export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -33,8 +35,8 @@ export async function POST(
     let sent = 0;
     let failed = 0;
 
-    // Send in batches of 5 with delay
-    const BATCH = 5;
+    // Send in batches of 10 with delay
+    const BATCH = 10;
     for (let i = 0; i < leads.length; i += BATCH) {
       const batch = leads.slice(i, i + BATCH);
 
@@ -63,7 +65,7 @@ export async function POST(
 
       // Delay between batches to respect Resend rate limits
       if (i + BATCH < leads.length) {
-        await new Promise((r) => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 200));
       }
     }
 
