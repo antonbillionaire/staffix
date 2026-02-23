@@ -634,16 +634,47 @@ export default function AIEmployeePage() {
             />
           </div>
 
-          {/* Rules */}
+          {/* Rules / Prompt Editor */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              {t("botPage.specialInstructions")}
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-gray-300">
+                {t("botPage.specialInstructions")}
+              </label>
+              <span className="text-xs text-gray-500">{aiSettings.rules.length} / 2000</span>
+            </div>
+
+            {/* Quick-insert chips */}
+            <div className="flex flex-wrap gap-2 mb-3">
+              {[
+                { label: "🚫 Не обсуждать конкурентов", text: "Никогда не упоминай и не обсуждай конкурентов." },
+                { label: "💰 Без скидок", text: "Не давай скидки самостоятельно, направляй к менеджеру." },
+                { label: "📋 Уточнять имя", text: "В начале разговора всегда уточняй имя клиента." },
+                { label: "🌐 Только русский", text: "Отвечай только на русском языке." },
+                { label: "📦 Проверять наличие", text: "Перед оформлением заказа уточняй актуальное наличие товара." },
+                { label: "🎯 Только по теме", text: "Отвечай только на вопросы, связанные с нашим бизнесом. На посторонние темы вежливо отказывай." },
+                { label: "⏰ Время ответа", text: "Если клиент ждёт — сообщай, что ответишь в течение нескольких минут." },
+                { label: "📞 Предлагать звонок", text: "При сложных вопросах предлагай связаться по телефону." },
+              ].map((chip) => (
+                <button
+                  key={chip.label}
+                  type="button"
+                  onClick={() => {
+                    const sep = aiSettings.rules && !aiSettings.rules.endsWith("\n") ? "\n" : "";
+                    setAiSettings({ ...aiSettings, rules: aiSettings.rules + sep + chip.text });
+                  }}
+                  className="text-xs px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 hover:bg-blue-500/20 hover:border-blue-500/40 hover:text-blue-300 transition-colors"
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+
             <textarea
               value={aiSettings.rules}
               onChange={(e) => setAiSettings({ ...aiSettings, rules: e.target.value })}
               placeholder={t("botPage.instructionsPlaceholder")}
-              rows={4}
+              rows={7}
+              maxLength={2000}
               className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             />
             <p className="text-xs text-gray-500 mt-2">

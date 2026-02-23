@@ -146,17 +146,17 @@ ${business.aiRules ? `## Правила от владельца:\n${business.aiR
  */
 export function isSalesMode(businessType: string | null): boolean {
   if (!businessType) return false;
-  const salesTypes = [
-    "shop",
-    "ecommerce",
-    "store",
-    "retail",
-    "магазин",
-    "онлайн-магазин",
-    "интернет-магазин",
-    "marketplace",
+  // Exact ID matches (onboarding business type IDs)
+  const salesIds = ["online_shop", "flowers", "restaurant"];
+  if (salesIds.includes(businessType.toLowerCase())) return true;
+  // Keyword matches for custom types
+  const salesKeywords = [
+    "shop", "ecommerce", "store", "retail", "marketplace",
+    "магазин", "онлайн-магазин", "интернет-магазин",
+    "flowers", "цветоч", "гүл", "gullar",
+    "restaurant", "ресторан", "кафе", "мейрамхана",
   ];
-  return salesTypes.some((t) =>
-    businessType.toLowerCase().includes(t.toLowerCase())
+  return salesKeywords.some((kw) =>
+    businessType.toLowerCase().includes(kw.toLowerCase())
   );
 }
