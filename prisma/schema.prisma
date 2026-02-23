@@ -90,6 +90,7 @@ model Business {
   botUsername   String?
   botActive     Boolean   @default(false)
   botLogo       String?   // URL к логотипу бота
+  webhookSecret String?   // HMAC secret для верификации Telegram webhook (secret_token)
 
   // Telegram уведомления владельца
   ownerTelegramUsername String?  // @username владельца для уведомлений
@@ -992,4 +993,13 @@ model StaffTimeOff {
 
   @@index([staffId, startDate])
   @@index([staffId, endDate])
+}
+
+// Rate limiting — защита от брутфорса
+model RateLimitEntry {
+  key       String   @id          // e.g. "login:192.168.1.1"
+  attempts  Int      @default(1)
+  resetAt   DateTime
+
+  @@map("rate_limit_entries")
 }

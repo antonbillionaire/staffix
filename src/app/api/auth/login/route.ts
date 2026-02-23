@@ -1,10 +1,21 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // Rate limiting: 5 попыток за 15 минут с одного IP
+    const ip = getClientIp(request);
+    const { allowed, retryAfterSeconds } = await rateLimit(`login:${ip}`, 5, 15);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: `Слишком много попыток входа. Попробуйте через ${Math.ceil(retryAfterSeconds / 60)} мин.` },
+        { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
+      );
+    }
+
     const { email, password } = await request.json();
 
     // Validate input

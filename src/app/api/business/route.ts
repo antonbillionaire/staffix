@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
+import { randomBytes } from "crypto";
 
 // GET - получить данные бизнеса текущего пользователя
 export async function GET() {
@@ -95,11 +96,16 @@ async function validateBotToken(token: string): Promise<{ valid: boolean; userna
   }
 }
 
-// Helper: Register webhook for the bot
-async function registerWebhook(token: string, businessId: string): Promise<{ success: boolean; error?: string }> {
+// Helper: Register webhook for the bot with secret_token for signature verification
+async function registerWebhook(
+  token: string,
+  businessId: string
+): Promise<{ success: boolean; webhookSecret?: string; error?: string }> {
   try {
-    // Use www.staffix.io because Vercel redirects non-www to www
     const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.staffix.io'}/api/telegram/webhook?businessId=${businessId}`;
+
+    // Generate a secret token for HMAC verification (Telegram requirement: [A-Za-z0-9_-], 1-256 chars)
+    const webhookSecret = randomBytes(32).toString("hex");
 
     const response = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
       method: "POST",
@@ -107,13 +113,14 @@ async function registerWebhook(token: string, businessId: string): Promise<{ suc
       body: JSON.stringify({
         url: webhookUrl,
         allowed_updates: ["message", "callback_query"],
+        secret_token: webhookSecret,
       }),
     });
 
     const data = await response.json();
 
     if (data.ok) {
-      return { success: true };
+      return { success: true, webhookSecret };
     }
     return { success: false, error: data.description || "Ошибка регистрации webhook" };
   } catch (error) {
@@ -198,10 +205,13 @@ export async function PUT(request: Request) {
         );
       }
 
-      // Сохраняем данные бота
+      // Сохраняем данные бота и webhook secret для верификации
       updateData.botToken = botToken;
       updateData.botUsername = validation.username;
       updateData.botActive = true;
+      if (webhookResult.webhookSecret) {
+        updateData.webhookSecret = webhookResult.webhookSecret;
+      }
     }
 
     // Обновить данные

@@ -1,16 +1,27 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendVerificationEmail } from "@/lib/email";
 import { notifyNewRegistration } from "@/lib/admin-notify";
 import bcrypt from "bcryptjs";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 // Generate 6-digit verification code
 function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // Rate limiting: 3 регистрации за 60 минут с одного IP
+    const ip = getClientIp(request);
+    const { allowed, retryAfterSeconds } = await rateLimit(`register:${ip}`, 3, 60);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: `Слишком много попыток регистрации. Попробуйте через ${Math.ceil(retryAfterSeconds / 60)} мин.` },
+        { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
+      );
+    }
+
     const { name, email, password, businessName } = await request.json();
 
     // Validate input

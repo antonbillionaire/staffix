@@ -5,11 +5,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
-const DEMO_SECRET = process.env.DEMO_SECRET || "paypro-demo-2025";
+const DEMO_SECRET = process.env.DEMO_SECRET;
 
 export async function POST(request: NextRequest) {
   try {
-    // Check secret
+    // Endpoint disabled unless DEMO_SECRET is explicitly set in environment variables
+    if (!DEMO_SECRET) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
     const { secret } = await request.json();
 
     if (secret !== DEMO_SECRET) {

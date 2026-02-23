@@ -754,17 +754,17 @@ export async function POST(request: NextRequest) {
     const businessId = searchParams.get("businessId");
     const legacyToken = searchParams.get("token"); // Legacy support
 
-    let business: { id: string; name: string; botToken: string } | null = null;
+    let business: { id: string; name: string; botToken: string; webhookSecret: string | null } | null = null;
     let botToken: string | null = null;
 
     if (businessId) {
       // New method: find by businessId
       const foundBusiness = await prisma.business.findUnique({
         where: { id: businessId },
-        select: { id: true, name: true, botToken: true },
+        select: { id: true, name: true, botToken: true, webhookSecret: true },
       });
       if (foundBusiness?.botToken) {
-        business = { id: foundBusiness.id, name: foundBusiness.name, botToken: foundBusiness.botToken };
+        business = { id: foundBusiness.id, name: foundBusiness.name, botToken: foundBusiness.botToken, webhookSecret: foundBusiness.webhookSecret };
         botToken = foundBusiness.botToken;
       }
     } else if (legacyToken) {
@@ -773,10 +773,10 @@ export async function POST(request: NextRequest) {
       if (foundBusiness) {
         const fullBusiness = await prisma.business.findUnique({
           where: { id: foundBusiness.id },
-          select: { id: true, name: true, botToken: true },
+          select: { id: true, name: true, botToken: true, webhookSecret: true },
         });
         if (fullBusiness?.botToken) {
-          business = { id: fullBusiness.id, name: fullBusiness.name, botToken: fullBusiness.botToken };
+          business = { id: fullBusiness.id, name: fullBusiness.name, botToken: fullBusiness.botToken, webhookSecret: fullBusiness.webhookSecret };
           botToken = fullBusiness.botToken;
         }
       }
@@ -786,7 +786,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid business or token" }, { status: 401 });
     }
 
-    const update: TelegramUpdate = await request.json();
+    // Читаем тело один раз
+    const rawBody = await request.text();
+
+    // Верификация подписи Telegram webhook (если webhookSecret задан)
+    // Telegram отправляет HMAC-SHA256(secret_token, rawBody) в X-Telegram-Bot-Api-Secret-Hash
+    if (business.webhookSecret) {
+      const { createHmac } = await import("crypto");
+      const receivedHash = request.headers.get("x-telegram-bot-api-secret-hash");
+      const expectedHash = createHmac("sha256", business.webhookSecret)
+        .update(rawBody)
+        .digest("hex");
+
+      if (!receivedHash || receivedHash !== expectedHash) {
+        console.error(`Telegram webhook: invalid signature for businessId=${businessId}`);
+        return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
+      }
+    }
+
+    const update: TelegramUpdate = JSON.parse(rawBody);
 
     // Обработка нажатий на inline-кнопки
     if (update.callback_query) {
