@@ -529,7 +529,7 @@ export async function sendOutreachEmail(
               <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 16px 20px; margin-bottom: 28px;">
                 <p style="color: #92400e; font-size: 14px; font-weight: 600; margin: 0 0 4px;">Специальное предложение</p>
                 <p style="color: #78350f; font-size: 14px; line-height: 1.6; margin: 0;">
-                  Первые <strong>14 дней — полностью бесплатно</strong>. Плюс ещё 30 дней в подарок, если поделитесь впечатлениями о работе системы.
+                  Первые <strong>14 дней — полностью бесплатно</strong>. И ещё <strong>30 дней сверху</strong> — за честную обратную связь: что добавить, что улучшить, чего не хватает именно для вашего бизнеса. Ваше мнение напрямую влияет на то, каким станет Staffix.
                 </p>
               </div>
 
