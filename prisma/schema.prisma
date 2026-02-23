@@ -126,6 +126,9 @@ model Business {
   // Мультиканальность (WhatsApp, Instagram)
   channelConnections ChannelConnection[]
   channelClients     ChannelClient[]
+
+  // CRM интеграции
+  crmIntegrations    CrmIntegration[]
 }
 
 // Услуги
@@ -1002,4 +1005,43 @@ model RateLimitEntry {
   resetAt   DateTime
 
   @@map("rate_limit_entries")
+}
+
+// ========================================
+// CRM ИНТЕГРАЦИИ — передача данных во внешние CRM
+// ========================================
+
+model CrmIntegration {
+  id          String    @id @default(cuid())
+
+  // Тип интеграции
+  type        String    // webhook | google_sheets | bitrix24 | amocrm
+
+  // Название (задаёт пользователь)
+  name        String
+
+  // Конфигурация (зависит от типа):
+  // webhook:       { url, secret?, headers? }
+  // google_sheets: { spreadsheetId, sheetName, credentialsJson }
+  // bitrix24:      { domain, token }
+  // amocrm:        { domain, token, pipelineId? }
+  config      Json
+
+  // Какие события отправлять
+  // Варианты: booking_created | booking_confirmed | booking_cancelled |
+  //           new_client | review_created | message_received
+  events      String[]  @default([])
+
+  isActive    Boolean   @default(true)
+  lastSyncAt  DateTime?
+  lastError   String?   // последняя ошибка отправки
+
+  businessId  String
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([businessId, isActive])
+  @@index([businessId, type])
 }

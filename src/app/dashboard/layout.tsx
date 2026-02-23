@@ -38,6 +38,7 @@ import {
   Globe,
   ChevronDown,
   Bell,
+  Link2,
   type LucideIcon,
 } from "lucide-react";
 const ChatWidget = dynamic(() => import("@/components/ChatWidget"), { ssr: false });
@@ -66,6 +67,7 @@ const navigation: NavItem[] = [
   { nameKey: "nav.broadcasts", href: "/dashboard/broadcasts", icon: Send },
   { nameKey: "nav.automation", href: "/dashboard/automation", icon: Zap },
   { nameKey: "nav.messages", href: "/dashboard/messages", icon: Mail },
+  { nameKey: "nav.integrations", href: "/dashboard/integrations", icon: Link2 },
   { nameKey: "nav.settings", href: "/dashboard/settings", icon: Settings },
   { nameKey: "nav.help", href: "/dashboard/support", icon: HelpCircle },
 ];

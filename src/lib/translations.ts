@@ -29,6 +29,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.publicFaq": "FAQ",
     "nav.resources": "Ресурсы",
     "nav.logout": "Выйти",
+    "nav.integrations": "Интеграции",
 
     // Sidebar
     "sidebar.yourBusiness": "Ваш бизнес",
@@ -642,6 +643,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.publicFaq": "FAQ",
     "nav.resources": "Resources",
     "nav.logout": "Log out",
+    "nav.integrations": "Integrations",
 
     // Sidebar
     "sidebar.yourBusiness": "Your business",
@@ -1255,6 +1257,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.publicFaq": "FAQ",
     "nav.resources": "Resurslar",
     "nav.logout": "Chiqish",
+    "nav.integrations": "Integratsiyalar",
 
     // Sidebar
     "sidebar.yourBusiness": "Sizning biznesingiz",
@@ -1868,6 +1871,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.publicFaq": "FAQ",
     "nav.resources": "Ресурстар",
     "nav.logout": "Шығу",
+    "nav.integrations": "Интеграциялар",
 
     // Sidebar
     "sidebar.yourBusiness": "Сіздің бизнесіңіз",
