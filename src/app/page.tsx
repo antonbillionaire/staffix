@@ -19,6 +19,13 @@ import {
   Quote,
   Globe,
   ChevronDown,
+  Package,
+  ShoppingCart,
+  Users,
+  Bell,
+  Link2,
+  BarChart3,
+  Send,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { languages } from "@/lib/translations";
@@ -43,8 +50,11 @@ export default function Home() {
     t("home.industry.beautySalons"),
     t("home.industry.barbershops"),
     t("home.industry.medicalClinics"),
+    t("home.industry.onlineShops"),
+    t("home.industry.restaurants"),
     t("home.industry.autoServices"),
     t("home.industry.spaCenters"),
+    t("home.industry.flowerShops"),
     t("home.industry.yourBusiness"),
   ];
 
@@ -365,6 +375,85 @@ export default function Home() {
                   <li key={i} className="flex items-center gap-3 text-gray-200">
                     <span className="text-green-400">✓</span>
                     {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* For every business */}
+      <section className="relative z-10 py-24">
+        <div className="container mx-auto px-4">
+          <div className="max-w-3xl mx-auto text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-bold mb-6">
+              {t("home.forBusiness.title")}
+            </h2>
+            <p className="text-xl text-gray-400">
+              {t("home.forBusiness.subtitle")}
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+            {/* Services */}
+            <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20 rounded-2xl p-8">
+              <div className="inline-flex items-center gap-2 bg-blue-500/20 text-blue-400 text-sm font-medium px-3 py-1.5 rounded-full mb-6">
+                <Calendar className="h-4 w-4" />
+                {t("home.forServices.badge")}
+              </div>
+              <ul className="space-y-3">
+                {[
+                  { icon: <Calendar className="h-4 w-4 text-blue-400" />, text: t("home.forServices.item1") },
+                  { icon: <Users className="h-4 w-4 text-blue-400" />, text: t("home.forServices.item2") },
+                  { icon: <Bell className="h-4 w-4 text-blue-400" />, text: t("home.forServices.item3") },
+                  { icon: <Check className="h-4 w-4 text-blue-400" />, text: t("home.forServices.item4") },
+                ].map((item, i) => (
+                  <li key={i} className="flex items-center gap-3 text-gray-300">
+                    {item.icon}
+                    {item.text}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Shops */}
+            <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-2xl p-8">
+              <div className="inline-flex items-center gap-2 bg-purple-500/20 text-purple-400 text-sm font-medium px-3 py-1.5 rounded-full mb-6">
+                <ShoppingCart className="h-4 w-4" />
+                {t("home.forShops.badge")}
+              </div>
+              <ul className="space-y-3">
+                {[
+                  { icon: <Package className="h-4 w-4 text-purple-400" />, text: t("home.forShops.item1") },
+                  { icon: <ShoppingCart className="h-4 w-4 text-purple-400" />, text: t("home.forShops.item2") },
+                  { icon: <Bell className="h-4 w-4 text-purple-400" />, text: t("home.forShops.item3") },
+                  { icon: <Sparkles className="h-4 w-4 text-purple-400" />, text: t("home.forShops.item4") },
+                ].map((item, i) => (
+                  <li key={i} className="flex items-center gap-3 text-gray-300">
+                    {item.icon}
+                    {item.text}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Both */}
+            <div className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 rounded-2xl p-8">
+              <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-400 text-sm font-medium px-3 py-1.5 rounded-full mb-6">
+                <Zap className="h-4 w-4" />
+                {t("home.forBoth.badge")}
+              </div>
+              <ul className="space-y-3">
+                {[
+                  { icon: <Users className="h-4 w-4 text-emerald-400" />, text: t("home.forBoth.item1") },
+                  { icon: <Link2 className="h-4 w-4 text-emerald-400" />, text: t("home.forBoth.item2") },
+                  { icon: <BarChart3 className="h-4 w-4 text-emerald-400" />, text: t("home.forBoth.item3") },
+                  { icon: <Send className="h-4 w-4 text-emerald-400" />, text: t("home.forBoth.item4") },
+                ].map((item, i) => (
+                  <li key={i} className="flex items-center gap-3 text-gray-300">
+                    {item.icon}
+                    {item.text}
                   </li>
                 ))}
               </ul>
