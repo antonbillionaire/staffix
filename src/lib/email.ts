@@ -467,7 +467,7 @@ export async function sendOutreachEmail(
       return { success: true };
     }
 
-    const subject = `Автоматизация фронт-офиса для ${businessName} — Staffix`;
+    const subject = `Идеальный сотрудник для ${businessName}: обучается за 5 минут, не увольняется`;
 
     const { error } = await resend.emails.send({
       from: FROM_EMAIL,
@@ -484,52 +484,60 @@ export async function sendOutreachEmail(
           <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden;">
 
             <!-- Header -->
-            <div style="padding: 24px 32px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; gap: 12px;">
+            <div style="padding: 20px 32px; border-bottom: 1px solid #f3f4f6;">
               <span style="font-size: 18px; font-weight: 700; color: #111827; letter-spacing: -0.3px;">Staffix</span>
             </div>
 
             <!-- Body -->
             <div style="padding: 32px;">
-              <p style="color: #374151; font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Добрый день!</p>
+              <p style="color: #374151; font-size: 15px; line-height: 1.7; margin: 0 0 20px;">Добрый день!</p>
+
+              <!-- Hook block -->
+              <div style="background: #fff7ed; border-left: 4px solid #f97316; padding: 16px 20px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+                <p style="color: #111827; font-size: 16px; font-weight: 600; line-height: 1.5; margin: 0;">
+                  А что если у вас был бы сотрудник, который обучается за 5 минут, работает круглосуточно и никогда не попросит прибавку к зарплате?
+                </p>
+              </div>
 
               <p style="color: #374151; font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
-                Меня зовут Антон, я основатель Staffix — платформы для автоматизации фронт-офиса для бизнесов в сфере услуг.
+                Меня зовут Антон — я основатель Staffix, и я создал именно такого сотрудника.
               </p>
 
               <p style="color: #374151; font-size: 15px; line-height: 1.7; margin: 0 0 20px;">
-                Управление записями, консультациями и клиентской базой — это то, что требует постоянного внимания и занимает значительную часть ресурсов любого сервисного бизнеса.
+                За годы работы с бизнесами в сфере услуг я видел одну и ту же проблему: хорошего администратора сложно найти и ещё сложнее удержать. Уходят, болеют, обучаются неделями — и снова уходят. Staffix решает это раз и навсегда.
               </p>
 
               <!-- Feature block -->
               <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px 24px; margin-bottom: 24px;">
-                <p style="color: #111827; font-size: 15px; font-weight: 600; margin: 0 0 12px;">Staffix — это ИИ-сотрудник, который:</p>
-                <ul style="color: #374151; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 20px;">
-                  <li>Работает 24/7, не болеет и не увольняется</li>
-                  <li>Быстро обучается на основе данных вашего бизнеса</li>
-                  <li>Автоматизирует консультации, запись на посещение и ведение CRM</li>
-                  <li>Функционирует на самом современном ИИ-движке</li>
-                </ul>
+                <p style="color: #111827; font-size: 14px; font-weight: 600; margin: 0 0 14px;">Ваш новый ИИ-сотрудник:</p>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr><td style="padding: 6px 0; color: #f97316; font-size: 16px; width: 24px;">→</td><td style="padding: 6px 0; color: #374151; font-size: 14px; line-height: 1.5;">Обучается за <strong>5 минут</strong> на данных вашего бизнеса — и помнит всё</td></tr>
+                  <tr><td style="padding: 6px 0; color: #f97316; font-size: 16px; width: 24px;">→</td><td style="padding: 6px 0; color: #374151; font-size: 14px; line-height: 1.5;">Отвечает клиентам <strong>24/7</strong> — ни одно обращение не останется без ответа</td></tr>
+                  <tr><td style="padding: 6px 0; color: #f97316; font-size: 16px; width: 24px;">→</td><td style="padding: 6px 0; color: #374151; font-size: 14px; line-height: 1.5;">Ведёт запись, консультирует и помнит каждого клиента</td></tr>
+                  <tr><td style="padding: 6px 0; color: #f97316; font-size: 16px; width: 24px;">→</td><td style="padding: 6px 0; color: #374151; font-size: 14px; line-height: 1.5;"><strong>Никогда</strong> не уволится, не заболеет и не совершит случайных ошибок</td></tr>
+                </table>
               </div>
 
               <!-- CTA -->
               <div style="text-align: center; margin-bottom: 24px;">
-                <a href="https://staffix.io" style="display: inline-block; background: linear-gradient(135deg, #f97316, #ea580c); color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 8px;">
-                  Попробовать Staffix бесплатно
+                <a href="https://staffix.io" style="display: inline-block; background: linear-gradient(135deg, #f97316, #ea580c); color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; padding: 14px 36px; border-radius: 8px;">
+                  Попробовать бесплатно →
                 </a>
               </div>
 
               <!-- Offer -->
-              <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 16px 20px; margin-bottom: 24px;">
+              <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 16px 20px; margin-bottom: 28px;">
                 <p style="color: #92400e; font-size: 14px; font-weight: 600; margin: 0 0 4px;">Специальное предложение</p>
                 <p style="color: #78350f; font-size: 14px; line-height: 1.6; margin: 0;">
-                  14 дней пробного периода бесплатно + ещё 30 дней в подарок за обратную связь о работе системы.
+                  Первые <strong>14 дней — полностью бесплатно</strong>. Плюс ещё 30 дней в подарок, если поделитесь впечатлениями о работе системы.
                 </p>
               </div>
 
-              <p style="color: #374151; font-size: 14px; line-height: 1.6; margin: 0;">
-                С уважением,<br>
-                <strong>Антон</strong><br>
-                Основатель Staffix
+              <p style="color: #374151; font-size: 14px; line-height: 1.6; margin: 0 0 4px;">
+                С уважением,
+              </p>
+              <p style="color: #111827; font-size: 15px; font-weight: 600; margin: 0;">
+                Антон, основатель Staffix
               </p>
             </div>
 
