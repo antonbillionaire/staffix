@@ -22,6 +22,7 @@ import {
   BarChart3,
   Menu,
   X,
+  ShoppingCart,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { languages } from "@/lib/translations";
@@ -39,6 +40,7 @@ const sectionIcons: Record<string, typeof Brain> = {
   BookOpen,
   UserCog,
   BarChart3,
+  ShoppingCart,
 };
 
 export default function DocsPage() {

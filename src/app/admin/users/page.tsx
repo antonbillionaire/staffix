@@ -32,6 +32,7 @@ interface User {
   business: {
     id: string;
     name: string;
+    businessType: string | null;
     botActive: boolean;
     botUsername: string | null;
     bookingsCount: number;
@@ -67,6 +68,7 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
   const [planFilter, setPlanFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
 
   // Email modal
@@ -191,6 +193,34 @@ export default function AdminUsersPage() {
     return days;
   };
 
+  const isSalesType = (type: string | null) => {
+    if (!type) return false;
+    const salesTypes = ["online_shop", "flowers", "restaurant"];
+    return salesTypes.includes(type) || ["shop", "store", "магазин"].some(k => type.toLowerCase().includes(k));
+  };
+
+  const getTypeBadge = (type: string | null) => {
+    if (!type) return <span className="text-gray-600 text-xs">—</span>;
+    const typeLabels: Record<string, string> = {
+      salon: "Салон", barbershop: "Барбершоп", clinic: "Клиника",
+      spa: "СПА", fitness: "Фитнес", auto_service: "Автосервис",
+      delivery: "Доставка", cleaning: "Клининг", pet_care: "Животные",
+      online_shop: "Магазин", restaurant: "Ресторан", flowers: "Цветы",
+      repair: "Ремонт", real_estate: "Недвижимость", travel: "Туризм",
+      photo_video: "Фото/Видео", legal: "Юрист", professional: "Проф.",
+      education: "Образование", events: "Ивент", other: "Другое",
+    };
+    const label = typeLabels[type] || type;
+    const isSales = isSalesType(type);
+    return (
+      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+        isSales ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400"
+      }`}>
+        {isSales ? "🛒 " : "📅 "}{label}
+      </span>
+    );
+  };
+
   const getPlanBadge = (plan: string, isExpired: boolean) => {
     if (isExpired) {
       return (
@@ -303,6 +333,18 @@ export default function AdminUsersPage() {
                 <option value="expired">Истёкшие</option>
               </select>
             </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Тип бизнеса</label>
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="all">Все типы</option>
+                <option value="services">📅 Сервисы (запись)</option>
+                <option value="shops">🛒 Магазины (продажи)</option>
+              </select>
+            </div>
           </div>
         )}
       </div>
@@ -325,6 +367,7 @@ export default function AdminUsersPage() {
                 <tr className="border-b border-white/5 bg-white/5">
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Пользователь</th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Бизнес</th>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Тип</th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">План</th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Использование</th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Активность</th>
@@ -333,7 +376,13 @@ export default function AdminUsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {users.map((user) => (
+                {users.filter((user) => {
+                  if (typeFilter === "all") return true;
+                  const type = user.business?.businessType || null;
+                  if (typeFilter === "shops") return isSalesType(type);
+                  if (typeFilter === "services") return !isSalesType(type);
+                  return true;
+                }).map((user) => (
                   <tr key={user.id} className="border-b border-white/5 hover:bg-white/5">
                     <td className="py-3 px-4">
                       <div>
@@ -355,6 +404,9 @@ export default function AdminUsersPage() {
                       ) : (
                         <span className="text-gray-500">—</span>
                       )}
+                    </td>
+                    <td className="py-3 px-4">
+                      {getTypeBadge(user.business?.businessType || null)}
                     </td>
                     <td className="py-3 px-4">
                       {user.subscription ? (

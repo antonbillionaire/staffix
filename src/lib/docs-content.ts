@@ -1,4 +1,4 @@
-// Documentation content for Staffix - 11 sections, 4 languages
+// Documentation content for Staffix - 12 sections, 4 languages
 export type Language = "ru" | "en" | "uz" | "kz";
 
 export interface DocSection {
@@ -1377,6 +1377,249 @@ Excel tahlili uchun CSV yuklab olish.`,
 
 ### Деректерді экспорттау
 Excel талдауы үшін CSV жүктеп алу.`,
+    },
+  },
+
+  // ===== 12. AI SALES BOT FOR SHOPS =====
+  {
+    id: "shop-sales",
+    icon: "ShoppingCart",
+    title: {
+      ru: "AI-продавец для магазина",
+      en: "AI Sales Bot for Shops",
+      uz: "Do'kon uchun AI-sotuvchi",
+      kz: "Дүкен үшін AI-сатушы",
+    },
+    description: {
+      ru: "Каталог товаров, приём заказов через Telegram и управление продажами",
+      en: "Product catalog, Telegram order intake, and sales management",
+      uz: "Mahsulot katalogi, Telegram orqali buyurtma qabul qilish va savdoni boshqarish",
+      kz: "Өнім каталогы, Telegram арқылы тапсырыс қабылдау және сатуды басқару",
+    },
+    content: {
+      ru: `## AI-продавец для магазина
+
+Staffix поддерживает два режима: **запись на услуги** (для салонов, клиник) и **продажа товаров** (для магазинов, ресторанов, цветочных). Режим выбирается автоматически по типу бизнеса, указанному при регистрации.
+
+## Какой тип бизнеса активирует режим продаж?
+
+При регистрации выберите один из типов:
+- **Онлайн-торговля** — классический онлайн-магазин
+- **Ресторан / Кафе** — продажа блюд, приём заказов
+- **Цветочный магазин** — каталог букетов с доставкой
+- Любой другой тип с ключевым словом "магазин", "shop", "store"
+
+## Шаг 1: Добавьте товары в каталог
+
+Перейдите в **Дашборд → Каталог**. Для каждого товара укажите:
+- Название и описание
+- Цена и старая цена (для скидки)
+- Категория и теги
+- Остаток на складе (или оставьте пустым для неограниченного)
+- Фото товара (URL)
+
+Товары автоматически становятся доступны AI-сотруднику. Он сможет искать их, объяснять преимущества и оформлять покупку.
+
+## Шаг 2: Как работает AI-продавец
+
+Когда клиент пишет боту, AI:
+
+1. **Выявляет потребность** — задаёт уточняющие вопросы, узнаёт бюджет и предпочтения
+2. **Ищет подходящие товары** — использует поиск по каталогу, фильтрует по категории
+3. **Презентует** — объясняет преимущества, сравнивает варианты
+4. **Работает с возражениями** — по цене, качеству, срокам доставки
+5. **Оформляет заказ** — собирает имя, телефон, адрес доставки, подтверждает заказ
+6. **Допродаёт** — предлагает сопутствующие товары после оформления
+
+## Шаг 3: Управление заказами
+
+Перейдите в **Дашборд → Заказы**. Здесь вы видите все заказы с:
+- Статусом (Новый → Подтверждён → В обработке → Отправлен → Доставлен)
+- Составом и суммой заказа
+- Контактами покупателя и адресом
+
+**Смена статуса:** выберите новый статус из выпадающего списка — клиент автоматически получит уведомление в Telegram.
+
+**Оплата:** отметьте заказ как оплаченный кнопкой «Отметить оплаченным».
+
+## Уведомления о новых заказах
+
+Как только клиент оформит заказ, вы получите сообщение в Telegram:
+
+🛒 *Новый заказ #1001*
+👤 Иван Петров | +79991234567
+📍 г. Алматы, ул. Абая 10, кв. 5
+📦 Наушники Sony × 1 = 32 000
+💰 *Итого: 32 000*
+
+## Интеграция с CRM
+
+Каждый новый заказ автоматически отправляется в вашу CRM (если настроена в разделе **Интеграции**):
+- **Bitrix24** — создаётся лид и контакт
+- **AmoCRM** — создаётся сделка
+- **Google Sheets** — добавляется строка в таблицу
+- **Webhook** — POST-запрос на ваш URL с данными заказа
+
+## Техники продаж AI
+
+AI-продавец применяет 10 профессиональных техник:
+- **Активное слушание** — задаёт вопросы перед предложением
+- **Ценность перед ценой** — сначала объясняет пользу, потом называет стоимость
+- **Дефицит и срочность** — упоминает остатки, если их мало
+- **Допродажи** — предлагает сопутствующий товар один раз после оформления
+- **Работа с возражениями** — отвечает на "дорого", "подумаю", "не сейчас"`,
+
+      en: `## AI Sales Bot for Shops
+
+Staffix supports two modes: **service booking** (for salons, clinics) and **product sales** (for shops, restaurants, flower stores). The mode is automatically selected based on the business type set during registration.
+
+## Which business types activate sales mode?
+
+During registration, select one of:
+- **Online Shop** — classic e-commerce
+- **Restaurant / Cafe** — dish sales, order intake
+- **Flower Shop** — bouquet catalog with delivery
+- Any type with keywords: "shop", "store", "магазин"
+
+## Step 1: Add products to catalog
+
+Go to **Dashboard → Catalog**. For each product, specify:
+- Name and description
+- Price and old price (for discount display)
+- Category and tags
+- Stock quantity (leave empty for unlimited)
+- Product image URL
+
+Products become immediately available to your AI employee.
+
+## Step 2: How the AI sales bot works
+
+When a client writes to the bot, the AI:
+
+1. **Identifies the need** — asks clarifying questions, learns budget and preferences
+2. **Searches products** — uses catalog search, filters by category
+3. **Presents** — explains benefits, compares options
+4. **Handles objections** — responds to price, quality, delivery concerns
+5. **Places order** — collects name, phone, delivery address, confirms order
+6. **Upsells** — suggests related products after purchase
+
+## Step 3: Order management
+
+Go to **Dashboard → Orders**. Here you see all orders with:
+- Status (New → Confirmed → Processing → Shipped → Delivered)
+- Order items and total
+- Customer contacts and delivery address
+
+**Status change:** select a new status — the customer automatically receives a Telegram notification.
+
+## New order notifications
+
+When a customer places an order, you receive a Telegram message:
+
+🛒 *New order #1001*
+👤 John Smith | +1234567890
+📍 123 Main St, City
+📦 Sony Headphones × 1 = $350
+💰 *Total: $350*
+
+## CRM integration
+
+Each new order is automatically sent to your CRM (if configured in **Integrations**):
+- **Bitrix24** — lead and contact created
+- **AmoCRM** — deal created
+- **Google Sheets** — row added to spreadsheet
+- **Webhook** — POST request with order data
+
+## AI sales techniques
+
+The AI salesperson applies 10 professional techniques:
+- **Active listening** — asks questions before suggesting
+- **Value before price** — explains benefits first, then mentions cost
+- **Scarcity & urgency** — mentions low stock when applicable
+- **Upselling** — suggests a related product once after purchase
+- **Objection handling** — responds to "too expensive", "I'll think about it"`,
+
+      uz: `## Do'kon uchun AI-sotuvchi
+
+Staffix ikki rejimni qo'llab-quvvatlaydi: **xizmatlarga yozish** (salonlar, klinikalar uchun) va **mahsulot sotish** (do'konlar, restoranlar, gul do'konlari uchun). Rejim ro'yxatdan o'tishda ko'rsatilgan biznes turiga qarab avtomatik tanlanadi.
+
+## 1-qadam: Katalogga mahsulot qo'shing
+
+**Boshqaruv paneli → Katalog** bo'limiga o'ting. Har bir mahsulot uchun ko'rsating:
+- Nomi va tavsifi
+- Narxi va eski narxi (chegirma uchun)
+- Kategoriya va teglar
+- Ombordagi miqdor (cheksiz uchun bo'sh qoldiring)
+
+## 2-qadam: AI-sotuvchi qanday ishlaydi
+
+Mijoz botga yozganda, AI:
+
+1. **Ehtiyojni aniqlaydi** — aniqlashtiruvchi savollar beradi
+2. **Mahsulotlarni qidiradi** — katalog bo'yicha qidiradi
+3. **Taqdim etadi** — afzalliklarni tushuntiradi, variantlarni solishtiradi
+4. **E'tirozlar bilan ishlaydi** — narx, sifat, yetkazib berish muddati bo'yicha
+5. **Buyurtma rasmiylashtiradi** — ism, telefon, yetkazib berish manzili
+6. **Qo'shimcha sotadi** — rasmiylashtirish dan keyin qo'shimcha mahsulot taklif qiladi
+
+## 3-qadam: Buyurtmalarni boshqarish
+
+**Boshqaruv paneli → Buyurtmalar** bo'limiga o'ting. Har bir buyurtmada ko'rsatiladi:
+- Holat (Yangi → Tasdiqlangan → Yuborilgan → Yetkazilgan)
+- Tarkibi va umumiy summasi
+- Xaridor kontaktlari va manzil
+
+**Holat o'zgarishi:** yangi holatni tanlang — mijoz Telegram orqali bildirishnoma oladi.
+
+## Yangi buyurtma haqida bildirishnomalar
+
+Mijoz buyurtma berishi bilanoq siz Telegram xabari olasiz:
+
+🛒 *Yangi buyurtma #1001*
+👤 Ism Familiya | +998901234567
+📦 Mahsulot × 1 = 350 000 so'm
+💰 *Jami: 350 000 so'm*`,
+
+      kz: `## Дүкен үшін AI-сатушы
+
+Staffix екі режимді қолдайды: **қызметтерге жазу** (салондар, клиникалар үшін) және **өнім сату** (дүкендер, мейрамханалар, гүл дүкендері үшін). Режим тіркелу кезінде көрсетілген бизнес түріне қарай автоматты түрде таңдалады.
+
+## 1-қадам: Каталогқа өнімдер қосыңыз
+
+**Бақылау тақтасы → Каталог** бөліміне өтіңіз. Әр өнім үшін көрсетіңіз:
+- Атауы мен сипаттамасы
+- Бағасы және ескі бағасы (жеңілдік үшін)
+- Санаты мен тегтері
+- Қоймадағы саны (шексіз үшін бос қалдырыңыз)
+
+## 2-қадам: AI-сатушы қалай жұмыс істейді
+
+Клиент ботқа жазғанда, AI:
+
+1. **Қажеттілікті анықтайды** — нақтылайтын сұрақтар қояды
+2. **Өнімдерді іздейді** — каталог бойынша іздейді
+3. **Таныстырады** — артықшылықтарды түсіндіреді
+4. **Қарсылықтармен жұмыс істейді** — баға, сапа бойынша
+5. **Тапсырысты рәсімдейді** — аты, телефон, жеткізу мекенжайы
+6. **Қосымша сатады** — рәсімдеуден кейін қосымша өнім ұсынады
+
+## 3-қадам: Тапсырыстарды басқару
+
+**Бақылау тақтасы → Тапсырыстар** бөліміне өтіңіз. Әр тапсырыста көрсетіледі:
+- Мәртебе (Жаңа → Расталған → Жіберілген → Жеткізілген)
+- Құрамы мен жалпы сомасы
+- Сатып алушы байланыстары мен мекенжайы
+
+**Мәртебе өзгерісі:** жаңа мәртебені таңдаңыз — клиент Telegram арқылы хабарландыру алады.
+
+## Жаңа тапсырыс туралы хабарландырулар
+
+Клиент тапсырыс бергенде сіз Telegram хабары аласыз:
+
+🛒 *Жаңа тапсырыс #1001*
+👤 Аты-жөні | +77001234567
+📦 Өнім × 1 = 160 000 тг
+💰 *Барлығы: 160 000 тг*`,
     },
   },
 ];

@@ -75,6 +75,7 @@ export async function GET(request: NextRequest) {
           ? {
               id: business.id,
               name: business.name,
+              businessType: business.businessType,
               botActive: business.botActive,
               botUsername: business.botUsername,
               bookingsCount: business._count.bookings,
