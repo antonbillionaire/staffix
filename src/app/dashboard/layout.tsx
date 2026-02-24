@@ -46,6 +46,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 const ChatWidget = dynamic(() => import("@/components/ChatWidget"), { ssr: false });
+const OnboardingWizard = dynamic(() => import("@/components/OnboardingWizard"), { ssr: false });
 import TrialExpiredBanner from "@/components/TrialExpiredBanner";
 import { type PlanId, hasMenuAccess } from "@/lib/plans";
 
@@ -653,6 +654,9 @@ export default function DashboardLayout({
         {subscription.plan === "trial" && subscription.isExpired && (
           <TrialExpiredBanner />
         )}
+
+        {/* Onboarding wizard */}
+        <OnboardingWizard />
 
         {/* Low messages warning */}
         {subscription.messagesLimit - subscription.messagesUsed <= 50 && (
