@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-const ADMIN_TELEGRAM_CHAT_ID = process.env.ADMIN_TELEGRAM_CHAT_ID;
-const STAFFIX_BOT_TOKEN = process.env.STAFFIX_BOT_TOKEN;
+// Use existing Vercel ENV vars (same bot/chat as sales notifications)
+const ADMIN_TELEGRAM_CHAT_ID = process.env.SALES_ADMIN_CHAT_ID;
+const STAFFIX_BOT_TOKEN = process.env.SALES_BOT_TELEGRAM_TOKEN;
 
 async function notifyAdmin(partner: {
   name: string;
