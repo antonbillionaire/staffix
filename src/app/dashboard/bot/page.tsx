@@ -42,6 +42,7 @@ export default function AIEmployeePage() {
     tone: "friendly",
     welcomeMessage: "",
     rules: "",
+    language: "ru",
   });
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -102,6 +103,7 @@ export default function AIEmployeePage() {
               tone: data.business.aiTone || "friendly",
               welcomeMessage: data.business.welcomeMessage || "",
               rules: data.business.aiRules || "",
+              language: data.business.language || "ru",
             });
             setBusinessId(data.business.id || "");
             setWaSettings({
@@ -186,6 +188,7 @@ export default function AIEmployeePage() {
           aiTone: aiSettings.tone,
           welcomeMessage: aiSettings.welcomeMessage,
           aiRules: aiSettings.rules,
+          language: aiSettings.language,
         }),
       });
 
@@ -620,6 +623,30 @@ export default function AIEmployeePage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Bot language */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Язык бота
+            </label>
+            <select
+              value={aiSettings.language}
+              onChange={(e) => setAiSettings({ ...aiSettings, language: e.target.value })}
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="ru">Русский</option>
+              <option value="en">English</option>
+              <option value="uz">O&apos;zbek (Узбекский)</option>
+              <option value="kz">Қазақ (Казахский)</option>
+              <option value="kg">Кыргыз (Кыргызский)</option>
+              <option value="tj">Тоҷикӣ (Таджикский)</option>
+              <option value="am">Հայերեն (Армянский)</option>
+              <option value="ge">ქართული (Грузинский)</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Бот будет отвечать на выбранном языке по умолчанию. Если клиент пишет на другом языке — бот автоматически переключится.
+            </p>
           </div>
 
           {/* Welcome message */}

@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     }
 
     const data = await request.json();
-    const { businessType, businessName, phone, address, staffCount, language, crmSystem } = data;
+    const { businessType, businessTypes, businessName, phone, address, staffCount, language, crmSystem } = data;
 
     if (!businessName) {
       return NextResponse.json(
@@ -52,7 +52,8 @@ export async function POST(request: Request) {
           name: businessName,
           phone: phone || null,
           address: address || null,
-          businessType: businessType || null,
+          businessType: businessType || (Array.isArray(businessTypes) && businessTypes[0]) || null,
+          businessTypes: Array.isArray(businessTypes) ? businessTypes : [],
           staffCount: staffCount ? parseInt(staffCount) || null : null,
           language: language || "ru",
           crmSystem: crmSystem || null,
@@ -67,7 +68,8 @@ export async function POST(request: Request) {
           name: businessName,
           phone: phone || null,
           address: address || null,
-          businessType: businessType || null,
+          businessType: businessType || (Array.isArray(businessTypes) && businessTypes[0]) || null,
+          businessTypes: Array.isArray(businessTypes) ? businessTypes : [],
           staffCount: staffCount ? parseInt(staffCount) || null : null,
           language: language || "ru",
           crmSystem: crmSystem || null,

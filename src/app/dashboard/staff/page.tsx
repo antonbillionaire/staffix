@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, X, User, Loader2, Camera, CalendarDays, MessageCircle, BedDouble } from "lucide-react";
+import { Plus, Pencil, Trash2, X, User, Loader2, Camera, CalendarDays, MessageCircle, BedDouble, Upload } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -88,6 +88,67 @@ export default function StaffPage() {
   const [savingSchedule, setSavingSchedule] = useState(false);
 
   // Time-off modal
+  // Import modal
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importCsv, setImportCsv] = useState("");
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<{ message?: string; errors?: string[] } | null>(null);
+  const [parsingFile, setParsingFile] = useState(false);
+
+  const handleImportFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (ext === "xlsx" || ext === "xls") {
+      setParsingFile(true);
+      try {
+        const mod = await import("xlsx");
+        const XLSX = mod.default || mod;
+        const buf = await file.arrayBuffer();
+        const data = new Uint8Array(buf);
+        const wb = XLSX.read(data, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const csv = XLSX.utils.sheet_to_csv(ws, { FS: ";", rawNumbers: true });
+        setImportCsv(csv);
+      } catch {
+        setImportResult({ message: "Ошибка чтения Excel файла" });
+      } finally {
+        setParsingFile(false);
+      }
+    } else {
+      setParsingFile(true);
+      try {
+        const buf = await file.arrayBuffer();
+        const text = new TextDecoder("utf-8").decode(buf);
+        setImportCsv(text);
+      } finally {
+        setParsingFile(false);
+      }
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importCsv.trim()) return;
+    setImportLoading(true);
+    setImportResult(null);
+    try {
+      const res = await fetch("/api/import/staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csv: importCsv }),
+      });
+      const data = await res.json();
+      setImportResult({ message: data.message || data.error, errors: data.errors });
+      if (data.success) {
+        fetchStaff();
+      }
+    } catch {
+      setImportResult({ message: "Ошибка при импорте" });
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   const [isTimeOffOpen, setIsTimeOffOpen] = useState(false);
   const [timeOffStaffId, setTimeOffStaffId] = useState<string | null>(null);
   const [timeOffStaffName, setTimeOffStaffName] = useState("");
@@ -321,13 +382,22 @@ export default function StaffPage() {
             {t("staffPage.subtitle")}
           </p>
         </div>
-        <button
-          onClick={() => openModal()}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          {t("staffPage.add")}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setIsImportOpen(true); setImportCsv(""); setImportResult(null); }}
+            className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 border ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+          >
+            <Upload className="h-4 w-4" />
+            Импорт
+          </button>
+          <button
+            onClick={() => openModal()}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            {t("staffPage.add")}
+          </button>
+        </div>
       </div>
 
       {/* Staff list */}
@@ -568,6 +638,88 @@ export default function StaffPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {isImportOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className={`${isDark ? "bg-[#12122a]" : "bg-white"} rounded-lg p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+                Импорт сотрудников
+              </h3>
+              <button
+                onClick={() => setIsImportOpen(false)}
+                className={`${isDark ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"}`}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className={`text-sm mb-4 p-3 rounded-lg ${isDark ? "bg-white/5 text-gray-400" : "bg-gray-50 text-gray-600"}`}>
+              <p className="font-medium mb-1">Формат CSV:</p>
+              <code className="text-xs">Имя;Должность;Telegram</code>
+              <p className="mt-2 text-xs">Колонки определяются автоматически по названиям в первой строке. Поддерживаются файлы CSV, Excel (.xlsx/.xls), TXT.</p>
+            </div>
+
+            <div className="mb-4">
+              <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                Загрузить файл
+              </label>
+              <input
+                type="file"
+                accept=".csv,.txt,.xlsx,.xls"
+                onChange={handleImportFileUpload}
+                className={`w-full text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}
+              />
+              {parsingFile && (
+                <div className="flex items-center gap-2 mt-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+                  <span className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>Чтение файла...</span>
+                </div>
+              )}
+            </div>
+
+            <div className="mb-4">
+              <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                Или вставьте данные вручную
+              </label>
+              <textarea
+                rows={6}
+                value={importCsv}
+                onChange={(e) => setImportCsv(e.target.value)}
+                placeholder={"Имя;Должность;Telegram\nАнна Иванова;Мастер маникюра;@anna_master\nОлег Петров;Барбер;@oleg_barber"}
+                className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-600" : "border-gray-300 placeholder-gray-400"}`}
+              />
+            </div>
+
+            {importResult && (
+              <div className={`mb-4 p-3 rounded-lg text-sm ${importResult.errors ? (isDark ? "bg-yellow-400/10 text-yellow-300" : "bg-yellow-50 text-yellow-800") : (isDark ? "bg-green-400/10 text-green-300" : "bg-green-50 text-green-800")}`}>
+                <p>{importResult.message}</p>
+                {importResult.errors?.map((err, i) => (
+                  <p key={i} className="text-xs mt-1 opacity-80">• {err}</p>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setIsImportOpen(false)}
+                className={`flex-1 px-4 py-2 border rounded-lg font-medium ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+              >
+                Закрыть
+              </button>
+              <button
+                onClick={handleImport}
+                disabled={importLoading || !importCsv.trim()}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {importLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                Импортировать
+              </button>
+            </div>
           </div>
         </div>
       )}

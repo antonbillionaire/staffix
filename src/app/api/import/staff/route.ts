@@ -26,18 +26,12 @@ async function getUserBusiness(): Promise<string | null> {
   return business?.id || null;
 }
 
-/**
- * Parse CSV text into rows of cells.
- * Handles quoted fields with commas and semicolons as delimiters.
- */
 function parseCsv(text: string): string[][] {
   const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
   const rows: string[][] = [];
 
   for (const line of lines) {
     if (!line.trim()) continue;
-
-    // Detect delimiter: semicolon takes priority if present
     const delim = line.includes(";") ? ";" : ",";
     const cells: string[] = [];
     let current = "";
@@ -66,9 +60,8 @@ function parseCsv(text: string): string[][] {
   return rows;
 }
 
-// POST /api/import/services
-// Body: { csv: string } — CSV text
-// CSV columns: name, price, duration (minutes), description (optional)
+// POST /api/import/staff
+// Body: { csv: string }
 export async function POST(request: NextRequest) {
   try {
     const businessId = await getUserBusiness();
@@ -86,17 +79,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Файл пустой" }, { status: 400 });
     }
 
-    // Column-name aliases for smart mapping
     const ALIASES: Record<string, string[]> = {
-      name: ["название", "наименование", "name", "услуга", "service"],
-      price: ["цена", "price", "стоимость", "cost"],
-      duration: ["длительность", "duration", "время", "time", "минут", "minutes", "мин"],
-      description: ["описание", "description", "desc"],
+      name: ["имя", "name", "сотрудник", "staff", "фио", "ф.и.о", "мастер"],
+      role: ["должность", "role", "позиция", "position", "специальность"],
+      telegram: ["telegram", "телеграм", "username", "tg", "тг"],
     };
 
     const firstRow = rows[0].map((c) => c.toLowerCase().trim());
     const hasHeader = firstRow.some((c) =>
-      [...ALIASES.name, ...ALIASES.price].some((a) => c.includes(a))
+      [...ALIASES.name, ...ALIASES.role].some((a) => c.includes(a))
     );
 
     const colMap: Record<string, number> = {};
@@ -113,7 +104,7 @@ export async function POST(request: NextRequest) {
     }
     const usePositional = !hasHeader || colMap.name === undefined;
     if (usePositional) {
-      colMap.name = 0; colMap.price = 1; colMap.duration = 2; colMap.description = 3;
+      colMap.name = 0; colMap.role = 1; colMap.telegram = 2;
     }
 
     const dataRows = hasHeader ? rows.slice(1) : rows;
@@ -130,29 +121,26 @@ export async function POST(request: NextRequest) {
       const rowNum = hasHeader ? i + 2 : i + 1;
 
       const name = row[colMap.name]?.trim();
-      const priceRaw = (row[colMap.price] || "").trim().replace(/[^\d.,-]/g, "").replace(/\s/g, "").replace(",", ".");
-      const durationRaw = colMap.duration !== undefined ? row[colMap.duration]?.trim() : undefined;
-      const description = colMap.description !== undefined ? row[colMap.description]?.trim() || undefined : undefined;
+      const role = colMap.role !== undefined ? row[colMap.role]?.trim() || undefined : undefined;
+      let telegram = colMap.telegram !== undefined ? row[colMap.telegram]?.trim() || undefined : undefined;
 
       if (!name) {
-        errors.push(`Строка ${rowNum}: пустое название`);
+        errors.push(`Строка ${rowNum}: пустое имя`);
         continue;
       }
 
-      const price = Math.round(parseFloat(priceRaw));
-      if (isNaN(price) || price < 0) {
-        errors.push(`Строка ${rowNum} («${name}»): некорректная цена «${priceRaw}»`);
-        continue;
+      // Clean telegram username
+      if (telegram) {
+        telegram = telegram.replace(/^@/, "").replace(/^https?:\/\/t\.me\//i, "");
       }
 
-      const duration = parseInt(durationRaw || "", 10);
-      if (isNaN(duration) || duration <= 0) {
-        errors.push(`Строка ${rowNum} («${name}»): некорректная длительность «${durationRaw}» (укажите в минутах)`);
-        continue;
-      }
-
-      await prisma.service.create({
-        data: { name, price, duration, description, businessId },
+      await prisma.staff.create({
+        data: {
+          name,
+          role: role || null,
+          telegramUsername: telegram || null,
+          businessId,
+        },
       });
       created.push(name);
     }
@@ -161,10 +149,10 @@ export async function POST(request: NextRequest) {
       success: true,
       created: created.length,
       errors: errors.length > 0 ? errors : undefined,
-      message: `Создано услуг: ${created.length}${errors.length > 0 ? `, пропущено: ${errors.length}` : ""}`,
+      message: `Создано сотрудников: ${created.length}${errors.length > 0 ? `, пропущено: ${errors.length}` : ""}`,
     });
   } catch (error) {
-    console.error("POST /api/import/services:", error);
+    console.error("POST /api/import/staff:", error);
     return NextResponse.json({ error: "Ошибка сервера" }, { status: 500 });
   }
 }

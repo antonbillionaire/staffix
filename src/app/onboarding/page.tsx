@@ -92,7 +92,8 @@ export default function OnboardingPage() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
   const [formData, setFormData] = useState({
-    businessType: "",
+    businessType: "",        // kept for backward compat
+    businessTypes: [] as string[],  // multi-select
     businessName: "",
     phone: "",
     address: "",
@@ -104,7 +105,7 @@ export default function OnboardingPage() {
   const totalSteps = 6;
 
   const handleNext = () => {
-    if (step === 1 && !formData.businessType) {
+    if (step === 1 && formData.businessTypes.length === 0) {
       setError(t("onboarding.error.selectType"));
       return;
     }
@@ -307,23 +308,28 @@ export default function OnboardingPage() {
                 return (
                   <button
                     key={type.id}
-                    onClick={() => setFormData({ ...formData, businessType: type.id })}
+                    onClick={() => {
+                      const types = formData.businessTypes.includes(type.id)
+                        ? formData.businessTypes.filter((t) => t !== type.id)
+                        : [...formData.businessTypes, type.id];
+                      setFormData({ ...formData, businessTypes: types, businessType: types[0] || "" });
+                    }}
                     className={`p-3 sm:p-4 rounded-xl border-2 transition-all ${
-                      formData.businessType === type.id
+                      formData.businessTypes.includes(type.id)
                         ? "border-blue-500 bg-blue-500/10"
                         : "border-white/10 hover:border-white/20 bg-white/5"
                     }`}
                   >
                     <Icon
                       className={`h-7 w-7 mx-auto mb-2 ${
-                        formData.businessType === type.id
+                        formData.businessTypes.includes(type.id)
                           ? "text-blue-400"
                           : "text-gray-400"
                       }`}
                     />
                     <p
                       className={`text-xs sm:text-sm font-medium ${
-                        formData.businessType === type.id
+                        formData.businessTypes.includes(type.id)
                           ? "text-blue-400"
                           : "text-gray-300"
                       }`}
@@ -597,7 +603,7 @@ export default function OnboardingPage() {
               <div className="flex justify-between">
                 <span className="text-gray-500">{t("onboarding.step5.businessType")}:</span>
                 <span className="text-white font-medium">
-                  {t(businessTypes.find((bt) => bt.id === formData.businessType)?.nameKey || "")}
+                  {formData.businessTypes.map((id) => t(businessTypes.find((bt) => bt.id === id)?.nameKey || "")).join(", ")}
                 </span>
               </div>
               <div className="flex justify-between">

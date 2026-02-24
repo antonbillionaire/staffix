@@ -21,6 +21,9 @@ interface ClientContext {
   totalMessages: number;
   lastVisitDate: Date | null;
   tags: string[];
+  loyaltyPoints: number;
+  loyaltyVisits: number;
+  loyaltyTotalSpent: number;
   recentBookings: Array<{
     date: Date;
     serviceName: string | null;
@@ -32,17 +35,33 @@ interface ClientContext {
 interface BusinessContext {
   name: string;
   businessType: string | null;
+  businessTypes: string[];
   industryCategory: string | null;
+  language: string;
   phone: string | null;
   address: string | null;
   workingHours: string | null;
   welcomeMessage: string | null;
   aiTone: string | null;
   aiRules: string | null;
+  deliveryEnabled: boolean;
+  deliveryTimeFrom: number | null;
+  deliveryTimeTo: number | null;
+  deliveryFee: number | null;
+  deliveryFreeFrom: number | null;
+  deliveryZones: string | null;
   services: Array<{ name: string; price: number; duration: number }>;
   staff: Array<{ name: string; role: string | null }>;
   faqs: Array<{ question: string; answer: string }>;
   documents: Array<{ name: string; extractedText: string | null }>;
+  loyalty: {
+    enabled: boolean;
+    type: string;
+    cashbackPercent: number | null;
+    visitsForReward: number | null;
+    rewardType: string | null;
+    rewardDiscount: number | null;
+  } | null;
 }
 
 // ========================================
@@ -115,6 +134,9 @@ export async function buildClientContext(
       totalMessages: client.totalMessages,
       lastVisitDate: client.lastVisitDate,
       tags: client.tags,
+      loyaltyPoints: client.loyaltyPoints,
+      loyaltyVisits: client.loyaltyVisits,
+      loyaltyTotalSpent: client.loyaltyTotalSpent,
       recentBookings: recentBookings.map((b) => ({
         date: b.date,
         serviceName: b.service?.name || null,
@@ -151,6 +173,9 @@ export async function buildBusinessContext(
           where: { parsed: true },
           select: { name: true, extractedText: true }
         },
+        loyaltyProgram: {
+          select: { enabled: true, type: true, cashbackPercent: true, visitsForReward: true, rewardType: true, rewardDiscount: true }
+        },
       },
     });
 
@@ -159,17 +184,33 @@ export async function buildBusinessContext(
     return {
       name: business.name,
       businessType: business.businessType,
+      businessTypes: business.businessTypes || [],
       industryCategory: business.industryCategory,
+      language: business.language || "ru",
       phone: business.phone,
       address: business.address,
       workingHours: business.workingHours,
       welcomeMessage: business.welcomeMessage,
       aiTone: business.aiTone,
       aiRules: business.aiRules,
+      deliveryEnabled: business.deliveryEnabled,
+      deliveryTimeFrom: business.deliveryTimeFrom,
+      deliveryTimeTo: business.deliveryTimeTo,
+      deliveryFee: business.deliveryFee,
+      deliveryFreeFrom: business.deliveryFreeFrom,
+      deliveryZones: business.deliveryZones,
       services: business.services,
       staff: business.staff,
       faqs: business.faqs,
       documents: business.documents,
+      loyalty: business.loyaltyProgram ? {
+        enabled: business.loyaltyProgram.enabled,
+        type: business.loyaltyProgram.type,
+        cashbackPercent: business.loyaltyProgram.cashbackPercent,
+        visitsForReward: business.loyaltyProgram.visitsForReward,
+        rewardType: business.loyaltyProgram.rewardType,
+        rewardDiscount: business.loyaltyProgram.rewardDiscount,
+      } : null,
     };
   } catch (error) {
     console.error("Error building business context:", error);
@@ -194,10 +235,31 @@ export function buildSystemPrompt(
     casual: "Общайся неформально и легко, как с другом.",
   };
 
+  // Language instruction for AI
+  const langMap: Record<string, string> = {
+    ru: "Отвечай на русском языке.",
+    en: "Respond in English.",
+    uz: "O'zbek tilida javob ber. (Respond in Uzbek)",
+    kz: "Қазақ тілінде жауап бер. (Respond in Kazakh)",
+    kg: "Кыргыз тилинде жооп бер. (Respond in Kyrgyz)",
+    tj: "Бо забони тоҷикӣ ҷавоб деҳ. (Respond in Tajik)",
+    am: "Հայերեն պատdelays. (Respond in Armenian)",
+    ge: "უპასუხე ქართულად. (Respond in Georgian)",
+  };
+  const langInstruction = langMap[business.language] || langMap.ru;
+
+  const businessTypeLabel = business.businessTypes.length > 0
+    ? business.businessTypes.join(", ")
+    : business.businessType || "не указан";
+
   let prompt = `Ты — AI-сотрудник компании "${business.name}".
 
+## Язык общения:
+${langInstruction}
+Если клиент пишет на другом языке — отвечай на языке клиента.
+
 ## О компании:
-- Тип бизнеса: ${business.businessType || "не указан"}
+- Тип бизнеса: ${businessTypeLabel}
 - Адрес: ${business.address || "не указан"}
 - Телефон: ${business.phone || "не указан"}
 - Часы работы: ${business.workingHours || "не указаны"}
@@ -237,6 +299,17 @@ ${
     : ""
 }
 
+${business.deliveryEnabled ? `## Доставка:
+- Время доставки: ${business.deliveryTimeFrom && business.deliveryTimeTo ? `${business.deliveryTimeFrom}–${business.deliveryTimeTo} минут` : "уточняйте"}
+${business.deliveryFee ? `- Стоимость доставки: ${business.deliveryFee}` : "- Доставка бесплатная"}
+${business.deliveryFreeFrom ? `- Бесплатная доставка от суммы: ${business.deliveryFreeFrom}` : ""}
+${business.deliveryZones ? `- Зоны: ${business.deliveryZones}` : ""}
+` : ""}
+${business.loyalty?.enabled ? `## Программа лояльности:
+${business.loyalty.type === "cashback" ? `- Тип: Кэшбэк ${business.loyalty.cashbackPercent}% от суммы заказа
+- Клиент накапливает бонусные баллы и может оплатить ими часть заказа` : ""}${business.loyalty.type === "visits" ? `- Тип: По визитам — каждый ${business.loyalty.visitsForReward}-й визит ${business.loyalty.rewardType === "free" ? "бесплатно" : `со скидкой ${business.loyalty.rewardDiscount}%`}` : ""}${business.loyalty.type === "tiered" ? `- Тип: Уровни — скидка растёт с суммой покупок` : ""}
+- Если клиент спрашивает о бонусах — расскажи о программе лояльности
+` : ""}
 ## Стиль общения:
 ${toneMap[business.aiTone || "friendly"] || toneMap.friendly}
 
@@ -339,6 +412,16 @@ ${business.aiRules ? `## Дополнительные правила:\n${busines
 
     if (client.tags.length > 0) {
       prompt += `\n- Теги: ${client.tags.join(", ")}`;
+    }
+
+    if (client.loyaltyPoints > 0) {
+      prompt += `\n- Бонусные баллы: ${client.loyaltyPoints}`;
+    }
+    if (client.loyaltyVisits > 0) {
+      prompt += `\n- Визитов (лояльность): ${client.loyaltyVisits}`;
+    }
+    if (client.loyaltyTotalSpent > 0) {
+      prompt += `\n- Общая сумма покупок: ${client.loyaltyTotalSpent.toLocaleString()}`;
     }
   }
 

@@ -19,6 +19,10 @@ import {
   RefreshCw,
   Calendar,
   Clock,
+  Lock,
+  Truck,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { TIMEZONES } from "@/lib/timezones";
 
@@ -72,6 +76,26 @@ export default function SettingsPage() {
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [subscriptionMessage, setSubscriptionMessage] = useState("");
 
+  // Password change
+  const [passwordData, setPasswordData] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" });
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [showOldPw, setShowOldPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+
+  // Delivery settings
+  const [delivery, setDelivery] = useState({
+    enabled: false,
+    timeFrom: "",
+    timeTo: "",
+    fee: "",
+    freeFrom: "",
+    zones: "",
+  });
+  const [deliverySaving, setDeliverySaving] = useState(false);
+  const [deliverySaved, setDeliverySaved] = useState(false);
+
   // Theme-based classes
   const isDark = theme === "dark";
   const bgCard = isDark ? "bg-[#12122a]" : "bg-white";
@@ -122,6 +146,17 @@ export default function SettingsPage() {
           }
           if (data.business?.ownerTelegramChatId) {
             setOwnerTelegramConnected(true);
+          }
+          // Delivery settings
+          if (data.business) {
+            setDelivery({
+              enabled: data.business.deliveryEnabled || false,
+              timeFrom: data.business.deliveryTimeFrom?.toString() || "",
+              timeTo: data.business.deliveryTimeTo?.toString() || "",
+              fee: data.business.deliveryFee?.toString() || "",
+              freeFrom: data.business.deliveryFreeFrom?.toString() || "",
+              zones: data.business.deliveryZones || "",
+            });
           }
         }
       } catch (err) {
@@ -248,6 +283,63 @@ export default function SettingsPage() {
     }
   };
 
+  // Change password
+  const handleChangePassword = async () => {
+    setPasswordError("");
+    setPasswordMessage("");
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordError("Пароли не совпадают");
+      return;
+    }
+    if (passwordData.newPassword.length < 8) {
+      setPasswordError("Минимум 8 символов");
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      const res = await fetch("/api/user/change-password", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oldPassword: passwordData.oldPassword, newPassword: passwordData.newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setPasswordMessage("Пароль успешно изменён");
+      setPasswordData({ oldPassword: "", newPassword: "", confirmPassword: "" });
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : "Ошибка");
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
+  // Save delivery settings
+  const handleSaveDelivery = async () => {
+    setDeliverySaving(true);
+    setDeliverySaved(false);
+    try {
+      const res = await fetch("/api/business", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deliveryEnabled: delivery.enabled,
+          deliveryTimeFrom: delivery.timeFrom,
+          deliveryTimeTo: delivery.timeTo,
+          deliveryFee: delivery.fee,
+          deliveryFreeFrom: delivery.freeFrom,
+          deliveryZones: delivery.zones,
+        }),
+      });
+      if (!res.ok) throw new Error("Ошибка сохранения");
+      setDeliverySaved(true);
+      setTimeout(() => setDeliverySaved(false), 3000);
+    } catch (err) {
+      console.error("Error saving delivery:", err);
+    } finally {
+      setDeliverySaving(false);
+    }
+  };
+
   // Navigate to pricing
   const handleChoosePlan = () => {
     router.push("/pricing");
@@ -313,6 +405,8 @@ export default function SettingsPage() {
 
   const tabs = [
     { id: "profile", label: "Профиль", icon: User },
+    { id: "security", label: "Безопасность", icon: Lock },
+    { id: "delivery", label: "Доставка", icon: Truck },
     { id: "theme", label: "Тема", icon: Palette },
     { id: "subscription", label: "Подписка", icon: CreditCard },
     { id: "notifications", label: "Уведомления", icon: Bell },
@@ -443,6 +537,183 @@ export default function SettingsPage() {
               </option>
             ))}
           </select>
+        </div>
+      )}
+
+      {/* Security Tab — Change Password */}
+      {activeTab === "security" && (
+        <div className={`${bgCard} rounded-xl border ${borderColor} p-6`}>
+          <div className="flex items-center gap-2 mb-4">
+            <Lock className="h-5 w-5 text-blue-500" />
+            <h3 className={`text-lg font-medium ${textPrimary}`}>Смена пароля</h3>
+          </div>
+
+          {passwordError && (
+            <div className="mb-4 bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg text-sm flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" /> {passwordError}
+            </div>
+          )}
+          {passwordMessage && (
+            <div className="mb-4 bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-lg text-sm flex items-center gap-2">
+              <Check className="h-4 w-4" /> {passwordMessage}
+            </div>
+          )}
+
+          <div className="space-y-4 max-w-md">
+            <div>
+              <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Текущий пароль</label>
+              <div className="relative">
+                <input
+                  type={showOldPw ? "text" : "password"}
+                  value={passwordData.oldPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
+                  className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12`}
+                  placeholder="Текущий пароль"
+                />
+                <button type="button" onClick={() => setShowOldPw(!showOldPw)} className={`absolute inset-y-0 right-0 pr-4 flex items-center ${textSecondary}`}>
+                  {showOldPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Новый пароль</label>
+              <div className="relative">
+                <input
+                  type={showNewPw ? "text" : "password"}
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                  className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12`}
+                  placeholder="Минимум 8 символов"
+                />
+                <button type="button" onClick={() => setShowNewPw(!showNewPw)} className={`absolute inset-y-0 right-0 pr-4 flex items-center ${textSecondary}`}>
+                  {showNewPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Подтвердите пароль</label>
+              <input
+                type="password"
+                value={passwordData.confirmPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                placeholder="Повторите новый пароль"
+              />
+            </div>
+            <button
+              onClick={handleChangePassword}
+              disabled={passwordSaving || !passwordData.newPassword}
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:opacity-90 disabled:opacity-50 transition-all"
+            >
+              {passwordSaving ? <><Loader2 className="h-4 w-4 animate-spin" /> Сохранение...</> : "Сменить пароль"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delivery Tab */}
+      {activeTab === "delivery" && (
+        <div className={`${bgCard} rounded-xl border ${borderColor} p-6`}>
+          <div className="flex items-center gap-2 mb-4">
+            <Truck className="h-5 w-5 text-blue-500" />
+            <h3 className={`text-lg font-medium ${textPrimary}`}>Настройки доставки</h3>
+            {deliverySaved && <span className="text-green-500 text-sm flex items-center gap-1"><Check className="h-3 w-3" /> Сохранено</span>}
+          </div>
+          <p className={`text-sm ${textSecondary} mb-6`}>
+            AI-бот будет сообщать клиентам информацию о доставке
+          </p>
+
+          <div className="space-y-4 max-w-lg">
+            {/* Enable toggle */}
+            <label className={`flex items-center justify-between p-4 ${isDark ? "bg-white/5" : "bg-gray-50"} rounded-xl cursor-pointer`}>
+              <div>
+                <p className={`font-medium ${textPrimary}`}>Доставка включена</p>
+                <p className={`text-sm ${textSecondary}`}>Показывать информацию о доставке клиентам</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDelivery({ ...delivery, enabled: !delivery.enabled })}
+                className={`relative w-11 h-6 rounded-full transition-colors ${delivery.enabled ? "bg-blue-600" : isDark ? "bg-white/10" : "bg-gray-300"}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${delivery.enabled ? "translate-x-5" : ""}`} />
+              </button>
+            </label>
+
+            {delivery.enabled && (
+              <>
+                {/* Time range */}
+                <div>
+                  <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Время доставки (минуты)</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min="0"
+                      value={delivery.timeFrom}
+                      onChange={(e) => setDelivery({ ...delivery, timeFrom: e.target.value })}
+                      placeholder="30"
+                      className={`w-24 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    />
+                    <span className={textSecondary}>—</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={delivery.timeTo}
+                      onChange={(e) => setDelivery({ ...delivery, timeTo: e.target.value })}
+                      placeholder="60"
+                      className={`w-24 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    />
+                    <span className={`text-sm ${textSecondary}`}>мин</span>
+                  </div>
+                </div>
+
+                {/* Delivery fee */}
+                <div>
+                  <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Стоимость доставки</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={delivery.fee}
+                    onChange={(e) => setDelivery({ ...delivery, fee: e.target.value })}
+                    placeholder="0 — бесплатная"
+                    className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  />
+                </div>
+
+                {/* Free from */}
+                <div>
+                  <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Бесплатная доставка от суммы</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={delivery.freeFrom}
+                    onChange={(e) => setDelivery({ ...delivery, freeFrom: e.target.value })}
+                    placeholder="Оставьте пустым если не применимо"
+                    className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  />
+                </div>
+
+                {/* Zones */}
+                <div>
+                  <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Зоны доставки (необязательно)</label>
+                  <textarea
+                    rows={3}
+                    value={delivery.zones}
+                    onChange={(e) => setDelivery({ ...delivery, zones: e.target.value })}
+                    placeholder="Например: Центр — 30 мин, Окраины — 60 мин"
+                    className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  />
+                </div>
+              </>
+            )}
+
+            <button
+              onClick={handleSaveDelivery}
+              disabled={deliverySaving}
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:opacity-90 disabled:opacity-50 transition-all"
+            >
+              {deliverySaving ? <><Loader2 className="h-4 w-4 animate-spin" /> Сохранение...</> : "Сохранить"}
+            </button>
+          </div>
         </div>
       )}
 

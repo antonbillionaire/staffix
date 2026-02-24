@@ -43,6 +43,7 @@ import {
   ShoppingBag,
   Building2,
   Briefcase,
+  Gift,
   type LucideIcon,
 } from "lucide-react";
 const ChatWidget = dynamic(() => import("@/components/ChatWidget"), { ssr: false });
@@ -110,6 +111,7 @@ const navConfig: NavEntry[] = [
       { nameKey: "nav.myStats", href: "/dashboard/statistics", icon: BarChart3 },
       { nameKey: "nav.myBroadcasts", href: "/dashboard/broadcasts", icon: Send },
       { nameKey: "nav.myAutomation", href: "/dashboard/automation", icon: Zap },
+      { nameKey: "nav.myLoyalty", href: "/dashboard/loyalty", icon: Gift },
       { nameKey: "nav.payments", href: "/dashboard/payments", icon: CreditCard },
     ],
   },

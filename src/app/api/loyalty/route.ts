@@ -1,0 +1,97 @@
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+
+async function getUserBusiness(): Promise<string | null> {
+  const session = await auth();
+  let userId: string | null = null;
+
+  if (session?.user?.email) {
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+    userId = user?.id || null;
+  }
+
+  if (!userId) {
+    const cookieStore = await cookies();
+    userId = cookieStore.get("userId")?.value || null;
+  }
+
+  if (!userId) return null;
+
+  const business = await prisma.business.findFirst({
+    where: { userId },
+    select: { id: true },
+  });
+  return business?.id || null;
+}
+
+// GET /api/loyalty — get loyalty program settings
+export async function GET() {
+  try {
+    const businessId = await getUserBusiness();
+    if (!businessId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const program = await prisma.loyaltyProgram.findUnique({
+      where: { businessId },
+    });
+
+    // Also get some stats
+    const clientStats = await prisma.client.aggregate({
+      where: { businessId, loyaltyPoints: { gt: 0 } },
+      _count: true,
+      _sum: { loyaltyPoints: true },
+    });
+
+    return NextResponse.json({
+      program: program || null,
+      stats: {
+        activeMembers: clientStats._count || 0,
+        totalPointsIssued: clientStats._sum?.loyaltyPoints || 0,
+      },
+    });
+  } catch (error) {
+    console.error("GET /api/loyalty:", error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
+
+// POST /api/loyalty — create or update loyalty program
+export async function POST(request: NextRequest) {
+  try {
+    const businessId = await getUserBusiness();
+    if (!businessId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const body = await request.json();
+    const {
+      enabled,
+      type,
+      cashbackPercent,
+      visitsForReward,
+      rewardType,
+      rewardDiscount,
+      tiers,
+    } = body;
+
+    const data = {
+      enabled: !!enabled,
+      type: type || "cashback",
+      cashbackPercent: cashbackPercent !== undefined ? parseInt(cashbackPercent) || 5 : 5,
+      visitsForReward: visitsForReward !== undefined ? parseInt(visitsForReward) || 10 : 10,
+      rewardType: rewardType || "discount",
+      rewardDiscount: rewardDiscount !== undefined ? parseInt(rewardDiscount) || 50 : 50,
+      tiers: tiers || null,
+    };
+
+    const program = await prisma.loyaltyProgram.upsert({
+      where: { businessId },
+      create: { businessId, ...data },
+      update: data,
+    });
+
+    return NextResponse.json({ success: true, program });
+  } catch (error) {
+    console.error("POST /api/loyalty:", error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}

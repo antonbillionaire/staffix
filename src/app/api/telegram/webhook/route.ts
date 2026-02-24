@@ -35,6 +35,17 @@ import { salesToolDefinitions, executeSalesTool, notifyManagerByTelegram } from 
 import { buildSalesSystemPrompt, isSalesMode } from "@/lib/sales-prompt";
 
 // ========================================
+// HELPERS
+// ========================================
+
+function getDefaultWelcome(name?: string | null, lang?: string | null): string {
+  const biz = name || "нашу компанию";
+  if (lang === "en") return `Hello! 👋 Welcome to ${biz}!\n\nI'm an AI assistant ready to answer your questions about our services, prices, and help with bookings.\n\nHow can I help you?`;
+  if (lang === "uz") return `Salom! 👋 ${biz}ga xush kelibsiz!\n\nMen AI yordamchiman — xizmatlar, narxlar haqida savollarga javob beraman va yozilishga yordam beraman.\n\nQanday yordam bera olaman?`;
+  return `Здравствуйте! 👋 Добро пожаловать в ${biz}!\n\nЯ AI-помощник и готов ответить на ваши вопросы о наших услугах, ценах и помочь с записью.\n\nЧем могу помочь?`;
+}
+
+// ========================================
 // ТИПЫ
 // ========================================
 
@@ -465,7 +476,7 @@ async function generateAIResponse(
           welcomeMessage: businessContext.welcomeMessage,
           aiTone: businessContext.aiTone,
           aiRules: businessContext.aiRules,
-          language: "ru",
+          language: businessContext.language || "ru",
         },
         salesClientCtx
       );
@@ -999,7 +1010,7 @@ export async function POST(request: NextRequest) {
         // Проверяем: это владелец подключается?
         const businessData = await prisma.business.findUnique({
           where: { id: business.id },
-          select: { ownerTelegramUsername: true, name: true, welcomeMessage: true },
+          select: { ownerTelegramUsername: true, name: true, welcomeMessage: true, language: true },
         });
 
         const ownerUsername = businessData?.ownerTelegramUsername?.toLowerCase().replace("@", "") || "";
@@ -1020,7 +1031,7 @@ export async function POST(request: NextRequest) {
         // Обычный клиент — показываем приветствие
         const welcomeMsg =
           businessData?.welcomeMessage ||
-          `Здравствуйте! 👋 Добро пожаловать в ${businessData?.name || "нашу компанию"}!\n\nЯ AI-помощник и готов ответить на ваши вопросы о наших услугах, ценах и помочь с записью.\n\nЧем могу помочь?`;
+          getDefaultWelcome(businessData?.name, businessData?.language);
 
         await sendTelegramMessage(botToken, chatId, welcomeMsg);
         return NextResponse.json({ ok: true });
@@ -1029,12 +1040,12 @@ export async function POST(request: NextRequest) {
       // Нет username — обычный клиент
       const businessData = await prisma.business.findUnique({
         where: { id: business.id },
-        select: { welcomeMessage: true, name: true },
+        select: { welcomeMessage: true, name: true, language: true },
       });
 
       const welcomeMsg =
         businessData?.welcomeMessage ||
-        `Здравствуйте! 👋 Добро пожаловать в ${businessData?.name || "нашу компанию"}!\n\nЯ AI-помощник и готов ответить на ваши вопросы о наших услугах, ценах и помочь с записью.\n\nЧем могу помочь?`;
+        getDefaultWelcome(businessData?.name, businessData?.language);
 
       await sendTelegramMessage(botToken, chatId, welcomeMsg);
       return NextResponse.json({ ok: true });

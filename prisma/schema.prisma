@@ -19,6 +19,10 @@ model User {
   verificationToken String? @unique
   verificationExpires DateTime?
 
+  // Сброс пароля
+  resetPasswordToken   String?
+  resetPasswordExpires DateTime?
+
   // Реферальная атрибуция
   referredByCode  String?   // код партнёра, использованный при регистрации
 
@@ -49,6 +53,7 @@ model Business {
 
   // Onboarding
   businessType  String?   // salon, clinic, barbershop, auto_service, other
+  businessTypes String[]  @default([])  // массив типов бизнеса (мульти-выбор)
   staffCount    Int?      // количество сотрудников
   language      String    @default("ru") // ru, uz, kz, kg, tj, am, ge
   onboardingCompleted Boolean @default(false)
@@ -101,6 +106,14 @@ model Business {
   // Telegram уведомления владельца
   ownerTelegramUsername String?  // @username владельца для уведомлений
   ownerTelegramChatId   BigInt?  // автоматически при /start
+
+  // Доставка
+  deliveryEnabled     Boolean @default(false)
+  deliveryTimeFrom    Int?    // минуты (от)
+  deliveryTimeTo      Int?    // минуты (до)
+  deliveryFee         Int?    // стоимость доставки
+  deliveryFreeFrom    Int?    // бесплатная доставка от суммы
+  deliveryZones       String? // текстовое описание зон
 
   // Платёжные системы (для магазинов)
   paymeId          String?   // Payme Merchant ID
@@ -156,6 +169,9 @@ model Business {
 
   // WhatsApp/Facebook разговоры
   channelConversations ChannelConversation[]
+
+  // Программа лояльности
+  loyaltyProgram     LoyaltyProgram?
 
   // Продажи (магазины, e-commerce)
   products           Product[]
@@ -475,6 +491,11 @@ model Client {
 
   // Последняя реактивация
   lastReactivationSent DateTime?
+
+  // Лояльность
+  loyaltyPoints     Int      @default(0)   // бонусные баллы
+  loyaltyVisits     Int      @default(0)   // кол-во визитов для программы
+  loyaltyTotalSpent Int      @default(0)   // общая сумма покупок
 
   // ========================================
   // AI MEMORY - Фаза 1
@@ -1246,6 +1267,32 @@ model PartnerEarning {
 
   @@index([partnerId, status])
   @@index([partnerId, createdAt])
+}
+
+// ========================================
+// ПРОГРАММА ЛОЯЛЬНОСТИ
+// ========================================
+
+model LoyaltyProgram {
+  id            String   @id @default(cuid())
+  businessId    String   @unique
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  enabled       Boolean  @default(false)
+  type          String   @default("cashback") // cashback | visits | tiered
+
+  // Cashback: % от суммы возвращается бонусами
+  cashbackPercent  Int?     @default(5)
+
+  // Visits: каждый N-й визит — награда
+  visitsForReward  Int?     @default(10)
+  rewardType       String?  @default("discount") // free | discount
+  rewardDiscount   Int?     @default(50)  // скидка % для награды
+
+  // Tiered: уровни по сумме покупок
+  tiers            Json?    // [{minSpent:0,name:"Bronze",discount:0},...]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 // Rate limiting — защита от брутфорса

@@ -84,9 +84,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Файл пустой" }, { status: 400 });
     }
 
-    const firstRow = rows[0].map((c) => c.toLowerCase());
-    const hasHeader =
-      firstRow.some((c) => c.includes("наименование") || c.includes("название") || c === "name" || c === "товар");
+    // Column-name aliases for smart mapping
+    const ALIASES: Record<string, string[]> = {
+      name: ["название", "наименование", "name", "товар", "product", "item", "продукт"],
+      price: ["цена", "price", "стоимость", "cost"],
+      category: ["категория", "category", "группа", "group"],
+      description: ["описание", "description", "desc"],
+      stock: ["остаток", "stock", "количество", "qty", "quantity", "кол-во"],
+      sku: ["артикул", "sku", "код", "code"],
+      oldPrice: ["старая цена", "old price", "старая_цена", "скидка от", "old_price", "oldprice"],
+    };
+
+    const firstRow = rows[0].map((c) => c.toLowerCase().trim());
+    const hasHeader = firstRow.some((c) =>
+      [...ALIASES.name, ...ALIASES.price].some((a) => c.includes(a))
+    );
+
+    // Build column index map
+    const colMap: Record<string, number> = {};
+    if (hasHeader) {
+      for (let ci = 0; ci < firstRow.length; ci++) {
+        const cell = firstRow[ci];
+        for (const [field, aliases] of Object.entries(ALIASES)) {
+          if (!colMap[field] && aliases.some((a) => cell.includes(a))) {
+            colMap[field] = ci;
+            break;
+          }
+        }
+      }
+    }
+    // Fallback to positional if no name column found
+    const usePositional = !hasHeader || colMap.name === undefined;
+    if (usePositional) {
+      colMap.name = 0; colMap.price = 1; colMap.category = 2;
+      colMap.description = 3; colMap.stock = 4; colMap.sku = 5; colMap.oldPrice = 6;
+    }
+
     const dataRows = hasHeader ? rows.slice(1) : rows;
 
     if (dataRows.length === 0) {
@@ -100,14 +133,13 @@ export async function POST(request: NextRequest) {
       const row = dataRows[i];
       const rowNum = hasHeader ? i + 2 : i + 1;
 
-      // columns: name, price, category, description, stock, sku, old_price
-      const name = row[0]?.trim();
-      const priceRaw = row[1]?.trim().replace(/[^\d.,-]/g, "").replace(/\s/g, "").replace(",", ".");
-      const category = row[2]?.trim() || undefined;
-      const description = row[3]?.trim() || undefined;
-      const stockRaw = row[4]?.trim();
-      const sku = row[5]?.trim() || undefined;
-      const oldPriceRaw = row[6]?.trim().replace(/[^\d.,-]/g, "").replace(/\s/g, "").replace(",", ".");
+      const name = row[colMap.name]?.trim();
+      const priceRaw = (row[colMap.price] || "").trim().replace(/[^\d.,-]/g, "").replace(/\s/g, "").replace(",", ".");
+      const category = colMap.category !== undefined ? row[colMap.category]?.trim() || undefined : undefined;
+      const description = colMap.description !== undefined ? row[colMap.description]?.trim() || undefined : undefined;
+      const stockRaw = colMap.stock !== undefined ? row[colMap.stock]?.trim() : undefined;
+      const sku = colMap.sku !== undefined ? row[colMap.sku]?.trim() || undefined : undefined;
+      const oldPriceRaw = colMap.oldPrice !== undefined ? (row[colMap.oldPrice] || "").trim().replace(/[^\d.,-]/g, "").replace(/\s/g, "").replace(",", ".") : "";
 
       if (!name) {
         errors.push(`Строка ${rowNum}: пустое название`);

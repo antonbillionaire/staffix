@@ -149,7 +149,7 @@ export async function PUT(request: Request) {
     }
 
     const data = await request.json();
-    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, botLogo, timezone, ownerTelegramUsername, paymeId, clickServiceId, clickMerchantId, kaspiPayLink, waPhoneNumberId, waAccessToken, waVerifyToken, waActive, fbPageId, fbPageAccessToken, fbVerifyToken, fbActive } = data;
+    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, botLogo, timezone, ownerTelegramUsername, paymeId, clickServiceId, clickMerchantId, kaspiPayLink, waPhoneNumberId, waAccessToken, waVerifyToken, waActive, fbPageId, fbPageAccessToken, fbVerifyToken, fbActive, businessTypes, language, deliveryEnabled, deliveryTimeFrom, deliveryTimeTo, deliveryFee, deliveryFreeFrom, deliveryZones } = data;
 
     // Найти бизнес пользователя
     const existingBusiness = await prisma.business.findFirst({
@@ -180,6 +180,16 @@ export async function PUT(request: Request) {
     if (clickServiceId !== undefined) updateData.clickServiceId = clickServiceId || null;
     if (clickMerchantId !== undefined) updateData.clickMerchantId = clickMerchantId || null;
     if (kaspiPayLink !== undefined) updateData.kaspiPayLink = kaspiPayLink || null;
+
+    // Business types, language, delivery
+    if (businessTypes !== undefined) updateData.businessTypes = businessTypes;
+    if (language !== undefined) updateData.language = language;
+    if (deliveryEnabled !== undefined) updateData.deliveryEnabled = Boolean(deliveryEnabled);
+    if (deliveryTimeFrom !== undefined) updateData.deliveryTimeFrom = deliveryTimeFrom ? parseInt(deliveryTimeFrom) : null;
+    if (deliveryTimeTo !== undefined) updateData.deliveryTimeTo = deliveryTimeTo ? parseInt(deliveryTimeTo) : null;
+    if (deliveryFee !== undefined) updateData.deliveryFee = deliveryFee ? parseInt(deliveryFee) : null;
+    if (deliveryFreeFrom !== undefined) updateData.deliveryFreeFrom = deliveryFreeFrom ? parseInt(deliveryFreeFrom) : null;
+    if (deliveryZones !== undefined) updateData.deliveryZones = deliveryZones || null;
 
     // WhatsApp
     if (waPhoneNumberId !== undefined) updateData.waPhoneNumberId = waPhoneNumberId || null;
