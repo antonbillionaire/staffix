@@ -852,6 +852,10 @@ async function handleCallbackQuery(
 // ========================================
 
 export async function POST(request: NextRequest) {
+  // These are set as early as possible so the catch can send a fallback message
+  let catchBotToken: string | null = null;
+  let catchChatId: number | null = null;
+
   try {
     // Получаем параметры из URL
     const { searchParams } = new URL(request.url);
@@ -889,6 +893,8 @@ export async function POST(request: NextRequest) {
     if (!business || !botToken) {
       return NextResponse.json({ error: "Invalid business or token" }, { status: 401 });
     }
+
+    catchBotToken = botToken; // Save for error fallback
 
     // Rate limiting: 30 сообщений в минуту на бизнес (защита от flood)
     const rlResult = await rateLimit(`tg-webhook:${business.id}`, 30, 1);
@@ -929,6 +935,7 @@ export async function POST(request: NextRequest) {
 
     const { message } = update;
     const chatId = message.chat.id;
+    catchChatId = chatId; // Save for error fallback
     const telegramId = BigInt(message.from.id);
     const userMessage = message.text || "";
     const userName =
@@ -1160,6 +1167,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Webhook error:", error);
+    // Try to inform the user rather than silently failing
+    if (catchBotToken && catchChatId) {
+      try {
+        await fetch(`https://api.telegram.org/bot${catchBotToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: catchChatId,
+            text: "Произошла техническая ошибка. Попробуйте написать снова через минуту.",
+          }),
+        });
+      } catch {
+        // ignore send error
+      }
+    }
     return NextResponse.json({ ok: true }); // Всегда 200 для Telegram
   }
 }
