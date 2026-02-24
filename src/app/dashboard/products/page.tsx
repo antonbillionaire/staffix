@@ -149,7 +149,8 @@ export default function ProductsPage() {
 
     if (ext === "xlsx" || ext === "xls") {
       // Excel: parse with SheetJS
-      const XLSX = (await import("xlsx")).default;
+      const mod = await import("xlsx");
+      const XLSX = mod.default || mod;
       const reader = new FileReader();
       reader.onload = (ev) => {
         const data = new Uint8Array(ev.target?.result as ArrayBuffer);

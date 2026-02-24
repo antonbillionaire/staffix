@@ -134,7 +134,8 @@ export default function ServicesPage() {
     const ext = file.name.split(".").pop()?.toLowerCase();
 
     if (ext === "xlsx" || ext === "xls") {
-      const XLSX = (await import("xlsx")).default;
+      const mod = await import("xlsx");
+      const XLSX = mod.default || mod;
       const reader = new FileReader();
       reader.onload = (ev) => {
         const data = new Uint8Array(ev.target?.result as ArrayBuffer);
