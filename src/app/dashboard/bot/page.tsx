@@ -873,17 +873,17 @@ export default function AIEmployeePage() {
         {waOpen && (
           <div className="px-5 pb-5 space-y-4 border-t border-white/10 pt-4">
             {/* Instructions */}
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-sm text-blue-300 space-y-2">
-              <p className="font-semibold text-blue-200">📋 Пошаговая инструкция:</p>
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-sm text-gray-100 space-y-2">
+              <p className="font-semibold text-white">📋 Пошаговая инструкция:</p>
               <div className="space-y-1.5">
-                <p><span className="font-semibold text-blue-200">Шаг 1.</span> Купите отдельную симкарту — номер не должен быть зарегистрирован в WhatsApp</p>
-                <p><span className="font-semibold text-blue-200">Шаг 2.</span> Установите WhatsApp Business, зарегистрируйте эту симку (получите SMS-код)</p>
-                <p><span className="font-semibold text-blue-200">Шаг 3.</span> Откройте <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="underline">developers.facebook.com</a> → ваше приложение → WhatsApp → API Setup → скопируйте <strong>Phone Number ID</strong> и <strong>Access Token</strong></p>
-                <p><span className="font-semibold text-blue-200">Шаг 4.</span> Вставьте данные в поля ниже → придумайте Verify Token → нажмите Сохранить → скопируйте Webhook URL</p>
-                <p><span className="font-semibold text-blue-200">Шаг 5.</span> Вернитесь в Meta Developers → WhatsApp → Configuration → вставьте Webhook URL и Verify Token → выберите событие <strong>messages</strong> → Verify and Save</p>
-                <p><span className="font-semibold text-blue-200">Шаг 6.</span> Включите тоггл «Активировать WhatsApp» → Сохранить</p>
+                <p><span className="font-semibold text-white">Шаг 1.</span> Купите отдельную симкарту — номер не должен быть зарегистрирован в WhatsApp</p>
+                <p><span className="font-semibold text-white">Шаг 2.</span> Установите WhatsApp Business, зарегистрируйте эту симку (получите SMS-код)</p>
+                <p><span className="font-semibold text-white">Шаг 3.</span> Откройте <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="underline text-blue-300 hover:text-blue-200">developers.facebook.com</a> → ваше приложение → WhatsApp → API Setup → скопируйте <strong className="text-white">Phone Number ID</strong> и <strong className="text-white">Access Token</strong></p>
+                <p><span className="font-semibold text-white">Шаг 4.</span> Вставьте данные в поля ниже → придумайте Verify Token → нажмите Сохранить → скопируйте Webhook URL</p>
+                <p><span className="font-semibold text-white">Шаг 5.</span> Вернитесь в Meta Developers → WhatsApp → Configuration → вставьте Webhook URL и Verify Token → выберите событие <strong className="text-white">messages</strong> → Verify and Save</p>
+                <p><span className="font-semibold text-white">Шаг 6.</span> Включите тоггл «Активировать WhatsApp» → Сохранить</p>
               </div>
-              <p className="text-xs text-blue-400 pt-1">💡 Не получается? Напишите в <a href="/dashboard/support" className="underline">поддержку</a> — поможем за 15 минут</p>
+              <p className="text-xs text-blue-300 pt-1">💡 Не получается? Напишите в <a href="/dashboard/support" className="underline hover:text-blue-200">поддержку</a> — поможем за 15 минут</p>
             </div>
 
             {/* Webhook URL */}
@@ -1016,16 +1016,16 @@ export default function AIEmployeePage() {
 
         {fbOpen && (
           <div className="px-5 pb-5 space-y-4 border-t border-white/10 pt-4">
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-sm text-blue-300 space-y-2">
-              <p className="font-semibold text-blue-200">📋 Пошаговая инструкция:</p>
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-sm text-gray-100 space-y-2">
+              <p className="font-semibold text-white">📋 Пошаговая инструкция:</p>
               <div className="space-y-1.5">
-                <p><span className="font-semibold text-blue-200">Шаг 1.</span> Откройте вашу Facebook Страницу → Настройки → О странице → скопируйте <strong>Page ID</strong></p>
-                <p><span className="font-semibold text-blue-200">Шаг 2.</span> Зайдите на <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="underline">developers.facebook.com</a> → ваше приложение → Messenger → Настройка → привяжите Facebook Страницу → нажмите <strong>Создать токен</strong></p>
-                <p><span className="font-semibold text-blue-200">Шаг 3.</span> Вставьте Page ID и Page Access Token в поля ниже → придумайте Verify Token → нажмите Сохранить → скопируйте Webhook URL</p>
-                <p><span className="font-semibold text-blue-200">Шаг 4.</span> В Meta Developers → Messenger → Webhooks → вставьте Webhook URL и Verify Token → выберите событие <strong>messages</strong> → Verify and Save</p>
-                <p><span className="font-semibold text-blue-200">Шаг 5.</span> Включите тоггл «Активировать Facebook Messenger» → Сохранить</p>
+                <p><span className="font-semibold text-white">Шаг 1.</span> Откройте вашу Facebook Страницу → Настройки → О странице → скопируйте <strong className="text-white">Page ID</strong></p>
+                <p><span className="font-semibold text-white">Шаг 2.</span> Зайдите на <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="underline text-blue-300 hover:text-blue-200">developers.facebook.com</a> → ваше приложение → Messenger → Настройка → привяжите Facebook Страницу → нажмите <strong className="text-white">Создать токен</strong></p>
+                <p><span className="font-semibold text-white">Шаг 3.</span> Вставьте Page ID и Page Access Token в поля ниже → придумайте Verify Token → нажмите Сохранить → скопируйте Webhook URL</p>
+                <p><span className="font-semibold text-white">Шаг 4.</span> В Meta Developers → Messenger → Webhooks → вставьте Webhook URL и Verify Token → выберите событие <strong className="text-white">messages</strong> → Verify and Save</p>
+                <p><span className="font-semibold text-white">Шаг 5.</span> Включите тоггл «Активировать Facebook Messenger» → Сохранить</p>
               </div>
-              <p className="text-xs text-blue-400 pt-1">💡 Не получается? Напишите в <a href="/dashboard/support" className="underline">поддержку</a> — поможем за 15 минут</p>
+              <p className="text-xs text-blue-300 pt-1">💡 Не получается? Напишите в <a href="/dashboard/support" className="underline hover:text-blue-200">поддержку</a> — поможем за 15 минут</p>
             </div>
 
             {businessId && (
