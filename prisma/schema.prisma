@@ -102,6 +102,18 @@ model Business {
   clickMerchantId  String?   // Click Merchant ID
   kaspiPayLink     String?   // Kaspi статическая ссылка на оплату
 
+  // WhatsApp Business API (прямое подключение от Meta)
+  waPhoneNumberId   String?   // Meta Phone Number ID
+  waAccessToken     String?   // Meta User/System Access Token
+  waVerifyToken     String?   // Random secret для верификации webhook
+  waActive          Boolean   @default(false)
+
+  // Facebook Messenger (прямое подключение страницы)
+  fbPageId          String?   // Facebook Page ID
+  fbPageAccessToken String?   // Page Access Token
+  fbVerifyToken     String?   // Random secret для верификации webhook
+  fbActive          Boolean   @default(false)
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -135,6 +147,9 @@ model Business {
 
   // CRM интеграции
   crmIntegrations    CrmIntegration[]
+
+  // WhatsApp/Facebook разговоры
+  channelConversations ChannelConversation[]
 
   // Продажи (магазины, e-commerce)
   products           Product[]
@@ -912,9 +927,37 @@ model SalesLead {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
+  // История разговора с ботом Staffix
+  history           Json      @default("[]")  // [{role, content}]
+
   @@index([stage])
   @@index([channel])
   @@index([createdAt])
+}
+
+// ========================================
+// CHANNEL CONVERSATIONS — разговоры через WhatsApp / Facebook
+// ========================================
+
+// Диалоги клиентов через WhatsApp и Facebook Messenger (per-business)
+model ChannelConversation {
+  id           String    @id @default(cuid())
+  channel      String    // "whatsapp" | "facebook"
+  clientId     String    // wa_id (phone) или Facebook PSID
+  clientName   String?
+
+  // История хранится как JSON массив [{role:"user"|"assistant", content:string}]
+  history      Json      @default("[]")
+  messageCount Int       @default(0)
+
+  businessId   String
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([businessId, channel, clientId])
+  @@index([businessId, channel])
 }
 
 // ========================================

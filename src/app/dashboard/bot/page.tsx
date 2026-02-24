@@ -66,6 +66,31 @@ export default function AIEmployeePage() {
   const [paymentSaved, setPaymentSaved] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
 
+  // WhatsApp settings
+  const [waSettings, setWaSettings] = useState({
+    phoneNumberId: "",
+    accessToken: "",
+    verifyToken: "",
+    active: false,
+  });
+  const [savingWa, setSavingWa] = useState(false);
+  const [waSaved, setWaSaved] = useState(false);
+  const [waOpen, setWaOpen] = useState(false);
+
+  // Facebook Messenger settings
+  const [fbSettings, setFbSettings] = useState({
+    pageId: "",
+    pageAccessToken: "",
+    verifyToken: "",
+    active: false,
+  });
+  const [savingFb, setSavingFb] = useState(false);
+  const [fbSaved, setFbSaved] = useState(false);
+  const [fbOpen, setFbOpen] = useState(false);
+
+  // Business ID for webhook URLs
+  const [businessId, setBusinessId] = useState("");
+
   // Prompt templates
   const promptTemplates = [
     {
@@ -132,6 +157,19 @@ export default function AIEmployeePage() {
               clickServiceId: data.business.clickServiceId || "",
               clickMerchantId: data.business.clickMerchantId || "",
               kaspiPayLink: data.business.kaspiPayLink || "",
+            });
+            setBusinessId(data.business.id || "");
+            setWaSettings({
+              phoneNumberId: data.business.waPhoneNumberId || "",
+              accessToken: "", // masked in GET, don't show
+              verifyToken: data.business.waVerifyToken || "",
+              active: data.business.waActive || false,
+            });
+            setFbSettings({
+              pageId: data.business.fbPageId || "",
+              pageAccessToken: "", // masked in GET
+              verifyToken: data.business.fbVerifyToken || "",
+              active: data.business.fbActive || false,
             });
           }
         }
@@ -837,6 +875,282 @@ export default function AIEmployeePage() {
                 <><Check className="h-4 w-4" /> Сохранено!</>
               ) : (
                 <><Save className="h-4 w-4" /> Сохранить настройки оплаты</>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── WhatsApp ────────────────────────────────────────────── */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+        <button
+          onClick={() => setWaOpen(!waOpen)}
+          className="w-full flex items-center justify-between p-5 hover:bg-white/5 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-green-500/20 rounded-xl flex items-center justify-center">
+              <span className="text-green-400 text-lg">💬</span>
+            </div>
+            <div className="text-left">
+              <p className="font-medium text-white">WhatsApp Business API</p>
+              <p className="text-xs text-gray-500">
+                {waSettings.active ? (
+                  <span className="text-green-400">● Активен</span>
+                ) : waSettings.phoneNumberId ? (
+                  <span className="text-yellow-400">● Настроен, не активен</span>
+                ) : (
+                  "Подключите WhatsApp к вашему боту"
+                )}
+              </p>
+            </div>
+          </div>
+          <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${waOpen ? "rotate-180" : ""}`} />
+        </button>
+
+        {waOpen && (
+          <div className="px-5 pb-5 space-y-4 border-t border-white/10 pt-4">
+            {/* Instructions */}
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-sm text-blue-300 space-y-1">
+              <p className="font-medium">Как подключить:</p>
+              <p>1. Откройте <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="underline">developers.facebook.com</a> → Ваше приложение → WhatsApp</p>
+              <p>2. Скопируйте <strong>Phone Number ID</strong> из раздела "Начало работы"</p>
+              <p>3. Создайте <strong>постоянный токен</strong> в System Users вашего Meta Business</p>
+              <p>4. Вставьте данные ниже → сохраните → скопируйте Webhook URL</p>
+              <p>5. В Meta Developers → WhatsApp → Configuration → вставьте Webhook URL и Verify Token</p>
+            </div>
+
+            {/* Webhook URL */}
+            {businessId && (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Webhook URL (скопируйте в Meta)</label>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={`https://staffix.io/api/whatsapp/webhook?businessId=${businessId}`}
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-gray-400 text-sm focus:outline-none"
+                  />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`https://staffix.io/api/whatsapp/webhook?businessId=${businessId}`);
+                    }}
+                    className="px-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl transition-colors"
+                  >
+                    <Copy className="h-4 w-4 text-gray-400" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">Phone Number ID</label>
+              <input
+                type="text"
+                value={waSettings.phoneNumberId}
+                onChange={(e) => setWaSettings({ ...waSettings, phoneNumberId: e.target.value })}
+                placeholder="1234567890123456"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-green-500/50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">Access Token</label>
+              <input
+                type="password"
+                value={waSettings.accessToken}
+                onChange={(e) => setWaSettings({ ...waSettings, accessToken: e.target.value })}
+                placeholder="EAAxxxxxxxx..."
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-green-500/50"
+              />
+              <p className="text-xs text-gray-500 mt-1">Токен уже сохранён (показан как ***). Введите новый только если хотите обновить.</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">Verify Token (придумайте сами)</label>
+              <input
+                type="text"
+                value={waSettings.verifyToken}
+                onChange={(e) => setWaSettings({ ...waSettings, verifyToken: e.target.value })}
+                placeholder="my_secret_token_2025"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-green-500/50"
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={waSettings.active}
+                  onChange={(e) => setWaSettings({ ...waSettings, active: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-green-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all" />
+              </label>
+              <span className="text-sm text-gray-300">Активировать WhatsApp канал</span>
+            </div>
+
+            <button
+              onClick={async () => {
+                setSavingWa(true);
+                try {
+                  const body: Record<string, unknown> = {
+                    waPhoneNumberId: waSettings.phoneNumberId,
+                    waVerifyToken: waSettings.verifyToken,
+                    waActive: waSettings.active,
+                  };
+                  if (waSettings.accessToken) body.waAccessToken = waSettings.accessToken;
+                  await fetch("/api/business", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                  });
+                  setWaSaved(true);
+                  setTimeout(() => setWaSaved(false), 3000);
+                } catch {}
+                setSavingWa(false);
+              }}
+              disabled={savingWa}
+              className="w-full bg-green-600/20 border border-green-500/30 text-green-300 py-3 px-4 rounded-xl font-medium hover:bg-green-600/30 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
+            >
+              {savingWa ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Сохраняем...</>
+              ) : waSaved ? (
+                <><Check className="h-4 w-4" /> Сохранено!</>
+              ) : (
+                <><Save className="h-4 w-4" /> Сохранить WhatsApp</>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Facebook Messenger ──────────────────────────────────── */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+        <button
+          onClick={() => setFbOpen(!fbOpen)}
+          className="w-full flex items-center justify-between p-5 hover:bg-white/5 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-blue-500/20 rounded-xl flex items-center justify-center">
+              <span className="text-blue-400 text-lg">💙</span>
+            </div>
+            <div className="text-left">
+              <p className="font-medium text-white">Facebook Messenger</p>
+              <p className="text-xs text-gray-500">
+                {fbSettings.active ? (
+                  <span className="text-green-400">● Активен</span>
+                ) : fbSettings.pageId ? (
+                  <span className="text-yellow-400">● Настроен, не активен</span>
+                ) : (
+                  "Подключите Facebook страницу к боту"
+                )}
+              </p>
+            </div>
+          </div>
+          <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${fbOpen ? "rotate-180" : ""}`} />
+        </button>
+
+        {fbOpen && (
+          <div className="px-5 pb-5 space-y-4 border-t border-white/10 pt-4">
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-sm text-blue-300 space-y-1">
+              <p className="font-medium">Как подключить:</p>
+              <p>1. <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="underline">developers.facebook.com</a> → Ваше приложение → Messenger → Настройка</p>
+              <p>2. Привяжите Facebook Страницу → скопируйте <strong>Page ID</strong> и сгенерируйте <strong>Page Access Token</strong></p>
+              <p>3. Вставьте данные ниже → сохраните → скопируйте Webhook URL</p>
+              <p>4. В Meta Developers → Messenger → Webhooks → вставьте Webhook URL и Verify Token → выберите events: <strong>messages</strong></p>
+            </div>
+
+            {businessId && (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Webhook URL (скопируйте в Meta)</label>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={`https://staffix.io/api/facebook/webhook?businessId=${businessId}`}
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-gray-400 text-sm focus:outline-none"
+                  />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`https://staffix.io/api/facebook/webhook?businessId=${businessId}`);
+                    }}
+                    className="px-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl transition-colors"
+                  >
+                    <Copy className="h-4 w-4 text-gray-400" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">Page ID</label>
+              <input
+                type="text"
+                value={fbSettings.pageId}
+                onChange={(e) => setFbSettings({ ...fbSettings, pageId: e.target.value })}
+                placeholder="123456789012345"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500/50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">Page Access Token</label>
+              <input
+                type="password"
+                value={fbSettings.pageAccessToken}
+                onChange={(e) => setFbSettings({ ...fbSettings, pageAccessToken: e.target.value })}
+                placeholder="EAAxxxxxxxx..."
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500/50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">Verify Token (придумайте сами)</label>
+              <input
+                type="text"
+                value={fbSettings.verifyToken}
+                onChange={(e) => setFbSettings({ ...fbSettings, verifyToken: e.target.value })}
+                placeholder="my_fb_secret_2025"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500/50"
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={fbSettings.active}
+                  onChange={(e) => setFbSettings({ ...fbSettings, active: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-blue-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all" />
+              </label>
+              <span className="text-sm text-gray-300">Активировать Facebook Messenger</span>
+            </div>
+
+            <button
+              onClick={async () => {
+                setSavingFb(true);
+                try {
+                  const body: Record<string, unknown> = {
+                    fbPageId: fbSettings.pageId,
+                    fbVerifyToken: fbSettings.verifyToken,
+                    fbActive: fbSettings.active,
+                  };
+                  if (fbSettings.pageAccessToken) body.fbPageAccessToken = fbSettings.pageAccessToken;
+                  await fetch("/api/business", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                  });
+                  setFbSaved(true);
+                  setTimeout(() => setFbSaved(false), 3000);
+                } catch {}
+                setSavingFb(false);
+              }}
+              disabled={savingFb}
+              className="w-full bg-blue-600/20 border border-blue-500/30 text-blue-300 py-3 px-4 rounded-xl font-medium hover:bg-blue-600/30 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
+            >
+              {savingFb ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Сохраняем...</>
+              ) : fbSaved ? (
+                <><Check className="h-4 w-4" /> Сохранено!</>
+              ) : (
+                <><Save className="h-4 w-4" /> Сохранить Facebook Messenger</>
               )}
             </button>
           </div>

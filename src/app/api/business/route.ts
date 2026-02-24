@@ -58,7 +58,12 @@ export async function GET() {
     ]);
 
     return NextResponse.json({
-      business,
+      business: {
+        ...business,
+        // Mask sensitive tokens in GET response
+        waAccessToken: business.waAccessToken ? "***" : null,
+        fbPageAccessToken: business.fbPageAccessToken ? "***" : null,
+      },
       stats: { bookingsToday, totalClients },
     });
   } catch (error) {
@@ -144,7 +149,7 @@ export async function PUT(request: Request) {
     }
 
     const data = await request.json();
-    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, botLogo, timezone, ownerTelegramUsername, paymeId, clickServiceId, clickMerchantId, kaspiPayLink } = data;
+    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, botLogo, timezone, ownerTelegramUsername, paymeId, clickServiceId, clickMerchantId, kaspiPayLink, waPhoneNumberId, waAccessToken, waVerifyToken, waActive, fbPageId, fbPageAccessToken, fbVerifyToken, fbActive } = data;
 
     // Найти бизнес пользователя
     const existingBusiness = await prisma.business.findFirst({
@@ -175,6 +180,18 @@ export async function PUT(request: Request) {
     if (clickServiceId !== undefined) updateData.clickServiceId = clickServiceId || null;
     if (clickMerchantId !== undefined) updateData.clickMerchantId = clickMerchantId || null;
     if (kaspiPayLink !== undefined) updateData.kaspiPayLink = kaspiPayLink || null;
+
+    // WhatsApp
+    if (waPhoneNumberId !== undefined) updateData.waPhoneNumberId = waPhoneNumberId || null;
+    if (waAccessToken !== undefined) updateData.waAccessToken = waAccessToken || null;
+    if (waVerifyToken !== undefined) updateData.waVerifyToken = waVerifyToken || null;
+    if (waActive !== undefined) updateData.waActive = Boolean(waActive);
+
+    // Facebook Messenger
+    if (fbPageId !== undefined) updateData.fbPageId = fbPageId || null;
+    if (fbPageAccessToken !== undefined) updateData.fbPageAccessToken = fbPageAccessToken || null;
+    if (fbVerifyToken !== undefined) updateData.fbVerifyToken = fbVerifyToken || null;
+    if (fbActive !== undefined) updateData.fbActive = Boolean(fbActive);
 
     // Если передан токен бота - валидируем и регистрируем/перерегистрируем webhook
     if (botToken) {
