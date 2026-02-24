@@ -35,6 +35,7 @@ export default function ServicesPage() {
   const [importCsv, setImportCsv] = useState("");
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ message: string; errors?: string[] } | null>(null);
+  const [parsingFile, setParsingFile] = useState(false);
 
   // Загрузка услуг из базы данных
   const fetchServices = useCallback(async () => {
@@ -134,17 +135,21 @@ export default function ServicesPage() {
     const ext = file.name.split(".").pop()?.toLowerCase();
 
     if (ext === "xlsx" || ext === "xls") {
-      const mod = await import("xlsx");
-      const XLSX = mod.default || mod;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const data = new Uint8Array(ev.target?.result as ArrayBuffer);
+      setParsingFile(true);
+      try {
+        const mod = await import("xlsx");
+        const XLSX = mod.default || mod;
+        const buf = await file.arrayBuffer();
+        const data = new Uint8Array(buf);
         const wb = XLSX.read(data, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const csv = XLSX.utils.sheet_to_csv(ws, { FS: ";", rawNumbers: true });
         setImportCsv(csv);
-      };
-      reader.readAsArrayBuffer(file);
+      } catch {
+        setImportResult({ message: "Ошибка чтения Excel файла" });
+      } finally {
+        setParsingFile(false);
+      }
     } else {
       const reader = new FileReader();
       reader.onload = (ev) => setImportCsv((ev.target?.result as string) || "");

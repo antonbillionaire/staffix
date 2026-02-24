@@ -47,6 +47,7 @@ export default function ProductsPage() {
   const [importCsv, setImportCsv] = useState("");
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ message: string; errors?: string[] } | null>(null);
+  const [parsingFile, setParsingFile] = useState(false);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -148,18 +149,21 @@ export default function ProductsPage() {
     const ext = file.name.split(".").pop()?.toLowerCase();
 
     if (ext === "xlsx" || ext === "xls") {
-      // Excel: parse with SheetJS
-      const mod = await import("xlsx");
-      const XLSX = mod.default || mod;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const data = new Uint8Array(ev.target?.result as ArrayBuffer);
+      setParsingFile(true);
+      try {
+        const mod = await import("xlsx");
+        const XLSX = mod.default || mod;
+        const buf = await file.arrayBuffer();
+        const data = new Uint8Array(buf);
         const wb = XLSX.read(data, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const csv = XLSX.utils.sheet_to_csv(ws, { FS: ";", rawNumbers: true });
         setImportCsv(csv);
-      };
-      reader.readAsArrayBuffer(file);
+      } catch {
+        setImportResult({ message: "Ошибка чтения Excel файла" });
+      } finally {
+        setParsingFile(false);
+      }
     } else {
       // CSV/TXT: read as text
       const reader = new FileReader();
@@ -586,6 +590,13 @@ export default function ProductsPage() {
                   className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none resize-none ${input}`}
                 />
               </div>
+
+              {parsingFile && (
+                <div className={`flex items-center gap-2 p-3 rounded-lg text-sm ${isDark ? "bg-blue-500/10 text-blue-300" : "bg-blue-50 text-blue-700"}`}>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Чтение Excel файла...
+                </div>
+              )}
 
               {importResult && (
                 <div className={`p-3 rounded-lg text-sm ${importResult.errors && importResult.errors.length > 0 ? (isDark ? "bg-yellow-500/10 text-yellow-300" : "bg-yellow-50 text-yellow-800") : (isDark ? "bg-green-500/10 text-green-300" : "bg-green-50 text-green-800")}`}>
