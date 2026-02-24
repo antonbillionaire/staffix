@@ -3,6 +3,9 @@
  * Интеграция с AI Memory System (Фаза 1)
  */
 
+// Vercel Pro: allow up to 300 seconds for AI processing
+export const maxDuration = 300;
+
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
