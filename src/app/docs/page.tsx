@@ -23,6 +23,13 @@ import {
   Menu,
   X,
   ShoppingCart,
+  ShoppingBag,
+  CalendarDays,
+  Users2,
+  Package,
+  CreditCard,
+  Bell,
+  FileUp,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { languages } from "@/lib/translations";
@@ -41,6 +48,13 @@ const sectionIcons: Record<string, typeof Brain> = {
   UserCog,
   BarChart3,
   ShoppingCart,
+  ShoppingBag,
+  CalendarDays,
+  Users2,
+  Package,
+  CreditCard,
+  Bell,
+  FileUp,
 };
 
 export default function DocsPage() {
