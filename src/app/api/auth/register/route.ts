@@ -22,7 +22,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name, email, password, businessName } = await request.json();
+    const { name, email, password, businessName, referralCode: bodyRefCode } = await request.json();
+
+    // Referral code: from request body (passed by frontend from cookie) or cookie directly
+    const cookieRefCode = request.cookies.get("staffix_ref")?.value;
+    const referralCode = bodyRefCode || cookieRefCode || null;
 
     // Validate input
     if (!name || !email || !password || !businessName) {
@@ -66,6 +70,7 @@ export async function POST(request: NextRequest) {
         emailVerified: false,
         verificationToken: verificationCode,
         verificationExpires: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+        referredByCode: referralCode,
         businesses: {
           create: {
             name: businessName,
@@ -83,6 +88,22 @@ export async function POST(request: NextRequest) {
         businesses: true,
       },
     });
+
+    // Track partner referral (non-blocking)
+    if (referralCode) {
+      prisma.partner.findUnique({ where: { referralCode } }).then((partner) => {
+        if (partner) {
+          return prisma.partnerReferral.create({
+            data: {
+              userId: user.id,
+              userEmail: email,
+              referralCode,
+              partnerId: partner.id,
+            },
+          });
+        }
+      }).catch(console.error);
+    }
 
     // Remove password from response
     const { password: _, verificationToken: __, ...userWithoutPassword } = user;

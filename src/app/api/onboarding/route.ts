@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     }
 
     const data = await request.json();
-    const { businessType, businessName, phone, address, staffCount, language } = data;
+    const { businessType, businessName, phone, address, staffCount, language, crmSystem } = data;
 
     if (!businessName) {
       return NextResponse.json(
@@ -55,6 +55,7 @@ export async function POST(request: Request) {
           businessType: businessType || null,
           staffCount: staffCount ? parseInt(staffCount) || null : null,
           language: language || "ru",
+          crmSystem: crmSystem || null,
           onboardingCompleted: true,
         },
       });
@@ -69,6 +70,7 @@ export async function POST(request: Request) {
           businessType: businessType || null,
           staffCount: staffCount ? parseInt(staffCount) || null : null,
           language: language || "ru",
+          crmSystem: crmSystem || null,
           onboardingCompleted: true,
           subscription: {
             create: {

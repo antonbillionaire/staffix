@@ -98,9 +98,10 @@ export default function OnboardingPage() {
     address: "",
     staffCount: "",
     language: "ru",
+    crmSystem: "",
   });
 
-  const totalSteps = 5;
+  const totalSteps = 6;
 
   const handleNext = () => {
     if (step === 1 && !formData.businessType) {
@@ -266,7 +267,7 @@ export default function OnboardingPage() {
 
         {/* Progress */}
         <div className="flex items-center justify-between mb-8">
-          {[1, 2, 3, 4, 5].map((s) => (
+          {[1, 2, 3, 4, 5, 6].map((s) => (
             <div key={s} className="flex items-center">
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center font-medium transition-all ${
@@ -281,7 +282,7 @@ export default function OnboardingPage() {
               </div>
               {s < totalSteps && (
                 <div
-                  className={`w-12 sm:w-16 h-1 mx-1 sm:mx-2 rounded ${
+                  className={`w-8 sm:w-12 h-1 mx-1 rounded ${
                     s < step ? "bg-green-500" : "bg-white/10"
                   }`}
                 />
@@ -418,8 +419,56 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 3: File Upload */}
+        {/* Step 3: CRM Question */}
         {step === 3 && (
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              Используете ли вы CRM-систему?
+            </h2>
+            <p className="text-gray-400 mb-6">
+              Staffix легко интегрируется с вашей CRM — или может помочь выбрать подходящую.
+            </p>
+
+            <div className="space-y-3">
+              {[
+                { id: "none", label: "Нет, пока без CRM", desc: "Staffix сам ведёт базу клиентов и историю записей" },
+                { id: "bitrix24", label: "Битрикс24", desc: "Staffix создаёт сделки в Битрикс24 через API автоматически" },
+                { id: "amocrm", label: "amoCRM", desc: "AI квалифицирует лиды и пушит в воронку amoCRM" },
+                { id: "smartup", label: "Smartup / BILLZ", desc: "AI-консьерж для розницы, данные синхронизируются" },
+                { id: "1c", label: "1С", desc: "Интеграция через webhook и API" },
+                { id: "other", label: "Другая CRM", desc: "Подскажем как интегрировать" },
+              ].map((crm) => (
+                <button
+                  key={crm.id}
+                  onClick={() => setFormData({ ...formData, crmSystem: crm.id })}
+                  className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+                    formData.crmSystem === crm.id
+                      ? "border-blue-500 bg-blue-500/10"
+                      : "border-white/10 hover:border-white/20 bg-white/5"
+                  }`}
+                >
+                  <p className={`font-medium ${formData.crmSystem === crm.id ? "text-blue-400" : "text-white"}`}>
+                    {crm.label}
+                  </p>
+                  <p className="text-sm text-gray-400 mt-0.5">{crm.desc}</p>
+                </button>
+              ))}
+            </div>
+
+            {formData.crmSystem === "none" && (
+              <div className="mt-4 bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
+                <p className="text-sm text-blue-300">
+                  💡 <span className="font-medium">Рекомендуем:</span> Битрикс24 или amoCRM прекрасно работают
+                  вместе со Staffix. Staffix добавляет AI-сотрудника поверх CRM — ваши клиенты пишут
+                  в WhatsApp/Telegram, AI отвечает, данные сами попадают в CRM.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Step 4: File Upload */}
+        {step === 4 && (
           <div>
             <h2 className="text-2xl font-bold text-white mb-2">
               {t("onboarding.step3.title")}
@@ -501,8 +550,8 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 4: Language */}
-        {step === 4 && (
+        {/* Step 5: Language */}
+        {step === 5 && (
           <div>
             <h2 className="text-2xl font-bold text-white mb-2">
               {t("onboarding.step4.title")}
@@ -538,8 +587,8 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 5: Confirmation */}
-        {step === 5 && (
+        {/* Step 6: Confirmation */}
+        {step === 6 && (
           <div>
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -574,6 +623,14 @@ export default function OnboardingPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-500">{t("onboarding.step2.address")}:</span>
                   <span className="text-white font-medium">{formData.address}</span>
+                </div>
+              )}
+              {formData.crmSystem && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">CRM:</span>
+                  <span className="text-white font-medium capitalize">
+                    {formData.crmSystem === "none" ? "Без CRM" : formData.crmSystem}
+                  </span>
                 </div>
               )}
               <div className="flex justify-between">

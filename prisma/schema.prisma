@@ -19,6 +19,9 @@ model User {
   verificationToken String? @unique
   verificationExpires DateTime?
 
+  // Реферальная атрибуция
+  referredByCode  String?   // код партнёра, использованный при регистрации
+
   // Настройки
   theme         String    @default("dark") // dark, light
 
@@ -79,6 +82,9 @@ model Business {
   totalConversations Int     @default(0)
   totalBookings     Int       @default(0)
   conversionRate    Float?    // % разговоров → записи
+
+  // CRM интеграция (вопрос при онбординге)
+  crmSystem     String?   // none, bitrix24, amocrm, smartup, billz, 1c, other
 
   // AI настройки
   aiTone        String?   // friendly, professional, casual
@@ -1146,6 +1152,100 @@ model OrderItem {
 
   productId   String?
   product     Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+}
+
+// ========================================
+// ПАРТНЁРСКАЯ ПРОГРАММА
+// ========================================
+
+// Партнёры (CRM-дистрибьюторы, агентства, рефереры)
+model Partner {
+  id              String    @id @default(cuid())
+
+  // Профиль
+  name            String
+  email           String    @unique
+  phone           String?
+  company         String?   // название компании/агентства
+  website         String?
+  description     String?   // как планирует продвигать Staffix
+
+  // Реферальный код (генерируется при одобрении)
+  referralCode    String?   @unique
+
+  // Токен доступа к дашборду (UUID, отправляется на email)
+  accessToken     String?   @unique
+
+  // Статус
+  status          String    @default("pending") // pending, approved, rejected, suspended
+  approvedAt      DateTime?
+
+  // Финансы
+  commissionRate  Float     @default(0.20) // 20%
+  totalEarnings   Float     @default(0)    // суммарно заработано
+  totalPaid       Float     @default(0)    // суммарно выплачено
+  pendingPayout   Float     @default(0)    // ожидает выплаты
+
+  referrals       PartnerReferral[]
+  earnings        PartnerEarning[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([status])
+  @@index([referralCode])
+}
+
+// Реферальные переходы (кто пришёл по ссылке партнёра)
+model PartnerReferral {
+  id              String    @id @default(cuid())
+
+  // Кто пришёл
+  userId          String    // User.id кто зарегистрировался
+  userEmail       String
+
+  // Атрибуция
+  referralCode    String
+  signedUpAt      DateTime  @default(now())
+
+  // Конверсия в платящего
+  converted       Boolean   @default(false)
+  convertedAt     DateTime?
+  convertedPlan   String?   // starter, pro, business, enterprise
+
+  partnerId       String
+  partner         Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  earnings        PartnerEarning[]
+
+  @@unique([userId])
+  @@index([partnerId, converted])
+  @@index([referralCode])
+}
+
+// Начисления партнёру (за каждый платёж реферала)
+model PartnerEarning {
+  id              String    @id @default(cuid())
+
+  // Сумма
+  commissionAmount Float    // сколько начислено партнёру ($)
+  paymentAmount    Float    // полная сумма платежа реферала ($)
+  subscriptionPlan String   // starter, pro, business, enterprise
+
+  // Статус
+  status          String    @default("pending") // pending, approved, paid
+  paidAt          DateTime?
+
+  referralId      String
+  referral        PartnerReferral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+
+  partnerId       String
+  partner         Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime  @default(now())
+
+  @@index([partnerId, status])
+  @@index([partnerId, createdAt])
 }
 
 // Rate limiting — защита от брутфорса
