@@ -23,15 +23,27 @@ const faqItems = [
   },
   {
     question: "Как подключить Telegram бота?",
-    answer: "После завершения онбординга вы получите ссылку на готового Telegram бота. Просто поделитесь этой ссылкой с клиентами или разместите на вашем сайте.",
+    answer: "1. Откройте @BotFather в Telegram → отправьте /newbot\n2. Придумайте имя и username бота\n3. Скопируйте токен (выглядит как 123456789:ABCxxx)\n4. Dashboard → Бот → вставьте токен → нажмите «Активировать AI»\nГотово! Бот начнёт отвечать клиентам автоматически.",
   },
   {
     question: "Что входит в пробный период?",
-    answer: "В пробный период (14 дней) входят все функции стартового плана: 100 сообщений, 1 AI-сотрудник, базовая аналитика и email поддержка.",
+    answer: "В пробный период (14 дней) входят все функции платформы: 100 сообщений AI, CRM, записи, рассылки, аналитика. Кредитная карта не нужна.",
   },
   {
     question: "Как увеличить лимит сообщений?",
     answer: "Перейдите в Настройки → Подписка и выберите подходящий тарифный план. После оплаты лимит будет увеличен автоматически.",
+  },
+  {
+    question: "💬 Как подключить WhatsApp к боту? (пошагово)",
+    answer: "Шаг 1. Купите отдельную симкарту — номер не должен быть в WhatsApp.\n\nШаг 2. Установите WhatsApp Business, зарегистрируйте эту симку.\n\nШаг 3. Зайдите на developers.facebook.com → ваше приложение → WhatsApp → API Setup → скопируйте Phone Number ID и Access Token.\n\nШаг 4. Dashboard → Бот → WhatsApp → вставьте Phone Number ID + Access Token → придумайте Verify Token (например: myjuntos2025) → Сохранить → скопируйте Webhook URL.\n\nШаг 5. Вернитесь в Meta Developers → WhatsApp → Configuration → вставьте Webhook URL и Verify Token → выберите событие messages → Verify and Save.\n\nШаг 6. В Staffix включите тоггл «Активировать WhatsApp» → Сохранить.\n\nВсё! Клиенты пишут в WhatsApp — AI отвечает. Если не получается — напишите нам, поможем за 15 минут.",
+  },
+  {
+    question: "💬 WhatsApp подключён, но бот не отвечает",
+    answer: "Проверьте:\n✅ Тоггл «Активировать WhatsApp» включён\n✅ Phone Number ID — только цифры, 16-17 знаков\n✅ Access Token начинается с EAAA... и не истёк (временный токен живёт 24 часа — создайте постоянный через System Users в Meta Business)\n✅ Verify Token в Staffix совпадает с тем что вы вводили в Meta\n✅ В Meta Developers → WhatsApp → Configuration — Webhook зелёный (активен)\n✅ В подписках Webhook выбрано событие messages\n\nЕсли всё верно, но не работает — напишите нам с скриншотом страницы Configuration.",
+  },
+  {
+    question: "💬 Где взять постоянный Access Token для WhatsApp?",
+    answer: "Временный токен истекает через 24 часа. Постоянный:\n1. business.facebook.com → Настройки → Системные пользователи\n2. Добавить системного пользователя → роль Admin\n3. Создать токен → выберите приложение Staffix AI\n4. Разрешения: whatsapp_business_messaging + whatsapp_business_management\n5. Создать токен → скопируйте\n6. Вставьте в Staffix → Бот → WhatsApp → Access Token → Сохранить\n\nЭтот токен бессрочный.",
   },
 ];
 

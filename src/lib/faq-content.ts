@@ -446,6 +446,80 @@ export const faqCategories: FaqCategory[] = [
     ],
   },
 
+  // ==================== WHATSAPP ====================
+  {
+    id: "whatsapp",
+    icon: "MessageCircle",
+    title: {
+      ru: "Подключение WhatsApp",
+      en: "WhatsApp Setup",
+      uz: "WhatsApp ulash",
+      kz: "WhatsApp қосу",
+    },
+    questions: [
+      {
+        id: "whatsapp-what-need",
+        question: {
+          ru: "Что нужно для подключения WhatsApp?",
+          en: "What do I need to connect WhatsApp?",
+          uz: "WhatsApp ulash uchun nima kerak?",
+          kz: "WhatsApp қосу үшін не керек?",
+        },
+        answer: {
+          ru: "Для подключения WhatsApp понадобится:\n\n• Отдельная симкарта (любой оператор), которая ещё не привязана к WhatsApp\n• Телефон для получения SMS-кода при регистрации\n• Аккаунт в Facebook (для Meta Developers)\n\nНомер будет работать как WhatsApp Business API — клиенты пишут вам, AI отвечает автоматически.",
+          en: "To connect WhatsApp, you'll need:\n\n• A separate SIM card (any carrier) not yet linked to WhatsApp\n• A phone to receive the SMS verification code\n• A Facebook account (for Meta Developers)\n\nThe number will work as WhatsApp Business API — clients write to you, AI replies automatically.",
+          uz: "WhatsApp ulash uchun kerak:\n\n• Alohida SIM-karta (istalgan operator), hali WhatsApp-ga bog'lanmagan\n• SMS-kod olish uchun telefon\n• Facebook akkaunti (Meta Developers uchun)\n\nRaqam WhatsApp Business API sifatida ishlaydi — mijozlar sizga yozadi, AI avtomatik javob beradi.",
+          kz: "WhatsApp қосу үшін қажет:\n\n• Бөлек SIM-карта (кез келген оператор), әлі WhatsApp-қа байланбаған\n• SMS-код алу үшін телефон\n• Facebook аккаунті (Meta Developers үшін)\n\nНөмір WhatsApp Business API ретінде жұмыс істейді — клиенттер сізге жазады, AI автоматты жауап береді.",
+        },
+      },
+      {
+        id: "whatsapp-step-by-step",
+        question: {
+          ru: "Пошаговая инструкция: как подключить WhatsApp к боту?",
+          en: "Step-by-step: how to connect WhatsApp to the bot?",
+          uz: "Bosqichma-bosqich: WhatsApp-ni botga qanday ulash mumkin?",
+          kz: "Қадамдық нұсқаулық: WhatsApp-ты ботқа қалай қосуға болады?",
+        },
+        answer: {
+          ru: "**Шаг 1. Купите отдельную симкарту**\nВозьмите новую симку любого оператора. Важно: этот номер не должен быть зарегистрирован в WhatsApp.\n\n**Шаг 2. Зарегистрируйтесь в WhatsApp Business**\nСкачайте приложение WhatsApp Business, зарегистрируйте на нём эту симку — получите SMS, введите код.\n\n**Шаг 3. Откройте Meta Developers**\nЗайдите на developers.facebook.com → войдите через Facebook → выберите ваше приложение (или создайте новое) → перейдите в раздел WhatsApp → API Setup.\n\n**Шаг 4. Скопируйте Phone Number ID и Access Token**\nНа странице API Setup увидите поле Phone Number ID — скопируйте его. Временный Access Token там же — скопируйте (или создайте постоянный через System Users).\n\n**Шаг 5. Внесите данные в Staffix**\nDashboard → Бот → раздел WhatsApp → вставьте Phone Number ID и Access Token → придумайте Verify Token (любое слово, например: mybusiness2025) → нажмите Сохранить → скопируйте Webhook URL.\n\n**Шаг 6. Настройте Webhook в Meta**\nMeta Developers → WhatsApp → Configuration → вставьте Webhook URL и Verify Token → выберите событие messages → нажмите Verify and Save.\n\n**Шаг 7. Активируйте**\nВернитесь в Staffix → Бот → WhatsApp → включите тоггл «Активировать» → Сохранить.\n\nГотово! Теперь клиенты пишут на ваш WhatsApp, а AI отвечает автоматически. Если что-то не получается — напишите в поддержку, поможем за 15 минут.",
+          en: "**Step 1. Get a separate SIM card**\nGet a new SIM from any carrier. Important: the number must not be registered in WhatsApp.\n\n**Step 2. Register in WhatsApp Business**\nDownload WhatsApp Business app, register this SIM — receive SMS, enter the code.\n\n**Step 3. Open Meta Developers**\nGo to developers.facebook.com → log in via Facebook → select your app (or create one) → go to WhatsApp → API Setup.\n\n**Step 4. Copy Phone Number ID and Access Token**\nOn the API Setup page, find Phone Number ID — copy it. Temporary Access Token is there too — copy it (or create a permanent one via System Users).\n\n**Step 5. Enter data in Staffix**\nDashboard → Bot → WhatsApp section → paste Phone Number ID and Access Token → invent a Verify Token (any word, e.g.: mybusiness2025) → click Save → copy the Webhook URL.\n\n**Step 6. Set up Webhook in Meta**\nMeta Developers → WhatsApp → Configuration → paste Webhook URL and Verify Token → select messages event → click Verify and Save.\n\n**Step 7. Activate**\nReturn to Staffix → Bot → WhatsApp → enable the Activate toggle → Save.\n\nDone! Clients write to your WhatsApp, AI replies automatically. If you need help — contact support, we'll help in 15 minutes.",
+          uz: "**1-qadam. Alohida SIM-karta oling**\nIstalgan operatordan yangi SIM-karta oling. Muhim: bu raqam WhatsApp-da ro'yxatdan o'tmagan bo'lishi kerak.\n\n**2-qadam. WhatsApp Business-da ro'yxatdan o'ting**\nWhatsApp Business ilovasini yuklab oling, ushbu SIM-kartani ro'yxatdan o'tkazing — SMS oling, kodni kiriting.\n\n**3-qadam. Meta Developers-ni oching**\ndevelopers.facebook.com ga kiring → Facebook orqali kiring → ilovangizni tanlang → WhatsApp → API Setup ga o'ting.\n\n**4-qadam. Phone Number ID va Access Token-ni nusxalang**\nAPI Setup sahifasida Phone Number ID maydonini toping — nusxalang. Vaqtinchalik Access Token ham u yerda — nusxalang.\n\n**5-qadam. Ma'lumotlarni Staffix-ga kiriting**\nDashboard → Bot → WhatsApp bo'limi → Phone Number ID va Access Token-ni joylashtiring → Verify Token o'ylab toping → Saqlash tugmasini bosing → Webhook URL-ni nusxalang.\n\n**6-qadam. Meta-da Webhook-ni sozlang**\nMeta Developers → WhatsApp → Configuration → Webhook URL va Verify Token-ni joylashtiring → messages hodisasini tanlang → Verify and Save.\n\n**7-qadam. Faollashtiring**\nStaffixga qayting → Bot → WhatsApp → Faollashtirish tugmasini yoqing → Saqlash.\n\nTayyor! Endi mijozlar sizning WhatsApp-ingizga yozadi, AI avtomatik javob beradi.",
+          kz: "**1-қадам. Бөлек SIM-карта алыңыз**\nКез келген операторда жаңа SIM-карта алыңыз. Маңызды: бұл нөмір WhatsApp-та тіркелмеген болуы керек.\n\n**2-қадам. WhatsApp Business-та тіркеліңіз**\nWhatsApp Business қосымшасын жүктеңіз, осы SIM-картаны тіркеңіз — SMS алыңыз, кодты енгізіңіз.\n\n**3-қадам. Meta Developers-ті ашыңыз**\ndevelopers.facebook.com сайтына кіріңіз → Facebook арқылы кіріңіз → қосымшаңызды таңдаңыз → WhatsApp → API Setup-қа өтіңіз.\n\n**4-қадам. Phone Number ID мен Access Token-ді көшіріңіз**\nAPI Setup бетінде Phone Number ID өрісін табыңыз — көшіріңіз. Уақытша Access Token да сонда — көшіріңіз.\n\n**5-қадам. Деректерді Staffix-ке енгізіңіз**\nDashboard → Бот → WhatsApp бөлімі → Phone Number ID мен Access Token-ді қойыңыз → Verify Token ойлап табыңыз → Сақтау → Webhook URL-ді көшіріңіз.\n\n**6-қадам. Meta-да Webhook орнатыңыз**\nMeta Developers → WhatsApp → Configuration → Webhook URL мен Verify Token-ді қойыңыз → messages оқиғасын таңдаңыз → Verify and Save.\n\n**7-қадам. Белсендіріңіз**\nStaffixке оралыңыз → Бот → WhatsApp → Белсендіру тоглін қосыңыз → Сақтау.\n\nДайын!",
+        },
+      },
+      {
+        id: "whatsapp-permanent-token",
+        question: {
+          ru: "Как создать постоянный Access Token для WhatsApp?",
+          en: "How to create a permanent WhatsApp Access Token?",
+          uz: "WhatsApp uchun doimiy Access Token qanday yaratiladi?",
+          kz: "WhatsApp үшін тұрақты Access Token қалай жасалады?",
+        },
+        answer: {
+          ru: "Временный токен истекает через 24 часа. Для постоянной работы создайте системный токен:\n\n1. Откройте business.facebook.com → Настройки → Системные пользователи\n2. Нажмите «Добавить системного пользователя» → дайте ему роль Admin\n3. Нажмите «Создать токен» → выберите ваше приложение Staffix AI\n4. В разделе разрешений включите: whatsapp_business_messaging + whatsapp_business_management\n5. Нажмите «Создать токен» → скопируйте токен → сохраните в надёжное место\n6. Вставьте этот токен в настройках WhatsApp в Staffix\n\nЭтот токен бессрочный. Если возникнут сложности — напишите в поддержку, поможем пошагово.",
+          en: "The temporary token expires after 24 hours. For permanent operation, create a system token:\n\n1. Open business.facebook.com → Settings → System Users\n2. Click Add System User → give it Admin role\n3. Click Generate Token → select your Staffix AI app\n4. In permissions, enable: whatsapp_business_messaging + whatsapp_business_management\n5. Click Generate Token → copy the token → save it securely\n6. Paste this token in WhatsApp settings in Staffix\n\nThis token never expires. If you need help — contact support.",
+          uz: "Vaqtinchalik token 24 soatdan keyin tugaydi. Doimiy ishlash uchun tizim tokenini yarating:\n\n1. business.facebook.com → Sozlamalar → Tizim foydalanuvchilari\n2. Tizim foydalanuvchisini qo'shish → Admin roli bering\n3. Token yaratish → Staffix AI ilovangizni tanlang\n4. Ruxsatlar: whatsapp_business_messaging + whatsapp_business_management\n5. Token yaratish → nusxalang → xavfsiz joyga saqlang\n6. Bu tokenni Staffix WhatsApp sozlamalariga joylashtiring\n\nBu token muddatsiz.",
+          kz: "Уақытша токен 24 сағаттан кейін аяқталады. Тұрақты жұмыс үшін жүйелік токен жасаңыз:\n\n1. business.facebook.com → Параметрлер → Жүйелік пайдаланушылар\n2. Жүйелік пайдаланушы қосу → Admin рөлін беріңіз\n3. Токен жасау → Staffix AI қосымшаңызды таңдаңыз\n4. Рұқсаттар: whatsapp_business_messaging + whatsapp_business_management\n5. Токен жасау → көшіріңіз → сенімді жерге сақтаңыз\n6. Бұл токенді Staffix WhatsApp баптауларына қойыңыз\n\nБұл токен мерзімсіз.",
+        },
+      },
+      {
+        id: "whatsapp-not-working",
+        question: {
+          ru: "WhatsApp подключён, но бот не отвечает. Что делать?",
+          en: "WhatsApp is connected, but the bot doesn't respond. What to do?",
+          uz: "WhatsApp ulangan, lekin bot javob bermayapti. Nima qilish kerak?",
+          kz: "WhatsApp қосылған, бірақ бот жауап бермейді. Не істеу керек?",
+        },
+        answer: {
+          ru: "Проверьте по чек-листу:\n\n✅ В разделе WhatsApp включён тоггл «Активировать»\n✅ Phone Number ID — числовой, без пробелов (16-17 цифр)\n✅ Access Token начинается с EAAA... и не истёк (или используйте постоянный)\n✅ Verify Token в Staffix совпадает с тем, что вы вводили в Meta Developers\n✅ В Meta Developers → WhatsApp → Configuration → Webhook активен (зелёная галочка)\n✅ В подписках Webhook выбрано событие messages\n\nЕсли всё в порядке — напишите в поддержку, приложите скриншот страницы Configuration в Meta Developers. Разберёмся за 15 минут.",
+          en: "Check this list:\n\n✅ In WhatsApp section, the Activate toggle is on\n✅ Phone Number ID is numeric, no spaces (16-17 digits)\n✅ Access Token starts with EAAA... and hasn't expired (or use a permanent one)\n✅ Verify Token in Staffix matches what you entered in Meta Developers\n✅ In Meta Developers → WhatsApp → Configuration → Webhook is active (green checkmark)\n✅ Webhook subscriptions include the messages event\n\nIf everything looks fine — contact support with a screenshot of the Configuration page. We'll resolve it in 15 minutes.",
+          uz: "Tekshirish ro'yxati:\n\n✅ WhatsApp bo'limida Faollashtirish tugmasi yoqilgan\n✅ Phone Number ID raqamli, bo'shliqlarsiz (16-17 raqam)\n✅ Access Token EAAA... bilan boshlanadi va muddati o'tmagan\n✅ Staffixdagi Verify Token Meta Developers-ga kiritilgan bilan mos keladi\n✅ Meta Developers → WhatsApp → Configuration → Webhook faol (yashil belgi)\n✅ Webhook obunalarida messages hodisasi tanlangan\n\nHamma narsa to'g'ri ko'rinsa — qo'llab-quvvatlash xizmatiga yozing.",
+          kz: "Тексеру тізімі:\n\n✅ WhatsApp бөлімінде Белсендіру тоглі қосулы\n✅ Phone Number ID сандық, бос орынсыз (16-17 сан)\n✅ Access Token EAAA... басталады және мерзімі өтпеген\n✅ Staffixтегі Verify Token Meta Developers-ке енгізілгенмен сәйкес\n✅ Meta Developers → WhatsApp → Configuration → Webhook белсенді (жасыл белгі)\n✅ Webhook жазылымдарында messages оқиғасы таңдалған\n\nБәрі дұрыс болып көрінсе — қолдауға жазыңыз.",
+        },
+      },
+    ],
+  },
+
   // ==================== SECURITY ====================
   {
     id: "security",
