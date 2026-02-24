@@ -455,15 +455,6 @@ export default function OnboardingPage() {
               ))}
             </div>
 
-            {formData.crmSystem === "none" && (
-              <div className="mt-4 bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-                <p className="text-sm text-blue-300">
-                  💡 <span className="font-medium">Рекомендуем:</span> Битрикс24 или amoCRM прекрасно работают
-                  вместе со Staffix. Staffix добавляет AI-сотрудника поверх CRM — ваши клиенты пишут
-                  в WhatsApp/Telegram, AI отвечает, данные сами попадают в CRM.
-                </p>
-              </div>
-            )}
           </div>
         )}
 
