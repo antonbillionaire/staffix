@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, X, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Loader2, Upload } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -29,6 +29,12 @@ export default function ServicesPage() {
     price: "",
     duration: "",
   });
+
+  // CSV Import state
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importCsv, setImportCsv] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ message: string; errors?: string[] } | null>(null);
 
   // Загрузка услуг из базы данных
   const fetchServices = useCallback(async () => {
@@ -122,6 +128,34 @@ export default function ServicesPage() {
     }
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setImportCsv((ev.target?.result as string) || "");
+    reader.readAsText(file, "utf-8");
+  };
+
+  const handleImport = async () => {
+    if (!importCsv.trim()) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const res = await fetch("/api/import/services", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csv: importCsv }),
+      });
+      const data = await res.json();
+      setImportResult({ message: data.message || data.error, errors: data.errors });
+      if (data.created > 0) await fetchServices();
+    } catch {
+      setImportResult({ message: "Ошибка при импорте" });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const formatPrice = (price: number) => {
     const locale = language === "ru" ? "ru-RU" : language === "kz" ? "kk-KZ" : language === "uz" ? "uz-UZ" : "en-US";
     const currency = language === "en" ? "$" : language === "kz" ? " тг" : language === "uz" ? " so'm" : " сум";
@@ -137,13 +171,22 @@ export default function ServicesPage() {
             {t("servicesPage.subtitle")}
           </p>
         </div>
-        <button
-          onClick={() => openModal()}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          {t("servicesPage.add")}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setIsImportOpen(true); setImportResult(null); setImportCsv(""); }}
+            className={`px-3 py-2 rounded-lg font-medium flex items-center gap-2 text-sm border ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+          >
+            <Upload className="h-4 w-4" />
+            Импорт CSV
+          </button>
+          <button
+            onClick={() => openModal()}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            {t("servicesPage.add")}
+          </button>
+        </div>
       </div>
 
       {/* Services list */}
@@ -316,6 +359,86 @@ export default function ServicesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CSV Import Modal */}
+      {isImportOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className={`${isDark ? "bg-[#12122a]" : "bg-white"} rounded-lg p-6 w-full max-w-lg mx-4`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
+                Импорт услуг из CSV
+              </h3>
+              <button onClick={() => setIsImportOpen(false)} className={`${isDark ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"}`}>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className={`text-sm mb-4 p-3 rounded-lg ${isDark ? "bg-white/5 text-gray-400" : "bg-gray-50 text-gray-600"}`}>
+              <p className="font-medium mb-1">Формат CSV (колонки через запятую или точку с запятой):</p>
+              <code className={`text-xs block ${isDark ? "text-green-400" : "text-green-700"}`}>
+                Название;Цена;Длительность (мин);Описание (необязательно)
+              </code>
+              <code className={`text-xs block mt-1 ${isDark ? "text-blue-400" : "text-blue-700"}`}>
+                Стрижка;5000;30;Классическая стрижка волос
+              </code>
+              <p className="mt-2 text-xs">Первая строка может быть заголовком — она будет пропущена автоматически.</p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                  Загрузить файл .csv
+                </label>
+                <input
+                  type="file"
+                  accept=".csv,.txt"
+                  onChange={handleFileUpload}
+                  className={`w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700 ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                  Или вставьте текст CSV
+                </label>
+                <textarea
+                  value={importCsv}
+                  onChange={(e) => setImportCsv(e.target.value)}
+                  rows={6}
+                  placeholder={"Стрижка;5000;30\nМаникюр;3000;60\nПедикюр;4000;90"}
+                  className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-600" : "border-gray-300"}`}
+                />
+              </div>
+            </div>
+
+            {importResult && (
+              <div className={`mt-3 p-3 rounded-lg text-sm ${importResult.errors && importResult.errors.length > 0 ? (isDark ? "bg-yellow-500/10 text-yellow-300" : "bg-yellow-50 text-yellow-800") : (isDark ? "bg-green-500/10 text-green-300" : "bg-green-50 text-green-800")}`}>
+                <p className="font-medium">{importResult.message}</p>
+                {importResult.errors?.map((e, i) => (
+                  <p key={i} className="text-xs mt-1">• {e}</p>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => setIsImportOpen(false)}
+                className={`flex-1 px-4 py-2 border rounded-lg font-medium ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+              >
+                Закрыть
+              </button>
+              <button
+                onClick={handleImport}
+                disabled={importing || !importCsv.trim()}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {importing && <Loader2 className="h-4 w-4 animate-spin" />}
+                Импортировать
+              </button>
+            </div>
           </div>
         </div>
       )}

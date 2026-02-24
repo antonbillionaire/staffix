@@ -17,6 +17,7 @@ import {
   ExternalLink,
   CheckCircle,
   Info,
+  ShoppingBag,
 } from "lucide-react";
 
 interface AutomationSettings {
@@ -518,6 +519,55 @@ export default function AutomationPage() {
                   "Привет, Анна! Давно вас не видели! 💜 Мы скучаем! Вот вам скидка {settings.reactivationDiscount}% на следующий визит. Промокод: WELCOME{settings.reactivationDiscount}"
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Order Automations */}
+      <div className={`${bgCard} rounded-xl border ${borderColor} p-6`}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 bg-green-500/10 rounded-lg">
+            <ShoppingBag className="h-5 w-5 text-green-400" />
+          </div>
+          <div>
+            <h3 className={`font-semibold ${textPrimary}`}>Уведомления о заказах</h3>
+            <p className={`text-sm ${textSecondary}`}>Автоматические уведомления клиентам при смене статуса заказа</p>
+          </div>
+          <div className="ml-auto">
+            <span className="px-2 py-1 bg-green-500/10 text-green-400 text-xs rounded-full font-medium">Активно</span>
+          </div>
+        </div>
+
+        <div className="space-y-2 mb-4">
+          {[
+            { status: "Подтверждён", emoji: "✅", desc: "Заказ принят и подтверждён" },
+            { status: "В обработке", emoji: "⚙️", desc: "Идёт сборка / обработка заказа" },
+            { status: "Отправлен", emoji: "🚚", desc: "Заказ передан в доставку" },
+            { status: "Доставлен", emoji: "🎉", desc: "Клиент получил заказ" },
+            { status: "Отменён", emoji: "❌", desc: "Заказ отменён" },
+          ].map((item) => (
+            <div key={item.status} className={`flex items-center gap-3 p-3 rounded-lg ${isDark ? "bg-white/5" : "bg-gray-50"}`}>
+              <span className="text-lg">{item.emoji}</span>
+              <div className="flex-1">
+                <span className={`text-sm font-medium ${textPrimary}`}>{item.status}</span>
+                <span className={`text-xs ml-2 ${textSecondary}`}>— {item.desc}</span>
+              </div>
+              <CheckCircle className="h-4 w-4 text-green-400" />
+            </div>
+          ))}
+        </div>
+
+        <div className={`p-4 rounded-xl border ${isDark ? "border-green-500/20 bg-green-500/5" : "border-green-200 bg-green-50"}`}>
+          <div className="flex items-start gap-2">
+            <Info className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+            <div className={`text-sm ${textSecondary}`}>
+              <p className="font-medium text-green-400 mb-1">Как это работает:</p>
+              <p>
+                Когда вы меняете статус заказа в разделе{" "}
+                <span className="font-medium">Заказы</span>, клиент автоматически получает
+                Telegram-уведомление с актуальным статусом. Никаких настроек не требуется — всё работает сразу.
+              </p>
             </div>
           </div>
         </div>
