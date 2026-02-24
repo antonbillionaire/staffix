@@ -102,12 +102,12 @@ export async function POST(request: NextRequest) {
 
       // columns: name, price, category, description, stock, sku, old_price
       const name = row[0]?.trim();
-      const priceRaw = row[1]?.trim().replace(/\s/g, "").replace(",", ".");
+      const priceRaw = row[1]?.trim().replace(/[^\d.,-]/g, "").replace(/\s/g, "").replace(",", ".");
       const category = row[2]?.trim() || undefined;
       const description = row[3]?.trim() || undefined;
       const stockRaw = row[4]?.trim();
       const sku = row[5]?.trim() || undefined;
-      const oldPriceRaw = row[6]?.trim().replace(/\s/g, "").replace(",", ".");
+      const oldPriceRaw = row[6]?.trim().replace(/[^\d.,-]/g, "").replace(/\s/g, "").replace(",", ".");
 
       if (!name) {
         errors.push(`Строка ${rowNum}: пустое название`);

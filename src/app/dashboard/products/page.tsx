@@ -156,7 +156,7 @@ export default function ProductsPage() {
         const data = new Uint8Array(ev.target?.result as ArrayBuffer);
         const wb = XLSX.read(data, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const csv = XLSX.utils.sheet_to_csv(ws, { FS: ";" });
+        const csv = XLSX.utils.sheet_to_csv(ws, { FS: ";", rawNumbers: true });
         setImportCsv(csv);
       };
       reader.readAsArrayBuffer(file);
