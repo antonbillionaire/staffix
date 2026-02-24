@@ -16,7 +16,6 @@ import {
   X,
   Wand2,
   Image,
-  CreditCard,
   ChevronDown,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -55,17 +54,6 @@ export default function AIEmployeePage() {
 
   // Selected template tracking
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-
-  // Payment settings
-  const [paymentSettings, setPaymentSettings] = useState({
-    paymeId: "",
-    clickServiceId: "",
-    clickMerchantId: "",
-    kaspiPayLink: "",
-  });
-  const [savingPayment, setSavingPayment] = useState(false);
-  const [paymentSaved, setPaymentSaved] = useState(false);
-  const [paymentOpen, setPaymentOpen] = useState(false);
 
   // WhatsApp settings
   const [waSettings, setWaSettings] = useState({
@@ -114,12 +102,6 @@ export default function AIEmployeePage() {
               tone: data.business.aiTone || "friendly",
               welcomeMessage: data.business.welcomeMessage || "",
               rules: data.business.aiRules || "",
-            });
-            setPaymentSettings({
-              paymeId: data.business.paymeId || "",
-              clickServiceId: data.business.clickServiceId || "",
-              clickMerchantId: data.business.clickMerchantId || "",
-              kaspiPayLink: data.business.kaspiPayLink || "",
             });
             setBusinessId(data.business.id || "");
             setWaSettings({
@@ -287,25 +269,6 @@ export default function AIEmployeePage() {
   const applyTemplate = (templateId: string) => {
     setSelectedTemplate(templateId);
     setAiSettings({ ...aiSettings, rules: generatePrompt(templateId, botInfo.name) });
-  };
-
-  const handleSavePayment = async () => {
-    setSavingPayment(true);
-    try {
-      const res = await fetch("/api/business", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(paymentSettings),
-      });
-      if (res.ok) {
-        setPaymentSaved(true);
-        setTimeout(() => setPaymentSaved(false), 3000);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSavingPayment(false);
-    }
   };
 
   if (loading) {
@@ -746,104 +709,6 @@ export default function AIEmployeePage() {
         </div>
       </div>
 
-      {/* Payment Settings */}
-      <div className="bg-[#12122a] rounded-xl border border-white/5 overflow-hidden">
-        <button
-          onClick={() => setPaymentOpen(!paymentOpen)}
-          className="w-full flex items-center justify-between p-6 text-left hover:bg-white/5 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <CreditCard className="h-5 w-5 text-green-400" />
-            <div>
-              <h3 className="text-lg font-semibold text-white">💳 Приём оплаты</h3>
-              <p className="text-sm text-gray-400">Payme, Click, Kaspi — клиент платит прямо в Telegram</p>
-            </div>
-          </div>
-          <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${paymentOpen ? "rotate-180" : ""}`} />
-        </button>
-
-        {paymentOpen && (
-          <div className="px-6 pb-6 space-y-5 border-t border-white/5 pt-5">
-            <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 text-sm text-green-300">
-              Введите свои ID из личных кабинетов Payme/Click — и бот будет автоматически отправлять кнопки оплаты клиентам после каждого заказа.
-            </div>
-
-            {/* Payme */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                Payme Merchant ID
-              </label>
-              <input
-                type="text"
-                value={paymentSettings.paymeId}
-                onChange={(e) => setPaymentSettings({ ...paymentSettings, paymeId: e.target.value })}
-                placeholder="6505e7cb3e9d89693d95eef5"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500/50"
-              />
-              <p className="text-xs text-gray-500 mt-1">Найдите в личном кабинете Payme → Настройки → Мерчант ID</p>
-            </div>
-
-            {/* Click */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Click Service ID
-                </label>
-                <input
-                  type="text"
-                  value={paymentSettings.clickServiceId}
-                  onChange={(e) => setPaymentSettings({ ...paymentSettings, clickServiceId: e.target.value })}
-                  placeholder="12345"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500/50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Click Merchant ID
-                </label>
-                <input
-                  type="text"
-                  value={paymentSettings.clickMerchantId}
-                  onChange={(e) => setPaymentSettings({ ...paymentSettings, clickMerchantId: e.target.value })}
-                  placeholder="67890"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500/50"
-                />
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 -mt-3">Найдите в личном кабинете my.click.uz → Мои сервисы</p>
-
-            {/* Kaspi */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                Kaspi Pay ссылка
-              </label>
-              <input
-                type="url"
-                value={paymentSettings.kaspiPayLink}
-                onChange={(e) => setPaymentSettings({ ...paymentSettings, kaspiPayLink: e.target.value })}
-                placeholder="https://kaspi.kz/pay/..."
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500/50"
-              />
-              <p className="text-xs text-gray-500 mt-1">Ваша персональная ссылка Kaspi для получения оплаты</p>
-            </div>
-
-            <button
-              onClick={handleSavePayment}
-              disabled={savingPayment}
-              className="w-full bg-green-600/20 border border-green-500/30 text-green-300 py-3 px-4 rounded-xl font-medium hover:bg-green-600/30 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
-            >
-              {savingPayment ? (
-                <><Loader2 className="h-4 w-4 animate-spin" /> Сохраняем...</>
-              ) : paymentSaved ? (
-                <><Check className="h-4 w-4" /> Сохранено!</>
-              ) : (
-                <><Save className="h-4 w-4" /> Сохранить настройки оплаты</>
-              )}
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* ── WhatsApp ────────────────────────────────────────────── */}
       <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
         <button
@@ -873,17 +738,17 @@ export default function AIEmployeePage() {
         {waOpen && (
           <div className="px-5 pb-5 space-y-4 border-t border-white/10 pt-4">
             {/* Instructions */}
-            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-sm text-gray-100 space-y-2">
-              <p className="font-semibold text-white">📋 Пошаговая инструкция:</p>
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-gray-700 space-y-2">
+              <p className="font-semibold text-gray-900">📋 Пошаговая инструкция:</p>
               <div className="space-y-1.5">
-                <p><span className="font-semibold text-white">Шаг 1.</span> Купите отдельную симкарту — номер не должен быть зарегистрирован в WhatsApp</p>
-                <p><span className="font-semibold text-white">Шаг 2.</span> Установите WhatsApp Business, зарегистрируйте эту симку (получите SMS-код)</p>
-                <p><span className="font-semibold text-white">Шаг 3.</span> Откройте <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="underline text-blue-300 hover:text-blue-200">developers.facebook.com</a> → ваше приложение → WhatsApp → API Setup → скопируйте <strong className="text-white">Phone Number ID</strong> и <strong className="text-white">Access Token</strong></p>
-                <p><span className="font-semibold text-white">Шаг 4.</span> Вставьте данные в поля ниже → придумайте Verify Token → нажмите Сохранить → скопируйте Webhook URL</p>
-                <p><span className="font-semibold text-white">Шаг 5.</span> Вернитесь в Meta Developers → WhatsApp → Configuration → вставьте Webhook URL и Verify Token → выберите событие <strong className="text-white">messages</strong> → Verify and Save</p>
-                <p><span className="font-semibold text-white">Шаг 6.</span> Включите тоггл «Активировать WhatsApp» → Сохранить</p>
+                <p><span className="font-semibold text-gray-900">Шаг 1.</span> Купите отдельную симкарту — номер не должен быть зарегистрирован в WhatsApp</p>
+                <p><span className="font-semibold text-gray-900">Шаг 2.</span> Установите WhatsApp Business, зарегистрируйте эту симку (получите SMS-код)</p>
+                <p><span className="font-semibold text-gray-900">Шаг 3.</span> Откройте <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="underline text-blue-600 hover:text-blue-700">developers.facebook.com</a> → ваше приложение → WhatsApp → API Setup → скопируйте <strong className="text-gray-900">Phone Number ID</strong> и <strong className="text-gray-900">Access Token</strong></p>
+                <p><span className="font-semibold text-gray-900">Шаг 4.</span> Вставьте данные в поля ниже → придумайте Verify Token → нажмите Сохранить → скопируйте Webhook URL</p>
+                <p><span className="font-semibold text-gray-900">Шаг 5.</span> Вернитесь в Meta Developers → WhatsApp → Configuration → вставьте Webhook URL и Verify Token → выберите событие <strong className="text-gray-900">messages</strong> → Verify and Save</p>
+                <p><span className="font-semibold text-gray-900">Шаг 6.</span> Включите тоггл «Активировать WhatsApp» → Сохранить</p>
               </div>
-              <p className="text-xs text-blue-300 pt-1">💡 Не получается? Напишите в <a href="/dashboard/support" className="underline hover:text-blue-200">поддержку</a> — поможем за 15 минут</p>
+              <p className="text-xs text-gray-500 pt-1">💡 Не получается? Напишите в <a href="/dashboard/support" className="underline text-blue-600 hover:text-blue-700">поддержку</a> — поможем за 15 минут</p>
             </div>
 
             {/* Webhook URL */}
@@ -1016,16 +881,16 @@ export default function AIEmployeePage() {
 
         {fbOpen && (
           <div className="px-5 pb-5 space-y-4 border-t border-white/10 pt-4">
-            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-sm text-gray-100 space-y-2">
-              <p className="font-semibold text-white">📋 Пошаговая инструкция:</p>
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-gray-700 space-y-2">
+              <p className="font-semibold text-gray-900">📋 Пошаговая инструкция:</p>
               <div className="space-y-1.5">
-                <p><span className="font-semibold text-white">Шаг 1.</span> Откройте вашу Facebook Страницу → Настройки → О странице → скопируйте <strong className="text-white">Page ID</strong></p>
-                <p><span className="font-semibold text-white">Шаг 2.</span> Зайдите на <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="underline text-blue-300 hover:text-blue-200">developers.facebook.com</a> → ваше приложение → Messenger → Настройка → привяжите Facebook Страницу → нажмите <strong className="text-white">Создать токен</strong></p>
-                <p><span className="font-semibold text-white">Шаг 3.</span> Вставьте Page ID и Page Access Token в поля ниже → придумайте Verify Token → нажмите Сохранить → скопируйте Webhook URL</p>
-                <p><span className="font-semibold text-white">Шаг 4.</span> В Meta Developers → Messenger → Webhooks → вставьте Webhook URL и Verify Token → выберите событие <strong className="text-white">messages</strong> → Verify and Save</p>
-                <p><span className="font-semibold text-white">Шаг 5.</span> Включите тоггл «Активировать Facebook Messenger» → Сохранить</p>
+                <p><span className="font-semibold text-gray-900">Шаг 1.</span> Откройте вашу Facebook Страницу → Настройки → О странице → скопируйте <strong className="text-gray-900">Page ID</strong></p>
+                <p><span className="font-semibold text-gray-900">Шаг 2.</span> Зайдите на <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="underline text-blue-600 hover:text-blue-700">developers.facebook.com</a> → ваше приложение → Messenger → Настройка → привяжите Facebook Страницу → нажмите <strong className="text-gray-900">Создать токен</strong></p>
+                <p><span className="font-semibold text-gray-900">Шаг 3.</span> Вставьте Page ID и Page Access Token в поля ниже → придумайте Verify Token → нажмите Сохранить → скопируйте Webhook URL</p>
+                <p><span className="font-semibold text-gray-900">Шаг 4.</span> В Meta Developers → Messenger → Webhooks → вставьте Webhook URL и Verify Token → выберите событие <strong className="text-gray-900">messages</strong> → Verify and Save</p>
+                <p><span className="font-semibold text-gray-900">Шаг 5.</span> Включите тоггл «Активировать Facebook Messenger» → Сохранить</p>
               </div>
-              <p className="text-xs text-blue-300 pt-1">💡 Не получается? Напишите в <a href="/dashboard/support" className="underline hover:text-blue-200">поддержку</a> — поможем за 15 минут</p>
+              <p className="text-xs text-gray-500 pt-1">💡 Не получается? Напишите в <a href="/dashboard/support" className="underline text-blue-600 hover:text-blue-700">поддержку</a> — поможем за 15 минут</p>
             </div>
 
             {businessId && (

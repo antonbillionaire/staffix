@@ -109,6 +109,7 @@ const navConfig: NavEntry[] = [
       { nameKey: "nav.myStats", href: "/dashboard/statistics", icon: BarChart3 },
       { nameKey: "nav.myBroadcasts", href: "/dashboard/broadcasts", icon: Send },
       { nameKey: "nav.myAutomation", href: "/dashboard/automation", icon: Zap },
+      { nameKey: "nav.payments", href: "/dashboard/payments", icon: CreditCard },
     ],
   },
   { nameKey: "nav.integrations", href: "/dashboard/integrations", icon: Link2, single: true },
