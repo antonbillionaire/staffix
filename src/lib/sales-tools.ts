@@ -142,6 +142,30 @@ export const salesToolDefinitions: Anthropic.Tool[] = [
       required: ["ordered_product_ids"],
     },
   },
+  {
+    name: "notify_manager",
+    description:
+      "Уведомить менеджера/владельца о вопросе клиента, который требует участия человека. Используй когда: клиент задаёт сложный вопрос за пределами твоей компетенции, нужно принять нестандартное решение, клиент явно просит поговорить с человеком, ситуация требует личного участия персонала. После вызова сообщи клиенту что передал вопрос менеджеру.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        client_name: {
+          type: "string",
+          description: "Имя клиента",
+        },
+        reason: {
+          type: "string",
+          description: "Краткое описание ситуации или вопроса клиента",
+        },
+        urgency: {
+          type: "string",
+          enum: ["normal", "urgent"],
+          description: "Срочность: normal — обычный запрос, urgent — срочно",
+        },
+      },
+      required: ["reason"],
+    },
+  },
 ];
 
 // ========================================
@@ -678,6 +702,68 @@ async function notifyNewOrder(
 }
 
 // ========================================
+// УВЕДОМЛЕНИЕ МЕНЕДЖЕРА (ЭСКАЛАЦИЯ)
+// ========================================
+
+export async function notifyManagerByTelegram(
+  businessId: string,
+  clientTelegramId: bigint,
+  reason: string,
+  clientName?: string,
+  urgency?: string
+): Promise<SalesToolResult> {
+  try {
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { botToken: true, ownerTelegramChatId: true, name: true },
+    });
+
+    if (!business?.botToken) {
+      return { success: false, error: "Бот не настроен" };
+    }
+
+    if (!business.ownerTelegramChatId) {
+      return {
+        success: true,
+        notified: false,
+        message: "Менеджер будет уведомлён при первой возможности",
+      };
+    }
+
+    const urgencyLabel = urgency === "urgent" ? "🚨 СРОЧНО" : "📩 Новый запрос";
+    const clientLabel = clientName ? `👤 *${clientName}*` : `👤 Клиент (ID: ${clientTelegramId})`;
+
+    const text =
+      `${urgencyLabel} — требуется помощь менеджера\n\n` +
+      `${clientLabel}\n` +
+      `💬 *Вопрос:* ${reason}\n\n` +
+      `_Клиент ждёт ответа в Telegram_`;
+
+    await fetch(
+      `https://api.telegram.org/bot${business.botToken}/sendMessage`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: business.ownerTelegramChatId.toString(),
+          text,
+          parse_mode: "Markdown",
+        }),
+      }
+    );
+
+    return {
+      success: true,
+      notified: true,
+      message: "Менеджер уведомлён. Он свяжется с клиентом в ближайшее время.",
+    };
+  } catch (error) {
+    console.error("notifyManagerByTelegram error:", error);
+    return { success: false, error: "Ошибка при уведомлении менеджера" };
+  }
+}
+
+// ========================================
 // ДИСПЕТЧЕР ИНСТРУМЕНТОВ (вызывается из webhook)
 // ========================================
 
@@ -735,6 +821,17 @@ export async function executeSalesTool(
         const result = await getUpsellSuggestions(
           businessId,
           toolInput.ordered_product_ids as string[]
+        );
+        return JSON.stringify(result);
+      }
+
+      case "notify_manager": {
+        const result = await notifyManagerByTelegram(
+          businessId,
+          telegramId,
+          toolInput.reason as string,
+          toolInput.client_name as string | undefined,
+          toolInput.urgency as string | undefined
         );
         return JSON.stringify(result);
       }

@@ -28,7 +28,7 @@ import {
 import { sendBookingNotification } from "@/lib/notifications";
 import { formatDateRu } from "@/lib/automation";
 import { dispatchCrmEvent } from "@/lib/crm-integrations";
-import { salesToolDefinitions, executeSalesTool } from "@/lib/sales-tools";
+import { salesToolDefinitions, executeSalesTool, notifyManagerByTelegram } from "@/lib/sales-tools";
 import { buildSalesSystemPrompt, isSalesMode } from "@/lib/sales-prompt";
 
 // ========================================
@@ -391,6 +391,17 @@ async function handleToolCall(
             },
           }).catch(() => {});
         }
+        return JSON.stringify(result);
+      }
+
+      case "notify_manager": {
+        const result = await notifyManagerByTelegram(
+          businessId,
+          telegramId,
+          toolInput.reason,
+          toolInput.client_name,
+          toolInput.urgency
+        );
         return JSON.stringify(result);
       }
 

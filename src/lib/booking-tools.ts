@@ -757,5 +757,29 @@ export const bookingToolDefinitions: any[] = [
       required: ["booking_id"],
     },
   },
+  {
+    name: "notify_manager",
+    description:
+      "Уведомить менеджера/владельца о вопросе клиента, который требует участия человека. Используй когда: клиент задаёт сложный вопрос за пределами твоей компетенции, нужно принять нестандартное решение, клиент явно просит поговорить с человеком, ситуация требует личного участия персонала. После вызова сообщи клиенту что передал вопрос менеджеру.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        client_name: {
+          type: "string",
+          description: "Имя клиента",
+        },
+        reason: {
+          type: "string",
+          description: "Краткое описание ситуации или вопроса клиента",
+        },
+        urgency: {
+          type: "string",
+          enum: ["normal", "urgent"],
+          description: "Срочность: normal — обычный запрос, urgent — срочно",
+        },
+      },
+      required: ["reason"],
+    },
+  },
 ];
 
