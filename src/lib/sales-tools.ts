@@ -8,6 +8,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "./prisma";
 import { dispatchCrmEvent } from "./crm-integrations";
+import { getPaymentButtons } from "./payment-links";
 
 // ========================================
 // ТИПЫ
@@ -429,8 +430,8 @@ export async function createOrder(
       }
     }
 
-    // Уведомляем владельца через Telegram
-    notifyNewOrder(businessId, order, orderItemsData).catch(() => {});
+    // Уведомляем владельца через Telegram + отправляем кнопки оплаты клиенту
+    notifyNewOrder(businessId, order, orderItemsData, telegramId).catch(() => {});
 
     // Диспатчим в CRM
     dispatchCrmEvent(businessId, "booking_created", {
@@ -580,7 +581,8 @@ export async function getUpsellSuggestions(
 async function notifyNewOrder(
   businessId: string,
   order: { id: string; orderNumber: number; totalPrice: number; clientName: string; clientPhone: string | null; clientAddress: string | null },
-  items: Array<{ name: string; price: number; quantity: number }>
+  items: Array<{ name: string; price: number; quantity: number }>,
+  clientTelegramId?: bigint
 ): Promise<void> {
   try {
     const business = await prisma.business.findUnique({
@@ -589,10 +591,14 @@ async function notifyNewOrder(
         botToken: true,
         ownerTelegramChatId: true,
         name: true,
+        paymeId: true,
+        clickServiceId: true,
+        clickMerchantId: true,
+        kaspiPayLink: true,
       },
     });
 
-    if (!business?.botToken || !business.ownerTelegramChatId) return;
+    if (!business?.botToken) return;
 
     const itemsList = items
       .map((i) => `• ${i.name} × ${i.quantity} = ${(i.price * i.quantity).toLocaleString("ru-RU")}`)
@@ -606,18 +612,50 @@ async function notifyNewOrder(
       `💰 *Итого: ${order.totalPrice.toLocaleString("ru-RU")}*\n\n` +
       `🔗 Управление: staffix.io/dashboard/orders`;
 
-    await fetch(
-      `https://api.telegram.org/bot${business.botToken}/sendMessage`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: business.ownerTelegramChatId.toString(),
-          text: message,
-          parse_mode: "Markdown",
-        }),
+    // Уведомление владельцу
+    if (business.ownerTelegramChatId) {
+      await fetch(
+        `https://api.telegram.org/bot${business.botToken}/sendMessage`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: business.ownerTelegramChatId.toString(),
+            text: message,
+            parse_mode: "Markdown",
+          }),
+        }
+      );
+    }
+
+    // Отправить кнопки оплаты клиенту (если есть платёжные методы)
+    if (clientTelegramId) {
+      const paymentButtons = getPaymentButtons(
+        {
+          paymeId: business.paymeId,
+          clickServiceId: business.clickServiceId,
+          clickMerchantId: business.clickMerchantId,
+          kaspiPayLink: business.kaspiPayLink,
+        },
+        order.totalPrice,
+        order.orderNumber
+      );
+
+      if (paymentButtons.length > 0) {
+        await fetch(
+          `https://api.telegram.org/bot${business.botToken}/sendMessage`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: clientTelegramId.toString(),
+              text: `💳 Оплатите заказ #${order.orderNumber} — ${order.totalPrice.toLocaleString("ru-RU")} сум:`,
+              reply_markup: { inline_keyboard: paymentButtons },
+            }),
+          }
+        );
       }
-    );
+    }
 
     // Создаём уведомление в дашборде
     await prisma.notification.create({

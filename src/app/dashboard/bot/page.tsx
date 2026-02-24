@@ -16,6 +16,8 @@ import {
   X,
   Wand2,
   Image,
+  CreditCard,
+  ChevronDown,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -52,6 +54,17 @@ export default function AIEmployeePage() {
 
   // Selected template tracking
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+
+  // Payment settings
+  const [paymentSettings, setPaymentSettings] = useState({
+    paymeId: "",
+    clickServiceId: "",
+    clickMerchantId: "",
+    kaspiPayLink: "",
+  });
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [paymentSaved, setPaymentSaved] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
 
   // Prompt templates
   const promptTemplates = [
@@ -113,6 +126,12 @@ export default function AIEmployeePage() {
               tone: data.business.aiTone || "friendly",
               welcomeMessage: data.business.welcomeMessage || "",
               rules: data.business.aiRules || "",
+            });
+            setPaymentSettings({
+              paymeId: data.business.paymeId || "",
+              clickServiceId: data.business.clickServiceId || "",
+              clickMerchantId: data.business.clickMerchantId || "",
+              kaspiPayLink: data.business.kaspiPayLink || "",
             });
           }
         }
@@ -267,6 +286,25 @@ export default function AIEmployeePage() {
   const applyTemplate = (templateId: string, promptKey: string) => {
     setSelectedTemplate(templateId);
     setAiSettings({ ...aiSettings, rules: t(promptKey) });
+  };
+
+  const handleSavePayment = async () => {
+    setSavingPayment(true);
+    try {
+      const res = await fetch("/api/business", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(paymentSettings),
+      });
+      if (res.ok) {
+        setPaymentSaved(true);
+        setTimeout(() => setPaymentSaved(false), 3000);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSavingPayment(false);
+    }
   };
 
   if (loading) {
@@ -705,6 +743,104 @@ export default function AIEmployeePage() {
             )}
           </button>
         </div>
+      </div>
+
+      {/* Payment Settings */}
+      <div className="bg-[#12122a] rounded-xl border border-white/5 overflow-hidden">
+        <button
+          onClick={() => setPaymentOpen(!paymentOpen)}
+          className="w-full flex items-center justify-between p-6 text-left hover:bg-white/5 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <CreditCard className="h-5 w-5 text-green-400" />
+            <div>
+              <h3 className="text-lg font-semibold text-white">💳 Приём оплаты</h3>
+              <p className="text-sm text-gray-400">Payme, Click, Kaspi — клиент платит прямо в Telegram</p>
+            </div>
+          </div>
+          <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${paymentOpen ? "rotate-180" : ""}`} />
+        </button>
+
+        {paymentOpen && (
+          <div className="px-6 pb-6 space-y-5 border-t border-white/5 pt-5">
+            <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 text-sm text-green-300">
+              Введите свои ID из личных кабинетов Payme/Click — и бот будет автоматически отправлять кнопки оплаты клиентам после каждого заказа.
+            </div>
+
+            {/* Payme */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                Payme Merchant ID
+              </label>
+              <input
+                type="text"
+                value={paymentSettings.paymeId}
+                onChange={(e) => setPaymentSettings({ ...paymentSettings, paymeId: e.target.value })}
+                placeholder="6505e7cb3e9d89693d95eef5"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500/50"
+              />
+              <p className="text-xs text-gray-500 mt-1">Найдите в личном кабинете Payme → Настройки → Мерчант ID</p>
+            </div>
+
+            {/* Click */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Click Service ID
+                </label>
+                <input
+                  type="text"
+                  value={paymentSettings.clickServiceId}
+                  onChange={(e) => setPaymentSettings({ ...paymentSettings, clickServiceId: e.target.value })}
+                  placeholder="12345"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500/50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Click Merchant ID
+                </label>
+                <input
+                  type="text"
+                  value={paymentSettings.clickMerchantId}
+                  onChange={(e) => setPaymentSettings({ ...paymentSettings, clickMerchantId: e.target.value })}
+                  placeholder="67890"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500/50"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 -mt-3">Найдите в личном кабинете my.click.uz → Мои сервисы</p>
+
+            {/* Kaspi */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                Kaspi Pay ссылка
+              </label>
+              <input
+                type="url"
+                value={paymentSettings.kaspiPayLink}
+                onChange={(e) => setPaymentSettings({ ...paymentSettings, kaspiPayLink: e.target.value })}
+                placeholder="https://kaspi.kz/pay/..."
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500/50"
+              />
+              <p className="text-xs text-gray-500 mt-1">Ваша персональная ссылка Kaspi для получения оплаты</p>
+            </div>
+
+            <button
+              onClick={handleSavePayment}
+              disabled={savingPayment}
+              className="w-full bg-green-600/20 border border-green-500/30 text-green-300 py-3 px-4 rounded-xl font-medium hover:bg-green-600/30 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
+            >
+              {savingPayment ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Сохраняем...</>
+              ) : paymentSaved ? (
+                <><Check className="h-4 w-4" /> Сохранено!</>
+              ) : (
+                <><Save className="h-4 w-4" /> Сохранить настройки оплаты</>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

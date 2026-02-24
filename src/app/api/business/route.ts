@@ -144,7 +144,7 @@ export async function PUT(request: Request) {
     }
 
     const data = await request.json();
-    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, botLogo, timezone, ownerTelegramUsername } = data;
+    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, botLogo, timezone, ownerTelegramUsername, paymeId, clickServiceId, clickMerchantId, kaspiPayLink } = data;
 
     // Найти бизнес пользователя
     const existingBusiness = await prisma.business.findFirst({
@@ -171,6 +171,10 @@ export async function PUT(request: Request) {
     if (botLogo !== undefined) updateData.botLogo = botLogo;
     if (timezone !== undefined) updateData.timezone = timezone;
     if (ownerTelegramUsername !== undefined) updateData.ownerTelegramUsername = ownerTelegramUsername;
+    if (paymeId !== undefined) updateData.paymeId = paymeId || null;
+    if (clickServiceId !== undefined) updateData.clickServiceId = clickServiceId || null;
+    if (clickMerchantId !== undefined) updateData.clickMerchantId = clickMerchantId || null;
+    if (kaspiPayLink !== undefined) updateData.kaspiPayLink = kaspiPayLink || null;
 
     // Если передан токен бота - валидируем и регистрируем/перерегистрируем webhook
     if (botToken) {

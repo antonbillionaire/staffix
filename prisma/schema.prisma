@@ -96,6 +96,12 @@ model Business {
   ownerTelegramUsername String?  // @username владельца для уведомлений
   ownerTelegramChatId   BigInt?  // автоматически при /start
 
+  // Платёжные системы (для магазинов)
+  paymeId          String?   // Payme Merchant ID
+  clickServiceId   String?   // Click Service ID
+  clickMerchantId  String?   // Click Merchant ID
+  kaspiPayLink     String?   // Kaspi статическая ссылка на оплату
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

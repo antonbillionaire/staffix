@@ -11,129 +11,110 @@ import {
   Calendar,
   Users,
   ArrowRight,
-  AlertCircle,
-  TrendingUp,
-  Clock,
-  Sparkles,
-  FileText,
-  Loader2,
   CheckCircle2,
+  XCircle,
+  Clock,
+  Loader2,
+  Scissors,
+  Package,
+  FileText,
+  Globe,
+  Send,
+  BarChart3,
 } from "lucide-react";
 
-interface RecentBooking {
-  id: string;
-  clientName: string;
-  date: string;
-  serviceName: string | null;
-  staffName: string | null;
-  status: string;
+type Period = "day" | "week" | "month" | "all";
+
+interface StatsData {
+  period: Period;
+  stats: {
+    bookings: number;
+    orders: number;
+    clients: number;
+    messages: number;
+  };
+  channels: {
+    telegram: boolean;
+    whatsapp: boolean;
+    instagram: boolean;
+  };
+  readiness: {
+    telegram: boolean;
+    team: boolean;
+    services: boolean;
+    products: boolean;
+    knowledge: boolean;
+  };
 }
 
-interface DashboardData {
-  business: {
-    name: string;
-    botActive: boolean;
-    botUsername?: string;
-  };
-  subscription: {
-    messagesUsed: number;
-    messagesLimit: number;
-    daysLeft: number;
-  };
-  stats: {
-    bookingsToday: number;
-    totalClients: number;
-    totalMessages: number;
-  };
-  recentBookings: RecentBooking[];
+interface BizData {
+  name: string;
+  botActive: boolean;
+  botUsername?: string;
 }
 
 export default function DashboardPage() {
   const { theme } = useTheme();
   const { t } = useLanguage();
   const searchParams = useSearchParams();
+
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [bizData, setBizData] = useState<BizData | null>(null);
+  const [statsData, setStatsData] = useState<StatsData | null>(null);
+  const [period, setPeriod] = useState<Period>("week");
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
-  const [businessTimezone, setBusinessTimezone] = useState("Asia/Tashkent");
+
+  const isDark = theme === "dark";
+  const cardBg = isDark ? "bg-[#12122a]" : "bg-white";
+  const borderColor = isDark ? "border-white/5" : "border-gray-200";
+  const textPrimary = isDark ? "text-white" : "text-gray-900";
+  const textSecondary = isDark ? "text-gray-400" : "text-gray-600";
+  const textMuted = isDark ? "text-gray-500" : "text-gray-400";
 
   useEffect(() => {
     if (searchParams.get("payment") === "success") {
       setShowPaymentSuccess(true);
-      // Remove query param from URL without reload
       window.history.replaceState({}, "", "/dashboard");
       const timer = setTimeout(() => setShowPaymentSuccess(false), 8000);
       return () => clearTimeout(timer);
     }
   }, [searchParams]);
 
-  // Theme-aware styles
-  const isDark = theme === "dark";
-  const cardBg = isDark ? "bg-[#12122a]" : "bg-white";
-  const borderColor = isDark ? "border-white/5" : "border-gray-200";
-  const textPrimary = isDark ? "text-white" : "text-gray-900";
-  const textSecondary = isDark ? "text-gray-400" : "text-gray-600";
-  const textTertiary = isDark ? "text-gray-500" : "text-gray-500";
-
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchBiz = async () => {
       try {
-        const [bizRes, bookingsRes] = await Promise.all([
-          fetch("/api/business"),
-          fetch("/api/bookings"),
-        ]);
-
-        let recentBookings: RecentBooking[] = [];
-        if (bookingsRes.ok) {
-          const bookingsData = await bookingsRes.json();
-          if (bookingsData.timezone) setBusinessTimezone(bookingsData.timezone);
-          recentBookings = (bookingsData.bookings || []).slice(0, 5).map((b: { id: string; clientName: string; date: string; serviceName: string | null; staffName: string | null; status: string }) => ({
-            id: b.id,
-            clientName: b.clientName,
-            date: b.date,
-            serviceName: b.serviceName,
-            staffName: b.staffName,
-            status: b.status,
-          }));
-        }
-
-        if (bizRes.ok) {
-          const result = await bizRes.json();
-          if (result.business) {
-            const sub = result.business.subscription;
-            const daysLeft = sub ? Math.max(0, Math.ceil(
-              (new Date(sub.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-            )) : 14;
-
-            setData({
-              business: {
-                name: result.business.name,
-                botActive: result.business.botActive || false,
-                botUsername: result.business.botUsername,
-              },
-              subscription: {
-                messagesUsed: sub?.messagesUsed || 0,
-                messagesLimit: sub?.messagesLimit || 100,
-                daysLeft,
-              },
-              stats: {
-                bookingsToday: result.stats?.bookingsToday || 0,
-                totalClients: result.stats?.totalClients || 0,
-                totalMessages: sub?.messagesUsed || 0,
-              },
-              recentBookings,
+        const res = await fetch("/api/business");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.business) {
+            setBizData({
+              name: data.business.name,
+              botActive: data.business.botActive || false,
+              botUsername: data.business.botUsername,
             });
           }
         }
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      } finally {
-        setLoading(false);
-      }
+      } catch {}
+      finally { setLoading(false); }
     };
-
-    fetchData();
+    fetchBiz();
   }, []);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      setStatsLoading(true);
+      try {
+        const res = await fetch(`/api/dashboard/stats?period=${period}`);
+        if (res.ok) {
+          const data = await res.json();
+          setStatsData(data);
+        }
+      } catch {}
+      finally { setStatsLoading(false); }
+    };
+    fetchStats();
+  }, [period]);
 
   if (loading) {
     return (
@@ -143,377 +124,222 @@ export default function DashboardPage() {
     );
   }
 
-  const botConnected = data?.business.botActive || false;
+  const periods: { id: Period; key: string }[] = [
+    { id: "day", key: "dashboard.today" },
+    { id: "week", key: "dashboard.week" },
+    { id: "month", key: "dashboard.month" },
+    { id: "all", key: "dashboard.all" },
+  ];
+
+  const readinessItems = [
+    {
+      key: "telegram",
+      label: t("nav.telegram"),
+      href: "/dashboard/bot",
+      icon: MessageSquare,
+      done: statsData?.readiness.telegram,
+    },
+    {
+      key: "team",
+      label: t("nav.myTeam"),
+      href: "/dashboard/staff",
+      icon: Users,
+      done: statsData?.readiness.team,
+    },
+    {
+      key: "services",
+      label: t("nav.myServices"),
+      href: "/dashboard/services",
+      icon: Scissors,
+      done: statsData?.readiness.services,
+    },
+    {
+      key: "products",
+      label: t("nav.myProducts"),
+      href: "/dashboard/products",
+      icon: Package,
+      done: statsData?.readiness.products,
+    },
+    {
+      key: "knowledge",
+      label: t("nav.knowledge"),
+      href: "/dashboard/faq",
+      icon: FileText,
+      done: statsData?.readiness.knowledge,
+    },
+  ];
+
+  const readinessDone = readinessItems.filter(r => r.done).length;
+  const readinessTotal = readinessItems.length;
+  const readinessPct = Math.round((readinessDone / readinessTotal) * 100);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Payment success banner */}
       {showPaymentSuccess && (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 flex items-center gap-3">
           <CheckCircle2 className="h-6 w-6 text-green-400 flex-shrink-0" />
           <div>
             <p className="text-green-400 font-semibold">Оплата прошла успешно!</p>
             <p className={`text-sm ${textSecondary}`}>Ваша подписка активирована. Спасибо за покупку!</p>
           </div>
-          <button
-            onClick={() => setShowPaymentSuccess(false)}
-            className="ml-auto text-gray-400 hover:text-white"
-          >
+          <button onClick={() => setShowPaymentSuccess(false)} className="ml-auto text-gray-400 hover:text-white">
             &times;
           </button>
         </div>
       )}
 
-      {/* Welcome header */}
+      {/* Header */}
       <div>
-        <h1 className={`text-2xl font-bold ${textPrimary} mb-2`}>
-          {t("dashboard.welcomeTitle")}
-        </h1>
-        <p className={textSecondary}>
-          {t("dashboard.welcomeSubtitle")}
-        </p>
+        <h1 className={`text-2xl font-bold ${textPrimary} mb-1`}>{t("dashboard.welcomeTitle")}</h1>
+        <p className={textSecondary}>{t("dashboard.welcomeSubtitle")}</p>
       </div>
 
-      {/* Alert if bot not connected */}
-      {!botConnected && (
-        <div className={`${isDark ? "bg-gradient-to-r from-yellow-500/10 to-orange-500/10" : "bg-yellow-50"} border border-yellow-500/30 rounded-xl p-5 flex items-start gap-4`}>
-          <div className="w-10 h-10 bg-yellow-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
-            <AlertCircle className="h-5 w-5 text-yellow-500" />
-          </div>
-          <div className="flex-1">
-            <h3 className={`font-semibold ${textPrimary} mb-1`}>{t("dashboard.aiNotActive")}</h3>
-            <p className={`text-sm ${textSecondary} mb-3`}>
-              {t("dashboard.aiNotActiveDesc")}
-            </p>
-            <Link
-              href="/dashboard/bot"
-              className="inline-flex items-center gap-2 text-sm font-medium text-yellow-600 hover:text-yellow-500 transition-colors"
-            >
-              {t("dashboard.activateEmployee")} <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          icon={<Brain className="h-5 w-5" />}
-          title={t("dashboard.aiEmployee")}
-          value={botConnected ? t("dashboard.active") : t("dashboard.inactive")}
-          subtitle={botConnected ? `@${data?.business.botUsername}` : t("dashboard.needsSetup")}
-          gradient="from-blue-500 to-purple-500"
-          status={botConnected ? "success" : "warning"}
-          cardBg={cardBg}
-          borderColor={borderColor}
-          textPrimary={textPrimary}
-          textSecondary={textSecondary}
-          textTertiary={textTertiary}
-          t={t}
-        />
-        <StatCard
-          icon={<MessageSquare className="h-5 w-5" />}
-          title={t("dashboard.messages")}
-          value={`${data?.subscription.messagesUsed || 0}`}
-          subtitle={t("dashboard.ofAvailable", { limit: data?.subscription.messagesLimit || 100 })}
-          gradient="from-cyan-500 to-blue-500"
-          progress={(data?.subscription.messagesUsed || 0) / (data?.subscription.messagesLimit || 100) * 100}
-          cardBg={cardBg}
-          borderColor={borderColor}
-          textPrimary={textPrimary}
-          textSecondary={textSecondary}
-          textTertiary={textTertiary}
-          t={t}
-        />
-        <StatCard
-          icon={<Calendar className="h-5 w-5" />}
-          title={t("dashboard.bookingsToday")}
-          value={data?.stats.bookingsToday?.toString() || "0"}
-          subtitle={t("dashboard.newBookings")}
-          gradient="from-green-500 to-emerald-500"
-          cardBg={cardBg}
-          borderColor={borderColor}
-          textPrimary={textPrimary}
-          textSecondary={textSecondary}
-          textTertiary={textTertiary}
-          t={t}
-        />
-        <StatCard
-          icon={<Users className="h-5 w-5" />}
-          title={t("dashboard.customers")}
-          value={data?.stats.totalClients?.toString() || "0"}
-          subtitle={t("dashboard.totalRequests")}
-          gradient="from-purple-500 to-pink-500"
-          cardBg={cardBg}
-          borderColor={borderColor}
-          textPrimary={textPrimary}
-          textSecondary={textSecondary}
-          textTertiary={textTertiary}
-          t={t}
-        />
-      </div>
-
-      {/* Quick Setup */}
+      {/* ── CHANNELS ── */}
       <div>
-        <h2 className={`text-lg font-semibold ${textPrimary} mb-4 flex items-center gap-2`}>
-          <Sparkles className="h-5 w-5 text-yellow-400" />
-          {t("dashboard.quickSetup")}
+        <h2 className={`text-sm font-semibold uppercase tracking-wider ${textMuted} mb-3`}>
+          {t("dashboard.channels")}
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <SetupCard
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Telegram */}
+          <Link
             href="/dashboard/bot"
-            icon={<Brain className="h-6 w-6" />}
-            title={t("dashboard.activateAI")}
-            description={t("dashboard.connectTelegram")}
-            completed={botConnected}
-            step={1}
-            cardBg={cardBg}
-            borderColor={borderColor}
-            textPrimary={textPrimary}
-            textSecondary={textSecondary}
-            isDark={isDark}
-          />
-          <SetupCard
-            href="/dashboard/services"
-            icon={<span className="text-2xl">💇</span>}
-            title={t("dashboard.addServices")}
-            description={t("dashboard.specifyPrices")}
-            completed={false}
-            step={2}
-            cardBg={cardBg}
-            borderColor={borderColor}
-            textPrimary={textPrimary}
-            textSecondary={textSecondary}
-            isDark={isDark}
-          />
-          <SetupCard
-            href="/dashboard/staff"
-            icon={<Users className="h-6 w-6" />}
-            title={t("dashboard.addTeam")}
-            description={t("dashboard.setupMasters")}
-            completed={false}
-            step={3}
-            cardBg={cardBg}
-            borderColor={borderColor}
-            textPrimary={textPrimary}
-            textSecondary={textSecondary}
-            isDark={isDark}
-          />
-          <SetupCard
-            href="/dashboard/faq"
-            icon={<FileText className="h-6 w-6" />}
-            title={t("dashboard.knowledgeBase")}
-            description={t("dashboard.addFAQ")}
-            completed={false}
-            step={4}
-            cardBg={cardBg}
-            borderColor={borderColor}
-            textPrimary={textPrimary}
-            textSecondary={textSecondary}
-            isDark={isDark}
-          />
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent bookings */}
-        <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={`font-semibold ${textPrimary}`}>{t("dashboard.recentBookings")}</h3>
-            <Link href="/dashboard/bookings" className="text-sm text-blue-500 hover:text-blue-400">
-              {t("dashboard.allBookings")} →
-            </Link>
-          </div>
-          {data?.recentBookings && data.recentBookings.length > 0 ? (
-            <div className="space-y-3">
-              {data.recentBookings.map((b) => (
-                <div key={b.id} className={`flex items-center justify-between py-2 border-b last:border-0 ${isDark ? "border-white/5" : "border-gray-100"}`}>
-                  <div>
-                    <p className={`font-medium text-sm ${textPrimary}`}>{b.clientName}</p>
-                    <p className={`text-xs ${textTertiary}`}>
-                      {b.serviceName || "Услуга"}{b.staffName ? ` · ${b.staffName}` : ""}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-sm ${textSecondary}`}>
-                      {new Date(b.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short", timeZone: businessTimezone })}
-                    </p>
-                    <p className={`text-xs ${textTertiary}`}>
-                      {new Date(b.date).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: businessTimezone })}
-                    </p>
-                  </div>
-                </div>
-              ))}
+            className={`${cardBg} border ${bizData?.botActive ? "border-green-500/30 hover:border-green-500/50" : `${borderColor} hover:border-blue-500/30`} rounded-xl p-4 flex items-center gap-3 transition-all group`}
+          >
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bizData?.botActive ? "bg-green-500/20" : isDark ? "bg-white/5" : "bg-gray-100"}`}>
+              <MessageSquare className={`h-5 w-5 ${bizData?.botActive ? "text-green-400" : textMuted}`} />
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Calendar className={`h-12 w-12 ${isDark ? "text-gray-600" : "text-gray-400"} mb-3`} />
-              <p className={textSecondary}>{t("dashboard.noBookingsYet")}</p>
-              <p className={`text-sm ${textTertiary} mt-1`}>
-                {t("dashboard.bookingsWillAppear")}
+            <div className="flex-1">
+              <p className={`font-medium ${textPrimary}`}>{t("nav.telegram")}</p>
+              <p className={`text-xs ${bizData?.botActive ? "text-green-400" : textMuted}`}>
+                {bizData?.botActive
+                  ? bizData.botUsername ? `@${bizData.botUsername}` : t("dashboard.connected")
+                  : t("dashboard.notConnected")}
               </p>
             </div>
-          )}
-        </div>
+            {bizData?.botActive
+              ? <CheckCircle2 className="h-5 w-5 text-green-400 flex-shrink-0" />
+              : <ArrowRight className={`h-4 w-4 ${textMuted} group-hover:text-blue-400 transition-colors flex-shrink-0`} />
+            }
+          </Link>
 
-        {/* Activity feed */}
-        <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={`font-semibold ${textPrimary}`}>{t("dashboard.activity")}</h3>
-            <span className={`text-sm ${textTertiary}`}>{t("dashboard.last7Days")}</span>
+          {/* WhatsApp */}
+          <div className={`${cardBg} border ${borderColor} rounded-xl p-4 flex items-center gap-3 opacity-60`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? "bg-white/5" : "bg-gray-100"}`}>
+              <Globe className={`h-5 w-5 ${textMuted}`} />
+            </div>
+            <div className="flex-1">
+              <p className={`font-medium ${textPrimary}`}>{t("nav.whatsapp")}</p>
+              <p className={`text-xs ${textMuted}`}>{t("dashboard.comingSoon")}</p>
+            </div>
+            <Clock className={`h-4 w-4 ${textMuted} flex-shrink-0`} />
           </div>
-          {botConnected ? (
-            <div className="space-y-4">
-              <div className={`flex items-center justify-between py-2 border-b ${isDark ? "border-white/5" : "border-gray-100"}`}>
-                <span className={`text-sm ${textSecondary}`}>Сообщений</span>
-                <span className={`font-semibold ${textPrimary}`}>{data?.stats.totalMessages || 0}</span>
-              </div>
-              <div className={`flex items-center justify-between py-2 border-b ${isDark ? "border-white/5" : "border-gray-100"}`}>
-                <span className={`text-sm ${textSecondary}`}>Записей сегодня</span>
-                <span className={`font-semibold ${textPrimary}`}>{data?.stats.bookingsToday || 0}</span>
-              </div>
-              <div className={`flex items-center justify-between py-2 border-b ${isDark ? "border-white/5" : "border-gray-100"}`}>
-                <span className={`text-sm ${textSecondary}`}>Клиентов</span>
-                <span className={`font-semibold ${textPrimary}`}>{data?.stats.totalClients || 0}</span>
-              </div>
-              <div className={`flex items-center justify-between py-2`}>
-                <span className={`text-sm ${textSecondary}`}>Подписка</span>
-                <span className={`font-semibold ${textPrimary}`}>{data?.subscription.daysLeft} дн.</span>
-              </div>
+
+          {/* Instagram */}
+          <div className={`${cardBg} border ${borderColor} rounded-xl p-4 flex items-center gap-3 opacity-60`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? "bg-white/5" : "bg-gray-100"}`}>
+              <Send className={`h-5 w-5 ${textMuted}`} />
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <TrendingUp className={`h-12 w-12 ${isDark ? "text-gray-600" : "text-gray-400"} mb-3`} />
-              <p className={textSecondary}>{t("dashboard.noDataPeriod")}</p>
-              <p className={`text-sm ${textTertiary} mt-1`}>
-                {t("dashboard.statsAfterActivation")}
-              </p>
+            <div className="flex-1">
+              <p className={`font-medium ${textPrimary}`}>{t("nav.instagram")}</p>
+              <p className={`text-xs ${textMuted}`}>{t("dashboard.comingSoon")}</p>
             </div>
-          )}
+            <Clock className={`h-4 w-4 ${textMuted} flex-shrink-0`} />
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
 
-function StatCard({
-  icon,
-  title,
-  value,
-  subtitle,
-  gradient,
-  status,
-  progress,
-  cardBg,
-  borderColor,
-  textPrimary,
-  textSecondary,
-  textTertiary,
-  t,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  value: string;
-  subtitle: string;
-  gradient: string;
-  status?: "success" | "warning";
-  progress?: number;
-  cardBg: string;
-  borderColor: string;
-  textPrimary: string;
-  textSecondary: string;
-  textTertiary: string;
-  t: (key: string) => string;
-}) {
-  return (
-    <div className={`${cardBg} border ${borderColor} rounded-xl p-5 hover:border-blue-500/20 transition-all`}>
-      <div className="flex items-start justify-between mb-3">
-        <div className={`w-10 h-10 bg-gradient-to-br ${gradient} rounded-xl flex items-center justify-center text-white`}>
-          {icon}
-        </div>
-        {status && (
-          <div className={`flex items-center gap-1.5 text-xs ${
-            status === "success" ? "text-green-500" : "text-yellow-500"
-          }`}>
-            {status === "success" ? (
-              <CheckCircle2 className="h-3.5 w-3.5" />
-            ) : (
-              <Clock className="h-3.5 w-3.5" />
-            )}
-            {status === "success" ? t("dashboard.online") : t("dashboard.offline")}
+      {/* ── STATISTICS ── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className={`text-sm font-semibold uppercase tracking-wider ${textMuted}`}>
+            <BarChart3 className="inline h-4 w-4 mr-1" />{t("nav.statistics")}
+          </h2>
+          {/* Period switcher */}
+          <div className={`flex items-center gap-1 p-1 ${isDark ? "bg-white/5" : "bg-gray-100"} rounded-xl`}>
+            {periods.map(p => (
+              <button
+                key={p.id}
+                onClick={() => setPeriod(p.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  period === p.id
+                    ? "bg-blue-500 text-white shadow"
+                    : `${textSecondary} hover:${textPrimary}`
+                }`}
+              >
+                {t(p.key)}
+              </button>
+            ))}
           </div>
-        )}
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { label: t("dashboard.messages"), value: statsData?.stats.messages ?? 0, icon: MessageSquare, gradient: "from-cyan-500 to-blue-500" },
+            { label: t("dashboard.bookings"), value: statsData?.stats.bookings ?? 0, icon: Calendar, gradient: "from-green-500 to-emerald-500" },
+            { label: t("dashboard.orders"), value: statsData?.stats.orders ?? 0, icon: Package, gradient: "from-orange-500 to-amber-500" },
+            { label: t("dashboard.clients"), value: statsData?.stats.clients ?? 0, icon: Users, gradient: "from-purple-500 to-pink-500" },
+          ].map((item) => (
+            <div key={item.label} className={`${cardBg} border ${borderColor} rounded-xl p-4`}>
+              <div className={`w-9 h-9 bg-gradient-to-br ${item.gradient} rounded-lg flex items-center justify-center text-white mb-3`}>
+                <item.icon className="h-4 w-4" />
+              </div>
+              <p className={`text-xs ${textMuted} mb-1`}>{item.label}</p>
+              {statsLoading ? (
+                <div className={`h-7 w-12 ${isDark ? "bg-white/5" : "bg-gray-100"} rounded animate-pulse`} />
+              ) : (
+                <p className={`text-2xl font-bold ${textPrimary}`}>{item.value.toLocaleString()}</p>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
-      <p className={`text-sm ${textSecondary} mb-1`}>{title}</p>
-      <p className={`text-2xl font-bold ${textPrimary} mb-1`}>{value}</p>
-      <p className={`text-xs ${textTertiary}`}>{subtitle}</p>
-      {progress !== undefined && (
-        <div className="mt-3 h-1.5 bg-gray-200 dark:bg-white/10 rounded-full overflow-hidden">
+
+      {/* ── READINESS CHECKLIST ── */}
+      <div className={`${cardBg} border ${borderColor} rounded-xl p-5`}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className={`font-semibold ${textPrimary}`}>{t("dashboard.readiness")}</h2>
+          <span className={`text-sm font-medium ${readinessPct === 100 ? "text-green-400" : textSecondary}`}>
+            {readinessDone}/{readinessTotal}
+          </span>
+        </div>
+
+        {/* Progress bar */}
+        <div className={`h-1.5 ${isDark ? "bg-white/10" : "bg-gray-100"} rounded-full overflow-hidden mb-4`}>
           <div
-            className={`h-full bg-gradient-to-r ${gradient} rounded-full transition-all`}
-            style={{ width: `${Math.min(100, progress)}%` }}
+            className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500"
+            style={{ width: `${readinessPct}%` }}
           />
         </div>
-      )}
+
+        <div className="space-y-2">
+          {readinessItems.map((item) => (
+            <Link
+              key={item.key}
+              href={item.href}
+              className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+                item.done
+                  ? isDark ? "bg-green-500/5 border border-green-500/20" : "bg-green-50 border border-green-100"
+                  : `${isDark ? "hover:bg-white/5" : "hover:bg-gray-50"} border border-transparent`
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                item.done ? "bg-green-500/20" : isDark ? "bg-white/5" : "bg-gray-100"
+              }`}>
+                <item.icon className={`h-4 w-4 ${item.done ? "text-green-400" : textMuted}`} />
+              </div>
+              <span className={`flex-1 text-sm font-medium ${item.done ? "text-green-400" : textSecondary}`}>
+                {item.label}
+              </span>
+              {item.done ? (
+                <CheckCircle2 className="h-5 w-5 text-green-400 flex-shrink-0" />
+              ) : (
+                <XCircle className={`h-5 w-5 ${textMuted} flex-shrink-0`} />
+              )}
+            </Link>
+          ))}
+        </div>
+      </div>
     </div>
-  );
-}
-
-function SetupCard({
-  href,
-  icon,
-  title,
-  description,
-  completed,
-  step,
-  cardBg,
-  borderColor,
-  textPrimary,
-  textSecondary,
-  isDark,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  completed: boolean;
-  step: number;
-  cardBg: string;
-  borderColor: string;
-  textPrimary: string;
-  textSecondary: string;
-  isDark: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`relative ${cardBg} border rounded-xl p-5 transition-all group ${
-        completed
-          ? "border-green-500/30 hover:border-green-500/50"
-          : `${borderColor} hover:border-blue-500/30`
-      }`}
-    >
-      {/* Step badge */}
-      <div className="absolute -top-2 -right-2">
-        {completed ? (
-          <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-            <CheckCircle2 className="h-4 w-4 text-white" />
-          </div>
-        ) : (
-          <div className={`w-6 h-6 ${isDark ? "bg-gray-700" : "bg-gray-200"} rounded-full flex items-center justify-center text-xs font-bold ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-            {step}
-          </div>
-        )}
-      </div>
-
-      <div className={`mb-3 ${completed ? "text-green-500" : `${textSecondary} group-hover:text-blue-500`} transition-colors`}>
-        {icon}
-      </div>
-      <h3 className={`font-medium mb-1 ${completed ? "text-green-500" : textPrimary}`}>
-        {title}
-      </h3>
-      <p className={`text-sm ${textSecondary}`}>{description}</p>
-    </Link>
   );
 }
