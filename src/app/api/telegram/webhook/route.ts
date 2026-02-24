@@ -505,7 +505,7 @@ async function generateAIResponse(
     const systemWithDate = systemPrompt + systemHint;
 
     let response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-5",
       max_tokens: 1024,
       system: systemWithDate,
       messages: recentMessages,
@@ -568,7 +568,7 @@ async function generateAIResponse(
       // Вызываем Claude снова с результатами
       try {
         response = await anthropic.messages.create({
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-5",
           max_tokens: 1024,
           system: systemWithDate,
           messages: recentMessages,

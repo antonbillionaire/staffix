@@ -1,0 +1,1808 @@
+ID и информация профиля
+Идентификация — это ключ к созданию персонализированного интерфейса Messenger. Платформа Messenger предлагает целый ряд API, которые помогут вам найти своих нынешних клиентов в Messenger, обеспечить единый интерфейс в приложениях и на Страницах Facebook, которыми вы управляете, а также извлекать основную информацию из профилей пользователей, чтобы сделать общение более личным.
+
+Информация профиля
+Идентификатор PSID позволяет получить информацию профиля человека, чтобы персонализировать переписки и найти индивидуальный подход к каждому клиенту.
+
+Дополнительная информация →
+Поиск по ID
+Функция поиска по ID позволяет находить людей во всех приложениях и на Страницах Facebook, которыми вы управляете. Для этого вам понадобится лишь ID внутри приложения или на Странице.
+
+Дополнительная информация →
+Привязка аккаунта
+Используя процесс входа в браузере, авторизуйте человека и сопоставьте его идентификационные данные с аккаунтом Messenger, чтобы сделать переписку более функциональной.
+
+Дополнительная информация →
+
+
+
+User Profile API
+User Profile API позволяет извлекать из пользовательского профиля данные по ID внутри страницы (PSID), чтобы персонализировать переписку в Messenger.
+
+Доступность
+Чтобы получить информацию о пользователе, вам необходим расширенный уровень доступа для функции доступа к профилю пользователя объектов компании. Для доступа к некоторым полям требуются дополнительные разрешения.
+
+В некоторых случаях получить информацию о профиле пользователя по PSID невозможно, даже если идентификатор действителен. Например, PSID, связанные со Страницами моментальных игр, недоступны через User Profile API.
+
+Согласие пользователя на получение сообщений
+Ваш бот Messenger получает разрешение на доступ к информации о профиле пользователя в результате следующих событий:
+
+человек начинает переписку на экране приветствия и нажимает кнопку "Начать";
+человек начинает переписку, нажав кнопку "Отправить в Messenger";
+человек начинает переписку, отправив сообщение;
+человек начинает переписку, приняв запрос от Страницы;
+бот Messenger использует функцию askPermission() SDK расширений Messenger в веб-представлении, чтобы запросить разрешение user_profile;
+приложениям для бизнеса дополнительно требуется функция доступа к профилю пользователя объектов компании, которую можно получить, пройдя проверку приложения.
+Некоторые точки входа позволяют приложениям начинать переписку без получения разрешения на получение общедоступной информации о профиле пользователя. В таких случаях приложение получает разрешение на доступ к профилю человека, когда он ответит на изначальное сообщение. Следует отметить ситуации, когда человек начинает переписку с приложением, но не дает разрешение на доступ к профилю. Примеры таких ситуаций:
+
+переписка начинается через плагин с флажком, и человек не отвечает в Messenger;
+взаимодействие с рекламой с переходом в Messenger до ответа человека в Messenger.
+Недоступный профиль
+Сейчас User Profile API не поддерживает получение информации о профиле для аккаунтов Messenger, созданных по номеру телефона.
+
+В этом случае API возвращает ошибку с кодом 2018218 и сообщением "У этого пользователя нет профиля".
+
+Доступные поля профиля
+Приложения, успешно прошедшие проверку для необходимой функции или разрешения, могут получать следующие поля для пользователей, которые сделали эту информацию доступной всем и дали согласие на получение сообщений от вашей Страницы.
+
+Название поля	Описание	Разрешение
+id
+
+PSID пользователя
+
+Нет
+
+name
+
+Имя и фамилия пользователя
+
+Нет
+
+first_name
+
+имя
+
+Нет
+
+last_name
+
+фамилия
+
+Нет
+
+profile_pic
+
+Фото профиля
+
+Нет
+
+locale
+
+Локаль пользователя на Facebook
+
+pages_user_locale
+
+timezone
+
+Часовой пояс — число, связанное с GMT
+
+pages_user_timezone
+
+gender
+
+Пол
+
+pages_user_gender
+
+Запрос доступа функции к полям пользователя на Странице
+Перейдите в раздел Настройки Страницы > Расширенный обмен сообщениями.
+В разделе "Информация о пользователях" выберите поле и нажмите кнопку "Запросить".
+
+Получение информации о профиле пользователя
+Чтобы использовать User Profile API, отправьте запрос GET с полями профиля пользователя, которые вы хотите получить:
+
+curl -X GET "https://graph.facebook.com/<PSID>?fields=first_name,last_name,profile_pic&access_token=<PAGE_ACCESS_TOKEN>"
+Если у приложения есть доступ к профилю человека, User Profile API вернет строку JSON с запрошенными полями этого профиля.
+
+{
+  "first_name": "Peter",
+  "last_name": "Chang",
+  "profile_pic": "https://fbcdn-profile-a.akamaihd.net/hprofile-ak-xpf1/v/t1.0-1/p200x200/13055603_10105219398495383_8237637584159975445_n.jpg?oh=1d241d4b6d4dac50eaf9bb73288ea192&oe=57AF5C03&__gda__=1470213755_ab17c8c8e3a0a447fed3f272fa2179ce",
+  "locale": "en_US",
+  "timezone": -7,
+  "gender": "male",
+  "last_ad_referral": {
+    "source": "ADS",
+    "type": "OPEN_THREAD",
+    "ad_id": "6045246247433"
+  }
+}
+Если у приложения нет доступа к профилю, будет возвращен пустой объект.
+
+Дополнительная информация
+Коды ошибок на платформе Messenger
+
+
+
+Account Linking
+Account Linking is separate from the other webview features available in Messenger Platform. It can only be started via Log In buttons, and not from the bot's persistent menu, from URL buttons, or from within an already-opened webview flow.
+
+Developers using these features can now get the user's ID in a secure fashion using the getContext() function in Messenger Extensions. Bots can then use that to link the user's account or personalize the experience.
+
+Account Linking is currently only supported on iOS and Android Messenger app.
+
+When a user starts a conversation with your business, you may want to identify him or her as a customer who already has an account with your business. To help with this, we have created a secured protocol to link and unlink the Messenger user identity with your business user identity.
+
+
+Account Linking allows you to invite users to log-in using your own authentication flow, and to receive a Messenger page-scoped ID (PSID) upon completion. You can then provide a more secure, personalized and relevant experience to users.
+
+Contents
+Linking Process
+Callback
+Webhook event
+Account Unlink Endpoint
+Best Practices
+Linking Process
+The Account Linking flow follows few simple steps.
+
+Register a callback URL using Log In Button.
+Messenger Platform invokes the registered URL when a user starts the account linking flow. The redirect_uri and account_linking_token parameters are appended to your registered callback.
+Once linking is complete, redirect users to the location provided by redirect_uri and append a authorization_code parameter (defined by you) to confirm linking.
+Optionally retrieve the user's page-scoped ID (PSID) using the account linking endpoint. This step should only be used in special cases when you need the user's PSID as part of the linking process.
+Account Unlinking can be initiated:
+
+By the user when tapping a Log Out button sent by the developer
+By the business using the Account Unlink endpoint
+Callback
+Account linking URL is invoked by Messenger Platform when a user triggers account linking. The redirect_uri and account_linking_token parameters are appended to the URL callback.
+
+<yourAccountLinkingUrl>
+  ?account_linking_token=ACCOUNT_LINKING_TOKEN
+  &redirect_uri=CALLBACK_URL
+If account linking is successful, you need to complete the flow by redirecting the browser to the URL specified in the redirect_uri parameter and appending an authorization_code parameter defined by you. Note that the URL may already contain parameters, so you should append the authorization code accordingly:
+
+<redirect_uri>
+  &authorization_code=AUTHORIZATION_CODE
+If account linking failed, redirect the browser to the redirect_uri passed to you as a parameter but do not append the authorization_code.
+
+Parameters
+Parameter Name	Description
+redirect_uri
+
+Redirect URI which will be added by Messenger, you must redirect the browser to this location at the end of the authentication flow. It may contain URL encoded parameters.
+
+account_linking_token
+
+Short-lived token passed by Messenger which you need to pass back as part of the redirect scheme. This token is only valid for 5 minutes, it is encrypted and unique per user.
+You can call the PSID retrieval endpoint with this token to fetch the corresponding PSID.
+
+authorization_code
+
+Code provided by you to confirm a successful linking. Messenger Platform will pass back this code along with the user's PSID as the Account Linking webhook event. Failing to pass this parameter will cause the linking process to abort.
+
+Webhook event
+A successful linking flow triggers the Account Linking event to deliver the user's page-scoped ID (PSID).
+
+You must register to the account linking callback event. Not acknowledging this webhook event will cause the linking process to abort.
+
+PSID retrieval endpoint
+In certain cases you need to retrieve the user page-scoped ID (PSID) during the linking flow. To help with this situation we are providing a PSID retrieval endpoint allowing you to fetch the user's PSID given a valid and unexpired account_linking_token.
+
+Request
+curl -X GET "https://graph.facebook.com/v2.6/me?access_token=PAGE_ACCESS_TOKEN \
+      &fields=recipient \
+      &account_linking_token=ACCOUNT_LINKING_TOKEN"
+Response
+{
+  "id": "PAGE_ID",
+  "recipient": "PSID"
+}    
+Account Unlink Endpoint
+In certain cases you need to unlink the user page-scoped ID (PSID) programmatically from your backend. To help with this situation we are providing a PSID unlinking endpoint allowing you to unlink the user's account given a valid PSID.
+
+Request
+curl -X POST -H "Content-Type: application/json" -d '{
+   "psid":"PSID"
+}' "https://graph.facebook.com/v2.6/me/unlink_accounts?access_token=PAGE_ACCESS_TOKEN"
+Response
+{
+  "result": "unlink account success"
+}
+Best Practices
+Use Account Linking when you have a user account system that extends beyond Messenger.
+
+Let people create an account from within Messenger, so it's available elsewhere.
+
+Prompt for login when it's contextually relevant—that is, when your bot user can see the benefit of doing it.
+
+Consider how your bot should behave if a user declines login.
+
+Provide clear confirmation and a friendly welcome after login.
+
+Don't use Account Linking if people will only interact with you via Messenger. You can store account information via thread ID.
+
+Don't require Account Linking right away if you can avoid it; let people get a sense for your bot first.
+
+Recommended Design Flow
+Prompt for login with a message that includes our Account Linking button.
+Show your login page (including a Create Account option) in the Account Linking webview. Ensure it looks good and works well on mobile screens.
+After successful login, display a confirmation message in the webview. Users will need to dismiss it themselves afterward.
+Follow up with a friendly thank-you and/or next steps in the thread, including a Log Out option.
+
+
+Реклама с переходом в Messenger
+В этом руководстве рассказывается, как создавать и публиковать рекламу с переходом в Messenger с помощью Marketing API.
+
+Если вы хотите создать рекламную кампанию для сбора лидов с помощью Ads Manager, перейдите в Справочный центр Meta для бизнеса.
+
+Реклама с переходом в Messenger перенаправляет людей в переписку с вашей компанией в Messenger. Используйте ее, чтобы масштабировать охват и обеспечивать персонализированное высококачественное обслуживание.
+
+Реклама с переходом в Messenger поддерживает объявления с изображениями, видео, кольцевой галереей и слайд-шоу. В рекламное объявление также можно добавить подсказки "Позвонить".
+
+Если вы хотите создавать рекламу, которая перенаправляет людей в чаты Instagram или WhatsApp, ознакомьтесь со статьями Реклама с переходом в Instagram и Реклама с переходом в WhatsApp. Кроме того, можно создавать рекламу с переходом в место назначения, из которого пользователь предпочтет ответить с наибольшей вероятностью. Узнать больше можно в статье Реклама с переходом в несколько мест назначения.
+
+Обзор создания рекламы
+Чтобы создать и опубликовать рекламу, необходимо выполнить следующие действия:
+
+Создать рекламную кампанию.
+Создать группу объявлений, которая связывает объявления с рекламной кампанией.
+Создать креатив для типа рекламы с переходом в Messenger, которую вы хотите показывать.
+Создать рекламу, связав креатив с группой объявлений.
+Опубликовать рекламу на Facebook, в Instagram и Messenger.
+Прежде чем начать
+Это руководство написано с расчетом, что вы:
+
+создали рекламный аккаунт Meta ;
+интегрировали платформу Messenger со своим приложением или сайтом ;
+загрузили на серверы Meta все объекты, такие как изображения и видео, которые будут использоваться в вашей рекламе .
+Для успешных вызовов к конечным точкам, упомянутым в этом руководстве, вам потребуются:
+
+маркер доступа к Странице, запрошенный пользователем, который может выполнять задачу ADVERTIZE на этой Странице;
+следующие разрешения (они должны быть предоставлены пользователем вашего приложения):
+ads_management
+pages_manage_ads
+pages_read_engagement
+pages_show_list
+Шаг 1. Создание кампании
+Чтобы создать рекламную кампанию, отправьте запрос POST к конечной точке act_ad_account_id/campaigns, где ad_account_id — ID вашего рекламного аккаунта Meta. Запрос должен содержать следующие параметры:
+
+access_token
+buying_type
+name
+objective — значение OUTCOME_TRAFFIC (или OUTCOME_LEADS для рекламы для сбора лидов);
+special_ad_categories
+status
+Краткая справка по рекламной кампании
+Параметр	Значение
+access_token
+
+Маркер доступа к Странице.
+
+buying_type
+
+Значение AUCTION (по умолчанию) для рекламы в Messenger для сбора лидов.
+
+name
+
+Строка	
+Название рекламной кампании.
+
+objective
+
+Перечисление	
+Цель кампании.
+OUTCOME_TRAFFIC для рекламы с переходом к подписке.
+OUTCOME_LEADS для рекламы с переходом в Messenger для сбора лидов.
+OUTCOME_ENGAGEMENT, OUTCOME_SALES и OUTCOME_TRAFFIC для обычной рекламы с переходом в Messenger.
+
+special_ad_categories
+
+Массив[перечисление]	
+NONE или список рекламных категорий Meta через запятую .
+
+status
+
+Массив[перечисление]	
+PAUSED — кампания ещё не готова.
+
+Полный список доступных параметров можно просмотреть в справочнике по конечным точкам кампании для рекламного аккаунта .
+Пример запроса
+Для удобства чтения применено форматирование. Замените выделенный жирным шрифтом и курсивом текст, например ad_account_id, собственными значениями.
+curl -X POST "https://graph.facebook.com/v25.0/act_ad_account_id/campaigns" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "access_token":"Your_page_access_token",
+           "buying_type":"AUCTION",
+           "name":"Messenger_ad_campaign_name",
+           "objective":"OUTCOME_TRAFFIC",
+           "status":"PAUSED",
+           "special_ad_categories":["NONE"],
+         }'
+В случае успеха приложение получит ответ JSON, содержащий ID вашей кампании.
+
+{
+  "id": "campaign_id"
+}
+Шаг 2. Создание группы объявлений
+Чтобы создать группу объявлений, отправьте запрос POST к конечной точке act_ad_account_id/adsets, где ad_account_id — ID вашего рекламного аккаунта Meta. Запрос должен содержать следующие параметры:
+
+access_token
+bid_amount
+billing_event — задайте значение IMPRESSIONS;
+campaign_id
+daily_budget
+destination_type — задайте значение MESSENGER;
+name
+optimization_goal — задайте значение CONVERSATIONS, IMPRESSIONS или LEAD_GENERATION/QUALITY_LEAD для рекламы для сбора лидов;
+promoted_object — ID Страницы Facebook вашей компании;
+status — задайте значение PAUSED;
+targeting
+Краткая справка по группе объявлений
+Параметр	Значение
+access_token
+
+Маркер доступа к Странице.
+
+bid_amount
+
+Целое число	
+Максимальная сумма, которую вы готовы заплатить за результат исходя из вашей цели оптимизации.
+
+billing_event
+
+Перечисление	
+Должен иметь значение IMPRESSIONS. Meta взимает с вас плату за каждый показ вашей рекламы пользователям.
+
+campaign_id
+
+Целое число	
+ID вашей кампании из шага 1.
+
+daily_budget
+
+Целое число	
+Сумма, которую вы готовы тратить в день.
+
+destination_type
+
+Строка	
+Значение MESSENGER для рекламы в Messenger для сбора лидов. Обязательный параметр для рекламы в Messenger для сбора лидов.
+
+name
+
+Строка	
+Название группы объявлений.
+
+optimization_goal
+
+Перечисление	
+Может принимать значение CONVERSATIONS или CONVERSIONS для рекламы с переходом в Messenger и рекламы с переходом к подписке. Может принимать значение LEAD_GENERATION или QUALITY_LEAD для рекламы в Messenger для сбора лидов.
+
+promoted_object
+
+Перечисление	
+Значением должен быть ID Страницы Facebook вашей компании. Обязательный параметр для рекламы для сбора лидов в Messenger.
+
+Если вы настроили источник данных CRM  и выбрали цель оптимизации QUALITY_LEAD, можно добавить pixel_id в promoted_object для дальнейшей оптимизации по качеству. Обратите внимание: предоставлять pixel_rule вместе с pixel_id не требуется.
+status
+
+Перечисление	
+PAUSED
+
+targeting
+
+Объект	
+Объект, определяющий аудиторию , которой вы хотите показывать свою рекламу.
+
+Полный список доступных параметров можно просмотреть в справочнике по конечным точкам группы объявлений для рекламного аккаунта .
+
+Пример запроса
+Для удобства чтения применено форматирование. Замените выделенный жирным шрифтом и курсивом текст, например ad_account_id, собственными значениями.
+curl -X POST "https://graph.facebook.com/v25.0/act_ad_account_id/adsets"
+     -H "Content-Type: application/json" 
+     -d '{
+           "access_token":"Your_page_access_token",
+           "bid_amount":"Your_bid_amount",
+           "billing_event":"IMPRESSIONS",
+           "campaign_id":"Your_campaign_id",
+           "daily_budget":"Your_daily_budget",
+           "destination_type":"MESSENGER",
+           "name:"Your_messenger_adset_name",
+           "optimization_goal:IMPRESSIONS",
+           "status:PAUSED",
+           "targeting":{ 
+             "geo_locations": { "countries":["US","CA"] },
+             "device_platforms": ["mobile", "desktop"],
+             "publisher_platforms": ["messenger"] 
+           } 
+         }'
+В случае успеха ваше приложение получит следующий ответ JSON с ID группы объявлений.
+
+{
+  "id": "adset_id"
+}
+Шаг 3. Создание рекламного креатива
+С помощью рекламного креатива вы можете добавить объекты в свою рекламу.
+
+Ограничения
+Объявления, созданные с использованием object_story_id, не поддерживаются.
+Для просмотра вашей рекламы у пользователя на устройстве должен быть установлен Messenger.
+Не поддерживается размещение справа.
+
+Чтобы создать рекламный креатив, отправьте запрос POST к конечной точке /act_ad_account_id/adcreatives, где ad_account_id — ID вашего рекламного аккаунта Meta. Запрос должен содержать следующие параметры:
+
+access_token
+name
+object_story_spec — обязательный параметр;
+privacy_url — обязательный параметр для рекламы для сбора лидов;
+standard_enhancements.enroll_status — обязательный параметр для рекламных креативов, которым доступны стандартные улучшения.
+Краткая справка по рекламному креативу
+Параметр	Значение
+access_token
+
+Маркер доступа к Странице. Обязательный параметр.
+
+name
+
+Название рекламного креатива. Например, "Переход в Messenger (сентябрь)" и т. д. Обязательный параметр.
+
+object_story_spec 	
+Объект, содержащий информацию о сообщении. Обязательный параметр для рекламы с переходом в Messenger и с переходом к подписке.
+
+link_data  — объект, определяющий сообщение с шаблоном или кольцевой галереей.
+page_id  — обязательный параметр. ID Страницы Facebook, которая отправляет сообщение.
+photo_data  — объект, определяющий сообщение с изображением.
+text_data  — объект, определяющий сообщение только с текстом.
+video_data  — объект, определяющий сообщение с видео.
+privacy_url
+
+URL вашей политики конфиденциальности. Обязательный параметр для рекламы в Messenger для сбора лидов.
+
+Реклама с переходом в Messenger
+Чтобы создать рекламный креатив для рекламы с переходом в Messenger, отправьте запрос POST к конечной точке /act_ad_account_id/adcreatives, где ad_account_id — ID вашего рекламного аккаунта Meta. Запрос должен содержать следующие параметры:
+
+access_token
+name
+object_story_spec с объектом *_data, определяющим тип медиафайла.
+Краткая справка по рекламным изображениям
+Параметры link_data	Значения
+call_to_action
+
+Параметр, определяющий кнопку призыва к действию в рекламе.
+
+type — текст кнопки, например LEARN_MORE.
+value — место назначения клика по кнопке.
+{app_destination: MESSENGER} — обязательный параметр.
+image_hash
+
+Хэш изображения.
+
+link
+
+URL изображения.
+
+message
+
+Приветственный текст первого сообщения, которое вы отправляете пользователю, когда он нажимает на кнопку призыва к действию. Вы также можете отправить шаблон по умолчанию или серию, содержащую до пяти шаблонов сообщений. Подробнее .
+
+Пример запроса для рекламного изображения
+Для удобства чтения применено форматирование. Замените выделенный жирным шрифтом и курсивом текст, например page_access_token, собственными значениями.
+curl -X POST "https://graph.facebook.com/v25.0/act_ad_account_id/adcreatives"
+     -H "Content-Type: application/json" 
+     -d '{
+           "access_token":"page_access_token",
+           "name":"Your_CTM_image_ad_name",
+           "object_story_spec":{
+             "page_id": "your_page_id",
+             "link_data": { 
+               "page_welcome_message": "Your_welcome_message",
+               "image_hash": "Your_image_hash", 
+               "link": "Your_image_URL", 
+               "call_to_action": {
+                 "type":"LEARN_MORE",
+                 "value":{ "app_destination":"MESSENGER" }
+               }   
+             }
+           }
+         }'          
+
+Краткая справка по видеорекламе с переходом в Messenger
+Параметры video_data	Значения
+call_to_action
+
+Параметр, определяющий кнопку призыва к действию в рекламе.
+
+type — текст кнопки, например LEARN_MORE.
+value — место назначения клика по кнопке.
+{app_destination: MESSENGER} — обязательный параметр.
+link_description
+
+Текст видео.
+
+image_url
+
+URL миниатюры видео.
+
+page_welcome_message	
+Приветственный текст первого сообщения, которое вы отправляете пользователю, когда он нажимает на кнопку призыва к действию. Вы также можете отправить шаблон по умолчанию или серию, содержащую до пяти шаблонов сообщений. Подробнее .
+
+video_id	
+ID Meta для видео. Подробнее о загрузке объектов на серверы Meta .
+
+Пример запроса для видеорекламы
+Для удобства чтения применено форматирование. Замените выделенный жирным шрифтом и курсивом текст, например page_access_token, собственными значениями.
+curl -X POST "https://graph.facebook.com/v25.0/act_ad_account_id/adcreatives"
+     -H "Content-Type: application/json" 
+     -d '{
+           "access_token": "page_access_token",
+           "name": "Your_CTM_image_ad_name",
+           "object_story_spec": {
+             "page_id": "your_page_id",
+             "video_data": { 
+               "call_to_action": {
+                 "type": "LEARN_MORE",
+                 "value": { "app_destination": "MESSENGER" }
+               },
+               "link_description": "Your_link_description",
+               "image_url": "Your_thumbnail_URL", 
+               "page_welcome_message": "Your_welcome_text",
+               "video_id": "video_id"
+             } 
+           }
+         }'
+Реклама с использованием потока сообщений, настроенная в партнерском приложении
+Для удобства чтения применено форматирование. Замените выделенный жирным шрифтом и курсивом текст, например page_access_token, собственными значениями.
+curl -X POST "https://graph.facebook.com/v25.0/act_ad_account_id/adcreatives"
+     -H "Content-Type: application/json" 
+     -d '{
+           "access_token": "page_access_token",
+           "name": "Your_CTM_image_ad_name",
+           "object_story_spec": {
+             "page_id": "your_page_id",
+             "link_data": { 
+               "image_hash": "your_image_hash",
+               "link": "your_image_URL",
+               "call_to_action": {
+                 "type": "MESSAGE_PAGE",
+                 "value": { "app_destination":"MESSENGER" }
+               }   
+             }
+           },
+           "asset_feed_spec": {
+             "additional_data": {
+               "partner_app_welcome_message_flow_id": "FLOW-ID"
+             }
+           }
+         }'
+Подробнее о потоках сообщений в приложении см. в документации по платформе Messenger.
+
+Заполнение приветственного сообщения Страницы
+По умолчанию пользователь видит сообщение "Здравствуйте! Можно узнать об этом подробнее?" Вы можете сделать свою рекламу с переходом в Messenger более удобной для пользователей, настроив приветственное сообщение, вводные фразы и автозаполнение сообщений в page_welcome_message поле в object_story_spec.
+
+Узнать больше о вводных фразах можно в справке по ice_breakers.
+
+Ограничения
+Максимальная длина заголовков вводных фраз: 80 символов.
+Максимальная длина ответов вводных фраз: 300 символов.
+Максимальная длина текста сообщения: 300 символов.
+Пример
+Создайте объект page_welcome_message, чтобы добавить вводные фразы с приветственным сообщением.
+
+"page_welcome_message": {
+  "type":"VISUAL_EDITOR",
+  "version":2,
+  "landing_screen_type":"welcome_message",
+  "media_type":"text",
+  "text_format":{
+    "customer_action_type":"ice_breakers",
+    "message":{
+      "ice_breakers":[
+        {"title":"Can I make a purchase?","response":"This is a response 1"},
+        {"title":"Can I see a menu?", "response":"This is a response 2"},
+        {"title":"Where are you located?", "response":"This is a response 3"}],
+      "quick_replies":[],
+      "text":"Hi {{user_first_name}}! Please let us know how we can help you."}
+  },
+  "user_edit":false,
+  "surface":"visual_editor_new"
+}
+Реклама с переходом к подписке
+Реклама с переходом к подписке — это разновидность рекламы с переходом в Messenger, где object_story_spec.page_welcome_message представляет собой массив объектов с шаблоном сообщения-уведомления. Когда пользователь нажимает на кнопку Получать сообщения в вашем объявлении, он соглашается получать маркетинговые сообщения от вашей компании.
+
+Чтобы создать рекламный креатив для рекламы с переходом к подписке, отправьте запрос POST к конечной точке /act_ad_account_id/adcreatives, где ad_account_id — ID вашего рекламного аккаунта Meta. Запрос должен содержать следующие параметры:
+
+access_token
+name
+object_story_spec с:
+объектом *_data, определяющим тип медиафайла;
+массивом page_welcome_message, который задает предложение согласиться на получение маркетинговых сообщений (он должен содержать параметр landing_screen_type со значением marketing_messages и вложение в сообщение payload.template_type со значением nofitication_messages).
+Пример запроса для рекламного изображения
+Для удобства чтения применено форматирование. Замените выделенный жирным шрифтом и курсивом текст, например ad_account_id, собственными значениями.
+curl -X POST "https://graph.facebook.com/v25.0/act_ad_account_id/adcreatives"
+     -H "Content-Type: application/json" 
+     -d '{
+           "access_token": "page_access_token",
+           "name": "Your_CTS_image_ad_name",
+           "object_story_spec": {
+             "page_id": "your_page_id",
+             "link_data": { 
+               "image_hash": "Your_image_hash", 
+               "link": "Your_image_URL", 
+               "call_to_action": {
+                 "type": "LEARN_MORE",
+                 "value":{ "app_destination": "MESSENGER" }
+               }
+               "page_welcome_message": "{
+                 "landing_screen_type": "marketing_messages",
+                 "media_type": "image",
+                 "image_format": {
+                   "customer_action_type": "buttons",
+                   "message": {
+                     "text": "Your_welcome_message",
+                     "attachment": {
+                       "type": "template",
+                       "payload":{
+                         "template_type":"notification_messages",
+                         "elements": [{
+                             "title": "Your_CTS_title",
+                             "subtitle": "Your_CTS_subtitle",
+                             "image_url": "Your_image_URL",
+                             "app_id": "Your_Meta_app_ID",
+                             "buttons": [{
+                               "type": "postback",
+                               "payload": "Data_to_include_in_webhook_notification",
+                               "title": "Get messages"
+                             }]
+                         }]
+                       }
+                     }
+                   } 
+                 }
+               }"
+             }
+           }
+         }'          
+Реклама для сбора лидов в переписках
+Начиная с версии 24.0 возможность создания рекламы для сбора лидов в Messenger с помощью API не поддерживается. Вы по-прежнему сможете создавать рекламу в Messenger для сбора лидов с помощью Ads Manager. Узнать больше можно в статье Создание рекламы для сбора лидов с переходом в Messenger и Instagram Direct с помощью Meta Ads Manager.
+
+С помощью рекламы в Messenger для сбора лидов вы можете генерировать лиды в Messenger с использованием шаблона автоматического чата. Вы можете задавать определенные вопросы людям, которые интересуются вашей компанией, прямо на выбранной вами платформе для обмена сообщениями, собирать информацию о предпочтениях клиентов и создавать пользовательские вопросы, позволяющие сосредоточить внимание на самых квалифицированных лидах.
+
+Прежде чем создавать рекламные креативы для рекламы в Messenger для сбора лидов, необходимо принять условия и положения использования рекламы в Messenger для сбора лидов .
+
+Требования к шаблонам сообщений
+Приветственное сообщение, которое пользователь видит, нажав на ваше объявление, и которое объясняет ему, что может предложить ваша компания.
+Вопросы для сбора информации, позволяющие определить, является ли этот пользователь лидом. Это могут быть вопросы о его интересах, местоположении и контактных данных, таких как электронная почта и номер телефона.
+Сообщение с подтверждением, позволяющее поблагодарить человека за его ответы и объяснить ему, что произойдет дальше. Ваш новый лид появится в Ads Manager, в инструменте для публикации вашей Страницы или в вашей CRM.
+Политика конфиденциальности, которая необходима, так как вы собираете информацию клиентов.
+Ограничения
+После создания шаблон сообщения нельзя отредактировать или удалить.
+Создание шаблона сообщения
+Чтобы создать шаблон сообщения, отправьте запрос POST к конечной точке /page_id/messenger_lead_forms, где page_id — ID Страницы Facebook вашей компании. Запрос должен содержать следующие параметры:
+
+access_token
+privacy_url
+массив step_list, содержащий message, reply_type, step_id и step_type;
+template_name
+reminder_text
+Следующий шаблон сообщения содержит значения template_name, privacy_url, step_list с приветственным сообщением в параметре step_id: 0, вопросы в параметрах с step_id: 1 по 4, сообщение с подтверждением в параметре step_id: 5, а также сообщение об исключении в параметре step_id: 6.
+
+Краткая справка по шаблонам сообщений
+Параметры step_list	Описание
+allow_to_skip
+
+Логическое значение	
+true или false. false, если пользователь должен дать ответ, и true, если ответ необязателен.
+
+answer_validation_enabled
+
+Логическое значение	
+true или false. true, если ответ требует проверки. Поддерживается проверка только для города, страны, электронного адреса, национального удостоверения личности, номера телефона и индекса.
+
+answers
+
+Массив строк	
+Список ответов на вопрос. Обязательный параметр для reply_type: QUICK_REPLIES.
+
+message
+
+Строка	
+Текст для соответствующего шага. Например, это может быть приветственное сообщение, вопрос, инструкция, подтверждение или сообщение об исключении. Обязательный параметр.
+
+next_step_ids
+
+Массив объектов step_id	
+Следующий шаг (или возможные шаги) в списке вопросов. Не может указывать на предыдущий вопрос в списке. Может зависеть от полученного ответа. Например, если человек отвечает на вопрос таким образом, что это ведет к его исключению из числа лидов, на следующем шаге он может быть исключен. В противном случае он получает следующий вопрос из списка.
+
+prefill_type
+
+Перечисление{ CITY, EMAIL, PHONE }	
+В случае ответа в него подставляются данные пользователя (например, если он уже предоставил вашей компании свой электронный адрес или номер телефона).
+
+reminder_text
+
+Строка	
+Текст для человека, отвечающего на вопросы, с напоминанием заполнить форму.
+
+reply_type
+
+Перечисление{ NONE, PREFILL, QUICK_REPLIES }	
+Если для параметра reply_type задано значение PREFILL, то размеры step_list[x].next_step_ids и step_list[x].answers должны совпадать.
+
+step_id
+
+Строка	
+ID шага, позволяющий упорядочивать вопросы и сообщения. Например, если у вас список из 6 шагов, параметр 0 является приветственным сообщением, параметры с 1 по 3 — это вопросы, 4 — подтверждение, а 5 — сообщение об исключении.
+
+step_type
+
+Перечисление{ CONFIRMATION, DISQUALIFY, INTRO, QUESTION }	
+Тип шага, например вопрос или вводное сообщение. Шаги INTRO и CONFIRMATION являются обязательными.
+
+Пример шаблона сообщения для лидов
+Для удобства чтения применено форматирование. Замените выделенный жирным шрифтом и курсивом текст, например page_access_token, собственными значениями.
+curl -X POST "https://graph.facebook.com/v25.0/your_page_ID/messenger_lead_forms"
+     -H "Content-Type: application/json" 
+     -d '{
+           "access_token": "Your_page_access_token",
+           "privacy_url": "Your_privacy_policy_URL",
+           "reminder_text": "Your_reminder_text",
+           "template_name": "Your_template_name",
+           "step_list": [
+             {
+               "step_id": "0",
+               "message": "Your_welcome_message",
+               "step_type": "INTRO",
+               "reply_type": "NONE",
+               "next_step_ids": "1"
+             },
+             {
+               "step_id": "1"
+               "message": "Are_you_interested_in_our_products_or_services?",
+               "step_type": "QUESTION",
+               "reply_type": "QUICK_REPLIES",
+               "answers": ["Yes", "Not now", "Maybe"],
+               "next_step_ids": [2,6,2],
+               "allow_to_skip": false,
+               "answer_validation_enabled": true
+             },
+             {
+               "step_id": "2",
+               "message": "What city do you live in?",
+               "step_type": "QUESTION",
+               "reply_type": "PREFILL",
+               "prefill_type": "CITY",
+               "next_step_ids": "3",
+               "allow_to_skip": true
+             },
+             {
+               "step_id": "3",
+               "message": "What is your phone number?",
+               "step_type": "QUESTION",
+               "reply_type": "PREFILL",
+               "prefill_type": "PHONE",
+               "next_step_ids": "4",
+               "allow_to_skip": false,
+               "answer_validation_enabled": true
+             },
+             {
+               "step_id": "4",
+               "message": "What is your email address?",
+               "step_type": "QUESTION",
+               "reply_type": "PREFILL",
+               "prefill_type": "EMAIL",
+               "next_step_ids": "5",
+               "allow_to_skip": false,
+               "answer_validation_enabled": true
+             },
+             {
+               "step_id": "5",
+               "message": "Your_confirmation_message",
+               "step_type": "CONFIRMATION",
+               "reply_type": "NONE"
+             },
+             {
+               "step_id": "6",
+               "message": "Your_disqualification_message",
+               "step_type": "DISQUALIFY",
+               "reply_type": "NONE"
+             }
+           ]
+        }'
+В случае успеха приложение получит объект JSON, содержащий ID вашего шаблона.
+
+{
+  "id": "your_messenger_lead_gen_template_id"
+}
+В рамках этого процесса также создается объект fblead_form, который связывается с вашим шаблоном сообщения.
+
+Получение списка форм
+Чтобы получить список шаблонов форм для генерации лидов в Messenger, отправьте запрос GET к конечной точке /page_id/messenger_lead_forms. Чтобы получить информацию об определенном шаблоне, также можно отправить запрос GET к конечной точке /Your_messenger_lead_gen_template_id.
+
+Примеры рекламных креативов
+Чтобы создать рекламный креатив, отправьте запрос POST к конечной точке /act_ad_account_id/adcreatives, где ad_account_id — ID вашего рекламного аккаунта Meta. Запрос должен содержать следующие параметры:
+
+access_token
+name
+object_story_spec с объектом *_data, который определяет тип медиафайла (изображение или видео) и содержит:
+параметр *_data.page_welcome_message, в котором указана пара "ключ-значение".
+ctm_lead_gen_template_id:Your_messenger_lead_gen_template_id
+Пример креатива для рекламы в Messenger для сбора лидов с изображением
+Для удобства чтения применено форматирование. Замените выделенный жирным шрифтом и курсивом текст, например ad_account_id, собственными значениями.
+curl -X POST "https://graph.facebook.com/v25.0/act_AD_ACCOUNT_ID/adcreatives"
+    -H "Content-Type: application/json" 
+    -d '{
+          "access_token": "Your_page_access_token",
+          "degrees_of_freedom_spec": {
+            "creative_features_spec": {
+              "standard_enhancements": { "enroll_status": "OPT_IN" }
+            }
+          },
+          "name": "Your_lead_ad_image_ad_name",
+          "object_story_spec": {
+            "page_id": "Your_page_id",
+            "link_data": {
+              "call_to_action": {
+                "type": "MESSAGE_PAGE",
+                "value": { "app_destination": "MESSENGER" }
+              },
+              "description": "Sample_description",
+              "image_hash": "Your_image_hash", 
+              "message": "Sample_message_for_Creative",
+              "page_welcome_message": "{ "ctm_lead_gen_template_id": "Your_messenger_lead_gen_template_id" }"
+            }
+          }
+       }' 
+Пример креатива для рекламы в Messenger для сбора лидов с видео
+Для удобства чтения применено форматирование. Замените выделенный жирным шрифтом и курсивом текст, например ad_account_id, собственными значениями.
+curl -X POST "https://graph.facebook.com/v25.0/act_AD_ACCOUNT_ID/adcreatives"
+    -H "Content-Type: application/json" 
+    -d '{
+          "access_token": "Your_page_access_token",
+          "degrees_of_freedom_spec": {
+            "creative_features_spec": {
+              "standard_enhancements": { "enroll_status": "OPT_IN" }
+            }
+          },
+          "name": "Your_lead_ad_video_ad_name",
+          "object_story_spec": {
+            "page_id": "your_page_id",
+            "video_data": { 
+              "call_to_action": {
+                "type": "MESSAGE_PAGE",
+                "value":{ "app_destination": "MESSENGER" }
+              },
+              "image_url": "Your_thumbnail_url", 
+              "link_description": "Your_link_description ",
+              "message": "Sample message for Creative ",
+              "page_welcome_message": "{ "ctm_lead_gen_template_id": "Your_messenger_lead_gen_template_id" }",
+              "video_id": "Your_video_id" 
+            }
+          }
+       }' 
+Создание рекламных креативов с использованием контента в Instagram
+Публикации в Instagram
+Узнать больше можно в статье Использование публикаций в качестве рекламы в Instagram.
+
+curl -X POST \
+  -F 'name=Sample ad creative from Instagram post' \
+  -F 'object_id=<PAGE_ID>' \
+  -F 'instagram_user_id=<INSTAGRAM_USER_ID>' \
+  -F 'source_instagram_media_id=<INSTAGRAM_POST_ID>' \
+  -F 'call_to_action={
+       "type": "INSTAGRAM_MESSAGE",
+       "value": {
+         "link": "https://www.instagram.com"
+       }
+     }' \ 
+  -F 'access_token=<ACCESS_TOKEN>' \
+https://graph.facebook.com/v25.0/act_<AD_ACCOUNT_ID>/adcreatives
+Изображения в Instagram
+curl -X POST \
+  -F 'name=Sample ad creative from Instagram image' \
+  -F 'object_story_spec={
+       "page_id": "<PAGE_ID>",
+       "instagram_user_id": "<IG_USER_ID>",
+       "link_data": {
+         "message": "<AD_PRIMARY_TEXT>",
+         "picture": "<IMAGE_URL>"
+         "page_welcome_message": "<PAGE_WELCOME_MESSAGE>",
+         "call_to_action": {
+           "type": "INSTAGRAM_MESSAGE",
+           "value": {
+             "app_destination": "INSTAGRAM_DIRECT"
+           }
+         }
+       }
+     }' \
+  -F 'access_token=<ACCESS_TOKEN>' \
+https://graph.facebook.com/v25.0/act_<AD_ACCOUNT_ID>/adcreatives
+Создание рекламных креативов с использованием контента на Facebook
+Узнать больше можно в разделе Использование публикаций в качестве рекламы в Instagram: публикации на Facebook.
+
+curl -i -X POST \
+  "https://graph.facebook.com/v25.0/act_<AD_ACCOUNT>/adcreatives
+  ?object_story_id=<postOwnerID_postID>
+  &instagram_user_id=<IG_USER_ID>
+  &call_to_action="{'type':MESSAGE_PAGE,'value':{'app_destination':'MESSENGER'}}"
+  &access_token=<ACCESS_TOKEN>"
+Здесь object_story_id — ID публикации в формате postOwnerID_postID, а instagram_user_id — ID подключенного к странице аккаунта Instagram или ID аккаунта Instagram на базе Страницы. Узнать больше можно в статье Настройка аккаунта Instagram, связанного со Страницей.
+
+Добавление расширенного подбора товаров в рекламу с переходом в Messenger
+Что такое реклама с переходом в Messenger с расширенным подбором товаров?
+Расширенный подбор товаров ("Показать товар" в Meta Ads Manager) — это функция оптимизации креативов Advantage+, которая отображает товары из вашего каталога под одним статичным медиафайлом, если это может повысить эффективность рекламы. В этом документе описано, как использовать возможности расширенного подбора товаров в рекламе с переходом в Messenger. Вы узнаете, как добавлять расширенный подбор товаров для рекламы, не связанной с переходом в Messenger.
+
+Справка
+Реклама с переходом в Messenger
+Расширенный подбор товаров для креатива Advantage+
+Критерии соответствия
+У вас должен быть каталог, подключенный к магазину на Facebook.
+В каталоге должен быть хотя бы 1 товар.
+Кампания должна иметь цель OUTCOME_ENGAGMENET, OUTCOME_LEAD,OUTCOME_SALES или LINK_CLICK.
+Реклама должна быть в формате "Одно изображение или видео" или создана на основе существующей публикации на Facebook.
+Создание рекламы с одним изображением
+Для удобства чтения применено форматирование. Замените выделенный жирным шрифтом и курсивом текст, например ad_account_id, собственными значениями.
+curl -X POST "https://graph.facebook.com/v25.0/act_ad_account_id/ads"
+     -H "Content-Type: application/json" 
+     -d '{
+           "access_token": "Your_page_access_token",
+           "creative_sourcing_spec": {
+              "associated_product_set_id": "Your_associated_product_set_id"
+            },
+            "degrees_of_freedom_spec": {
+              "creative_features_spec": {
+                "product_extensions": {
+                   "enroll_status": "OPT_IN"
+                }
+              }
+            },
+            "object_story_spec": {
+              "page_id": Your_facebook_page_id",
+              "link_data": {
+                "call_to_action": {
+                  "type": "MESSAGE_PAGE",
+                  "value": {
+                    "app_destination": "MESSENGER"
+                  }
+                },
+                "image_hash":"Your_image_hash", (or “picture”: "Your_picture_url")"
+                "link": "https://fb.com/messenger_doc/",
+                "name": "Chat in Messenger"
+              },
+              "product_data": [
+                {
+                  "product_id": Your_product_id_1",
+                  "product_source": "MANUAL",
+		"product_decision": "ACCEPT"
+                },
+                {
+                  "product_id":Your_product_id_2",
+                  "product_source": "MANUAL",
+		"product_decision": "ACCEPT"
+                }
+              ]
+            }
+Создание рекламы с одним видео
+Для удобства чтения применено форматирование. Замените выделенный жирным шрифтом и курсивом текст, например ad_account_id, собственными значениями.
+curl -X POST "https://graph.facebook.com/v25.0/act_ad_account_id/ads"
+     -H "Content-Type: application/json" 
+     -d '{
+           "access_token": "Your_page_access_token",
+           "creative_sourcing_spec": {
+              "associated_product_set_id": "Your_associated_product_set_id"
+            },
+            "degrees_of_freedom_spec": {
+              "creative_features_spec": {
+                "product_extensions": {
+                   "enroll_status": "OPT_IN"
+                }
+              }
+            },
+            "object_story_spec": {
+              "page_id": "Your_facebook_page_id",
+              "video_data": {
+                "video_id":"Your_video_id"",
+                "video_thumbnail_id": "0",
+                "call_to_action": {
+                  "type": "MESSAGE_PAGE",
+                  "value": {
+                    "app_destination": "MESSENGER",
+                    "link": "https://fb.com/messenger_doc/"
+                  }
+                },
+                "image_url": "Your_image_url",
+                "title": "Chat in Messenger",
+                "video_thumbnail_source": "generated_default"
+              },
+
+              "product_data": [
+                {
+                  "product_id": Your_product_id_1",
+                  "product_source": "MANUAL",
+		"product_decision": "ACCEPT"
+                },
+                {
+                  "product_id":Your_product_id_2",
+                  "product_source": "MANUAL",
+		"product_decision": "ACCEPT"
+                }
+              ]
+            }
+Создание рекламы на основе существующей публикации на Facebook с медиаобъектом типа "изображение" или "видео"
+Для удобства чтения применено форматирование. Замените выделенный жирным шрифтом и курсивом текст, например ad_account_id, собственными значениями.
+curl -X POST "https://graph.facebook.com/v25.0/act_ad_account_id/ads"
+     -H "Content-Type: application/json" 
+     -d '{
+           "access_token": "Your_page_access_token",
+           "object_story_id": "Your_object_story_id(pageID_postID)",
+           "creative_sourcing_spec": {
+              "associated_product_set_id": "Your_associated_product_set_id"
+            },
+            "degrees_of_freedom_spec": {
+              "creative_features_spec": {
+                "product_extensions": {
+                  "enroll_status": "OPT_IN"
+                },
+                "multi_photo_to_video": {
+                  "enroll_status": "OPT_IN"
+                }
+              }
+            },
+            "product_data": [
+              {
+                "product_id": Your_product_id_1",
+                "product_source": "MANUAL",
+		"product_decision": "ACCEPT"
+              },
+              {
+                "product_id":Your_product_id_2",
+                "product_source": "MANUAL",
+		"product_decision": "ACCEPT"
+              }
+            ]
+          }
+Создание рекламы на основе существующей публикацией на Facebook с медиаобъектом типа "альбом"
+Если публикация содержит несколько фото, расширенный подбор товаров будет добавлен после преобразования этих фото в видео.
+Для удобства чтения применено форматирование. Замените выделенный жирным шрифтом и курсивом текст, например ad_account_id, собственными значениями.
+curl -X POST "https://graph.facebook.com/v25.0/act_ad_account_id/ads"
+     -H "Content-Type: application/json" 
+     -d '{
+           "access_token": "Your_page_access_token",
+           "object_story_id": "Your_object_story_id(pageID_postID)",
+           "creative_sourcing_spec": {
+              "associated_product_set_id": "Your_associated_product_set_id"
+            },
+            "degrees_of_freedom_spec": {
+              "creative_features_spec": {
+                "product_extensions": {
+                   "enroll_status": "OPT_IN"
+                }
+              }
+            },
+            "product_data": [
+              {
+                "product_id": Your_product_id_1",
+                "product_source": "MANUAL"
+		"product_decision": "ACCEPT"
+              },
+              {
+                "product_id":Your_product_id_2",
+                "product_source": "MANUAL"
+		"product_decision": "ACCEPT"
+              }
+            ]
+          }
+Шаг 4. Создание объявления
+Чтобы создать объявление, необходимо связать рекламный креатив и группу объявлений. Чтобы создать объявление, отправьте запрос POST к конечной точке /act_ad_account_id/ads, где ad_account_id — ID вашего рекламного аккаунта Meta. Запрос должен содержать следующие параметры:
+
+access_token
+adset_id (из шага 2)
+creative_id (из шага 3)
+name
+status
+Краткая справка по объявлениям для рекламного аккаунта
+Параметр	Значение
+access_token
+
+Маркер доступа к Странице.
+
+adset_id
+
+Значение AD-SET-ID из шага 2.
+
+creative_id
+
+{"creative_id": "AD-CREATIVE-ID"}, где AD-CREATIVE-ID — значение ID из шага 3.
+
+name
+
+Название этого объявления.
+
+status
+
+Задайте значение PAUSED. Задайте значение ACTIVE, когда будете готовы запустить рекламную кампанию.
+
+Пример запроса для объявления с креативом
+Для удобства чтения применено форматирование. Замените выделенный жирным шрифтом и курсивом текст, например ad_account_id, собственными значениями.
+curl -X POST "https://graph.facebook.com/v25.0/act_ad_account_id/ads"
+     -H "Content-Type: application/json" 
+     -d '{
+           "access_token": "Your_page_access_token",
+           "adset_id": "Your_ad_set_id",
+           "creative": { "creative_id": "Your_ad_creative_id" },
+           "status": "PAUSED"
+         }'
+В случае успеха ваше приложение получит следующий ответ JSON с ID объявления.
+
+{
+  "id": "ad_id"
+}
+Призыв к действию
+При создании объявления можно задать призыв к действию.
+
+"call_to_action": {
+  "value": {"app_destination":"MESSENGER"},
+  "type": "MESSAGE_PAGE"
+}
+Шаг 5. Публикация рекламы
+Убедитесь, что объявление присутствует в Ads Manager . Нажмите на кнопку Проверить и опубликовать в правом верхнем углу экрана. Выберите кампанию, группу объявлений для нее и объявление.
+
+Рекламу можно опубликовать из Ads Manager или через API. Чтобы опубликовать объявление через API, повторите шаг 4, задав для параметра status значение ACTIVE.
+
+Meta проверит вашу рекламу (в течение этого времени она будет иметь статус PENDING_REVIEW). После утверждения реклама перейдет в статус ACTIVE и начнется ее показ.
+
+Дополнительные элементы рекламы с переходом в Messenger
+Вы можете создавать сообщения, содержащие несколько элементов, таких как подсказка "Позвонить" или несколько шаблонов. Чтобы добавить эти элементы, задайте для параметра *_data.page_welcome_message значение в виде массива объектов, а не строки.
+
+Краткая справка по массиву приветственных сообщений Страницы
+Параметры page_welcome_message	Значения
+landing_screen_type
+
+Перечисление	
+Задайте значение call_prompt (обязательный параметр).
+
+media_type
+
+Перечисление	
+Задайте значение text для рекламы с подсказкой "Позвонить".
+
+message
+
+Объект	
+Используйте, чтобы добавить в рекламу с переходом в Messenger один или несколько шаблонов сообщений.
+
+text_format.message
+
+Объект, определяющий действия кнопок с подсказкой "Позвонить".
+
+text — текст приветственного сообщения.
+call_prompt_data  — пара "ключ-значение" для текста сообщения с подсказкой "Позвонить" (обязательный параметр).
+Укажите в параметре call_prompt_message текст с предложением пользователю позвонить в вашу компанию.} Пример: Позвоните, чтобы назначить встречу. Обязательный параметр.
+Добавление подсказки "Позвонить"
+Чтобы добавить подсказку "Позвонить" в рекламу с переходом в Messenger, передайте в параметре *_data.page_welcome_message массив объектов, определяющий элементы этой подсказки. Задайте для параметра landing_screen_type значение call_prompt, для параметра media_type — значение text, для объекта text_format.message — text с текстом вашего приветственного сообщения, а для параметра call_prompt_data.call_prompt_message — подсказку о звонке вашей компании.
+
+Для удобства чтения применено форматирование. Замените выделенный жирным шрифтом и курсивом текст, например page_access_token, собственными значениями.
+... 
+      "page_welcome_message": "[
+        {
+          "landing_screen_type": "call_prompt",
+          "media_type": "text",
+          "text_format": {
+            "message": {
+              "text": "Your_welcome_message",
+              "call_prompt_data": { 
+                "call_prompt_message": "Your_call_prompt_message"
+              }
+            }
+          },
+        }
+      ]"
+...
+Добавление одного или нескольких шаблонов
+Чтобы создать рекламу с несколькими шаблонами, передайте в параметре *_data.page_welcome_message массив шаблонов сообщений . В примере ниже добавляется шаблон быстрого ответа.
+
+Для удобства чтения применено форматирование. Замените выделенный жирным шрифтом и курсивом текст, например page_access_token, собственными значениями.
+... 
+      "page_welcome_message": "[{
+        'message': {
+          'text':'  Your_question_or_directive  ',
+          'quick_replies':[
+            {
+              'content_type':'text',
+              'title':'  Option_1  ',
+              'payload':'  Option_1_information_for_webhook  '
+            },
+            {
+              'content_type':'text',
+              'title':'  Option_2  ',
+              'payload':'  Option_2_information_for_webhook  '
+            },
+            {
+              'content_type':'text',
+              'title':'  Option_3  ',
+              'payload':'  Option_3_information_for_webhook  '
+            }
+          ]
+        }
+      }]",
+...
+Дальнейшие действия
+Если вы ещё этого не сделали, настройте Webhooks, чтобы получать уведомления, когда пользователи будут нажимать на вашу рекламу.
+
+Дополнительная информация
+Подробная информация о Marketing API и дополнительных параметрах для рекламы с переходом в Messenger.
+
+Marketing API
+Справка по рекламным кампаниям 
+Справка по рекламным креативам 
+Справка по объявлениям 
+Справка по группам объявлений 
+Справка по таргетингу на аудитории 
+Создание формы для рекламы для сбора лидов 
+Начало работы с Marketing API 
+Получение лидов, сгенерированных рекламой 
+Обзор целей оптимизации и событий биддинга 
+Платформа Messenger
+Справка по шаблонам сообщений 
+Справка по формам для сбора лидов в сообщениях 
+
+
+Messenger Platform Changelog
+This document contains the changelog for current versions of the Messenger Platform. The Messenger Platform follows Graph API Versioning.
+
+The latest version is: v25.0
+
+Related Changelogs
+Graph API Changelog 
+Instagram Graph API Changelog 
+Marketing API Changelog 
+Messenger Platform Changelog Archive 
+February 11, 2026
+Messenger Calling API — General Availability
+The Messenger Calling API is now generally available. Any app with the pages_messaging permission can enable voice calling between businesses and people on Messenger via third-party integration. The API supports inbound and outbound calls using WebRTC and includes:
+
+Call settings webhook — Receive real-time updates when a Page's Messenger call settings change
+Call permissions API — Programmatically check a Page's call permissions and rate limits before placing a call
+Call metrics API — Submit client-side call quality metrics for monitoring and diagnostics
+Audio call button CTA — Use the audio_call button type in generic and button message templates to prompt users to call
+Ad referral webhooks — Receive ad attribution data for calls originating from Call Prompt Ads
+See the Messenger Calling API documentation for integration details.
+
+January 30, 2026
+Page Integrity API
+You can now get real-time integrity information for a page via the Page Integrity Webhook and API. This include the integrity status, violations, restrictions, recommended actions (e.g. file an appeal) and appeal status.
+
+December 19, 2025
+Instagram PDF Attachments
+You can now upload and send PDF file attachment in Instagram Direct using Facebook Graph API for Instagram accounts linked with a Facebook page OR the Instagram API for Instagram-only accounts.
+
+Instagram Message Replies API
+You can now send a reply to a specific message in Instagram Direct using the Facebook Graph API for Instagram accounts linked with a Facebook page
+
+reply_to object will also be available in the Conversations API. It will be non-null when the message is a reply and will indicate if it is a self reply. This boolean flag will also be added to the reply_to object returned in the message object in Message and Echo webhooks.
+
+December 2, 2025
+Businesses can now use the Messenger and Instagram Send API to react with a reaction emoji to a message in their inbox, edit an existing reaction on a message and remove a reaction (unreact) from a message that was previously reacted to.
+
+November 3, 2025
+You can now send a collection of images in Instagram Direct using either the Facebook Graph API for Instagram accounts linked with a Facebook page OR the Instagram API for Intagram-only accounts.
+
+November 3, 2025: Multi-image sending is a Beta feature that will be rolled out incrementally over a few weeks . While the feature is rolled out, some Instagram accounts may get an error response 2534068 to indicate that the feature is not yet available for that account.
+
+October 30, 2025
+Starting November 3, 2025, the webhook payload for Instagram post shares will include two attachments: the existing share attachment and a new ig_post attachment. The payload now provides additional metadata, including media ID, URL, and title (caption).
+
+If this change is not compatible with your app and you need more time to make updates, please contact our developer support team via the Meta Developer Support Portal to request exclusion of your app(s) from this change until you make the necessary updates to support the new attachment type.
+
+The old share attachment type will continue to be supported for Instagram posts until February 1, 2026, after which it will be removed. Partners and integrators are encouraged to migrate to the new ig_post attachment type as soon as possible. See here for before and after payload sample.
+
+October 27, 2025
+AI generated stickers are now included in the Messenger Conversations API response when the shares message field is specified. The response provides both the stickerID and url for the AI generated sticker in the message.
+
+October 23, 2025
+Meta no longer supports the Handover Protocol for Instagram. All businesses have been migrated to Conversation Routing. Conversation Routing is backwards compatible with most Handover Protocol APIs and functionalities, and is expected to function without interruption.
+
+October 21, 2025
+Instagram Moderate Conversations API is now available. This new API will allow businesses to block users, unblock users, and move conversations to the spam folder in Meta Business Suite Inbox for the Instagram platform. Previously, these actions could only be completed on the Instagram app or Meta Business Suite.
+
+October 13, 2025
+The Conversations API now supports an is_owner field for both Messenger and Instagram. This field indicates if the app making the request is the current thread owner of the conversation or not, and is only returned when Conversation Routing is enabled.
+
+Benefits:
+
+Filter and respond only to conversations your app owns.
+Avoid unnecessary ticket creation and reduce costs.
+Streamline recovery after downtime by focusing on relevant threads.
+October 6, 2025
+reply_to is now available in the Conversations API. It will be non-null when a message is a reply and will indicate if it is a self reply.
+
+In addition to mid and text, the reply_to object will also be returned in the message object in Message and Echo webhooks. The reply_to object will be populated with the mid that the message is replying to and will contain a boolean field is_self_reply that indicates whether the message is a self reply or just a reply.
+
+September 29, 2025
+Launching image support for Utility Messages in Messenger. You can now send images with Utility Message templates.
+
+September 23, 2025
+Businesses can now display typing indicators and mark_seen indicators in a conversation to let message recipients know that the business has seen and are processing their message, using Sender Actions.
+
+September 16, 2025
+Custom thread control window for Click To Instagram Ads is now available. When a conversation starts from an ad, the app controls the thread for 24 hours from the last user message, extendable up to 30 days by setting receiving_app_control_expiration. Invalid values or Conversation Control actions reset the window to 1 day.
+
+September 10, 2025
+Introducing the new message_edit webhook subscription in Instagram supporting both use cases of both Business Login for Instagram and Facebook Login for Business. Sample message_edit webhook can be found here.
+
+July 22, 2025
+Custom thread control window for Click To Messenger Ads is now available. When a conversation starts from an ad, the app controls the thread for 24 hours from the last user message, extendable up to 30 days by setting receiving_app_control_expiration. Invalid values or Conversation Control actions reset the window to 1 day.
+
+July 15, 2025
+Messenger Message Replies
+Businesses can now reply to specific past messages within a chat with the Messenger Send API.
+
+March 19, 2025
+Businesses will now be able to send a stack of images in a message using the Messenger Send API.
+
+February 24, 2025
+Messenger and Instagram
+messaging_referrals webhook now contains flow ID. The webhook event contains a flow_id field when an ad referral originates from an ad with a Welcome Message flow. This is available in the ad referral object of the messages, messaging_postbacks, messaging_referrals webhooks. See more details about the webhook here.
+
+October 8, 2024
+Messenger response_feedback webhook
+The new response_feedback webhook event notifies you when a user provides feedback on a message you send, by clicking on one of the "thumbs up"/"thumbs down"/"Good response"/"Bad response" buttons. See more details about the webhook here.
+
+Send API Rate Limits
+Your app can now make 300 (up from 100) calls per second per Instagram professional account for messages that contain text, links, reactions, and stickers. Learn more.
+
+June 23, 2024
+Launch of the new Instagram API with Instagram Login
+Components of this new Instagram API:
+
+A Facebook Page will no longer be required
+The host URL for API calls is graph.instagram.com
+New permissions for this API:
+instagram_business_basic
+instagram_business_content_publishing
+instagram_business_manage_comments
+instagram_business_manage_messages
+New apps will add the new Instagram product when creating a Meta app
+Existing apps can add the new Instagram product in the App Dashboard
+Visit our migration guide to learn if this new Instagram API with Instagram Login is right for you.
+
+Monitor the Instagram Platform Changelog for changes including bug fixes and new features
+
+June 11, 2024
+Messenger Messages Webhook
+ig_reel will now be a supported attachment type for the messages webhook. IG reel attachments will have type ig_reel and the attachment payload will include the title, url, and video id for the reel.
+
+Instagram Messages Webhook
+ig_reel and reel will now be supported attachment types in a messages webhook. IG reel attachments will have type ig_reel, and the attachment payload will include the title, url, and video id for the reel. FB reel attachments will have type reel, and the attachment payload will include the title, url, and video id for the reel.
+
+Messenger Conversation Routing: app-level thread control configs
+Businesses using Messenger Conversation Routing can now configure the thread control takeover capability on the individual app level. The original takeover config that’s coupled with the default app is now deprecated with all values migrated. Learn more here.
+
+Instagram Comment Webhooks
+Applies to all versions
+
+In addition to the ad_id and ad_title, the original_media_id will be returned in the media object of the comments field's value object when a person comments on a boosted Instagram post or Instagram ads post. For more information, refer to Set Up Webhooks for Instagram.
+
+April 9, 2024
+message_edits Webhook Event
+The new message_edits webhook event notifies you when a user edits a previously-sent message. Learn more about this webhook event here.
+
+March 12, 2024
+Welcome Message Flows
+Welcome Message flows can now be configured for messaging ads using the marketing API. Learn more about Click to Messenger ads here and Click to Instagram ads here.
+
+February 20, 2024
+Messaging Webhooks for Messenger
+"Reel" will now be a supported attachment type for message webhooks sent for Messenger conversations. Reel attachments will be categorized as type reel and the attachment payload will include the title, URL, and video ID of the reel.
+
+January 10th, 2024
+Commands
+Commands are tappable keywords that the user can invoke at any time to perform specific actions within the Messenger experience. Commands are composed of the command itself and a hint, which educates the user on what it does. For example, when a user types "help me book flights and hotels to Mexico for the last week of december," they are invoking the flights and hotels commands configured by the travel business. Learn more here.
+
+Commands menu
+The commands menu is a new menu that we are introducing that will automatically appear when you set up commands. If you already have a persistent menu set for your Messenger experience, the commands menu will override it. Learn more here.
+
+Share sheet
+People can now share your messaging experience from the business profile page on Messenger. This helps drive word-of-mouth discovery of your Messenger experience. Learn more here.
+
+Business profile updates
+Commands will appear on the business profile once you configure the commands for your Messenger experience. People can navigate to the business profile by tapping on the page name at the top and learn about the commands you have made available in your Messenger experience.
+
+Welcome screen update
+The welcome screen shows the list of commands supported by the messaging experience, making it easy for people to understand what actions the Messenger experience can perform. Learn more here.
+
+Messenger app review update
+If you are developing the app to send and receive messages for your own page, you will not have to go through app review. Note that if you are planning to fetch user profile information, you still need to go through app review for the permissions required for accessing the User Profile API.
+
+October 17, 2023
+Conversation Routing for Instagram
+Conversation Routing is now available for Instagram. Conversation Routing allows Meta to route conversations between your business and customers, or prospective customers, to the app that you have specified to respond in the conversation. This routing allows your business to create rich conversations with people and to minimize API calls to Meta's servers.
+
+Custom Labels and Personas APIs
+The Custom Labels API and Personas API access has been restored to businesses that operate in Europe, and for people in Europe and Japan who connect with businesses globally.
+
+Updates to welcome message flows for Ads that Click to Messenger and Instagram Direct
+Businesses and agencies can now easily connect their Click to Messenger and Click to Instagram Direct ads to a welcome message created in a partner app without having to use a JSON code snippet. The welcome message will appear as a dropdown in ads manager when creating the Click to Messenger and Click to Instagram Direct ad. Learn more about it here.
+
+October 12, 2023
+Private Replies
+Private Reply is now available for comments on Facebook Reels.
+
+September 20, 2023
+Private Replies
+Updates to Private Replies for groups, new fields supporting commenter information via from field and parent context via parent_id introduced to the group_feed webhook. You may need to update your webhooks server to handle these new fields.
+
+September 12, 2023
+Conversation Routing
+As a business, you may use multiple third-party messaging providers for different conversations with your customers, like lead generation, marketing offers about your products, or customer support questions. Conversation routing lets you define which partners control customer conversations at a particular time, so that customers get the information they need. You can create and manage message routing rules in your Page settings.
+
+Button Template for Instagram
+The button template sends a text message with up to three attached buttons. This template is useful for offering the message recipient options to choose from, such as predetermined responses to a question, or actions to take. Supported button types are postback and web_url.
+
+September 12, 2023
+Conversation Routing
+As a business, you may use multiple third-party messaging providers for different conversations with your customers, like lead generation, marketing offers about your products, or customer support questions. Conversation routing lets you define which partners control customer conversations at a particular time, so that customers get the information they need. You can create and manage message routing rules in your Page settings.
+
+Button Template for Instagram
+The button template sends a text message with up to three attached buttons. This template is useful for offering the message recipient options to choose from, such as predetermined responses to a question, or actions to take. Supported button types are postback and web_url.
+
+July 26, 2023
+Lead Ads for Messenger
+Instant Form Message Template
+June 30, 2023
+Lead Ads for Messenger
+Lead form ads in a Messenger conversation
+Booking Button
+June 20, 2023
+Instagram Messaging with the Messenger Platform
+Instagram Messaging is now available for any Instagram Professional account for a business or a Creator.
+
+June 15, 2023
+Ads that Click to Messenger
+Call Prompt
+You can now add a call prompt to allow customers or people interested in your business to call your business.
+
+Click to Subscribe
+You can now create ads that include a click to subscribe flow that allow you to ask customers or people interested in your business to opt in to receiving marketing messages.
+
+Multi App Routing
+Multi App Routing is now available for Instagram Direct and Messenger.
+
+May 10, 2023
+Private Replies
+
+Your business can now send Private Replies to a person who commented on a Facebook Group Post.
+
+Recurring Notifications
+
+Recurring Notifications is now known as Marketing Messages.
+
+Templates
+
+A Structured Template is now available to gather shipping information from a customer.
+
+April 25, 2023
+Messaging Insights API
+
+New metrics and parameters are available for the Messaging Insights API. 
+
+February 21, 2023
+Recurring Notifications for Messenger Platform
+
+Titles for Opt In Request
+The title property for recurring notification opt in requests is no longer required. If title is not set, the value defaults to "Updates and promotions". This change applies to opt in requests sent from a Facebook Page or Instagram Professional accounts.
+
+February 2, 2023
+Recurring Notifications for Messenger Platform
+
+Message Frequency for Opt In Requests
+The notification_messages_frequency property for recurring notification opt in requests is deprecated and will no longer be returned in GET requests or webhook notifications. However, notification message tokens created before Feb. 2, 2023 for weekly or monthly recurring notifications will be supported and the notification_message_frequency will be returned in webhook notifications.
+
+Followup Messages for Opt Ins
+You can now send up to three followup messages to a person who has opted in to receiving recurring notifications. All three followup messages must be sent within 2 minutes of the first followup message.
+
+Notification Message Tokens
+The GET /PAGE-ID/notification_message_tokens endpoint is now available for Instagram Messaging.
+
+The next_eligible_time property for Notification Message Token endpoints is now available. This field returns the time at which you are able to send the next recurring notification using that notification message token.
+
+Messenger API for Instagram
+
+You can now send GIFs in messages sent from an Instagram Professional account using the Messenger API for Instagram.
+
+The Attachment Upload API now supports uploading media for messages sent from an Instagram Professional account.
+
+Referral information for ads that click to an Instagram conversation (CTD) is now returned in messages webhook notifications.
+
+January 2, 2023
+Messenger Platform Insights
+Beginning March, 31, 2023, you will no longer be able to download a CVS file from the Messenger Analytics dashboard. Visit the Messaging Insights API to learn how to get these insights.
+
+November 9, 2022
+Business Login for Instagram
+Business Login for Instagram makes it easier for you to onboard Instagram users who still need to configure their account for API access through modal pop ups and fewer steps.
+
+Improvements between Click to Messenger, Lead Gen ads and Messenger Platform
+We’ve made following up on Lead Gen ads that Click to Messenger easier through:
+
+A new Referral Webhook for Click to Messenger, Lead Gen ads that include the lead information.
+Improvements to the Handover Protocol. Advertisers can now select which app they want to route completed leads. Additionally, for apps that haven’t yet implemented these app notifications, an optional summary message can be enabled, to send lead information to that app in the form of a regular message.
+Since referral or summary events are triggered while the standard messaging window is open, apps can use this to follow-up with leads directly in Messenger, upsell them to Recurring Notifications or have them book an appointment or call the business directly.
+Messaging Events API
+Messaging Events API supports the lead_submitted event. Businesses can use this event to report lead submissions from Click to Messenger ads. This new messaging event is released as an Open Beta. Reporting in Ads Manager will come soon.
+
+Persistent Menu
+Persistent Menu is now available for Instagram Messaging.
+
+Private Replies
+Instagram Messaging now supports Private Replies for comments on Instagram Live Stories and ads posts. You may need to update your webhooks server to handle these new fields.
+
+Recurring Notifications
+You can now get a list of all valid Notification Message Tokens using the GET /PAGE-ID/notification_message_tokens endpoint.
+
+October 17, 2022
+Recurring Notifications
+App IDs will no longer be associated with notification message tokens. All apps linked to a Page will now receive opt in webhook notifications when a person has opted in to receive recurring notifications.
+
+The following message attachment payload fields have been added:
+
+image_aspect_ratio – Set an image to a horizontal or square aspect ratio for opt in requests
+elements – Create a carousel of images for opt in requests
+notification_message_tokens – Get a list of current notifications message tokens
+notification_messages_cta_text – Customize the text for call to actions for opt in requests
+The following ways to get opt ins for recurring notifications have been added:
+
+Chat Plugin
+Checkbox Plugin
+m.me links
+October 3, 2022
+The title field has been added to the Recurring Notfication webhooks notification.
+
+August 16, 2022
+Private Replies
+Private Reply is now available for comments on Instagram Reels.
+
+Instagram Messaging
+You can now send Instagram messages with audio and videos that have been uploaded to a Meta server or sent from your server.
+
+May 25, 2022
+User Profile API supports retrieval of the customer's Instagram username field on Graph API v14.0 and later.
+
+May 19, 2022
+Recurring Notifications for Messenger API
+Recurring Notifications is a major update to the Messenger API to allow businesses to send proactive, automated messages that drive re-engagement. Recurring Notifications help businesses deliver personalized, customer centric messages at every stage of the customer journey.
+
+Recurring Notifications for Messenger API for Instagram
+We’re announcing Recurring Notifications for Messenger API for Instagram as a beta. Developers can sign up for our beta interest list before July.
+
+Instagram Send API rate limit increase
+We have increased the rate limit for the Send API to 100 API calls per second for each Instagram Professional Account.
+
+ig.me referral parameter
+Businesses can add ig.me links on websites, emails, and product packaging to easily enable users to start a conversation with a business on Instagram. We are adding the ability for brands to add a referral parameter to these ig.me links to create personalized messaging experiences.
+
+Instagram API New Onboarding Flow
+We are announcing a new onboarding flow for the Instagram API as a beta. Developers can sign up for our beta interest list before June 29.
+
+April 19, 2022
+Ice Breakers on Messenger API now supports localization allowing businesses to set custom ice breakers depending on the user locale. The API will have a new format and we encourage developers to leverage the new format to set and retrieve Ice Breakers information.
+Messenger apps which haven’t completed business verification must complete verification by July 19, 2022. If apps don’t complete business verification by then, they won’t be able to send and receive messages via Messenger and pages_messaging permission for these apps will be revoked. Developer alerts have been sent to the impacted apps. If you have already completed business verification for your Messenger app no further action is needed.
+We have restored message reads, deliveries and reactions webhooks on Messenger Platform that weren’t available to businesses in Europe, and for people in Europe and Japan who connect with businesses globally.
+March 15, 2022
+We have launched the Persistent Menu for Messenger API support for Instagram. This enables users to discover and interact with a Page’s main features.
+
+Mar 14, 2022
+As per the announcement on September 14, 2021, all Facebook pages will now be migrated to support the new Handover Protocol behavior. We expect to have all Pages migrated by March 18, 2022. Please refer to the breaking changes section for more details. Here’s a summary of key improvements that were announced previously.
+
+We are making improvements to Handover Protocol which helps developers and businesses launch messaging experiences (i.e. apps) quickly, makes it easy to pass control of conversation between apps and ensures a great user experience by disallowing apps from interjecting ongoing conversations. Key improvements include Exclusive mode, Idle mode, New APIs for finer control over thread ownership and removing the requirement to assign primary or secondary roles for apps
+
+Feb 7, 2022
+We have launched the Chat Plugin Entrypoint customization settings through API as well as our first party setup tool. This will provide businesses with the option to choose the entry point icon and its label from a set of presets that best fits their branding. For more details please see our developer documentation.
+
+Nov 11, 2021
+Messenger API for Instagram is now available for Instagram Creators account type with less than 500K followers. Please see details in the developer documentation.
+
+Nov 9, 2021
+We have updated Private Reply on Instagram to support comments on Instagram Live videos. Please refer to the developer documentation for details on implementation.
+Oct 20, 2021
+IG comments webhook and API are updated with additional fields. Please refer to the developer documentation for more details on new fields.
+Starting support for IG.me link, a shortened URL service that directs users to messaging experience on Instagram. Developers can use the link format https://ig.me/m/{ig_profile_handle} on website, email, and more. Please refer to the developer documentation for more details.
+We have made updates to the Ice Breaker on Instagram to support multiple versions in different languages. Developers can now set up Ice Breakers in different languages and serve the right version to users based on user locale. Please refer to the developer documentation for more details.
+Sept 14, 2021
+Handover Protocol Improvements
+
+We are making improvements to Handover Protocol which helps developers and businesses launch messaging experiences (i.e. apps) quickly, makes it easy to pass control of conversation between apps and ensures a great user experience by disallowing apps from interjecting ongoing conversations. Key improvements include Exclusive mode, Idle mode, New APIs for finer control over thread ownership and removing the requirement to assign primary or secondary roles for apps
+Note that developers and businesses who currently use Handover Protocol need to implement the changes to their current Handover Protocol implementation by March 1st, 2022. Please refer to the migration guide and breaking changes sections for more details.
+Custom Labels API - We are making exciting updates to the Custom Labels API that would allow businesses to create, update and delete labels and sync the labels between the Facebook Page Inbox and any other tool the business might be using to communicate with their customers.
+
+In order to use the Custom Labels API after October 1st, 2021 businesses need to accept our new Page Contact Terms. These terms describe Meta’s data practices for the Custom Labels created by the business. We will be rolling out the Page Contact Terms acceptance requirement to Facebook Pages on a rolling basis starting October 1st.
+Graph API v12.0+ Custom Labels API name field will be replaced with page_label_name. This change will take effect on all older Graph API versions starting Dec 14, 2021. Developer should leverage page_label_name across various CRUD (Create, Retrieve, Update, Delete) API calls and webhooks.
+Messenger API Updates for Europe and Japan - We have restored Customer Feedback Template in the Messenger API that wasn’t available to businesses in Europe, and for people in Europe and Japan who connect with businesses globally. Details here.
+
+Messenger API for Instagram updates
+
+Reaction Webhook - We have updated emoji reactions to return a new unicode format and support multiple emoji reactions. Please refer to the developer documentation and migrate to the new version before December 14, 2021 in order to continue supporting emoji reactions.
+
+User Profile API - We have updated User Profile API to include additional fields that are publicly available on the Instagram app. Please refer to the developer documentation for details.
+
+IGID Deprecation - Conversation API will no longer return IGID field and fully rely on IGSID field. See developer documentation for details in order to migrate before December 14, 2021.
+
+Facebook Chat Plugin Customization API - We are launching Chat Plugin customization settings through API. With this new release, developers will be able to edit features including the position, color, greetings, guest mode settings, etc. that are currently only available using our first-party tools today.
+
+Message Echo webhook will now include the app id for Facebook Page Inbox as part of Graph API v12.0 - When a business responds to a Messenger conversation from Facebook Page Inbox, other apps connected to the Page can listen to the Message Echo webhook. These apps will receive an echo webhook with the Facebook Page inbox app id (263902037430900).
+
+Aug 16, 2021
+Messenger API for Instagram- Messenger API for Instagram opened up to all developers in June, with an opportunity to build for IG business accounts with follower counts between 10k-100k. Now, developers can add Instagram messaging into their apps and build Instagram messaging experiences for all businesses on Instagram. The use of Messenger API for Instagram must comply with the Developer Policies, particularly the policies listed under ‘Messenger and Instagram Messaging APIs’, as well as the technical documentation.
+Aug 10, 2021
+Messenger API Updates for Europe and Japan - We have restored many of the features in the Messenger API that weren’t available to businesses in Europe, and for people in Europe and Japan who connect with businesses globally. See the list of all restored features here.
+Aug 6, 2021
+Private Replies on Instagram Messaging API no longer need to be sent using the Human Agent Message Tag. Private Reply API calls with the Human Agent Tag will stop working after Sept 13, 2021.
+Aug 4, 2021
+Update on Messaging Referrals Webhook - We added the product_id inside ads_context_data block in the messaging_referrals webhook to allow apps to get the product ID if it is a dynamic ads.
+Jul 7, 2021
+Messenger API for Instagram - Messenger API for Instagram opened up to all developers in June, with an opportunity to build for IG business accounts with follower counts between 10k-100k. We are expanding the rollout to IG business accounts with follower counts between 1K-10K. Now, developers can add Instagram messaging into their apps and build Instagram messaging experiences for even more businesses. The use of Messenger API for Instagram must comply with the Developer Policies, particularly the policies listed under ‘Messenger and Instagram Messaging APIs’, as well as the technical documentation.
+June 22, 2021
+Generic Templates, which allows you to send a structured message that includes an image, text and buttons, is now available for Instagram
+June 8, 2021
+The following changes apply to v11.0+
+
+Adding <mid> to messaging_postback events for Messenger and Messenger API for Instagram for Graph API V11.0+ - We are adding the Message Id (<mid>) field as part of the messaging_postback payload to help reduce engineering overheads for our partners who have had to rely on the Conversations API to fetch conversation history and then compare it with the webhook events. See more details here.
+
+Airline Templates are deprecated - Airline Templates will no longer be supported starting Graph API v11. Deprecation for the prior versions of the Graph API will occur 6 months after the announcement of this change on Dec 6, 2021. We recommend airlines send Boarding Pass and Check-in templates as images which are consistent with how they typically send these notifications in other channels.
+
+June 2, 2021
+Messenger API for Instagram - We have opened up the Messenger API for Instagram to all developers who are making it possible for brands to offer messaging experiences on Instagram at scale. Now, developers can add Instagram messaging into their apps and build experiences for Instagram messaging. Developers can help businesses use different applications to leverage existing workflows, drive more meaningful conversations, increase customer satisfaction, and grow sales. Learn more here. The use of Messenger API for Instagram must comply with the Developer Policies, particularly the policies listed under ‘Messenger and Instagram Messaging APIs’, as well as the technical documentation.
+
+Human Agent message tag now available to all developers - This tag allows businesses to respond to user messages on Messenger and Instagram manually outside the 24-hour standard messaging window up to 7days. This tag is helpful especially for use cases such as weekend closures or for inquiries that need more than 24 hours to resolve. Developers should apply for the Human Agent tag permission via the App dashboard even if your app has been previously approved for Human Agent message tag. Navigate to the “Permissions and Features” section of the app dashboard and apply for the “Human Agent” permission. Learn more here.
+
+Customer Feedback Template is now available as Beta - We are launching a native template within Messenger that supports common survey formats such as CSAT (Customer Satisfaction), NPS (Net Promoter Score), CES (Customer Effort Score) and free form text. The native template is easier to integrate because it’s built on Send API, eliminates the need to build custom survey solutions using Webview and makes it easy for developers to aggregate scores across channels that use similar survey formats. Learn more here.
+
+Apr 13, 2021
+Messenger API Updates for Europe and Japan - We have restored many of the features in the Messenger API that weren’t available to businesses in Europe and Japan, and for people in Europe and Japan who connect with businesses globally. See the list of all restored features here.
+Mar 30, 2021
+Messenger API Updates for Japan - As part of our ongoing efforts to comply with regulations under the Japan Telecom Business act, several Messenger APIs will be unavailable for developers and businesses in Japan, and for people in Japan who connect with businesses globally. These Messenger API changes are similar to the changes we announced for Europe back in December.
+Dec 15, 2020
+Update on Messaging Referrals Webhook - We added the ads_context_data block to the messaging_referrals webhook to allow apps to get the post ID, ad title, picture and video URL.
+Dec 01, 2020
+Messenger API Updates for Europe - As part of our efforts to comply with new privacy rules in Europe, we're making updates that will impact some developers and businesses that use our Messenger API. Beginning December 16, several Messenger APIs will be unavailable for developers and businesses in Europe, and for people in Europe who connect with businesses globally.
+
+
+
+Быстрые ответы
+С помощью функции быстрых ответов можно добавить в беседу набор кнопок, позволяющих пользователю мгновенно ответить на реплику. Поддерживается до 13 быстрых ответов, каждый из которых должен содержать до 20 знаков (остальные будут обрезаны). Для быстрых ответов поддерживается только обычный текст.
+
+
+Когда кто-то нажимает один из быстрых ответов, кнопки исчезают, а название выбранной кнопки публикуется в переписке в виде сообщения. На Webhooks отправляется событие сообщения, содержащее название кнопки и необязательные полезные данные.
+
+Эта функция пока недоступна на ПК.
+
+Отправка быстрых ответов
+curl -X POST -H "Content-Type: application/json" -d '{
+  "recipient":{
+    "id":"
+Событие Webhooks
+При нажатии быстрого ответа на ваш Webhooks сообщений отправляется текстовое сообщение.
+
+Свойство text события соответствует заголовку быстрого ответа. Объект сообщения также содержит поле с именем quick_reply и полезными данными, связанными с этим быстрым ответом.
+
+{
+  "object": "instagram",
+  "entry": [
+    {
+      "id": "
+Быстрые ответы с номером телефона пользователя
+
+
+Этот тип быстрых ответов позволяет запросить у пользователя его номер телефона. При отправке быстрого ответа с номером телефона платформа Instagram Direct автоматически вводит в отображаемый быстрый ответ номер телефона из профиля пользователя.
+
+Если в профиле пользователя нет номера телефона, быстрый ответ не отображается.
+
+Бот не получит номер телефона, пока пользователь не нажмет быстрый ответ.
+
+При выборе быстрого ответа информация будет передана один раз. Данное действие не означает предоставления разрешения на доступ к этой информации в дальнейшем.
+
+Синтаксис
+{
+  "content_type":"user_phone_number"
+}
+Событие Webhooks
+Когда пользователь нажмет быстрый ответ, электронный адрес будет передан в атрибуте payload события Webhooks messages.
+
+{
+  "object": "page",
+  "entry": [
+    {
+      "id": "
+Поддержка разработчиков
+Инструмент Meta Status  предназначен для проверки статуса и доступности продуктов Meta для бизнеса.
+Инструмент Meta для поддержки разработчиков  позволяет сообщать об ошибках и просматривать существующие сведения о них, получать помощь по работе с Ads Manager и Business Manager и многое другое.
+Ознакомьтесь с ресурсами поддержки для платформы Messenger .
+
+
+Вводные фразы
+Вводные фразы позволяют человеку начать беседу с компанией, используя список часто задаваемых вопросов. С помощью API Ice Breaker можно задать до 4 вопросов.
+
+C 19 октября 2021 г. вводные фразы поддерживают локализацию, так что компании могут настраивать вопросы в зависимости от языка и региона пользователя. У API будет новый формат. Рекомендуем разработчикам использовать его, чтобы настраивать и получать данные вводных фраз. Список поддерживаемых локалей можно найти в этой статье.
+
+Эта функция пока недоступна на ПК.
+
+
+Настройка вводных фраз
+Новый формат (рекомендуется)
+curl -X POST -H "Content-Type: application/json" -d '{
+     "platform": "instagram",
+     "ice_breakers":[
+       {
+          "call_to_actions":[
+             {
+                "question":"
+Старый формат (нельзя использовать для нового API Ice Breaker)
+curl -X POST -H "Content-Type: application/json" -d '{
+  "platform": "instagram",
+  "ice_breakers":[
+     {
+        "question": "
+Получение вводных фраз
+Формат ответа на запрос GET зависит от настройки вводных фраз. Действует следующий алгоритм:
+
+если вводные фразы настроены в старом формате, запрос GET возвращает ответ в старом формате;
+если вводные фразы настроены в новом формате, запрос GET возвращает ответ в новом формате.
+Мы рекомендуем разработчикам перейти на новый формат, поскольку планируем отказываться от старого.
+
+curl -X GET "https://graph.facebook.com/v11.0/me/messenger_profile?fields=ice_breakers&platform=instagram&access_token=<PAGE_ACCESS_TOKEN>
+Ответ в новом формате
+
+{
+   "data": [
+        {
+          "call_to_actions" : [
+               {
+                "question": "
+Ответ в старом формате
+
+{
+   "data": [
+        {
+          "ice_breakers": [
+            {
+                "question": "
+Удаление вводных фраз
+curl -X DELETE -H "Content-Type: application/json" -d '{
+  "fields": [
+    "ice_breakers",
+  ]
+}' "https://graph.facebook.com/v11.0/me/messenger_profile?platform=instagram&access_token=%lt;PAGE_ACCESS_TOKEN>"
+Событие Webhooks
+Для получения уведомлений Webhooks обратной передачи от объектов вводных фраз приложение должно быть подписано на Webhooks messaging_postbacks версии 8.0 или более поздней в разделе Instagram в настройках приложения.
+
+Этот объект Webhooks будет получать полезные данные в формате JSON, аналогичные указанным в примере ниже.
+
+{
+  "object": "instagram",
+  "entry": [
+    {
+      "id": "<IGID>",
+      "time": 1502905976963,
+      "messaging": [
+        {
+          "sender": {
+            "id": "<IGSID>"
+          },
+          "recipient": {
+            "id": "<IGID>"
+          },
+          "timestamp": 1502905976377,
+          "postback": {
+            "title": "<SELECTED_ICEBREAKER_QUESTION>",
+            "payload": "<USER_DEFINED_PAYLOAD>",
+          }
+        }
+      ]
+    }
+  ]
+}
+
+     
+Поддержка разработчиков
+Инструмент Meta Status  предназначен для проверки статуса и доступности продуктов Meta для бизнеса.
+Инструмент Meta для поддержки разработчиков  позволяет сообщать об ошибках и просматривать существующие сведения о них, получать помощь по работе с Ads Manager и Business Manager и многое другое.
+Ознакомьтесь с ресурсами поддержки для платформы Messenger .
