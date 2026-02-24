@@ -20,6 +20,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { generatePrompt, PROMPT_TEMPLATES } from "@/lib/prompt-templates";
 
 export default function AIEmployeePage() {
   const { t } = useLanguage();
@@ -91,45 +92,7 @@ export default function AIEmployeePage() {
   // Business ID for webhook URLs
   const [businessId, setBusinessId] = useState("");
 
-  // Prompt templates
-  const promptTemplates = [
-    {
-      id: "salon",
-      nameKey: "botPage.beautySalon",
-      icon: "💇",
-      promptKey: "botPage.templateSalon",
-    },
-    {
-      id: "clinic",
-      nameKey: "botPage.medicalClinic",
-      icon: "🏥",
-      promptKey: "botPage.templateClinic",
-    },
-    {
-      id: "restaurant",
-      nameKey: "botPage.restaurant",
-      icon: "🍽️",
-      promptKey: "botPage.templateRestaurant",
-    },
-    {
-      id: "fitness",
-      nameKey: "botPage.fitnessClub",
-      icon: "🏋️",
-      promptKey: "botPage.templateFitness",
-    },
-    {
-      id: "auto",
-      nameKey: "botPage.autoService",
-      icon: "🚗",
-      promptKey: "botPage.templateAuto",
-    },
-    {
-      id: "shop",
-      nameKey: "botPage.onlineShop",
-      icon: "🛒",
-      promptKey: "botPage.templateShop",
-    },
-  ];
+  // Prompt templates come from @/lib/prompt-templates
 
   useEffect(() => {
     const fetchData = async () => {
@@ -321,9 +284,9 @@ export default function AIEmployeePage() {
     }
   };
 
-  const applyTemplate = (templateId: string, promptKey: string) => {
+  const applyTemplate = (templateId: string) => {
     setSelectedTemplate(templateId);
-    setAiSettings({ ...aiSettings, rules: t(promptKey) });
+    setAiSettings({ ...aiSettings, rules: generatePrompt(templateId, botInfo.name) });
   };
 
   const handleSavePayment = async () => {
@@ -546,10 +509,10 @@ export default function AIEmployeePage() {
         </p>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {promptTemplates.map((template) => (
+          {PROMPT_TEMPLATES.map((template) => (
             <button
               key={template.id}
-              onClick={() => applyTemplate(template.id, template.promptKey)}
+              onClick={() => applyTemplate(template.id)}
               className={`p-4 border rounded-xl text-left transition-all group ${
                 selectedTemplate === template.id
                   ? "bg-blue-500/20 border-blue-500/50 ring-2 ring-blue-500/30"
@@ -562,7 +525,7 @@ export default function AIEmployeePage() {
                   ? "text-blue-400"
                   : "text-white group-hover:text-blue-400"
               }`}>
-                {t(template.nameKey)}
+                {template.name}
               </span>
               {selectedTemplate === template.id && (
                 <span className="block text-xs text-blue-400 mt-1">{t("botPage.selected") || "Выбрано"}</span>
