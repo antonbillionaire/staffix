@@ -142,12 +142,29 @@ export default function ProductsPage() {
     fetchProducts();
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setImportCsv((ev.target?.result as string) || "");
-    reader.readAsText(file, "utf-8");
+    const ext = file.name.split(".").pop()?.toLowerCase();
+
+    if (ext === "xlsx" || ext === "xls") {
+      // Excel: parse with SheetJS
+      const XLSX = (await import("xlsx")).default;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const data = new Uint8Array(ev.target?.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const csv = XLSX.utils.sheet_to_csv(ws, { FS: ";" });
+        setImportCsv(csv);
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      // CSV/TXT: read as text
+      const reader = new FileReader();
+      reader.onload = (ev) => setImportCsv((ev.target?.result as string) || "");
+      reader.readAsText(file, "utf-8");
+    }
   };
 
   const handleImport = async () => {
@@ -530,7 +547,7 @@ export default function ProductsPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className={`${modalBg} border rounded-xl w-full max-w-lg`}>
             <div className="flex items-center justify-between p-5 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}">
-              <h3 className={`text-lg font-semibold ${text}`}>Импорт товаров из CSV</h3>
+              <h3 className={`text-lg font-semibold ${text}`}>Импорт товаров</h3>
               <button onClick={() => setIsImportOpen(false)} className={sub}>
                 <X className="w-5 h-5" />
               </button>
@@ -549,10 +566,10 @@ export default function ProductsPage() {
               </div>
 
               <div>
-                <label className={`block text-sm font-medium mb-1 ${text}`}>Загрузить файл .csv</label>
+                <label className={`block text-sm font-medium mb-1 ${text}`}>Загрузить файл (.xlsx, .xls, .csv)</label>
                 <input
                   type="file"
-                  accept=".csv,.txt"
+                  accept=".csv,.txt,.xlsx,.xls"
                   onChange={handleFileUpload}
                   className={`w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700 ${sub}`}
                 />
