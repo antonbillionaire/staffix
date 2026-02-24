@@ -905,17 +905,11 @@ export async function POST(request: NextRequest) {
     // Читаем тело один раз
     const rawBody = await request.text();
 
-    // Верификация подписи Telegram webhook (если webhookSecret задан)
-    // Telegram отправляет HMAC-SHA256(secret_token, rawBody) в X-Telegram-Bot-Api-Secret-Hash
+    // Верификация secret_token (Telegram шлёт его as-is в хедере X-Telegram-Bot-Api-Secret-Token)
     if (business.webhookSecret) {
-      const { createHmac } = await import("crypto");
-      const receivedHash = request.headers.get("x-telegram-bot-api-secret-hash");
-      const expectedHash = createHmac("sha256", business.webhookSecret)
-        .update(rawBody)
-        .digest("hex");
-
-      if (!receivedHash || receivedHash !== expectedHash) {
-        console.error(`Telegram webhook: invalid signature for businessId=${businessId}`);
+      const receivedToken = request.headers.get("x-telegram-bot-api-secret-token");
+      if (!receivedToken || receivedToken !== business.webhookSecret) {
+        console.error(`Telegram webhook: invalid secret_token for businessId=${businessId}`);
         return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
       }
     }
