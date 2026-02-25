@@ -3,6 +3,7 @@ import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { notifyNewRegistration } from "@/lib/admin-notify";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   // Session: JWT with 30-day persistence (survives browser close)
@@ -102,6 +103,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 },
               },
             });
+
+            // Notify admin about new Google registration
+            notifyNewRegistration(user.name || "User", user.email!, "Google OAuth (онбординг не завершён)").catch(() => {});
           }
           return true;
         } catch (error) {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
+import { notifyAdmin } from "@/lib/admin-notify";
 
 export async function POST(request: Request) {
   try {
@@ -84,6 +85,17 @@ export async function POST(request: Request) {
         },
       });
     }
+
+    // Notify admin about completed onboarding
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } });
+    notifyAdmin(
+      `📋 <b>Онбординг завершён!</b>\n\n` +
+      `👤 <b>Имя:</b> ${user?.name || "—"}\n` +
+      `📧 <b>Email:</b> ${user?.email || "—"}\n` +
+      `🏢 <b>Бизнес:</b> ${businessName}\n` +
+      `📂 <b>Тип:</b> ${Array.isArray(businessTypes) && businessTypes.length > 0 ? businessTypes.join(", ") : businessType || "не указан"}\n` +
+      `🕐 <b>Время:</b> ${new Date().toLocaleString("ru-RU", { timeZone: "Asia/Almaty" })}`
+    ).catch(() => {});
 
     return NextResponse.json({
       message: "Onboarding завершён",
