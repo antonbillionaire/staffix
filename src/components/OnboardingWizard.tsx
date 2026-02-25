@@ -37,7 +37,7 @@ const STEPS = [
   {
     id: "catalog",
     title: "Услуги / товары",
-    desc: "Добавьте каталог",
+    desc: "Импортируйте или добавьте вручную",
     href: "/dashboard/services",
     key: "hasCatalog" as keyof OnboardingStatus,
     icon: Scissors,
@@ -55,7 +55,7 @@ const STEPS = [
   {
     id: "knowledge",
     title: "База знаний",
-    desc: "Загрузите FAQ или файлы",
+    desc: "FAQ, доп. документы, условия",
     href: "/dashboard/faq",
     key: "hasKnowledge" as keyof OnboardingStatus,
     icon: BookOpen,

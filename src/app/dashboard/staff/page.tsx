@@ -523,16 +523,34 @@ export default function StaffPage() {
                 <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
                   {t("staffPage.role")}
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.role}
-                  onChange={(e) =>
-                    setFormData({ ...formData, role: e.target.value })
-                  }
-                  placeholder={t("staffPage.rolePlaceholder")}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
-                />
+                <select
+                  value={["admin", "manager", "master"].includes(formData.role) ? formData.role : "custom"}
+                  onChange={(e) => {
+                    if (e.target.value === "custom") {
+                      setFormData({ ...formData, role: "" });
+                    } else {
+                      setFormData({ ...formData, role: e.target.value });
+                    }
+                  }}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white" : "border-gray-300"}`}
+                >
+                  <option value="admin">Администратор</option>
+                  <option value="manager">Менеджер</option>
+                  <option value="master">Мастер</option>
+                  <option value="custom">Другое...</option>
+                </select>
+                {!["admin", "manager", "master"].includes(formData.role) && (
+                  <input
+                    type="text"
+                    required
+                    value={formData.role}
+                    onChange={(e) =>
+                      setFormData({ ...formData, role: e.target.value })
+                    }
+                    placeholder={t("staffPage.rolePlaceholder")}
+                    className={`w-full mt-2 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
+                  />
+                )}
               </div>
 
               {/* Telegram Username */}
@@ -659,9 +677,12 @@ export default function StaffPage() {
             </div>
 
             <div className={`text-sm mb-4 p-3 rounded-lg ${isDark ? "bg-white/5 text-gray-400" : "bg-gray-50 text-gray-600"}`}>
-              <p className="font-medium mb-1">Формат CSV:</p>
-              <code className="text-xs">Имя;Должность;Telegram</code>
-              <p className="mt-2 text-xs">Колонки определяются автоматически по названиям в первой строке. Поддерживаются файлы CSV, Excel (.xlsx/.xls), TXT.</p>
+              <p className="font-medium mb-2">Импорт сотрудников</p>
+              <p className="text-xs mb-1"><span className="font-medium">Обязательное поле:</span> Имя</p>
+              <p className="text-xs mb-2"><span className="font-medium">Необязательные:</span> Должность (Администратор / Менеджер / Мастер), Telegram</p>
+              <code className={`text-xs block ${isDark ? "text-green-400" : "text-green-700"}`}>Имя;Должность;Telegram</code>
+              <code className={`text-xs block mt-1 ${isDark ? "text-blue-400" : "text-blue-700"}`}>Анна;Мастер;@anna_beauty</code>
+              <p className="mt-2 text-xs">Форматы: .xlsx, .xls, .csv, .txt. Колонки определяются автоматически по заголовкам.</p>
             </div>
 
             <div className="mb-4">

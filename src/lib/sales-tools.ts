@@ -702,9 +702,13 @@ async function notifyNewOrder(
       console.log(`[Notify] No ownerTelegramChatId for business ${businessId} — owner needs to /start the bot`);
     }
 
-    // Также уведомляем сотрудников с включёнными уведомлениями
+    // Уведомляем сотрудников (кроме мастеров — они получают только записи)
     const staffMembers = await prisma.staff.findMany({
-      where: { businessId, telegramChatId: { not: null } },
+      where: {
+        businessId,
+        telegramChatId: { not: null },
+        NOT: { role: "master" },
+      },
       select: { telegramChatId: true, name: true },
     });
     for (const staff of staffMembers) {

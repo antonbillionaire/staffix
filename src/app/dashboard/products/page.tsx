@@ -582,14 +582,17 @@ export default function ProductsPage() {
 
             <div className="p-5 space-y-4">
               <div className={`text-sm p-3 rounded-lg ${isDark ? "bg-white/5 text-gray-400" : "bg-gray-50 text-gray-600"}`}>
-                <p className="font-medium mb-1">Формат CSV (колонки через запятую или точку с запятой):</p>
+                <p className="font-medium mb-2">Импорт каталога товаров</p>
+                <p className="text-xs mb-1"><span className="font-medium">Обязательные поля:</span> Название, Цена</p>
+                <p className="text-xs mb-2"><span className="font-medium">Необязательные:</span> Категория, Описание, Остаток, Артикул, Старая цена</p>
                 <code className={`text-xs block ${isDark ? "text-green-400" : "text-green-700"}`}>
                   Название;Цена;Категория;Описание;Остаток;Артикул;Старая цена
                 </code>
                 <code className={`text-xs block mt-1 ${isDark ? "text-blue-400" : "text-blue-700"}`}>
                   iPhone 15;150000;Смартфоны;Новинка 2024;10;IPH15;180000
                 </code>
-                <p className="mt-2 text-xs">Обязательны только Название и Цена. Остальные поля — необязательны (можно оставить пустыми).</p>
+                <p className="mt-2 text-xs">Форматы: .xlsx, .xls, .csv, .txt. Колонки определяются автоматически по заголовкам.</p>
+                <p className="mt-1 text-xs opacity-70">Для подробных описаний товаров загрузите документы в Базу знаний (раздел Бот).</p>
               </div>
 
               <div>

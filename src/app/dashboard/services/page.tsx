@@ -398,20 +398,22 @@ export default function ServicesPage() {
             </div>
 
             <div className={`text-sm mb-4 p-3 rounded-lg ${isDark ? "bg-white/5 text-gray-400" : "bg-gray-50 text-gray-600"}`}>
-              <p className="font-medium mb-1">Формат CSV (колонки через запятую или точку с запятой):</p>
+              <p className="font-medium mb-2">Импорт услуг</p>
+              <p className="text-xs mb-1"><span className="font-medium">Обязательные поля:</span> Название, Цена</p>
+              <p className="text-xs mb-2"><span className="font-medium">Необязательные:</span> Длительность (мин), Описание</p>
               <code className={`text-xs block ${isDark ? "text-green-400" : "text-green-700"}`}>
-                Название;Цена;Длительность (мин);Описание (необязательно)
+                Название;Цена;Длительность (мин);Описание
               </code>
               <code className={`text-xs block mt-1 ${isDark ? "text-blue-400" : "text-blue-700"}`}>
                 Стрижка;5000;30;Классическая стрижка волос
               </code>
-              <p className="mt-2 text-xs">Первая строка может быть заголовком — она будет пропущена автоматически.</p>
+              <p className="mt-2 text-xs">Форматы: .xlsx, .xls, .csv, .txt. Колонки определяются автоматически по заголовкам.</p>
             </div>
 
             <div className="space-y-3">
               <div>
                 <label className={`block text-sm font-medium mb-1 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                  Загрузить файл .csv
+                  Загрузить файл (.xlsx, .xls, .csv)
                 </label>
                 <input
                   type="file"

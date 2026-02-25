@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
@@ -44,6 +44,7 @@ import {
   Building2,
   Briefcase,
   Gift,
+  Truck,
   type LucideIcon,
 } from "lucide-react";
 const ChatWidget = dynamic(() => import("@/components/ChatWidget"), { ssr: false });
@@ -75,50 +76,67 @@ interface NavSingle {
 
 type NavEntry = NavGroup | NavSingle;
 
-const navConfig: NavEntry[] = [
-  { nameKey: "nav.dashboard", href: "/dashboard", icon: LayoutDashboard, single: true },
-  {
-    nameKey: "nav.aiEmployeeGroup",
-    href: "/dashboard/channels",
-    icon: Brain,
-    children: [
-      { nameKey: "nav.telegram", href: "/dashboard/bot", icon: MessageSquare },
-      { nameKey: "nav.whatsapp", href: "/dashboard/channels", icon: Globe },
-      { nameKey: "nav.instagram", href: "/dashboard/channels", icon: Send },
-      { nameKey: "nav.knowledge", href: "/dashboard/faq", icon: FileText },
-    ],
-  },
-  {
-    nameKey: "nav.myCompany",
-    href: "/dashboard/company",
-    icon: Building2,
-    children: [
-      { nameKey: "nav.myTeam", href: "/dashboard/staff", icon: Users },
-      { nameKey: "nav.myServices", href: "/dashboard/services", icon: Scissors },
-      { nameKey: "nav.myProducts", href: "/dashboard/products", icon: Package },
-    ],
-  },
-  {
-    nameKey: "nav.myBusiness",
-    href: "/dashboard/business",
-    icon: Briefcase,
-    children: [
-      { nameKey: "nav.myBookings", href: "/dashboard/bookings", icon: Calendar },
-      { nameKey: "nav.myClients", href: "/dashboard/customers", icon: UserCircle },
-      { nameKey: "nav.myCalendar", href: "/dashboard/calendar", icon: CalendarDays },
-      { nameKey: "nav.myOrders", href: "/dashboard/orders", icon: ShoppingBag },
-      { nameKey: "nav.myMessages", href: "/dashboard/messages", icon: Mail, badge: "messages" },
-      { nameKey: "nav.myStats", href: "/dashboard/statistics", icon: BarChart3 },
-      { nameKey: "nav.myBroadcasts", href: "/dashboard/broadcasts", icon: Send },
-      { nameKey: "nav.myAutomation", href: "/dashboard/automation", icon: Zap },
-      { nameKey: "nav.myLoyalty", href: "/dashboard/loyalty", icon: Gift },
-      { nameKey: "nav.payments", href: "/dashboard/payments", icon: CreditCard },
-    ],
-  },
-  { nameKey: "nav.integrations", href: "/dashboard/integrations", icon: Link2, single: true },
-  { nameKey: "nav.settings", href: "/dashboard/settings", icon: Settings, single: true },
-  { nameKey: "nav.help", href: "/dashboard/support", icon: HelpCircle, single: true },
-];
+// Detect if business type is sales/shop mode
+function isSalesDashboard(businessType: string | null): boolean {
+  if (!businessType) return false;
+  const bt = businessType.toLowerCase();
+  const salesIds = ["online_shop", "flowers", "restaurant", "delivery"];
+  if (salesIds.includes(bt)) return true;
+  const salesKeywords = ["shop", "store", "retail", "магазин", "цветоч", "ресторан", "кафе", "доставк"];
+  return salesKeywords.some(kw => bt.includes(kw));
+}
+
+function buildNavConfig(isSales: boolean): NavEntry[] {
+  return [
+    { nameKey: "nav.dashboard", href: "/dashboard", icon: LayoutDashboard, single: true },
+    {
+      nameKey: "nav.aiEmployeeGroup",
+      href: "/dashboard/channels",
+      icon: Brain,
+      children: [
+        { nameKey: "nav.telegram", href: "/dashboard/bot", icon: MessageSquare },
+        { nameKey: "nav.whatsapp", href: "/dashboard/channels", icon: Globe },
+        { nameKey: "nav.instagram", href: "/dashboard/channels", icon: Send },
+        { nameKey: "nav.knowledge", href: "/dashboard/faq", icon: FileText },
+      ],
+    },
+    {
+      nameKey: "nav.myCompany",
+      href: "/dashboard/company",
+      icon: Building2,
+      children: [
+        { nameKey: "nav.myTeam", href: "/dashboard/staff", icon: Users },
+        ...(!isSales ? [{ nameKey: "nav.myServices", href: "/dashboard/services", icon: Scissors }] : []),
+        ...(isSales ? [{ nameKey: "nav.myProducts", href: "/dashboard/products", icon: Package }] : []),
+      ],
+    },
+    {
+      nameKey: "nav.myBusiness",
+      href: "/dashboard/business",
+      icon: Briefcase,
+      children: [
+        ...(!isSales ? [
+          { nameKey: "nav.myBookings", href: "/dashboard/bookings", icon: Calendar },
+          { nameKey: "nav.myCalendar", href: "/dashboard/calendar", icon: CalendarDays },
+        ] : []),
+        ...(isSales ? [
+          { nameKey: "nav.myOrders", href: "/dashboard/orders", icon: ShoppingBag },
+          { nameKey: "nav.myDelivery", href: "/dashboard/delivery", icon: Truck },
+        ] : []),
+        { nameKey: "nav.myClients", href: "/dashboard/customers", icon: UserCircle },
+        { nameKey: "nav.myMessages", href: "/dashboard/messages", icon: Mail, badge: "messages" as const },
+        { nameKey: "nav.myStats", href: "/dashboard/statistics", icon: BarChart3 },
+        { nameKey: "nav.myBroadcasts", href: "/dashboard/broadcasts", icon: Send },
+        { nameKey: "nav.myAutomation", href: "/dashboard/automation", icon: Zap },
+        { nameKey: "nav.myLoyalty", href: "/dashboard/loyalty", icon: Gift },
+        { nameKey: "nav.payments", href: "/dashboard/payments", icon: CreditCard },
+      ],
+    },
+    { nameKey: "nav.integrations", href: "/dashboard/integrations", icon: Link2, single: true },
+    { nameKey: "nav.settings", href: "/dashboard/settings", icon: Settings, single: true },
+    { nameKey: "nav.help", href: "/dashboard/support", icon: HelpCircle, single: true },
+  ];
+}
 
 export default function DashboardLayout({
   children,
@@ -133,6 +151,7 @@ export default function DashboardLayout({
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [businessName, setBusinessName] = useState("");
+  const [businessType, setBusinessType] = useState<string | null>(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [notifMenuOpen, setNotifMenuOpen] = useState(false);
@@ -146,6 +165,10 @@ export default function DashboardLayout({
     daysLeft: 14,
     isExpired: false,
   });
+
+  // Build nav config based on business type
+  const isSales = isSalesDashboard(businessType);
+  const navConfig = useMemo(() => buildNavConfig(isSales), [isSales]);
 
   // Determine which groups are open based on current pathname
   const getInitialOpenGroups = () => {
@@ -201,6 +224,7 @@ export default function DashboardLayout({
               return;
             }
             setBusinessName(data.business.name);
+            setBusinessType(data.business.businessType || null);
             if (data.business.subscription) {
               const sub = data.business.subscription;
               const expiresAt = new Date(sub.expiresAt);
@@ -355,9 +379,7 @@ export default function DashboardLayout({
                 {/* Group header */}
                 <button
                   onClick={() => {
-                    router.push(group.href);
                     toggleGroup(group.nameKey);
-                    setSidebarOpen(false);
                   }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                     isGroupActive && !isGroupOpen

@@ -176,6 +176,30 @@ model Business {
   // Продажи (магазины, e-commerce)
   products           Product[]
   orders             Order[]
+
+  // Зоны доставки
+  deliveryZonesRel   DeliveryZone[]
+}
+
+// Зоны доставки
+model DeliveryZone {
+  id          String   @id @default(cuid())
+  name        String   // "Центр", "Окраины", "Экспресс"
+  fee         Int      // стоимость доставки
+  currency    String   @default("UZS") // UZS, KZT, RUB, KGS, USD
+  timeFrom    Int?     // мин. время в минутах
+  timeTo      Int?     // макс. время в минутах
+  freeFrom    Int?     // бесплатно от суммы
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([businessId, isActive])
 }
 
 // Услуги

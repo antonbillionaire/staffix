@@ -111,7 +111,7 @@ export async function sendBookingNotification(
       );
     }
 
-    // 3. Send Telegram to staff
+    // 3. Send Telegram to assigned staff (master)
     if (data.staffId) {
       const staff = await prisma.staff.findUnique({
         where: { id: data.staffId },
@@ -121,6 +121,26 @@ export async function sendBookingNotification(
       if (staff?.telegramChatId && staff.notificationsEnabled) {
         sendTelegramMsg(business.botToken, staff.telegramChatId, staffMsg).catch(
           (err) => console.error("Failed to notify staff:", err)
+        );
+      }
+    }
+
+    // 4. Also notify admin/manager staff about all bookings
+    const adminStaff = await prisma.staff.findMany({
+      where: {
+        businessId,
+        telegramChatId: { not: null },
+        notificationsEnabled: true,
+        role: { in: ["admin", "manager"] },
+        ...(data.staffId ? { id: { not: data.staffId } } : {}),
+      },
+      select: { telegramChatId: true },
+    });
+
+    for (const admin of adminStaff) {
+      if (admin.telegramChatId) {
+        sendTelegramMsg(business.botToken, admin.telegramChatId, ownerMsg).catch(
+          (err) => console.error("Failed to notify admin staff:", err)
         );
       }
     }
