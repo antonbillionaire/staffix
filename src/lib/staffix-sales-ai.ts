@@ -160,7 +160,7 @@ export async function generateStaffixSalesResponse(
     ];
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-sonnet-4-5-20250929",
       max_tokens: 1024,
       system: STAFFIX_SALES_SYSTEM_PROMPT,
       messages,

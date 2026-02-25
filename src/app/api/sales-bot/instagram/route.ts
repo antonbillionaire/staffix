@@ -41,7 +41,7 @@ async function generateAIResponse(
       getSalesSystemPrompt() + `\n\nКанал: ${context}. ID собеседника: ${senderId}`;
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-sonnet-4-5-20250929",
       max_tokens: 1024,
       system: systemPrompt,
       messages: history,

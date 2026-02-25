@@ -524,7 +524,7 @@ async function generateAIResponse(
 
     console.log(`[Webhook] Calling Claude API for business=${businessId}, salesMode=${salesMode}`);
     let response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-sonnet-4-5-20250929",
       max_tokens: 1024,
       system: systemWithDate,
       messages: recentMessages,
@@ -589,7 +589,7 @@ async function generateAIResponse(
       // Вызываем Claude снова с результатами
       try {
         response = await anthropic.messages.create({
-          model: "claude-sonnet-4-6",
+          model: "claude-sonnet-4-5-20250929",
           max_tokens: 1024,
           system: systemWithDate,
           messages: recentMessages,
