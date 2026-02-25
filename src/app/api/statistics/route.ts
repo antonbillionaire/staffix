@@ -253,6 +253,73 @@ export async function GET(request: NextRequest) {
       return Math.round(((current - previous) / previous) * 100);
     };
 
+    // ========= ORDER STATISTICS (for sales/shop businesses) =========
+    const totalOrders = await prisma.order.count({
+      where: { businessId: business.id, createdAt: { gte: startDate } },
+    });
+
+    const orderStatusCounts = await prisma.order.groupBy({
+      by: ["status"],
+      where: { businessId: business.id, createdAt: { gte: startDate } },
+      _count: true,
+    });
+
+    const ordersByStatus: Record<string, number> = {};
+    orderStatusCounts.forEach((item) => {
+      ordersByStatus[item.status] = item._count;
+    });
+
+    // Order revenue
+    const orderRevenueAgg = await prisma.order.aggregate({
+      where: { businessId: business.id, createdAt: { gte: startDate } },
+      _sum: { totalPrice: true },
+      _avg: { totalPrice: true },
+    });
+    const orderRevenue = orderRevenueAgg._sum?.totalPrice || 0;
+    const avgOrderValue = Math.round(orderRevenueAgg._avg?.totalPrice || 0);
+
+    // Orders by day
+    const ordersList = await prisma.order.findMany({
+      where: { businessId: business.id, createdAt: { gte: startDate } },
+      select: { createdAt: true },
+      orderBy: { createdAt: "asc" },
+    });
+    const ordersByDayMap = new Map<string, number>();
+    ordersList.forEach((o) => {
+      const dateStr = o.createdAt.toISOString().split("T")[0];
+      ordersByDayMap.set(dateStr, (ordersByDayMap.get(dateStr) || 0) + 1);
+    });
+    const ordersByDay = Array.from(ordersByDayMap.entries())
+      .map(([date, count]) => ({ date, count }))
+      .slice(-maxDays);
+
+    // Popular products (top items in orders)
+    const orderItems = await prisma.orderItem.findMany({
+      where: {
+        order: { businessId: business.id, createdAt: { gte: startDate } },
+      },
+      select: { name: true, quantity: true, price: true },
+    });
+    const productPopularity = new Map<string, { count: number; revenue: number }>();
+    orderItems.forEach((item) => {
+      const existing = productPopularity.get(item.name) || { count: 0, revenue: 0 };
+      existing.count += item.quantity;
+      existing.revenue += item.price * item.quantity;
+      productPopularity.set(item.name, existing);
+    });
+    const popularProducts = Array.from(productPopularity.entries())
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // Previous period orders for trend
+    const prevOrders = period !== "all" ? await prisma.order.count({
+      where: {
+        businessId: business.id,
+        createdAt: { gte: prevStartDate, lt: startDate },
+      },
+    }) : 0;
+
     // Calculate average response time from message pairs
     const recentConversations = await prisma.conversation.findMany({
       where: { businessId: business.id },
@@ -296,6 +363,7 @@ export async function GET(request: NextRequest) {
         messages: calcTrend(totalMessages, prevMessages),
         bookings: calcTrend(totalBookings, prevBookings),
         clients: calcTrend(totalClients, prevConversations.length),
+        orders: calcTrend(totalOrders, prevOrders),
       },
       // Enhanced CRM stats
       customerSegments,
@@ -303,6 +371,13 @@ export async function GET(request: NextRequest) {
       totalRevenue,
       broadcastsSent,
       avgRating,
+      // Order statistics (for sales/shop businesses)
+      totalOrders,
+      ordersByStatus,
+      orderRevenue,
+      avgOrderValue,
+      ordersByDay,
+      popularProducts,
     });
   } catch (error) {
     console.error("Statistics error:", error);

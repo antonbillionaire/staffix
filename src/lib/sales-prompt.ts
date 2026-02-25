@@ -17,6 +17,7 @@ interface SalesBusinessContext {
   language: string;
   categories?: string[];
   totalProducts?: number;
+  documents?: { name: string; extractedText: string | null }[];
 }
 
 interface SalesClientContext {
@@ -144,6 +145,21 @@ ${business.categories && business.categories.length > 0
     prompt += `\n## НОВЫЙ КЛИЕНТ:
 Клиент обращается впервые. Поприветствуй его и задай 1-2 вопроса чтобы понять потребность.
 НЕ вываливай весь каталог сразу — сначала узнай что ищет.`;
+  }
+
+  // Добавляем информацию из документов базы знаний
+  if (business.documents && business.documents.length > 0) {
+    const docs = business.documents.filter((d) => d.extractedText);
+    if (docs.length > 0) {
+      prompt += `\n\n## ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ ИЗ БАЗЫ ЗНАНИЙ:
+Используй эту информацию для ответов на вопросы клиентов.\n`;
+      for (const doc of docs) {
+        const text = doc.extractedText!.length > 4000
+          ? doc.extractedText!.substring(0, 4000) + "..."
+          : doc.extractedText!;
+        prompt += `\n### ${doc.name}:\n${text}\n`;
+      }
+    }
   }
 
   return prompt;

@@ -133,7 +133,7 @@ export async function PATCH(
       );
     }
 
-    const { action } = await request.json();
+    const { action, rating } = await request.json();
 
     // Verify ticket belongs to user
     const ticket = await prisma.supportTicket.findFirst({
@@ -169,6 +169,18 @@ export async function PATCH(
       });
 
       return NextResponse.json({ success: true, status: "open" });
+    }
+
+    if (action === "rate") {
+      const r = parseInt(rating, 10);
+      if (!r || r < 1 || r > 5) {
+        return NextResponse.json({ error: "Оценка от 1 до 5" }, { status: 400 });
+      }
+      await prisma.supportTicket.update({
+        where: { id: ticketId },
+        data: { rating: r },
+      });
+      return NextResponse.json({ success: true, rating: r });
     }
 
     if (action === "markAsRead") {

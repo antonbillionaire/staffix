@@ -19,6 +19,8 @@ import {
   DollarSign,
   Send,
   Star,
+  ShoppingCart,
+  Package,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -31,13 +33,20 @@ interface Stats {
   popularQuestions: { question: string; count: number }[];
   messagesByDay: { date: string; count: number }[];
   // Trends (% change vs previous period)
-  trends?: { messages: number; bookings: number; clients: number };
+  trends?: { messages: number; bookings: number; clients: number; orders?: number };
   // Enhanced stats
   customerSegments?: { vip: number; active: number; inactive: number };
   bookingsByStatus?: { pending: number; confirmed: number; completed: number; cancelled: number };
   totalRevenue?: number;
   broadcastsSent?: number;
   avgRating?: number;
+  // Order statistics (for sales/shop businesses)
+  totalOrders?: number;
+  ordersByStatus?: Record<string, number>;
+  orderRevenue?: number;
+  avgOrderValue?: number;
+  ordersByDay?: { date: string; count: number }[];
+  popularProducts?: { name: string; count: number; revenue: number }[];
 }
 
 export default function StatisticsPage() {
@@ -160,21 +169,40 @@ export default function StatisticsPage() {
           <p className={textSecondary}>Всего сообщений</p>
         </div>
 
-        <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
-          <div className="flex items-center justify-between">
-            <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center">
-              <Calendar className="h-6 w-6 text-green-500" />
-            </div>
-            {stats.trends && stats.trends.bookings !== 0 && (
-              <div className={`flex items-center gap-1 text-sm ${stats.trends.bookings > 0 ? "text-green-500" : "text-red-500"}`}>
-                {stats.trends.bookings > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                {stats.trends.bookings > 0 ? "+" : ""}{stats.trends.bookings}%
+        {/* Show orders for shops, bookings for services */}
+        {(stats.totalOrders ?? 0) > 0 || (stats.orderRevenue ?? 0) > 0 ? (
+          <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
+            <div className="flex items-center justify-between">
+              <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center">
+                <ShoppingCart className="h-6 w-6 text-green-500" />
               </div>
-            )}
+              {stats.trends?.orders !== undefined && stats.trends.orders !== 0 && (
+                <div className={`flex items-center gap-1 text-sm ${stats.trends.orders > 0 ? "text-green-500" : "text-red-500"}`}>
+                  {stats.trends.orders > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                  {stats.trends.orders > 0 ? "+" : ""}{stats.trends.orders}%
+                </div>
+              )}
+            </div>
+            <p className={`text-3xl font-bold ${textPrimary} mt-4`}>{stats.totalOrders || 0}</p>
+            <p className={textSecondary}>Заказов</p>
           </div>
-          <p className={`text-3xl font-bold ${textPrimary} mt-4`}>{stats.totalBookings}</p>
-          <p className={textSecondary}>Записей</p>
-        </div>
+        ) : (
+          <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
+            <div className="flex items-center justify-between">
+              <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center">
+                <Calendar className="h-6 w-6 text-green-500" />
+              </div>
+              {stats.trends && stats.trends.bookings !== 0 && (
+                <div className={`flex items-center gap-1 text-sm ${stats.trends.bookings > 0 ? "text-green-500" : "text-red-500"}`}>
+                  {stats.trends.bookings > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                  {stats.trends.bookings > 0 ? "+" : ""}{stats.trends.bookings}%
+                </div>
+              )}
+            </div>
+            <p className={`text-3xl font-bold ${textPrimary} mt-4`}>{stats.totalBookings}</p>
+            <p className={textSecondary}>Записей</p>
+          </div>
+        )}
 
         <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
           <div className="flex items-center justify-between">
@@ -271,6 +299,80 @@ export default function StatisticsPage() {
           Процент пользователей, которые записались после общения с AI-сотрудником
         </p>
       </div>
+
+      {/* Order Analytics (for shops) */}
+      {(stats.totalOrders ?? 0) > 0 && (
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Orders by Status */}
+          <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
+            <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Заказы по статусам</h3>
+            {stats.ordersByStatus ? (
+              <div className="space-y-3">
+                {[
+                  { key: "new", label: "Новые", color: "yellow" },
+                  { key: "confirmed", label: "Подтверждены", color: "blue" },
+                  { key: "processing", label: "В обработке", color: "purple" },
+                  { key: "shipped", label: "Отправлены", color: "cyan" },
+                  { key: "delivered", label: "Доставлены", color: "green" },
+                  { key: "cancelled", label: "Отменены", color: "red" },
+                ].map(({ key, label, color }) => {
+                  const count = stats.ordersByStatus![key] || 0;
+                  if (count === 0 && key !== "new") return null;
+                  return (
+                    <div key={key} className={`flex items-center justify-between p-3 bg-${color}-500/10 rounded-lg`}>
+                      <span className={`text-${color}-400`}>{label}</span>
+                      <span className={`font-bold ${textPrimary}`}>{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className={textSecondary}>Нет данных</p>
+            )}
+          </div>
+
+          {/* Order Revenue & Avg */}
+          <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
+            <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Выручка от заказов</h3>
+            <div className="space-y-4">
+              <div className={`p-4 rounded-xl ${isDark ? "bg-green-500/10" : "bg-green-50"}`}>
+                <p className={`text-sm ${textSecondary}`}>Общая выручка</p>
+                <p className={`text-2xl font-bold text-green-500`}>
+                  {(stats.orderRevenue || 0).toLocaleString()}
+                </p>
+              </div>
+              <div className={`p-4 rounded-xl ${isDark ? "bg-blue-500/10" : "bg-blue-50"}`}>
+                <p className={`text-sm ${textSecondary}`}>Средний чек</p>
+                <p className={`text-2xl font-bold text-blue-500`}>
+                  {(stats.avgOrderValue || 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Popular Products */}
+          <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
+            <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Популярные товары</h3>
+            {stats.popularProducts && stats.popularProducts.length > 0 ? (
+              <div className="space-y-3">
+                {stats.popularProducts.slice(0, 5).map((p, idx) => (
+                  <div key={idx} className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-purple-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Package className="h-4 w-4 text-purple-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm ${textPrimary} truncate`}>{p.name}</p>
+                      <p className={`text-xs ${textSecondary}`}>{p.count} шт. — {p.revenue.toLocaleString()}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className={textSecondary}>Нет данных о товарах</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* CRM Analytics */}
       <div className="grid lg:grid-cols-3 gap-6">

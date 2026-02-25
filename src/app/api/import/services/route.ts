@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Нет строк с данными" }, { status: 400 });
     }
 
-    const created: string[] = [];
+    const servicesToCreate: { name: string; price: number; duration: number; description: string | null; businessId: string }[] = [];
     const errors: string[] = [];
 
     for (let i = 0; i < dataRows.length; i++) {
@@ -151,17 +151,20 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      await prisma.service.create({
-        data: { name, price, duration, description, businessId },
-      });
-      created.push(name);
+      servicesToCreate.push({ name, price, duration, description: description || null, businessId });
+    }
+
+    let createdCount = 0;
+    if (servicesToCreate.length > 0) {
+      const result = await prisma.service.createMany({ data: servicesToCreate });
+      createdCount = result.count;
     }
 
     return NextResponse.json({
       success: true,
-      created: created.length,
+      created: createdCount,
       errors: errors.length > 0 ? errors : undefined,
-      message: `Создано услуг: ${created.length}${errors.length > 0 ? `, пропущено: ${errors.length}` : ""}`,
+      message: `Создано услуг: ${createdCount}${errors.length > 0 ? `, пропущено: ${errors.length}` : ""}`,
     });
   } catch (error) {
     console.error("POST /api/import/services:", error);

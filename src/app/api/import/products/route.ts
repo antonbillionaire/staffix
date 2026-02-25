@@ -126,7 +126,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Нет строк с данными" }, { status: 400 });
     }
 
-    const created: string[] = [];
+    const productsToCreate: {
+      name: string;
+      price: number;
+      category: string | null;
+      description: string | null;
+      stock: number | null;
+      sku: string | null;
+      oldPrice: number | null;
+      isActive: boolean;
+      businessId: string;
+    }[] = [];
     const errors: string[] = [];
 
     for (let i = 0; i < dataRows.length; i++) {
@@ -164,27 +174,31 @@ export async function POST(request: NextRequest) {
         if (!isNaN(op) && op > price) oldPrice = op;
       }
 
-      await prisma.product.create({
-        data: {
-          name,
-          price,
-          category: category || null,
-          description: description || null,
-          stock,
-          sku: sku || null,
-          oldPrice,
-          isActive: true,
-          businessId,
-        },
+      productsToCreate.push({
+        name,
+        price,
+        category: category || null,
+        description: description || null,
+        stock,
+        sku: sku || null,
+        oldPrice,
+        isActive: true,
+        businessId,
       });
-      created.push(name);
+    }
+
+    // Batch insert all valid products in one query
+    let createdCount = 0;
+    if (productsToCreate.length > 0) {
+      const result = await prisma.product.createMany({ data: productsToCreate });
+      createdCount = result.count;
     }
 
     return NextResponse.json({
       success: true,
-      created: created.length,
+      created: createdCount,
       errors: errors.length > 0 ? errors : undefined,
-      message: `Создано товаров: ${created.length}${errors.length > 0 ? `, пропущено: ${errors.length}` : ""}`,
+      message: `Создано товаров: ${createdCount}${errors.length > 0 ? `, пропущено: ${errors.length}` : ""}`,
     });
   } catch (error) {
     console.error("POST /api/import/products:", error);

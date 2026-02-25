@@ -362,6 +362,7 @@ model SupportTicket {
   subject       String
   priority      String    @default("normal") // low, normal, high
   status        String    @default("open")   // open, in_progress, resolved, closed
+  rating        Int?                           // 1-5 satisfaction rating
 
   userId        String
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)

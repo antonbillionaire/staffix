@@ -15,6 +15,8 @@ import {
   ChevronUp,
   ToggleLeft,
   ToggleRight,
+  HelpCircle,
+  BookOpen,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -126,6 +128,9 @@ export default function IntegrationsPage() {
   const [formName, setFormName] = useState("");
   const [formConfig, setFormConfig] = useState<Record<string, string>>({});
   const [formEvents, setFormEvents] = useState<string[]>(["booking_created", "booking_confirmed"]);
+
+  // Guide modal
+  const [showGuide, setShowGuide] = useState<IntegrationType | null>(null);
 
   // Загружаем бизнес-данные
   useEffect(() => {
@@ -275,13 +280,22 @@ export default function IntegrationsPage() {
               Автоматически передавайте данные о записях и клиентах во внешние системы
             </p>
           </div>
-          <button
-            onClick={openCreateModal}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Добавить интеграцию
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowGuide("webhook")}
+              className={`flex items-center gap-2 px-4 py-2 ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} rounded-lg text-sm font-medium ${sub} transition-colors`}
+            >
+              <BookOpen className="w-4 h-4" />
+              Как подключить?
+            </button>
+            <button
+              onClick={openCreateModal}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Добавить интеграцию
+            </button>
+          </div>
         </div>
 
         {/* Список интеграций */}
@@ -598,6 +612,110 @@ export default function IntegrationsPage() {
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 Создать
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Guide Modal */}
+      {showGuide && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className={`${card} border rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto`}>
+            <div className={`flex items-center justify-between p-6 border-b ${isDark ? "border-white/10" : "border-gray-200"}`}>
+              <div className="flex items-center gap-3">
+                <HelpCircle className="h-5 w-5 text-blue-500" />
+                <h2 className={`text-lg font-bold ${text}`}>Как подключить интеграцию</h2>
+              </div>
+              <button onClick={() => setShowGuide(null)} className={`p-2 rounded-lg ${isDark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}>
+                <X className={`h-5 w-5 ${sub}`} />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Tab selector */}
+              <div className="flex gap-2 flex-wrap">
+                {INTEGRATION_TYPES.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setShowGuide(t.id)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      showGuide === t.id ? "bg-blue-600 text-white" : `${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} ${sub}`
+                    }`}
+                  >
+                    {t.icon} {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Guide content */}
+              <div className={`text-sm ${text} space-y-4`}>
+                {showGuide === "webhook" && (
+                  <>
+                    <h3 className="font-bold text-lg">Universal Webhook</h3>
+                    <p className={sub}>Подходит для Zapier, Make (Integromat), n8n и любых HTTP API.</p>
+                    <ol className="list-decimal list-inside space-y-3">
+                      <li><strong>Создайте endpoint</strong> в вашем сервисе автоматизации (Zapier → "Catch Webhook", Make → "Custom Webhook", n8n → "Webhook")</li>
+                      <li><strong>Скопируйте URL</strong> вебхука, который вам выдал сервис</li>
+                      <li>В Staffix нажмите <strong>"Добавить интеграцию"</strong> → выберите <strong>Webhook</strong></li>
+                      <li>Вставьте URL и выберите <strong>события</strong> (новая запись, новый клиент и т.д.)</li>
+                      <li>Нажмите <strong>"Тест"</strong> чтобы проверить что данные доходят</li>
+                    </ol>
+                    <div className={`p-4 rounded-lg ${isDark ? "bg-white/5" : "bg-gray-50"}`}>
+                      <p className="font-medium mb-2">Формат данных (JSON):</p>
+                      <pre className={`text-xs ${sub} font-mono whitespace-pre-wrap`}>{`{
+  "event": "booking_created",
+  "timestamp": "2026-02-25T12:00:00Z",
+  "data": {
+    "client": { "name": "Иван", "phone": "+7700..." },
+    "booking": { "service": "Массаж", "date": "2026-02-26", "price": 5000 }
+  }
+}`}</pre>
+                    </div>
+                  </>
+                )}
+
+                {showGuide === "bitrix24" && (
+                  <>
+                    <h3 className="font-bold text-lg">Bitrix24</h3>
+                    <ol className="list-decimal list-inside space-y-3">
+                      <li>Откройте <strong>Bitrix24</strong> → <strong>Приложения</strong> (левое меню)</li>
+                      <li>Перейдите в <strong>Разработчикам</strong> → <strong>Другое</strong> → <strong>Входящий вебхук</strong></li>
+                      <li>Нажмите <strong>"Добавить"</strong></li>
+                      <li>В разделе <strong>"Настройка прав"</strong> выберите: <code>crm</code> (CRM), <code>crm.contact</code>, <code>crm.deal</code></li>
+                      <li>Сохраните и <strong>скопируйте URL вебхука</strong> (выглядит как: <code>https://ваш-домен.bitrix24.ru/rest/1/abc123xyz/</code>)</li>
+                      <li>В Staffix: <strong>Домен</strong> = <code>ваш-домен.bitrix24.ru</code>, <strong>Token</strong> = последняя часть URL (<code>abc123xyz</code>)</li>
+                    </ol>
+                  </>
+                )}
+
+                {showGuide === "amocrm" && (
+                  <>
+                    <h3 className="font-bold text-lg">AmoCRM</h3>
+                    <ol className="list-decimal list-inside space-y-3">
+                      <li>Откройте <strong>AmoCRM</strong> → <strong>Настройки</strong> (шестерёнка)</li>
+                      <li>Перейдите в <strong>API</strong> → <strong>Ваши интеграции</strong></li>
+                      <li>Нажмите <strong>"Создать интеграцию"</strong> → выберите <strong>"Внешняя интеграция"</strong></li>
+                      <li>Заполните: Название (например "Staffix"), Описание, URL перенаправления (любой, например https://staffix.io)</li>
+                      <li>После создания: скопируйте <strong>Access Token</strong> (долгоживущий токен)</li>
+                      <li>В Staffix: <strong>Поддомен</strong> = часть URL до .amocrm.ru (например <code>mycompany</code>)</li>
+                      <li><strong>ID воронки</strong> (опционально): Сделки → Воронка → ID в URL</li>
+                    </ol>
+                  </>
+                )}
+
+                {showGuide === "google_sheets" && (
+                  <>
+                    <h3 className="font-bold text-lg">Google Sheets</h3>
+                    <ol className="list-decimal list-inside space-y-3">
+                      <li>Откройте <strong>Google Cloud Console</strong> → <strong>API & Services</strong></li>
+                      <li>Включите <strong>Google Sheets API</strong></li>
+                      <li>Создайте <strong>Service Account</strong> (IAM & Admin → Service Accounts)</li>
+                      <li>Создайте ключ для сервисного аккаунта → скачайте <strong>JSON файл</strong></li>
+                      <li>Создайте <strong>Google Таблицу</strong> и поделитесь ей с email сервисного аккаунта (даёте доступ "Редактор")</li>
+                      <li>Скопируйте <strong>ID таблицы</strong> из URL: <code>https://docs.google.com/spreadsheets/d/<strong>ID_ЗДЕСЬ</strong>/edit</code></li>
+                      <li>В Staffix: вставьте <strong>ID таблицы</strong>, <strong>название листа</strong> и содержимое <strong>JSON файла</strong> с ключами</li>
+                    </ol>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>

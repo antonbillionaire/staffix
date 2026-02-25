@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
 import {
@@ -14,6 +14,11 @@ import {
   Clock,
   ChevronDown,
   ChevronUp,
+  Inbox,
+  CheckCircle2,
+  AlertCircle,
+  Star,
+  RotateCcw,
 } from "lucide-react";
 
 const faqItems = [
@@ -60,6 +65,44 @@ export default function SupportPage() {
   const [error, setError] = useState("");
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
+  // Ticket history
+  const [tickets, setTickets] = useState<Array<{
+    id: string;
+    subject: string;
+    priority: string;
+    status: string;
+    rating: number | null;
+    createdAt: string;
+    updatedAt: string;
+    messages: Array<{
+      id: string;
+      content: string;
+      isFromSupport: boolean;
+      createdAt: string;
+    }>;
+  }>>([]);
+  const [loadingTickets, setLoadingTickets] = useState(true);
+  const [expandedTicket, setExpandedTicket] = useState<string | null>(null);
+  const [ratingTicketId, setRatingTicketId] = useState<string | null>(null);
+  const [hoveredStar, setHoveredStar] = useState(0);
+
+  useEffect(() => {
+    const fetchTickets = async () => {
+      try {
+        const res = await fetch("/api/support");
+        if (res.ok) {
+          const data = await res.json();
+          setTickets(data.tickets || []);
+        }
+      } catch {
+        // silent
+      } finally {
+        setLoadingTickets(false);
+      }
+    };
+    fetchTickets();
+  }, [sent]);
+
   // Theme-based classes
   const isDark = theme === "dark";
   const bgCard = isDark ? "bg-[#12122a]" : "bg-white";
@@ -97,6 +140,61 @@ export default function SupportPage() {
 
   const handleViewMessages = () => {
     router.push("/dashboard/messages");
+  };
+
+  const handleTicketAction = async (ticketId: string, action: string, rating?: number) => {
+    try {
+      const res = await fetch(`/api/support/${ticketId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, rating }),
+      });
+      if (res.ok) {
+        // Refresh tickets
+        const listRes = await fetch("/api/support");
+        if (listRes.ok) {
+          const data = await listRes.json();
+          setTickets(data.tickets || []);
+        }
+        setRatingTicketId(null);
+        setHoveredStar(0);
+      }
+    } catch {
+      // silent
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  };
+
+  const statusLabel = (status: string) => {
+    switch (status) {
+      case "open": return "Открыт";
+      case "in_progress": return "В работе";
+      case "resolved": return "Решён";
+      case "closed": return "Закрыт";
+      default: return status;
+    }
+  };
+
+  const statusColor = (status: string) => {
+    switch (status) {
+      case "open": return "text-blue-400 bg-blue-500/10";
+      case "in_progress": return "text-yellow-400 bg-yellow-500/10";
+      case "resolved": return "text-green-400 bg-green-500/10";
+      case "closed": return "text-gray-400 bg-gray-500/10";
+      default: return "text-gray-400 bg-gray-500/10";
+    }
+  };
+
+  const priorityIcon = (priority: string) => {
+    switch (priority) {
+      case "high": return "text-red-400";
+      case "low": return "text-green-400";
+      default: return "text-yellow-400";
+    }
   };
 
   return (
@@ -302,6 +400,156 @@ export default function SupportPage() {
           </div>
 
         </div>
+      </div>
+
+      {/* Ticket history */}
+      <div className="mt-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className={`w-10 h-10 ${isDark ? 'bg-indigo-500/10' : 'bg-indigo-50'} rounded-lg flex items-center justify-center`}>
+            <Inbox className="h-5 w-5 text-indigo-500" />
+          </div>
+          <div>
+            <h3 className={`text-lg font-medium ${textPrimary}`}>Мои обращения</h3>
+            <p className={`text-sm ${textSecondary}`}>История ваших запросов в поддержку</p>
+          </div>
+        </div>
+
+        {loadingTickets ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className={`h-6 w-6 animate-spin ${textSecondary}`} />
+          </div>
+        ) : tickets.length === 0 ? (
+          <div className={`${bgCard} rounded-xl border ${borderColor} p-8 text-center`}>
+            <Inbox className={`h-10 w-10 ${textSecondary} mx-auto mb-3 opacity-50`} />
+            <p className={textSecondary}>Обращений пока нет</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {tickets.map((ticket) => (
+              <div
+                key={ticket.id}
+                className={`${bgCard} rounded-xl border ${borderColor} overflow-hidden`}
+              >
+                {/* Ticket header */}
+                <button
+                  onClick={() => setExpandedTicket(expandedTicket === ticket.id ? null : ticket.id)}
+                  className={`w-full flex items-center gap-3 p-4 text-left ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'} transition-colors`}
+                >
+                  <AlertCircle className={`h-4 w-4 flex-shrink-0 ${priorityIcon(ticket.priority)}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`font-medium ${textPrimary} truncate`}>{ticket.subject}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${statusColor(ticket.status)}`}>
+                        {statusLabel(ticket.status)}
+                      </span>
+                      {ticket.rating && (
+                        <span className="flex items-center gap-0.5 text-yellow-500 text-xs">
+                          <Star className="h-3 w-3 fill-current" />
+                          {ticket.rating}
+                        </span>
+                      )}
+                    </div>
+                    <div className={`text-xs ${textSecondary}`}>
+                      {formatDate(ticket.createdAt)} · {ticket.messages.length} сообщ.
+                    </div>
+                  </div>
+                  {expandedTicket === ticket.id ? (
+                    <ChevronUp className={`h-5 w-5 flex-shrink-0 ${textSecondary}`} />
+                  ) : (
+                    <ChevronDown className={`h-5 w-5 flex-shrink-0 ${textSecondary}`} />
+                  )}
+                </button>
+
+                {/* Expanded ticket content */}
+                {expandedTicket === ticket.id && (
+                  <div className={`border-t ${borderColor} p-4`}>
+                    {/* Messages */}
+                    <div className="space-y-3 mb-4 max-h-80 overflow-y-auto">
+                      {ticket.messages.map((msg) => (
+                        <div
+                          key={msg.id}
+                          className={`flex ${msg.isFromSupport ? 'justify-start' : 'justify-end'}`}
+                        >
+                          <div className={`max-w-[80%] rounded-lg p-3 ${
+                            msg.isFromSupport
+                              ? isDark ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-100'
+                              : isDark ? 'bg-white/5' : 'bg-gray-100'
+                          }`}>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`text-xs font-medium ${msg.isFromSupport ? 'text-blue-400' : textSecondary}`}>
+                                {msg.isFromSupport ? 'Поддержка' : 'Вы'}
+                              </span>
+                              <span className={`text-xs ${textSecondary}`}>
+                                {formatDate(msg.createdAt)}
+                              </span>
+                            </div>
+                            <p className={`text-sm ${textPrimary} whitespace-pre-wrap`}>{msg.content}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Actions */}
+                    <div className={`flex items-center gap-3 pt-3 border-t ${borderColor}`}>
+                      {ticket.status === "open" || ticket.status === "in_progress" ? (
+                        <button
+                          onClick={() => handleTicketAction(ticket.id, "resolve")}
+                          className="flex items-center gap-1.5 text-sm text-green-500 hover:text-green-400 font-medium"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          Вопрос решён
+                        </button>
+                      ) : ticket.status === "resolved" ? (
+                        <>
+                          <button
+                            onClick={() => handleTicketAction(ticket.id, "reopen")}
+                            className="flex items-center gap-1.5 text-sm text-blue-500 hover:text-blue-400 font-medium"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                            Открыть снова
+                          </button>
+                          {!ticket.rating && (
+                            <div className="flex items-center gap-1 ml-auto">
+                              <span className={`text-xs ${textSecondary} mr-1`}>Оцените:</span>
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <button
+                                  key={star}
+                                  onMouseEnter={() => { setRatingTicketId(ticket.id); setHoveredStar(star); }}
+                                  onMouseLeave={() => { setHoveredStar(0); }}
+                                  onClick={() => handleTicketAction(ticket.id, "rate", star)}
+                                  className="p-0.5"
+                                >
+                                  <Star
+                                    className={`h-5 w-5 transition-colors ${
+                                      (ratingTicketId === ticket.id && star <= hoveredStar)
+                                        ? 'text-yellow-400 fill-yellow-400'
+                                        : isDark ? 'text-gray-600' : 'text-gray-300'
+                                    }`}
+                                  />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {ticket.rating && (
+                            <div className="flex items-center gap-1 ml-auto">
+                              <span className={`text-xs ${textSecondary} mr-1`}>Оценка:</span>
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`h-4 w-4 ${star <= ticket.rating! ? 'text-yellow-400 fill-yellow-400' : isDark ? 'text-gray-600' : 'text-gray-300'}`}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

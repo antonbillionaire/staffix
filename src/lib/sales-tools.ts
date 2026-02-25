@@ -663,7 +663,10 @@ async function notifyNewOrder(
       },
     });
 
-    if (!business?.botToken) return;
+    if (!business?.botToken) {
+      console.log("[Notify] No botToken for business", businessId);
+      return;
+    }
 
     const itemsList = items
       .map((i) => `• ${i.name} × ${i.quantity} = ${(i.price * i.quantity).toLocaleString("ru-RU")}`)
@@ -679,7 +682,8 @@ async function notifyNewOrder(
 
     // Уведомление владельцу
     if (business.ownerTelegramChatId) {
-      await fetch(
+      console.log(`[Notify] Sending order #${order.orderNumber} to owner chatId=${business.ownerTelegramChatId}`);
+      const ownerRes = await fetch(
         `https://api.telegram.org/bot${business.botToken}/sendMessage`,
         {
           method: "POST",
@@ -691,6 +695,34 @@ async function notifyNewOrder(
           }),
         }
       );
+      if (!ownerRes.ok) {
+        console.error(`[Notify] Failed to send to owner:`, await ownerRes.text());
+      }
+    } else {
+      console.log(`[Notify] No ownerTelegramChatId for business ${businessId} — owner needs to /start the bot`);
+    }
+
+    // Также уведомляем сотрудников с включёнными уведомлениями
+    const staffMembers = await prisma.staff.findMany({
+      where: { businessId, telegramChatId: { not: null } },
+      select: { telegramChatId: true, name: true },
+    });
+    for (const staff of staffMembers) {
+      if (staff.telegramChatId) {
+        console.log(`[Notify] Sending order #${order.orderNumber} to staff ${staff.name} chatId=${staff.telegramChatId}`);
+        await fetch(
+          `https://api.telegram.org/bot${business.botToken}/sendMessage`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: staff.telegramChatId.toString(),
+              text: message,
+              parse_mode: "Markdown",
+            }),
+          }
+        ).catch((e) => console.error(`[Notify] Staff notify error:`, e));
+      }
     }
 
     // Отправить кнопки оплаты клиенту (если есть платёжные методы)
