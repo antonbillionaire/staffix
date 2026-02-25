@@ -170,8 +170,8 @@ model Business {
   // WhatsApp/Facebook разговоры
   channelConversations ChannelConversation[]
 
-  // Программа лояльности
-  loyaltyProgram     LoyaltyProgram?
+  // Программы лояльности (может быть несколько типов)
+  loyaltyPrograms    LoyaltyProgram[]
 
   // Продажи (магазины, e-commerce)
   products           Product[]
@@ -482,7 +482,13 @@ model Client {
 
   telegramId        BigInt
   name              String?
+  surname           String?
   phone             String?
+  email             String?
+  company           String?   // название бизнеса клиента
+
+  // Лояльность: какие программы назначены (пустой = все)
+  loyaltyProgramIds String[]  @default([])
 
   // Статус
   lastVisitDate     DateTime?
@@ -1275,10 +1281,11 @@ model PartnerEarning {
 
 model LoyaltyProgram {
   id            String   @id @default(cuid())
-  businessId    String   @unique
+  businessId    String
   business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   enabled       Boolean  @default(false)
   type          String   @default("cashback") // cashback | visits | tiered
+  name          String?  // Пользовательское название, напр. "Кэшбэк 5%"
 
   // Cashback: % от суммы возвращается бонусами
   cashbackPercent  Int?     @default(5)
@@ -1293,6 +1300,9 @@ model LoyaltyProgram {
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@unique([businessId, type]) // один тип программы на бизнес
+  @@index([businessId])
 }
 
 // Rate limiting — защита от брутфорса

@@ -20,6 +20,11 @@ import {
   ExternalLink,
   Ban,
   RefreshCw,
+  Upload,
+  FileSpreadsheet,
+  X,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 
 interface Customer {
@@ -54,6 +59,15 @@ interface Pagination {
   totalPages: number;
 }
 
+interface ImportResult {
+  success: boolean;
+  created: number;
+  updated: number;
+  skipped: number;
+  total: number;
+  errors: string[];
+}
+
 export default function CustomersPage() {
   const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
@@ -67,6 +81,13 @@ export default function CustomersPage() {
   });
   const [search, setSearch] = useState("");
   const [segment, setSegment] = useState("all");
+
+  // Import state
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importCsv, setImportCsv] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importError, setImportError] = useState("");
 
   // Theme-aware styles
   const isDark = theme === "dark";
@@ -112,6 +133,57 @@ export default function CustomersPage() {
     e.preventDefault();
     setPagination((p) => ({ ...p, page: 1 }));
     fetchCustomers();
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      setImportCsv(text);
+      setImportError("");
+      setImportResult(null);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImport = async () => {
+    if (!importCsv.trim()) {
+      setImportError("Вставьте данные или загрузите файл");
+      return;
+    }
+    setImporting(true);
+    setImportError("");
+    setImportResult(null);
+
+    try {
+      const res = await fetch("/api/import/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csv: importCsv }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setImportError(data.error || "Ошибка импорта");
+      } else {
+        setImportResult(data);
+        fetchCustomers();
+      }
+    } catch {
+      setImportError("Ошибка сети");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const closeImportModal = () => {
+    setShowImportModal(false);
+    setImportCsv("");
+    setImportResult(null);
+    setImportError("");
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -163,13 +235,22 @@ export default function CustomersPage() {
             {stats.total} клиентов в базе
           </p>
         </div>
-        <button
-          onClick={fetchCustomers}
-          className={`flex items-center gap-2 px-4 py-2 ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} rounded-xl ${textSecondary} transition-colors`}
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Обновить
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-xl hover:opacity-90 transition-opacity"
+          >
+            <Upload className="h-4 w-4" />
+            Импорт клиентов
+          </button>
+          <button
+            onClick={fetchCustomers}
+            className={`flex items-center gap-2 px-4 py-2 ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} rounded-xl ${textSecondary} transition-colors`}
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Обновить
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -380,6 +461,118 @@ export default function CustomersPage() {
           </div>
         )}
       </div>
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className={`${cardBg} border ${borderColor} rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto`}>
+            <div className={`flex items-center justify-between p-6 border-b ${borderColor}`}>
+              <div className="flex items-center gap-3">
+                <FileSpreadsheet className="h-5 w-5 text-blue-500" />
+                <h2 className={`text-lg font-bold ${textPrimary}`}>Импорт клиентов</h2>
+              </div>
+              <button onClick={closeImportModal} className={`p-2 ${hoverBg} rounded-lg transition-colors`}>
+                <X className={`h-5 w-5 ${textSecondary}`} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Instructions */}
+              <div className={`text-sm ${textSecondary} space-y-1`}>
+                <p>Загрузите CSV/TXT файл или вставьте данные.</p>
+                <p>Поддерживаемые колонки: <span className={textPrimary}>Имя, Фамилия, Телефон, Email, Компания, Заметки</span></p>
+                <p>Разделитель: запятая или точка с запятой</p>
+              </div>
+
+              {/* File upload */}
+              <label className={`flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed ${inputBorder} rounded-xl cursor-pointer ${hoverBg} transition-colors`}>
+                <Upload className={`h-5 w-5 ${textSecondary}`} />
+                <span className={textSecondary}>Выбрать файл (.csv, .txt)</span>
+                <input
+                  type="file"
+                  accept=".csv,.txt,.tsv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+
+              {/* Or paste */}
+              <div>
+                <label className={`block text-sm font-medium ${textSecondary} mb-1`}>
+                  Или вставьте данные:
+                </label>
+                <textarea
+                  value={importCsv}
+                  onChange={(e) => { setImportCsv(e.target.value); setImportError(""); setImportResult(null); }}
+                  rows={8}
+                  placeholder={"Имя;Фамилия;Телефон;Email;Компания\nИван;Петров;+77001234567;ivan@mail.ru;ТОО Рога"}
+                  className={`w-full px-3 py-2 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono`}
+                />
+              </div>
+
+              {/* Error */}
+              {importError && (
+                <div className="flex items-center gap-2 p-3 bg-red-500/10 text-red-400 rounded-xl text-sm">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  {importError}
+                </div>
+              )}
+
+              {/* Result */}
+              {importResult && (
+                <div className="p-4 bg-green-500/10 rounded-xl space-y-2">
+                  <div className="flex items-center gap-2 text-green-400 font-medium">
+                    <CheckCircle2 className="h-5 w-5" />
+                    Импорт завершён
+                  </div>
+                  <div className={`text-sm ${textSecondary} grid grid-cols-2 gap-1`}>
+                    <span>Всего строк:</span><span className={textPrimary}>{importResult.total}</span>
+                    <span>Создано:</span><span className="text-green-400">{importResult.created}</span>
+                    <span>Обновлено:</span><span className="text-blue-400">{importResult.updated}</span>
+                    <span>Пропущено:</span><span className={textTertiary}>{importResult.skipped}</span>
+                  </div>
+                  {importResult.errors.length > 0 && (
+                    <div className="mt-2 text-sm text-red-400">
+                      {importResult.errors.map((err, i) => (
+                        <p key={i}>{err}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={closeImportModal}
+                  className={`flex-1 px-4 py-2.5 ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} rounded-xl ${textSecondary} font-medium transition-colors`}
+                >
+                  {importResult ? "Закрыть" : "Отмена"}
+                </button>
+                {!importResult && (
+                  <button
+                    onClick={handleImport}
+                    disabled={importing || !importCsv.trim()}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-xl hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  >
+                    {importing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Импорт...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4" />
+                        Импортировать
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

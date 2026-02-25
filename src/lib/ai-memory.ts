@@ -166,7 +166,7 @@ export async function buildBusinessContext(
   businessId: string
 ): Promise<BusinessContext | null> {
   try {
-    // Try with loyaltyProgram, fallback without if table doesn't exist yet
+    // Load business with all related data
     let business;
     try {
       business = await prisma.business.findUnique({
@@ -179,14 +179,15 @@ export async function buildBusinessContext(
             where: { parsed: true },
             select: { name: true, extractedText: true }
           },
-          loyaltyProgram: {
-            select: { enabled: true, type: true, cashbackPercent: true, visitsForReward: true, rewardType: true, rewardDiscount: true }
+          loyaltyPrograms: {
+            where: { enabled: true },
+            select: { enabled: true, type: true, name: true, cashbackPercent: true, visitsForReward: true, rewardType: true, rewardDiscount: true }
           },
         },
       });
     } catch {
-      // Fallback: loyaltyProgram table may not exist yet
-      console.log("buildBusinessContext: loyaltyProgram query failed, retrying without it");
+      // Fallback: loyaltyPrograms table may not exist yet
+      console.log("buildBusinessContext: loyaltyPrograms query failed, retrying without it");
       business = await prisma.business.findUnique({
         where: { id: businessId },
         include: {
@@ -205,6 +206,10 @@ export async function buildBusinessContext(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const biz = business as any;
+
+    // Build loyalty info from all enabled programs
+    const loyaltyPrograms = biz.loyaltyPrograms || [];
+    const firstProgram = loyaltyPrograms.length > 0 ? loyaltyPrograms[0] : null;
 
     return {
       name: business.name,
@@ -228,13 +233,13 @@ export async function buildBusinessContext(
       staff: business.staff,
       faqs: business.faqs,
       documents: business.documents,
-      loyalty: biz.loyaltyProgram ? {
-        enabled: biz.loyaltyProgram.enabled,
-        type: biz.loyaltyProgram.type,
-        cashbackPercent: biz.loyaltyProgram.cashbackPercent,
-        visitsForReward: biz.loyaltyProgram.visitsForReward,
-        rewardType: biz.loyaltyProgram.rewardType,
-        rewardDiscount: biz.loyaltyProgram.rewardDiscount,
+      loyalty: firstProgram ? {
+        enabled: firstProgram.enabled,
+        type: firstProgram.type,
+        cashbackPercent: firstProgram.cashbackPercent,
+        visitsForReward: firstProgram.visitsForReward,
+        rewardType: firstProgram.rewardType,
+        rewardDiscount: firstProgram.rewardDiscount,
       } : null,
     };
   } catch (error) {

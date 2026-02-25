@@ -182,44 +182,69 @@ export async function searchProducts(
   maxPrice?: number
 ): Promise<SalesToolResult> {
   try {
-    const where: Record<string, unknown> = {
-      businessId,
-      isActive: true,
-    };
+    // Build DB-level text search — search across name, description, category, tags
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const conditions: any[] = [{ businessId, isActive: true }];
+
+    // Text search across multiple fields at DB level
+    if (query) {
+      const queryWords = query.trim().split(/\s+/).filter(w => w.length > 1);
+      // Each word must match at least one field (AND logic between words)
+      for (const word of queryWords) {
+        conditions.push({
+          OR: [
+            { name: { contains: word, mode: "insensitive" } },
+            { description: { contains: word, mode: "insensitive" } },
+            { category: { contains: word, mode: "insensitive" } },
+            { sku: { contains: word, mode: "insensitive" } },
+            { tags: { has: word } },
+          ],
+        });
+      }
+    }
 
     if (category) {
-      where.category = { contains: category, mode: "insensitive" };
+      conditions.push({ category: { contains: category, mode: "insensitive" } });
     }
 
     if (maxPrice) {
-      where.price = { lte: maxPrice };
+      conditions.push({ price: { lte: maxPrice } });
     }
 
-    const products = await prisma.product.findMany({
-      where,
+    // Primary search: DB-level filtering
+    let products = await prisma.product.findMany({
+      where: { AND: conditions },
       orderBy: { name: "asc" },
-      take: 10,
+      take: 20,
     });
 
-    // Фильтруем по запросу (простой text search)
-    const queryLower = query.toLowerCase();
-    const filtered = products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(queryLower) ||
-        (p.description && p.description.toLowerCase().includes(queryLower)) ||
-        (p.tags && p.tags.some((t) => t.toLowerCase().includes(queryLower))) ||
-        (p.category && p.category.toLowerCase().includes(queryLower))
-    );
+    // Fallback: if strict AND didn't find anything, try OR across fields
+    if (products.length === 0 && query) {
+      products = await prisma.product.findMany({
+        where: {
+          businessId,
+          isActive: true,
+          OR: [
+            { name: { contains: query, mode: "insensitive" } },
+            { description: { contains: query, mode: "insensitive" } },
+            { category: { contains: query, mode: "insensitive" } },
+            { sku: { contains: query, mode: "insensitive" } },
+          ],
+          ...(maxPrice ? { price: { lte: maxPrice } } : {}),
+        },
+        orderBy: { name: "asc" },
+        take: 20,
+      });
+    }
 
-    // Если точного совпадения нет — показываем всё
-    const results = filtered.length > 0 ? filtered : products.slice(0, 8);
-
-    if (results.length === 0) {
+    if (products.length === 0) {
+      // Get available categories to help the bot suggest alternatives
+      const categories = await getAvailableCategories(businessId);
       return {
         success: true,
         found: false,
-        message:
-          "Товаров по этому запросу не найдено. Попробуй спросить о других товарах или посмотри категории.",
+        message: `Товар по запросу "${query}" не найден.`,
+        availableCategories: categories,
         products: [],
       };
     }
@@ -227,8 +252,8 @@ export async function searchProducts(
     return {
       success: true,
       found: true,
-      count: results.length,
-      products: results.map((p) => ({
+      count: products.length,
+      products: products.map((p) => ({
         id: p.id,
         name: p.name,
         price: p.price,
@@ -242,6 +267,22 @@ export async function searchProducts(
   } catch (error) {
     console.error("searchProducts error:", error);
     return { success: false, error: "Ошибка поиска товаров" };
+  }
+}
+
+/**
+ * Получить список доступных категорий товаров бизнеса
+ */
+export async function getAvailableCategories(businessId: string): Promise<string[]> {
+  try {
+    const products = await prisma.product.findMany({
+      where: { businessId, isActive: true, category: { not: null } },
+      select: { category: true },
+      distinct: ["category"],
+    });
+    return products.map(p => p.category).filter((c): c is string => c !== null);
+  } catch {
+    return [];
   }
 }
 

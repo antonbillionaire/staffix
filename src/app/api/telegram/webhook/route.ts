@@ -505,6 +505,12 @@ async function generateAIResponse(
             importantNotes: clientContext.importantNotes,
           }
         : null;
+
+      // Load product categories for sales prompt context
+      const { getAvailableCategories } = await import("@/lib/sales-tools");
+      const categories = await getAvailableCategories(businessId);
+      const totalProducts = await prisma.product.count({ where: { businessId, isActive: true } });
+
       systemPrompt = buildSalesSystemPrompt(
         {
           name: businessContext.name,
@@ -516,6 +522,8 @@ async function generateAIResponse(
           aiTone: businessContext.aiTone,
           aiRules: businessContext.aiRules,
           language: businessContext.language || "ru",
+          categories,
+          totalProducts,
         },
         salesClientCtx
       );

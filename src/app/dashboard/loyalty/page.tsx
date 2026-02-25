@@ -3,9 +3,6 @@
 import { useState, useEffect } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
 import {
-  Gift,
-  Star,
-  Users,
   Loader2,
   Save,
   Percent,
@@ -14,6 +11,8 @@ import {
   TrendingUp,
   Plus,
   Trash2,
+  Users,
+  CheckCircle2,
 } from "lucide-react";
 
 interface Tier {
@@ -22,9 +21,10 @@ interface Tier {
   discount: number;
 }
 
-interface LoyaltyProgram {
+interface ProgramData {
   enabled: boolean;
-  type: "cashback" | "visits" | "tiered";
+  type: string;
+  name: string;
   cashbackPercent: number;
   visitsForReward: number;
   rewardType: "free" | "discount";
@@ -39,21 +39,54 @@ const DEFAULT_TIERS: Tier[] = [
   { name: "Platinum", minSpent: 500000, discount: 15 },
 ];
 
+const PROGRAM_TYPES = [
+  {
+    type: "cashback",
+    label: "Кэшбэк",
+    icon: Percent,
+    desc: "Процент от суммы возвращается бонусами",
+    color: "blue",
+  },
+  {
+    type: "visits",
+    label: "Визиты",
+    icon: Award,
+    desc: "Каждый N-й визит бесплатно или со скидкой",
+    color: "green",
+  },
+  {
+    type: "tiered",
+    label: "Уровни",
+    icon: Layers,
+    desc: "Скидки растут с суммой покупок",
+    color: "purple",
+  },
+] as const;
+
+function defaultProgram(type: string): ProgramData {
+  return {
+    enabled: false,
+    type,
+    name: "",
+    cashbackPercent: 5,
+    visitsForReward: 10,
+    rewardType: "discount",
+    rewardDiscount: 50,
+    tiers: type === "tiered" ? DEFAULT_TIERS : null,
+  };
+}
+
 export default function LoyaltyPage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [program, setProgram] = useState<LoyaltyProgram>({
-    enabled: false,
-    type: "cashback",
-    cashbackPercent: 5,
-    visitsForReward: 10,
-    rewardType: "discount",
-    rewardDiscount: 50,
-    tiers: DEFAULT_TIERS,
+  const [savingType, setSavingType] = useState<string | null>(null);
+  const [savedType, setSavedType] = useState<string | null>(null);
+  const [programs, setPrograms] = useState<Record<string, ProgramData>>({
+    cashback: defaultProgram("cashback"),
+    visits: defaultProgram("visits"),
+    tiered: defaultProgram("tiered"),
   });
   const [stats, setStats] = useState({ activeMembers: 0, totalPointsIssued: 0 });
 
@@ -65,24 +98,34 @@ export default function LoyaltyPage() {
   const inputBorder = isDark ? "border-white/10" : "border-gray-300";
 
   useEffect(() => {
-    fetchProgram();
+    fetchPrograms();
   }, []);
 
-  const fetchProgram = async () => {
+  const fetchPrograms = async () => {
     try {
       const res = await fetch("/api/loyalty");
       if (res.ok) {
         const data = await res.json();
-        if (data.program) {
-          setProgram({
-            enabled: data.program.enabled,
-            type: data.program.type || "cashback",
-            cashbackPercent: data.program.cashbackPercent ?? 5,
-            visitsForReward: data.program.visitsForReward ?? 10,
-            rewardType: data.program.rewardType || "discount",
-            rewardDiscount: data.program.rewardDiscount ?? 50,
-            tiers: data.program.tiers || DEFAULT_TIERS,
-          });
+        if (data.programs && Array.isArray(data.programs)) {
+          const map: Record<string, ProgramData> = {
+            cashback: defaultProgram("cashback"),
+            visits: defaultProgram("visits"),
+            tiered: defaultProgram("tiered"),
+          };
+          for (const p of data.programs) {
+            const t = p.type || "cashback";
+            map[t] = {
+              enabled: p.enabled,
+              type: t,
+              name: p.name || "",
+              cashbackPercent: p.cashbackPercent ?? 5,
+              visitsForReward: p.visitsForReward ?? 10,
+              rewardType: p.rewardType || "discount",
+              rewardDiscount: p.rewardDiscount ?? 50,
+              tiers: p.tiers || (t === "tiered" ? DEFAULT_TIERS : null),
+            };
+          }
+          setPrograms(map);
         }
         if (data.stats) setStats(data.stats);
       }
@@ -93,62 +136,59 @@ export default function LoyaltyPage() {
     }
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    setSaved(false);
+  const saveProgram = async (type: string) => {
+    setSavingType(type);
+    setSavedType(null);
     try {
       const res = await fetch("/api/loyalty", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(program),
+        body: JSON.stringify(programs[type]),
       });
       if (res.ok) {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+        setSavedType(type);
+        setTimeout(() => setSavedType(null), 3000);
       }
     } catch (err) {
-      console.error("Failed to save loyalty:", err);
+      console.error("Failed to save:", err);
     } finally {
-      setSaving(false);
+      setSavingType(null);
     }
   };
 
+  const updateProgram = (type: string, updates: Partial<ProgramData>) => {
+    setPrograms((prev) => ({
+      ...prev,
+      [type]: { ...prev[type], ...updates },
+    }));
+  };
+
+  const toggleProgram = (type: string) => {
+    const p = programs[type];
+    updateProgram(type, { enabled: !p.enabled });
+  };
+
   const addTier = () => {
-    const tiers = program.tiers || [];
-    const lastTier = tiers[tiers.length - 1];
-    setProgram({
-      ...program,
-      tiers: [...tiers, { name: "", minSpent: (lastTier?.minSpent || 0) + 100000, discount: (lastTier?.discount || 0) + 5 }],
+    const tiers = programs.tiered.tiers || [];
+    const last = tiers[tiers.length - 1];
+    updateProgram("tiered", {
+      tiers: [
+        ...tiers,
+        { name: "", minSpent: (last?.minSpent || 0) + 100000, discount: (last?.discount || 0) + 5 },
+      ],
     });
   };
 
   const removeTier = (index: number) => {
-    const tiers = [...(program.tiers || [])];
+    const tiers = [...(programs.tiered.tiers || [])];
     tiers.splice(index, 1);
-    setProgram({ ...program, tiers });
+    updateProgram("tiered", { tiers });
   };
 
   const updateTier = (index: number, field: keyof Tier, value: string | number) => {
-    const tiers = [...(program.tiers || [])];
+    const tiers = [...(programs.tiered.tiers || [])];
     tiers[index] = { ...tiers[index], [field]: value };
-    setProgram({ ...program, tiers });
-  };
-
-  // Preview calculation
-  const getPreview = () => {
-    const spent = 100000;
-    if (program.type === "cashback") {
-      const bonus = Math.round(spent * program.cashbackPercent / 100);
-      return `Клиент потратил ${spent.toLocaleString()} → получает ${bonus.toLocaleString()} бонусов (${program.cashbackPercent}%)`;
-    }
-    if (program.type === "visits") {
-      return `Каждый ${program.visitsForReward}-й визит → ${program.rewardType === "free" ? "бесплатно" : `скидка ${program.rewardDiscount}%`}`;
-    }
-    if (program.type === "tiered" && program.tiers) {
-      const tier = [...program.tiers].reverse().find(t => spent >= t.minSpent);
-      return tier ? `При ${spent.toLocaleString()} потрачено → уровень "${tier.name}" (скидка ${tier.discount}%)` : "Нет подходящего уровня";
-    }
-    return "";
+    updateProgram("tiered", { tiers });
   };
 
   if (loading) {
@@ -159,34 +199,41 @@ export default function LoyaltyPage() {
     );
   }
 
-  const typeOptions = [
-    { value: "cashback", label: "Кэшбэк", icon: Percent, desc: "% от суммы возвращается бонусами" },
-    { value: "visits", label: "Визиты", icon: Award, desc: "Каждый N-й визит бесплатно/со скидкой" },
-    { value: "tiered", label: "Уровни", icon: Layers, desc: "Скидки растут с суммой покупок" },
-  ];
+  const colorMap: Record<string, { bg: string; text: string; border: string; ring: string }> = {
+    blue: {
+      bg: "bg-blue-500/10",
+      text: "text-blue-500",
+      border: "border-blue-500/50",
+      ring: "bg-blue-500",
+    },
+    green: {
+      bg: "bg-green-500/10",
+      text: "text-green-500",
+      border: "border-green-500/50",
+      ring: "bg-green-500",
+    },
+    purple: {
+      bg: "bg-purple-500/10",
+      text: "text-purple-500",
+      border: "border-purple-500/50",
+      ring: "bg-purple-500",
+    },
+  };
+
+  const enabledCount = Object.values(programs).filter((p) => p.enabled).length;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className={`text-2xl font-bold ${textPrimary}`}>Программа лояльности</h1>
-          <p className={`text-sm ${textSecondary} mt-1`}>
-            Настройте систему бонусов для ваших клиентов
-          </p>
-        </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Star className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-          {saved ? "Сохранено!" : "Сохранить"}
-        </button>
+      <div>
+        <h1 className={`text-2xl font-bold ${textPrimary}`}>Программы лояльности</h1>
+        <p className={`text-sm ${textSecondary} mt-1`}>
+          Настройте бонусные программы — можно включить несколько одновременно
+        </p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className={`${bgCard} border ${borderColor} rounded-xl p-5`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
@@ -209,185 +256,241 @@ export default function LoyaltyPage() {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Enable toggle */}
-      <div className={`${bgCard} border ${borderColor} rounded-xl p-6`}>
-        <div className="flex items-center justify-between">
+        <div className={`${bgCard} border ${borderColor} rounded-xl p-5`}>
           <div className="flex items-center gap-3">
-            <Gift className={`h-5 w-5 ${program.enabled ? "text-green-500" : textSecondary}`} />
+            <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+              <CheckCircle2 className="h-5 w-5 text-green-500" />
+            </div>
             <div>
-              <p className={`font-medium ${textPrimary}`}>Программа лояльности</p>
-              <p className={`text-sm ${textSecondary}`}>
-                {program.enabled ? "Активна — клиенты накапливают бонусы" : "Выключена"}
-              </p>
+              <p className={`text-2xl font-bold ${textPrimary}`}>{enabledCount} / 3</p>
+              <p className={`text-sm ${textSecondary}`}>Активных программ</p>
             </div>
           </div>
-          <button
-            onClick={() => setProgram({ ...program, enabled: !program.enabled })}
-            className={`relative w-12 h-7 rounded-full transition-colors ${program.enabled ? "bg-green-500" : isDark ? "bg-white/10" : "bg-gray-300"}`}
-          >
-            <span className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform shadow ${program.enabled ? "translate-x-5" : ""}`} />
-          </button>
         </div>
       </div>
 
-      {program.enabled && (
-        <>
-          {/* Type selection */}
-          <div className={`${bgCard} border ${borderColor} rounded-xl p-6`}>
-            <h3 className={`font-medium ${textPrimary} mb-4`}>Тип программы</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {typeOptions.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setProgram({ ...program, type: opt.value as LoyaltyProgram["type"] })}
-                  className={`p-4 rounded-xl border text-left transition-all ${
-                    program.type === opt.value
-                      ? "border-blue-500 bg-blue-500/10"
-                      : `${borderColor} ${isDark ? "hover:bg-white/5" : "hover:bg-gray-50"}`
-                  }`}
-                >
-                  <opt.icon className={`h-5 w-5 mb-2 ${program.type === opt.value ? "text-blue-500" : textSecondary}`} />
-                  <p className={`font-medium ${program.type === opt.value ? "text-blue-500" : textPrimary}`}>{opt.label}</p>
-                  <p className={`text-xs ${textSecondary} mt-1`}>{opt.desc}</p>
-                </button>
-              ))}
-            </div>
-          </div>
+      {/* Program Cards */}
+      {PROGRAM_TYPES.map(({ type, label, icon: Icon, desc, color }) => {
+        const p = programs[type];
+        const c = colorMap[color];
+        const isSaving = savingType === type;
+        const isSaved = savedType === type;
 
-          {/* Type-specific settings */}
-          <div className={`${bgCard} border ${borderColor} rounded-xl p-6`}>
-            <h3 className={`font-medium ${textPrimary} mb-4`}>Настройки</h3>
-
-            {program.type === "cashback" && (
-              <div>
-                <label className={`block text-sm ${textSecondary} mb-2`}>Процент кэшбэка</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={program.cashbackPercent}
-                    onChange={(e) => setProgram({ ...program, cashbackPercent: parseInt(e.target.value) || 5 })}
-                    className={`w-24 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-center`}
-                  />
-                  <span className={textSecondary}>%</span>
-                </div>
-                <p className={`text-xs ${textSecondary} mt-2`}>
-                  Клиент получает {program.cashbackPercent}% от суммы каждого заказа в виде бонусных баллов
-                </p>
-              </div>
-            )}
-
-            {program.type === "visits" && (
-              <div className="space-y-4">
-                <div>
-                  <label className={`block text-sm ${textSecondary} mb-2`}>Каждый N-й визит</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="number"
-                      min={2}
-                      max={100}
-                      value={program.visitsForReward}
-                      onChange={(e) => setProgram({ ...program, visitsForReward: parseInt(e.target.value) || 10 })}
-                      className={`w-24 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-center`}
-                    />
-                    <span className={textSecondary}>визит</span>
+        return (
+          <div
+            key={type}
+            className={`${bgCard} border rounded-xl overflow-hidden transition-colors ${
+              p.enabled ? c.border : borderColor
+            }`}
+          >
+            {/* Card Header */}
+            <div className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-xl ${c.bg} flex items-center justify-center`}>
+                    <Icon className={`h-6 w-6 ${c.text}`} />
                   </div>
-                </div>
-                <div>
-                  <label className={`block text-sm ${textSecondary} mb-2`}>Награда</label>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setProgram({ ...program, rewardType: "free" })}
-                      className={`px-4 py-2 rounded-lg border ${program.rewardType === "free" ? "border-blue-500 bg-blue-500/10 text-blue-500" : `${borderColor} ${textSecondary}`}`}
-                    >
-                      Бесплатно
-                    </button>
-                    <button
-                      onClick={() => setProgram({ ...program, rewardType: "discount" })}
-                      className={`px-4 py-2 rounded-lg border ${program.rewardType === "discount" ? "border-blue-500 bg-blue-500/10 text-blue-500" : `${borderColor} ${textSecondary}`}`}
-                    >
-                      Скидка
-                    </button>
-                  </div>
-                </div>
-                {program.rewardType === "discount" && (
                   <div>
-                    <label className={`block text-sm ${textSecondary} mb-2`}>Размер скидки</label>
+                    <h3 className={`text-lg font-bold ${textPrimary}`}>{label}</h3>
+                    <p className={`text-sm ${textSecondary}`}>{desc}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => toggleProgram(type)}
+                    className={`relative w-12 h-7 rounded-full transition-colors ${
+                      p.enabled ? c.ring : isDark ? "bg-white/10" : "bg-gray-300"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full transition-transform shadow ${
+                        p.enabled ? "translate-x-5" : ""
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Card Body — shown when enabled */}
+            {p.enabled && (
+              <div className={`px-6 pb-6 space-y-4 border-t ${borderColor} pt-4`}>
+                {/* Custom name */}
+                <div>
+                  <label className={`block text-sm ${textSecondary} mb-1`}>Название (опционально)</label>
+                  <input
+                    value={p.name}
+                    onChange={(e) => updateProgram(type, { name: e.target.value })}
+                    placeholder={`${label} программа`}
+                    className={`w-full max-w-xs px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-sm`}
+                  />
+                </div>
+
+                {/* Cashback settings */}
+                {type === "cashback" && (
+                  <div>
+                    <label className={`block text-sm ${textSecondary} mb-2`}>Процент кэшбэка</label>
                     <div className="flex items-center gap-3">
                       <input
                         type="number"
                         min={1}
-                        max={100}
-                        value={program.rewardDiscount}
-                        onChange={(e) => setProgram({ ...program, rewardDiscount: parseInt(e.target.value) || 50 })}
+                        max={50}
+                        value={p.cashbackPercent}
+                        onChange={(e) => updateProgram(type, { cashbackPercent: parseInt(e.target.value) || 5 })}
                         className={`w-24 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-center`}
                       />
                       <span className={textSecondary}>%</span>
                     </div>
+                    <p className={`text-xs ${textSecondary} mt-2`}>
+                      Клиент получает {p.cashbackPercent}% от суммы каждого заказа в виде бонусных баллов
+                    </p>
                   </div>
                 )}
+
+                {/* Visits settings */}
+                {type === "visits" && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className={`block text-sm ${textSecondary} mb-2`}>Каждый N-й визит</label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="number"
+                          min={2}
+                          max={100}
+                          value={p.visitsForReward}
+                          onChange={(e) => updateProgram(type, { visitsForReward: parseInt(e.target.value) || 10 })}
+                          className={`w-24 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-center`}
+                        />
+                        <span className={textSecondary}>визит</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className={`block text-sm ${textSecondary} mb-2`}>Награда</label>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => updateProgram(type, { rewardType: "free" })}
+                          className={`px-4 py-2 rounded-lg border ${
+                            p.rewardType === "free"
+                              ? "border-green-500 bg-green-500/10 text-green-500"
+                              : `${borderColor} ${textSecondary}`
+                          }`}
+                        >
+                          Бесплатно
+                        </button>
+                        <button
+                          onClick={() => updateProgram(type, { rewardType: "discount" })}
+                          className={`px-4 py-2 rounded-lg border ${
+                            p.rewardType === "discount"
+                              ? "border-green-500 bg-green-500/10 text-green-500"
+                              : `${borderColor} ${textSecondary}`
+                          }`}
+                        >
+                          Скидка
+                        </button>
+                      </div>
+                    </div>
+                    {p.rewardType === "discount" && (
+                      <div>
+                        <label className={`block text-sm ${textSecondary} mb-2`}>Размер скидки</label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={p.rewardDiscount}
+                            onChange={(e) =>
+                              updateProgram(type, { rewardDiscount: parseInt(e.target.value) || 50 })
+                            }
+                            className={`w-24 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-center`}
+                          />
+                          <span className={textSecondary}>%</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Tiered settings */}
+                {type === "tiered" && (
+                  <div className="space-y-3">
+                    {(p.tiers || []).map((tier, i) => (
+                      <div key={i} className={`flex items-center gap-3 p-3 rounded-lg border ${borderColor}`}>
+                        <input
+                          placeholder="Название"
+                          value={tier.name}
+                          onChange={(e) => updateTier(i, "name", e.target.value)}
+                          className={`flex-1 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-sm`}
+                        />
+                        <div className="flex items-center gap-1">
+                          <span className={`text-xs ${textSecondary}`}>от</span>
+                          <input
+                            type="number"
+                            value={tier.minSpent}
+                            onChange={(e) => updateTier(i, "minSpent", parseInt(e.target.value) || 0)}
+                            className={`w-28 px-2 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-sm text-center`}
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            value={tier.discount}
+                            onChange={(e) => updateTier(i, "discount", parseInt(e.target.value) || 0)}
+                            className={`w-16 px-2 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-sm text-center`}
+                          />
+                          <span className={`text-xs ${textSecondary}`}>%</span>
+                        </div>
+                        <button onClick={() => removeTier(i)} className="text-red-400 hover:text-red-300 p-1">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={addTier}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed ${borderColor} ${textSecondary} hover:border-purple-500 hover:text-purple-500 transition-colors text-sm`}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Добавить уровень
+                    </button>
+                  </div>
+                )}
+
+                {/* Save button */}
+                <div className="pt-2">
+                  <button
+                    onClick={() => saveProgram(type)}
+                    disabled={isSaving}
+                    className={`flex items-center gap-2 px-5 py-2.5 ${c.ring} text-white rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-50`}
+                  >
+                    {isSaving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : isSaved ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    {isSaved ? "Сохранено!" : "Сохранить"}
+                  </button>
+                </div>
               </div>
             )}
 
-            {program.type === "tiered" && (
-              <div className="space-y-3">
-                {(program.tiers || []).map((tier, i) => (
-                  <div key={i} className={`flex items-center gap-3 p-3 rounded-lg border ${borderColor}`}>
-                    <input
-                      placeholder="Название"
-                      value={tier.name}
-                      onChange={(e) => updateTier(i, "name", e.target.value)}
-                      className={`flex-1 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-sm`}
-                    />
-                    <div className="flex items-center gap-1">
-                      <span className={`text-xs ${textSecondary}`}>от</span>
-                      <input
-                        type="number"
-                        value={tier.minSpent}
-                        onChange={(e) => updateTier(i, "minSpent", parseInt(e.target.value) || 0)}
-                        className={`w-28 px-2 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-sm text-center`}
-                      />
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        value={tier.discount}
-                        onChange={(e) => updateTier(i, "discount", parseInt(e.target.value) || 0)}
-                        className={`w-16 px-2 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-sm text-center`}
-                      />
-                      <span className={`text-xs ${textSecondary}`}>%</span>
-                    </div>
-                    <button onClick={() => removeTier(i)} className="text-red-400 hover:text-red-300 p-1">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
+            {/* Disabled state — save toggle */}
+            {!p.enabled && (
+              <div className={`px-6 pb-4`}>
                 <button
-                  onClick={addTier}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed ${borderColor} ${textSecondary} hover:border-blue-500 hover:text-blue-500 transition-colors text-sm`}
+                  onClick={() => {
+                    toggleProgram(type);
+                    saveProgram(type);
+                  }}
+                  className={`text-sm ${textSecondary} hover:${c.text} transition-colors`}
                 >
-                  <Plus className="h-4 w-4" />
-                  Добавить уровень
+                  {/* hidden save on disable */}
                 </button>
               </div>
             )}
           </div>
-
-          {/* Preview */}
-          <div className={`${bgCard} border ${borderColor} rounded-xl p-6`}>
-            <h3 className={`font-medium ${textPrimary} mb-3`}>Как это работает</h3>
-            <div className={`p-4 rounded-lg ${isDark ? "bg-blue-500/5 border border-blue-500/20" : "bg-blue-50 border border-blue-200"}`}>
-              <p className={`text-sm ${textPrimary}`}>{getPreview()}</p>
-            </div>
-            <p className={`text-xs ${textSecondary} mt-3`}>
-              AI-бот автоматически информирует клиентов о бонусах и уровнях лояльности
-            </p>
-          </div>
-        </>
-      )}
+        );
+      })}
     </div>
   );
 }
