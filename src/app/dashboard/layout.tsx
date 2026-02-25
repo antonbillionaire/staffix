@@ -80,7 +80,7 @@ type NavEntry = NavGroup | NavSingle;
 function isSalesDashboard(businessType: string | null): boolean {
   if (!businessType) return false;
   const bt = businessType.toLowerCase();
-  const salesIds = ["online_shop", "flowers", "restaurant", "delivery"];
+  const salesIds = ["online_shop", "flowers", "restaurant", "delivery", "other_sales"];
   if (salesIds.includes(bt)) return true;
   const salesKeywords = ["shop", "store", "retail", "магазин", "цветоч", "ресторан", "кафе", "доставк"];
   return salesKeywords.some(kw => bt.includes(kw));

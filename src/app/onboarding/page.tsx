@@ -89,11 +89,13 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [showModeQuestion, setShowModeQuestion] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
   const [formData, setFormData] = useState({
     businessType: "",        // kept for backward compat
     businessTypes: [] as string[],  // multi-select
+    businessMode: "" as "" | "service" | "sales",  // for "other" type
     businessName: "",
     phone: "",
     address: "",
@@ -104,9 +106,30 @@ export default function OnboardingPage() {
 
   const totalSteps = 6;
 
+  // Types that are clearly "sales" or "service" — so we don't need to ask
+  const knownSalesIds = ["online_shop", "delivery", "restaurant", "flowers"];
+  const knownServiceIds = [
+    "salon", "barbershop", "clinic", "spa", "fitness", "auto_service",
+    "cleaning", "pet_care", "repair", "real_estate", "travel",
+    "photo_video", "legal", "professional", "education", "events",
+  ];
+
+  const needsModeQuestion = () => {
+    const types = formData.businessTypes;
+    if (!types.includes("other")) return false;
+    // If there's at least one clearly categorized type, no need to ask
+    return !types.some(t => knownSalesIds.includes(t) || knownServiceIds.includes(t));
+  };
+
   const handleNext = () => {
     if (step === 1 && formData.businessTypes.length === 0) {
       setError(t("onboarding.error.selectType"));
+      return;
+    }
+    // Show mode question for "other" before moving to step 2
+    if (step === 1 && needsModeQuestion() && !formData.businessMode) {
+      setShowModeQuestion(true);
+      setError("");
       return;
     }
     if (step === 2 && !formData.businessName) {
@@ -114,11 +137,17 @@ export default function OnboardingPage() {
       return;
     }
     setError("");
+    setShowModeQuestion(false);
     setStep(step + 1);
   };
 
   const handleBack = () => {
     setError("");
+    if (showModeQuestion) {
+      setShowModeQuestion(false);
+      setFormData({ ...formData, businessMode: "" });
+      return;
+    }
     setStep(step - 1);
   };
 
@@ -293,7 +322,7 @@ export default function OnboardingPage() {
         </div>
 
         {/* Step 1: Business Type */}
-        {step === 1 && (
+        {step === 1 && !showModeQuestion && (
           <div>
             <h2 className="text-2xl font-bold text-white mb-2">
               {t("onboarding.step1.title")}
@@ -312,7 +341,8 @@ export default function OnboardingPage() {
                       const types = formData.businessTypes.includes(type.id)
                         ? formData.businessTypes.filter((t) => t !== type.id)
                         : [...formData.businessTypes, type.id];
-                      setFormData({ ...formData, businessTypes: types, businessType: types[0] || "" });
+                      setFormData({ ...formData, businessTypes: types, businessType: types[0] || "", businessMode: "" });
+                      setShowModeQuestion(false);
                     }}
                     className={`p-3 sm:p-4 rounded-xl border-2 transition-all ${
                       formData.businessTypes.includes(type.id)
@@ -339,6 +369,70 @@ export default function OnboardingPage() {
                   </button>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* Step 1.5: Service or Sales mode (for "other" business type) */}
+        {step === 1 && showModeQuestion && (
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              Уточните тип вашего бизнеса
+            </h2>
+            <p className="text-gray-400 mb-6">
+              Это поможет настроить панель управления под ваши нужды
+            </p>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setFormData({ ...formData, businessMode: "service", businessType: "other" });
+                  setShowModeQuestion(false);
+                  setStep(2);
+                }}
+                className={`w-full p-5 rounded-xl border-2 text-left transition-all ${
+                  formData.businessMode === "service"
+                    ? "border-blue-500 bg-blue-500/10"
+                    : "border-white/10 hover:border-white/20 bg-white/5"
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center">
+                    <Scissors className="h-6 w-6 text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-white text-lg">Услуги</p>
+                    <p className="text-sm text-gray-400 mt-0.5">
+                      Запись клиентов, расписание, мастера
+                    </p>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setFormData({ ...formData, businessMode: "sales", businessType: "other_sales" });
+                  setShowModeQuestion(false);
+                  setStep(2);
+                }}
+                className={`w-full p-5 rounded-xl border-2 text-left transition-all ${
+                  formData.businessMode === "sales"
+                    ? "border-blue-500 bg-blue-500/10"
+                    : "border-white/10 hover:border-white/20 bg-white/5"
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center">
+                    <ShoppingCart className="h-6 w-6 text-purple-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-white text-lg">Продажи</p>
+                    <p className="text-sm text-gray-400 mt-0.5">
+                      Каталог товаров, заказы, доставка
+                    </p>
+                  </div>
+                </div>
+              </button>
             </div>
           </div>
         )}
@@ -604,6 +698,8 @@ export default function OnboardingPage() {
                 <span className="text-gray-500">{t("onboarding.step5.businessType")}:</span>
                 <span className="text-white font-medium">
                   {formData.businessTypes.map((id) => t(businessTypes.find((bt) => bt.id === id)?.nameKey || "")).join(", ")}
+                  {formData.businessMode === "sales" && " (Продажи)"}
+                  {formData.businessMode === "service" && " (Услуги)"}
                 </span>
               </div>
               <div className="flex justify-between">

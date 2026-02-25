@@ -171,7 +171,7 @@ ${business.categories && business.categories.length > 0
 export function isSalesMode(businessType: string | null): boolean {
   if (!businessType) return false;
   // Exact ID matches (onboarding business type IDs)
-  const salesIds = ["online_shop", "flowers", "restaurant"];
+  const salesIds = ["online_shop", "flowers", "restaurant", "delivery", "other_sales"];
   if (salesIds.includes(businessType.toLowerCase())) return true;
   // Keyword matches for custom types
   const salesKeywords = [
