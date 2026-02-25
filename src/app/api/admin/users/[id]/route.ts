@@ -273,6 +273,26 @@ export async function PATCH(
         return NextResponse.json({ success: true, message: "Счётчик сообщений сброшен" });
       }
 
+      case "reset_onboarding": {
+        if (!business) {
+          return NextResponse.json(
+            { error: "Бизнес не найден" },
+            { status: 400 }
+          );
+        }
+
+        await prisma.business.update({
+          where: { id: business.id },
+          data: {
+            onboardingCompleted: false,
+            businessType: null,
+            businessTypes: [],
+          },
+        });
+
+        return NextResponse.json({ success: true, message: "Онбординг сброшен — пользователь пройдёт его заново" });
+      }
+
       default:
         return NextResponse.json(
           { error: "Неизвестное действие" },
