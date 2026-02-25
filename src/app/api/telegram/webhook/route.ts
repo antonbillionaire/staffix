@@ -428,6 +428,38 @@ async function handleToolCall(
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildFallbackFromToolResults(toolResults: any[], salesMode: boolean): string {
+  for (const tr of toolResults) {
+    try {
+      const parsed = JSON.parse(tr.content);
+      if (!parsed.success) continue;
+
+      // Order confirmation (sales mode)
+      if (parsed.orderNumber && parsed.totalPrice !== undefined) {
+        const items = parsed.summary || parsed.items?.map((i: { name: string; quantity: number }) => `${i.name} × ${i.quantity}`).join(", ") || "";
+        return `Заказ ${parsed.orderNumber} оформлен! 🎉\n\n${items}\nИтого: ${parsed.totalPrice.toLocaleString()} ₸\n\nСпасибо за покупку! Мы скоро свяжемся с вами.`;
+      }
+
+      // Booking confirmation (service mode)
+      if (parsed.details) {
+        const d = parsed.details;
+        if (d.serviceName && d.staffName) {
+          return `Запись создана! ✅\n\n${d.serviceName} к мастеру ${d.staffName}\n📅 ${d.date} в ${d.time}\n\nЖдём вас!`;
+        }
+      }
+
+      // Generic success with message
+      if (parsed.message) {
+        return parsed.message;
+      }
+    } catch { /* not JSON */ }
+  }
+  return salesMode
+    ? "Ваш запрос обработан! Если есть вопросы — напишите."
+    : "Готово! Чем ещё могу помочь?";
+}
+
 async function generateAIResponse(
   businessId: string,
   telegramId: bigint,
@@ -535,6 +567,8 @@ async function generateAIResponse(
     // 7. Обрабатываем tool_use в цикле (до 5 итераций)
     let iterations = 0;
     const maxIterations = 5;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let lastToolResults: any[] = [];
 
     while (response.stop_reason === "tool_use" && iterations < maxIterations) {
       iterations++;
@@ -580,6 +614,8 @@ async function generateAIResponse(
         }
       }
 
+      lastToolResults = toolResults;
+
       // Добавляем результаты tool в messages
       recentMessages.push({
         role: "user",
@@ -598,27 +634,22 @@ async function generateAIResponse(
       } catch (apiError) {
         // If API fails after successful tool execution, build response from tool results
         console.error("[Webhook] API error after tool execution:", apiError);
-
-        // Try to extract useful info from the last tool results
-        for (const tr of toolResults) {
-          try {
-            const parsed = JSON.parse(tr.content);
-            if (parsed.success && parsed.details) {
-              const d = parsed.details;
-              return `Запись создана! ${d.serviceName} к мастеру ${d.staffName}, ${d.date} в ${d.time}. Ждём вас!`;
-            }
-          } catch { /* not JSON or no details */ }
-        }
-        return "Ваш запрос обработан. Если возникли вопросы, напишите ещё раз.";
+        return buildFallbackFromToolResults(lastToolResults, salesMode);
       }
     }
 
     // 8. Извлекаем финальный текстовый ответ
     const textBlocks = response.content.filter((block) => block.type === "text");
-    const assistantMessage =
-      textBlocks.length > 0 && textBlocks[0].type === "text"
-        ? textBlocks[0].text
-        : "Извините, не могу обработать ваш запрос.";
+    let assistantMessage: string;
+    if (textBlocks.length > 0 && textBlocks[0].type === "text") {
+      assistantMessage = textBlocks[0].text;
+    } else if (lastToolResults.length > 0) {
+      // Claude returned only tool_use without text — extract info from tool results
+      console.log("[Webhook] No text blocks in response, building from tool results");
+      assistantMessage = buildFallbackFromToolResults(lastToolResults, salesMode);
+    } else {
+      assistantMessage = "Чем ещё могу помочь?";
+    }
 
     // 9. Сохраняем сообщения в базу
     await saveMessage(conversation.id, "user", userMessage);
