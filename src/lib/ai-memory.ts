@@ -554,7 +554,7 @@ export async function generateConversationSummary(
       .join("\n");
 
     const response = await anthropic.messages.create({
-      model: "claude-3-haiku-20240307", // Используем дешёвую модель для саммари
+      model: "claude-haiku-4-5-20251001", // Используем дешёвую модель для саммари
       max_tokens: 200,
       messages: [
         {
@@ -661,7 +661,7 @@ export async function updateClientSummary(
     }
 
     const response = await anthropic.messages.create({
-      model: "claude-3-haiku-20240307",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 150,
       messages: [
         {

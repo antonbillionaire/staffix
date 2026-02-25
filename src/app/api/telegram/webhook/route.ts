@@ -437,21 +437,28 @@ async function generateAIResponse(
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
+    console.error("[Webhook] ANTHROPIC_API_KEY is not set!");
     return "Извините, сервис временно недоступен. Попробуйте позже.";
   }
 
   try {
     // 1. Загружаем контекст бизнеса
+    console.log(`[Webhook] Building business context for ${businessId}...`);
     const businessContext = await buildBusinessContext(businessId);
     if (!businessContext) {
+      console.error(`[Webhook] buildBusinessContext returned null for ${businessId}`);
       return "Извините, произошла ошибка. Попробуйте позже.";
     }
+    console.log(`[Webhook] Business context loaded: ${businessContext.name}`);
 
     // 2. Загружаем контекст клиента (AI Memory!)
+    console.log(`[Webhook] Building client context for telegramId=${telegramId}...`);
     const clientContext = await buildClientContext(businessId, telegramId);
+    console.log(`[Webhook] Client context: ${clientContext ? 'loaded' : 'null (new client)'}`);
 
     // 3. Определяем режим бота: продажи или запись
     const salesMode = isSalesMode(businessContext.businessType);
+    console.log(`[Webhook] Mode: ${salesMode ? 'sales' : 'service'}, type=${businessContext.businessType}`);
 
     // 4. Строим системный промпт
     let systemPrompt: string;
@@ -515,13 +522,15 @@ async function generateAIResponse(
       : `\n\nСегодняшняя дата: ${today}. Используй инструменты для работы с записями.`;
     const systemWithDate = systemPrompt + systemHint;
 
+    console.log(`[Webhook] Calling Claude API for business=${businessId}, salesMode=${salesMode}`);
     let response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
+      model: "claude-sonnet-4-6",
       max_tokens: 1024,
       system: systemWithDate,
       messages: recentMessages,
       tools: activeTools,
     });
+    console.log(`[Webhook] Claude response: stop_reason=${response.stop_reason}`);
 
     // 7. Обрабатываем tool_use в цикле (до 5 итераций)
     let iterations = 0;
@@ -547,6 +556,7 @@ async function generateAIResponse(
 
       for (const block of toolUseBlocks) {
         if (block.type === "tool_use") {
+          console.log(`[Webhook] Tool call: ${block.name}`);
           // Роутим к нужному диспетчеру в зависимости от режима
           const result = salesMode
             ? await executeSalesTool(
@@ -579,7 +589,7 @@ async function generateAIResponse(
       // Вызываем Claude снова с результатами
       try {
         response = await anthropic.messages.create({
-          model: "claude-sonnet-4-5",
+          model: "claude-sonnet-4-6",
           max_tokens: 1024,
           system: systemWithDate,
           messages: recentMessages,
@@ -642,8 +652,10 @@ async function generateAIResponse(
     }
 
     return assistantMessage;
-  } catch (error) {
-    console.error("Error generating AI response:", error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : '';
+    console.error(`[Webhook] generateAIResponse FAILED: ${errMsg}\n${errStack}`);
     return "Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте позже.";
   }
 }
@@ -1201,28 +1213,29 @@ export async function POST(request: NextRequest) {
     await sendTypingAction(botToken, chatId);
 
     // Генерируем ответ AI с учётом памяти
+    console.log(`[Webhook] Generating AI response for business=${business.id}, msg="${userMessage.slice(0, 50)}..."`);
     const aiResponse = await generateAIResponse(
       business.id,
       telegramId,
       userMessage,
       userName
     );
+    console.log(`[Webhook] AI response generated (${aiResponse.length} chars)`);
 
     // Отправляем ответ
     await sendTelegramMessage(botToken, chatId, aiResponse);
 
-    // Увеличиваем счётчик использованных сообщений
-    await incrementMessageUsage(business.id);
-
-    // Обновляем статистику бизнеса
-    await prisma.business.update({
+    // Увеличиваем счётчик использованных сообщений и статистику (не блокируем ответ)
+    incrementMessageUsage(business.id).catch(e => console.error("[Webhook] incrementMessageUsage error:", e));
+    prisma.business.update({
       where: { id: business.id },
       data: { totalConversations: { increment: 1 } },
-    });
+    }).catch(e => console.error("[Webhook] stats update error:", e));
 
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error("Webhook error:", error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error(`[Webhook] TOP-LEVEL ERROR: ${errMsg}`, error);
     // Try to inform the user rather than silently failing
     if (catchBotToken && catchChatId) {
       try {
