@@ -668,12 +668,16 @@ export default function StaffPage() {
               <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
                 Загрузить файл
               </label>
-              <input
-                type="file"
-                accept=".csv,.txt,.xlsx,.xls"
-                onChange={handleImportFileUpload}
-                className={`w-full text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}
-              />
+              <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer font-medium text-sm ${isDark ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}>
+                <Upload className="h-4 w-4" />
+                Выбрать файл
+                <input
+                  type="file"
+                  accept=".csv,.txt,.xlsx,.xls"
+                  onChange={handleImportFileUpload}
+                  className="hidden"
+                />
+              </label>
               {parsingFile && (
                 <div className="flex items-center gap-2 mt-2">
                   <Loader2 className="h-4 w-4 animate-spin text-blue-400" />

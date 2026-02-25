@@ -4,8 +4,6 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 async function getUserBusiness() {
   const session = await auth();
   let userId: string | null = null;
@@ -38,6 +36,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      console.error("ANTHROPIC_API_KEY not configured");
+      return NextResponse.json(
+        { error: "AI сервис не настроен. Проверьте ANTHROPIC_API_KEY." },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json();
     const description: string = body.description?.trim();
 
@@ -47,6 +54,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const anthropic = new Anthropic({ apiKey });
 
     const message = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",

@@ -143,6 +143,18 @@ export default function ProductsPage() {
     fetchProducts();
   };
 
+  const [deletingAll, setDeletingAll] = useState(false);
+  const handleDeleteAll = async () => {
+    if (!confirm(`Удалить все ${products.length} товаров? Это действие нельзя отменить.`)) return;
+    setDeletingAll(true);
+    try {
+      await fetch("/api/products/bulk-delete", { method: "DELETE" });
+      await fetchProducts();
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -231,6 +243,16 @@ export default function ProductsPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            {products.length > 0 && (
+              <button
+                onClick={handleDeleteAll}
+                disabled={deletingAll}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border ${isDark ? "border-red-500/30 text-red-400 hover:bg-red-500/10" : "border-red-300 text-red-600 hover:bg-red-50"} disabled:opacity-50`}
+              >
+                {deletingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Удалить все
+              </button>
+            )}
             <button
               onClick={() => { setIsImportOpen(true); setImportResult(null); setImportCsv(""); }}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border ${isDark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
@@ -591,10 +613,10 @@ export default function ProductsPage() {
                 />
               </div>
 
-              {parsingFile && (
-                <div className={`flex items-center gap-2 p-3 rounded-lg text-sm ${isDark ? "bg-blue-500/10 text-blue-300" : "bg-blue-50 text-blue-700"}`}>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Чтение Excel файла...
+              {(parsingFile || importing) && (
+                <div className={`flex items-center gap-3 p-4 rounded-lg text-sm font-medium ${isDark ? "bg-blue-500/10 text-blue-300 border border-blue-500/20" : "bg-blue-50 text-blue-700 border border-blue-200"}`}>
+                  <Loader2 className="w-5 h-5 animate-spin flex-shrink-0" />
+                  {parsingFile ? "Чтение файла... Пожалуйста, подождите" : "Импорт данных... Пожалуйста, подождите, не закрывайте окно"}
                 </div>
               )}
 

@@ -40,9 +40,9 @@ import { buildSalesSystemPrompt, isSalesMode } from "@/lib/sales-prompt";
 
 function getDefaultWelcome(name?: string | null, lang?: string | null): string {
   const biz = name || "нашу компанию";
-  if (lang === "en") return `Hello! 👋 Welcome to ${biz}!\n\nI'm an AI assistant ready to answer your questions about our services, prices, and help with bookings.\n\nHow can I help you?`;
-  if (lang === "uz") return `Salom! 👋 ${biz}ga xush kelibsiz!\n\nMen AI yordamchiman — xizmatlar, narxlar haqida savollarga javob beraman va yozilishga yordam beraman.\n\nQanday yordam bera olaman?`;
-  return `Здравствуйте! 👋 Добро пожаловать в ${biz}!\n\nЯ AI-помощник и готов ответить на ваши вопросы о наших услугах, ценах и помочь с записью.\n\nЧем могу помочь?`;
+  if (lang === "en") return `Hello! 👋 Welcome to ${biz}!\n\nI'm an AI assistant ready to answer your questions about our services, prices, and help with bookings.\n\nHow can I help you?\n\n💡 /lang — change language`;
+  if (lang === "uz") return `Salom! 👋 ${biz}ga xush kelibsiz!\n\nMen AI yordamchiman — xizmatlar, narxlar haqida savollarga javob beraman va yozilishga yordam beraman.\n\nQanday yordam bera olaman?\n\n💡 /lang — tilni o'zgartirish`;
+  return `Здравствуйте! 👋 Добро пожаловать в ${biz}!\n\nЯ AI-помощник и готов ответить на ваши вопросы о наших услугах, ценах и помочь с записью.\n\nЧем могу помочь?\n\n💡 /lang — сменить язык`;
 }
 
 // ========================================
@@ -854,6 +854,32 @@ async function handleCallbackQuery(
     return;
   }
 
+  // ---- SET LANGUAGE (from /lang command) ----
+  if (data.startsWith("set_lang:")) {
+    const lang = data.replace("set_lang:", "");
+    const langNames: Record<string, string> = { ru: "Русский", en: "English", uz: "O'zbek", kz: "Қазақша" };
+
+    // Save preferred language to client record
+    try {
+      await prisma.client.updateMany({
+        where: { businessId, telegramId },
+        data: { importantNotes: `Preferred language: ${lang}` },
+      });
+    } catch {}
+
+    await answerCallbackQuery(botToken, callbackQuery.id, langNames[lang] || lang);
+    if (messageId) {
+      const confirmMsg: Record<string, string> = {
+        ru: "✅ Язык установлен: Русский. Теперь я буду отвечать на русском!",
+        en: "✅ Language set: English. I'll respond in English from now on!",
+        uz: "✅ Til tanlandi: O'zbek. Endi men o'zbek tilida javob beraman!",
+        kz: "✅ Тіл таңдалды: Қазақша. Енді мен қазақ тілінде жауап беремін!",
+      };
+      await editMessageText(botToken, chatId, messageId, confirmMsg[lang] || confirmMsg.ru);
+    }
+    return;
+  }
+
   // Unknown callback — just acknowledge
   await answerCallbackQuery(botToken, callbackQuery.id);
 }
@@ -1048,6 +1074,31 @@ export async function POST(request: NextRequest) {
         getDefaultWelcome(businessData?.name, businessData?.language);
 
       await sendTelegramMessage(botToken, chatId, welcomeMsg);
+      return NextResponse.json({ ok: true });
+    }
+
+    // Команда /lang — выбор языка клиентом
+    if (userMessage === "/lang") {
+      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: "🌐 Выберите язык / Choose language / Tilni tanlang:",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "🇷🇺 Русский", callback_data: "set_lang:ru" },
+                { text: "🇬🇧 English", callback_data: "set_lang:en" },
+              ],
+              [
+                { text: "🇺🇿 O'zbek", callback_data: "set_lang:uz" },
+                { text: "🇰🇿 Қазақша", callback_data: "set_lang:kz" },
+              ],
+            ],
+          },
+        }),
+      });
       return NextResponse.json({ ok: true });
     }
 

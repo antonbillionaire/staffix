@@ -134,9 +134,12 @@ export async function buildClientContext(
       totalMessages: client.totalMessages,
       lastVisitDate: client.lastVisitDate,
       tags: client.tags,
-      loyaltyPoints: client.loyaltyPoints,
-      loyaltyVisits: client.loyaltyVisits,
-      loyaltyTotalSpent: client.loyaltyTotalSpent,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      loyaltyPoints: (client as any).loyaltyPoints ?? 0,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      loyaltyVisits: (client as any).loyaltyVisits ?? 0,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      loyaltyTotalSpent: (client as any).loyaltyTotalSpent ?? 0,
       recentBookings: recentBookings.map((b) => ({
         date: b.date,
         serviceName: b.service?.name || null,
@@ -163,28 +166,50 @@ export async function buildBusinessContext(
   businessId: string
 ): Promise<BusinessContext | null> {
   try {
-    const business = await prisma.business.findUnique({
-      where: { id: businessId },
-      include: {
-        services: { select: { name: true, price: true, duration: true } },
-        staff: { select: { name: true, role: true } },
-        faqs: { select: { question: true, answer: true } },
-        documents: {
-          where: { parsed: true },
-          select: { name: true, extractedText: true }
+    // Try with loyaltyProgram, fallback without if table doesn't exist yet
+    let business;
+    try {
+      business = await prisma.business.findUnique({
+        where: { id: businessId },
+        include: {
+          services: { select: { name: true, price: true, duration: true } },
+          staff: { select: { name: true, role: true } },
+          faqs: { select: { question: true, answer: true } },
+          documents: {
+            where: { parsed: true },
+            select: { name: true, extractedText: true }
+          },
+          loyaltyProgram: {
+            select: { enabled: true, type: true, cashbackPercent: true, visitsForReward: true, rewardType: true, rewardDiscount: true }
+          },
         },
-        loyaltyProgram: {
-          select: { enabled: true, type: true, cashbackPercent: true, visitsForReward: true, rewardType: true, rewardDiscount: true }
+      });
+    } catch {
+      // Fallback: loyaltyProgram table may not exist yet
+      console.log("buildBusinessContext: loyaltyProgram query failed, retrying without it");
+      business = await prisma.business.findUnique({
+        where: { id: businessId },
+        include: {
+          services: { select: { name: true, price: true, duration: true } },
+          staff: { select: { name: true, role: true } },
+          faqs: { select: { question: true, answer: true } },
+          documents: {
+            where: { parsed: true },
+            select: { name: true, extractedText: true }
+          },
         },
-      },
-    });
+      });
+    }
 
     if (!business) return null;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const biz = business as any;
 
     return {
       name: business.name,
       businessType: business.businessType,
-      businessTypes: business.businessTypes || [],
+      businessTypes: biz.businessTypes || [],
       industryCategory: business.industryCategory,
       language: business.language || "ru",
       phone: business.phone,
@@ -193,23 +218,23 @@ export async function buildBusinessContext(
       welcomeMessage: business.welcomeMessage,
       aiTone: business.aiTone,
       aiRules: business.aiRules,
-      deliveryEnabled: business.deliveryEnabled,
-      deliveryTimeFrom: business.deliveryTimeFrom,
-      deliveryTimeTo: business.deliveryTimeTo,
-      deliveryFee: business.deliveryFee,
-      deliveryFreeFrom: business.deliveryFreeFrom,
-      deliveryZones: business.deliveryZones,
+      deliveryEnabled: biz.deliveryEnabled ?? false,
+      deliveryTimeFrom: biz.deliveryTimeFrom ?? null,
+      deliveryTimeTo: biz.deliveryTimeTo ?? null,
+      deliveryFee: biz.deliveryFee ?? null,
+      deliveryFreeFrom: biz.deliveryFreeFrom ?? null,
+      deliveryZones: biz.deliveryZones ?? null,
       services: business.services,
       staff: business.staff,
       faqs: business.faqs,
       documents: business.documents,
-      loyalty: business.loyaltyProgram ? {
-        enabled: business.loyaltyProgram.enabled,
-        type: business.loyaltyProgram.type,
-        cashbackPercent: business.loyaltyProgram.cashbackPercent,
-        visitsForReward: business.loyaltyProgram.visitsForReward,
-        rewardType: business.loyaltyProgram.rewardType,
-        rewardDiscount: business.loyaltyProgram.rewardDiscount,
+      loyalty: biz.loyaltyProgram ? {
+        enabled: biz.loyaltyProgram.enabled,
+        type: biz.loyaltyProgram.type,
+        cashbackPercent: biz.loyaltyProgram.cashbackPercent,
+        visitsForReward: biz.loyaltyProgram.visitsForReward,
+        rewardType: biz.loyaltyProgram.rewardType,
+        rewardDiscount: biz.loyaltyProgram.rewardDiscount,
       } : null,
     };
   } catch (error) {

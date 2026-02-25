@@ -321,7 +321,7 @@ export default function FAQPage() {
               ref={fileInputRef}
               onChange={handleFileUpload}
               multiple
-              accept=".pdf,.doc,.docx,.txt"
+              accept=".pdf,.doc,.docx,.txt,.xlsx,.xls"
               className="hidden"
             />
             <button
