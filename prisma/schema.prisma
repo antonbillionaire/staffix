@@ -961,6 +961,7 @@ model SalesLead {
   telegramUsername   String?
   telegramChatId    BigInt?   @unique
   instagramId       String?   @unique
+  fbPsid            String?   @unique
   whatsappPhone     String?   @unique
 
   // Профиль

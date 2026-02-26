@@ -117,7 +117,9 @@ async function getOrCreateLead(
   name?: string,
   phone?: string
 ) {
-  const channelField = channel === "whatsapp" ? "whatsappPhone" : "instagramId";
+  const channelField =
+    channel === "whatsapp" ? "whatsappPhone" :
+    channel === "facebook" ? "fbPsid" : "instagramId";
 
   let lead = await prisma.salesLead.findFirst({
     where: { [channelField]: channelId },

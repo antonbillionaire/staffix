@@ -94,9 +94,9 @@ async function processStaffixFBMessage(msg: {
   pageId: string;
   text: string;
 }) {
-  const accessToken = process.env.STAFFIX_FB_PAGE_ACCESS_TOKEN;
+  const accessToken = process.env.STAFFIX_FB_PAGE_ACCESS_TOKEN || process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
   if (!accessToken) {
-    console.error("Staffix FB: missing STAFFIX_FB_PAGE_ACCESS_TOKEN");
+    console.error("Staffix FB: missing STAFFIX_FB_PAGE_ACCESS_TOKEN and FACEBOOK_PAGE_ACCESS_TOKEN");
     return;
   }
 
