@@ -122,6 +122,9 @@ export async function POST(request: NextRequest) {
 
         if (!senderId || !messageText) continue;
 
+        // Skip echo messages (bot's own responses sent back by Meta)
+        if (messaging.message.is_echo) continue;
+
         await upsertLead(senderId, "instagram_dm");
 
         // UX: mark as seen immediately, then show typing while generating
