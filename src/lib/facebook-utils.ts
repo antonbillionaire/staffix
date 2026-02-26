@@ -3,7 +3,7 @@
  * Docs: https://developers.facebook.com/docs/messenger-platform
  */
 
-const FB_API_VERSION = "v19.0";
+const FB_API_VERSION = "v21.0";
 const FB_API_BASE = `https://graph.facebook.com/${FB_API_VERSION}`;
 
 /**
@@ -68,33 +68,46 @@ export interface FBIncomingMessage {
   messageId: string;   // FB message ID
 }
 
-export function parseFBWebhook(body: Record<string, unknown>): FBIncomingMessage | null {
+/**
+ * Parse ALL incoming messages from a Facebook Messenger webhook payload.
+ * Returns array of messages (Meta can batch multiple entries/messaging events).
+ */
+export function parseFBWebhookAll(body: Record<string, unknown>): FBIncomingMessage[] {
+  const results: FBIncomingMessage[] = [];
   try {
-    if (body.object !== "page") return null;
+    if (body.object !== "page") return results;
 
-    const entry = (body.entry as Array<Record<string, unknown>>)?.[0];
-    const messaging = (entry?.messaging as Array<Record<string, unknown>>)?.[0];
+    for (const entry of (body.entry as Array<Record<string, unknown>>) || []) {
+      for (const messaging of (entry.messaging as Array<Record<string, unknown>>) || []) {
+        const sender = messaging.sender as Record<string, string>;
+        const recipient = messaging.recipient as Record<string, string>;
+        const message = messaging.message as Record<string, unknown>;
 
-    if (!messaging) return null;
+        // Skip echo messages (bot's own messages)
+        if (message?.is_echo) continue;
+        // Skip postbacks and other non-text events
+        if (!message?.text) continue;
 
-    const sender = messaging.sender as Record<string, string>;
-    const recipient = messaging.recipient as Record<string, string>;
-    const message = messaging.message as Record<string, unknown>;
-
-    // Skip echo messages (bot's own messages)
-    if (message?.is_echo) return null;
-    // Skip postbacks and other non-text events
-    if (!message?.text) return null;
-
-    return {
-      senderId: sender?.id,
-      pageId: recipient?.id,
-      text: String(message.text),
-      messageId: String(message.mid || ""),
-    };
-  } catch {
-    return null;
+        results.push({
+          senderId: sender?.id,
+          pageId: recipient?.id,
+          text: String(message.text),
+          messageId: String(message.mid || ""),
+        });
+      }
+    }
+  } catch (e) {
+    console.error("parseFBWebhookAll error:", e);
   }
+  return results;
+}
+
+/**
+ * Parse incoming Facebook Messenger webhook payload (legacy — returns first message only)
+ */
+export function parseFBWebhook(body: Record<string, unknown>): FBIncomingMessage | null {
+  const all = parseFBWebhookAll(body);
+  return all.length > 0 ? all[0] : null;
 }
 
 function splitMessage(text: string, maxLen: number): string[] {

@@ -17,9 +17,18 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { parseFBWebhook, sendFBMessage, sendFBTyping } from "@/lib/facebook-utils";
+import { parseFBWebhookAll, sendFBMessage, sendFBTyping } from "@/lib/facebook-utils";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
 import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
+
+// Deduplication: track recently processed FB message IDs (Meta retries if response is slow)
+const processedFBMessages = new Set<string>();
+function markFBProcessed(id: string): boolean {
+  if (!id || processedFBMessages.has(id)) return false;
+  processedFBMessages.add(id);
+  setTimeout(() => processedFBMessages.delete(id), 60_000);
+  return true;
+}
 
 // ─── GET: Webhook verification ───────────────────────────────────────────────
 export async function GET(request: Request) {
@@ -70,19 +79,26 @@ export async function POST(request: Request) {
     return respond200();
   }
 
-  const msg = parseFBWebhook(body);
-  if (!msg || !msg.text.trim()) return respond200();
+  const messages = parseFBWebhookAll(body);
+  if (messages.length === 0) return respond200();
 
-  if (businessId) {
-    // Scenario B: user's business
-    processBusinessFBMessage(businessId, msg).catch((e) =>
-      console.error("FB business error:", e)
-    );
-  } else {
-    // Scenario A: Staffix sales
-    processStaffixFBMessage(msg).catch((e) =>
-      console.error("FB sales error:", e)
-    );
+  for (const msg of messages) {
+    if (!msg.text.trim()) continue;
+
+    // Skip duplicate webhook deliveries (Meta retries if response >5s)
+    if (!markFBProcessed(msg.messageId)) continue;
+
+    if (businessId) {
+      // Scenario B: user's business
+      processBusinessFBMessage(businessId, msg).catch((e) =>
+        console.error("FB business error:", e)
+      );
+    } else {
+      // Scenario A: Staffix sales
+      processStaffixFBMessage(msg).catch((e) =>
+        console.error("FB sales error:", e)
+      );
+    }
   }
 
   return respond200();
