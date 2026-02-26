@@ -183,7 +183,7 @@ export async function sendWhatsAppMessage(
   recipientPhone: string,
   text: string
 ): Promise<boolean> {
-  const phoneNumberId = process.env.WHATSAPP_BUSINESS_PHONE_ID;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
 
   if (!phoneNumberId || !accessToken) {
@@ -225,7 +225,7 @@ export async function sendWhatsAppMessage(
  * Mark WhatsApp message as read
  */
 export async function markWhatsAppRead(messageId: string): Promise<void> {
-  const phoneNumberId = process.env.WHATSAPP_BUSINESS_PHONE_ID;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
   if (!phoneNumberId || !accessToken) return;
 
