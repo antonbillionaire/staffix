@@ -16,6 +16,15 @@ const conversationHistory: Map<
   Array<{ role: "user" | "assistant"; content: string }>
 > = new Map();
 
+// Deduplication: track recently processed message IDs (Meta retries if response is slow)
+const processedMessages = new Set<string>();
+function markProcessed(id: string): boolean {
+  if (processedMessages.has(id)) return false; // already seen
+  processedMessages.add(id);
+  setTimeout(() => processedMessages.delete(id), 60_000); // cleanup after 1 min
+  return true; // first time
+}
+
 // Generate AI response for any Instagram interaction
 async function generateAIResponse(
   userMessage: string,
@@ -119,11 +128,15 @@ export async function POST(request: NextRequest) {
       for (const messaging of entry.messaging || []) {
         const senderId = messaging.sender?.id;
         const messageText = messaging.message?.text;
+        const messageId = messaging.message?.mid;
 
         if (!senderId || !messageText) continue;
 
         // Skip echo messages (bot's own responses sent back by Meta)
         if (messaging.message.is_echo) continue;
+
+        // Skip duplicate webhook deliveries (Meta retries if response >5s)
+        if (messageId && !markProcessed(messageId)) continue;
 
         await upsertLead(senderId, "instagram_dm");
 
@@ -162,6 +175,9 @@ export async function POST(request: NextRequest) {
 
         // Skip replies to our own comments (prevent loops)
         if (value.parent_id) continue;
+
+        // Skip duplicate webhook deliveries
+        if (!markProcessed(commentId)) continue;
 
         const contextLabel = isAdComment
           ? `Instagram Ad Comment (ad: ${value.ad_title || value.ad_id})`
