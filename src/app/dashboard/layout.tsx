@@ -34,6 +34,7 @@ import {
   Lock,
   UserCircle,
   Send,
+  ArrowLeftRight,
   MessageSquare,
   Globe,
   ChevronDown,
@@ -278,6 +279,23 @@ export default function DashboardLayout({
     await signOut({ callbackUrl: "/" });
   };
 
+  const [switchingMode, setSwitchingMode] = useState(false);
+  const handleSwitchMode = async () => {
+    const newMode = isSales ? "service" : "sales";
+    setSwitchingMode(true);
+    try {
+      const res = await fetch("/api/business/dashboard-mode", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: newMode }),
+      });
+      if (res.ok) {
+        setDashboardMode(newMode);
+      }
+    } catch {}
+    finally { setSwitchingMode(false); }
+  };
+
   const currentLang = languages.find(l => l.id === language) || languages[0];
 
   // Find current page name for topbar
@@ -334,11 +352,33 @@ export default function DashboardLayout({
           </button>
         </div>
 
-        {/* Business name */}
+        {/* Business name + mode toggle */}
         {businessName && (
           <div className={`px-5 py-4 border-b ${borderColor} flex-shrink-0`}>
             <p className={`text-xs ${textMuted} uppercase tracking-wider`}>{t("sidebar.yourBusiness")}</p>
             <p className={`text-sm font-medium ${textPrimary} truncate mt-1`}>{businessName}</p>
+            <button
+              onClick={handleSwitchMode}
+              disabled={switchingMode}
+              className={`mt-2 flex items-center gap-2 w-full px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                isDark
+                  ? "bg-white/5 hover:bg-white/10 text-gray-400 hover:text-gray-200"
+                  : "bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700"
+              } ${switchingMode ? "opacity-50 cursor-wait" : ""}`}
+              title={isSales ? "Переключить на сервисный режим" : "Переключить на режим продаж"}
+            >
+              <ArrowLeftRight className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="truncate">
+                {isSales ? "Режим: Продажи" : "Режим: Услуги"}
+              </span>
+              <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded ${
+                isSales
+                  ? "bg-purple-500/20 text-purple-400"
+                  : "bg-blue-500/20 text-blue-400"
+              }`}>
+                {isSales ? "Shop" : "Service"}
+              </span>
+            </button>
           </div>
         )}
 
