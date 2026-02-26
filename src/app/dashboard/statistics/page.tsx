@@ -226,7 +226,9 @@ export default function StatisticsPage() {
               <Clock className="h-6 w-6 text-yellow-500" />
             </div>
           </div>
-          <p className={`text-3xl font-bold ${textPrimary} mt-4`}>{stats.avgResponseTime}с</p>
+          <p className={`text-3xl font-bold ${textPrimary} mt-4`}>
+            {stats.avgResponseTime <= 1 ? "<1с" : `${stats.avgResponseTime}с`}
+          </p>
           <p className={textSecondary}>Среднее время ответа</p>
         </div>
       </div>

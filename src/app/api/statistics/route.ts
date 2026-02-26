@@ -101,11 +101,24 @@ export async function GET(request: NextRequest) {
       messagesByDayMap.set(dateStr, (messagesByDayMap.get(dateStr) || 0) + 1);
     });
 
-    // Show appropriate number of days based on period
+    // Show appropriate number of days based on period, zero-fill missing days
     const maxDays = period === "week" ? 7 : period === "month" ? 30 : 90;
-    const messagesByDay = Array.from(messagesByDayMap.entries())
-      .map(([date, count]) => ({ date, count }))
-      .slice(-maxDays);
+    const messagesByDay: { date: string; count: number }[] = [];
+    if (period !== "all") {
+      // Fill all days in the range with 0s, then overlay actual data
+      for (let i = maxDays - 1; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split("T")[0];
+        messagesByDay.push({ date: dateStr, count: messagesByDayMap.get(dateStr) || 0 });
+      }
+    } else {
+      // "All time" — just show days that have data
+      const entries = Array.from(messagesByDayMap.entries())
+        .map(([date, count]) => ({ date, count }))
+        .slice(-maxDays);
+      messagesByDay.push(...entries);
+    }
 
     // Get popular questions (messages from users)
     const userMessages = await prisma.message.findMany({

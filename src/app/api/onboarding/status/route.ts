@@ -25,6 +25,7 @@ async function getUserBusiness() {
       id: true,
       botToken: true,
       aiRules: true,
+      businessType: true,
       _count: {
         select: {
           services: true,
@@ -52,6 +53,7 @@ export async function GET() {
       hasStaff: business._count.staff > 0,
       hasKnowledge: business._count.faqs + business._count.documents > 0,
       hasPrompt: !!business.aiRules && business.aiRules.trim().length > 10,
+      businessType: business.businessType || null,
     });
   } catch (error) {
     console.error("GET /api/onboarding/status:", error);

@@ -45,6 +45,7 @@ interface StatsData {
     products: boolean;
     knowledge: boolean;
   };
+  businessType: string | null;
 }
 
 interface BizData {
@@ -131,6 +132,16 @@ export default function DashboardPage() {
     { id: "all", key: "dashboard.all" },
   ];
 
+  // Detect sales vs service business
+  const isSales = (() => {
+    const bt = statsData?.businessType?.toLowerCase();
+    if (!bt) return false;
+    const salesIds = ["online_shop", "flowers", "restaurant", "delivery", "other_sales"];
+    if (salesIds.includes(bt)) return true;
+    const salesKeywords = ["shop", "store", "retail", "магазин", "цветоч", "ресторан", "кафе", "доставк"];
+    return salesKeywords.some(kw => bt.includes(kw));
+  })();
+
   const readinessItems = [
     {
       key: "telegram",
@@ -146,20 +157,23 @@ export default function DashboardPage() {
       icon: Users,
       done: statsData?.readiness.team,
     },
-    {
-      key: "services",
-      label: t("nav.myServices"),
-      href: "/dashboard/services",
-      icon: Scissors,
-      done: statsData?.readiness.services,
-    },
-    {
-      key: "products",
-      label: t("nav.myProducts"),
-      href: "/dashboard/products",
-      icon: Package,
-      done: statsData?.readiness.products,
-    },
+    // Show services OR products depending on business type
+    ...(isSales
+      ? [{
+          key: "products",
+          label: t("nav.myProducts"),
+          href: "/dashboard/products",
+          icon: Package,
+          done: statsData?.readiness.products,
+        }]
+      : [{
+          key: "services",
+          label: t("nav.myServices"),
+          href: "/dashboard/services",
+          icon: Scissors,
+          done: statsData?.readiness.services,
+        }]
+    ),
     {
       key: "knowledge",
       label: t("nav.knowledge"),

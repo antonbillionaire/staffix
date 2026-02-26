@@ -612,7 +612,7 @@ export default function DashboardLayout({
                           >
                             <div className="flex items-start gap-2">
                               <span className="text-sm mt-0.5">
-                                {notif.type === "new_booking" ? "📅" : notif.type === "cancellation" ? "❌" : "🔄"}
+                                {notif.type === "new_order" ? "🛒" : notif.type === "new_booking" ? "📅" : notif.type === "cancellation" ? "❌" : "🔄"}
                               </span>
                               <div className="flex-1 min-w-0">
                                 <p className={`text-sm font-medium ${textPrimary} truncate`}>{notif.title}</p>

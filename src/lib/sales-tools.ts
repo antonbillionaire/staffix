@@ -673,11 +673,11 @@ async function notifyNewOrder(
       .join("\n");
 
     const message =
-      `🛒 *Новый заказ #${order.orderNumber}*\n\n` +
+      `🛒 <b>Новый заказ #${order.orderNumber}</b>\n\n` +
       `👤 ${order.clientName}${order.clientPhone ? ` | ${order.clientPhone}` : ""}\n` +
       (order.clientAddress ? `📍 ${order.clientAddress}\n` : "") +
-      `\n📦 *Состав заказа:*\n${itemsList}\n\n` +
-      `💰 *Итого: ${order.totalPrice.toLocaleString("ru-RU")}*\n\n` +
+      `\n📦 <b>Состав заказа:</b>\n${itemsList}\n\n` +
+      `💰 <b>Итого: ${order.totalPrice.toLocaleString("ru-RU")}</b>\n\n` +
       `🔗 Управление: staffix.io/dashboard/orders`;
 
     // Уведомление владельцу
@@ -691,7 +691,7 @@ async function notifyNewOrder(
           body: JSON.stringify({
             chat_id: business.ownerTelegramChatId.toString(),
             text: message,
-            parse_mode: "Markdown",
+            parse_mode: "HTML",
           }),
         }
       );
@@ -702,12 +702,13 @@ async function notifyNewOrder(
       console.log(`[Notify] No ownerTelegramChatId for business ${businessId} — owner needs to /start the bot`);
     }
 
-    // Уведомляем сотрудников (кроме мастеров — они получают только записи)
+    // Уведомляем сотрудников (admin/manager с включёнными уведомлениями)
     const staffMembers = await prisma.staff.findMany({
       where: {
         businessId,
         telegramChatId: { not: null },
-        NOT: { role: "master" },
+        notificationsEnabled: true,
+        role: { in: ["admin", "manager"] },
       },
       select: { telegramChatId: true, name: true },
     });
@@ -722,7 +723,7 @@ async function notifyNewOrder(
             body: JSON.stringify({
               chat_id: staff.telegramChatId.toString(),
               text: message,
-              parse_mode: "Markdown",
+              parse_mode: "HTML",
             }),
           }
         ).catch((e) => console.error(`[Notify] Staff notify error:`, e));
@@ -762,7 +763,7 @@ async function notifyNewOrder(
     await prisma.notification.create({
       data: {
         businessId,
-        type: "new_booking",
+        type: "new_order",
         title: `Новый заказ #${order.orderNumber}`,
         message: `${order.clientName} — ${items.map((i) => i.name).join(", ")} — ${order.totalPrice.toLocaleString("ru-RU")}`,
         metadata: { orderId: order.id, orderNumber: order.orderNumber },

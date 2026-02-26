@@ -13,6 +13,7 @@ import {
   Users,
   BookOpen,
   Brain,
+  Package,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -22,55 +23,67 @@ interface OnboardingStatus {
   hasStaff: boolean;
   hasKnowledge: boolean;
   hasPrompt: boolean;
+  businessType: string | null;
 }
 
-const STEPS = [
-  {
-    id: "bot",
-    title: "Telegram бот",
-    desc: "Подключите бота",
-    href: "/dashboard/bot",
-    key: "botConnected" as keyof OnboardingStatus,
-    icon: MessageSquare,
-    color: "blue",
-  },
-  {
-    id: "catalog",
-    title: "Услуги / товары",
-    desc: "Импортируйте или добавьте вручную",
-    href: "/dashboard/services",
-    key: "hasCatalog" as keyof OnboardingStatus,
-    icon: Scissors,
-    color: "purple",
-  },
-  {
-    id: "staff",
-    title: "Команда",
-    desc: "Добавьте сотрудников",
-    href: "/dashboard/staff",
-    key: "hasStaff" as keyof OnboardingStatus,
-    icon: Users,
-    color: "pink",
-  },
-  {
-    id: "knowledge",
-    title: "База знаний",
-    desc: "FAQ, доп. документы, условия",
-    href: "/dashboard/faq",
-    key: "hasKnowledge" as keyof OnboardingStatus,
-    icon: BookOpen,
-    color: "orange",
-  },
-  {
-    id: "prompt",
-    title: "AI-сотрудник",
-    desc: "Настройте промпт",
-    href: "/dashboard/bot",
-    key: "hasPrompt" as keyof OnboardingStatus,
-    icon: Brain,
-    color: "green",
-  },
-];
+function isSalesType(businessType: string | null): boolean {
+  if (!businessType) return false;
+  const bt = businessType.toLowerCase();
+  const salesIds = ["online_shop", "flowers", "restaurant", "delivery", "other_sales"];
+  if (salesIds.includes(bt)) return true;
+  const salesKeywords = ["shop", "store", "retail", "магазин", "цветоч", "ресторан", "кафе", "доставк"];
+  return salesKeywords.some(kw => bt.includes(kw));
+}
+
+function getSteps(isSales: boolean) {
+  return [
+    {
+      id: "bot",
+      title: "Telegram бот",
+      desc: "Подключите бота",
+      href: "/dashboard/bot",
+      key: "botConnected" as keyof OnboardingStatus,
+      icon: MessageSquare,
+      color: "blue",
+    },
+    {
+      id: "catalog",
+      title: isSales ? "Товары" : "Услуги",
+      desc: isSales ? "Импортируйте каталог товаров" : "Добавьте услуги и цены",
+      href: isSales ? "/dashboard/products" : "/dashboard/services",
+      key: "hasCatalog" as keyof OnboardingStatus,
+      icon: isSales ? Package : Scissors,
+      color: "purple",
+    },
+    {
+      id: "staff",
+      title: "Команда",
+      desc: "Добавьте сотрудников",
+      href: "/dashboard/staff",
+      key: "hasStaff" as keyof OnboardingStatus,
+      icon: Users,
+      color: "pink",
+    },
+    {
+      id: "knowledge",
+      title: "База знаний",
+      desc: "FAQ, доп. документы, условия",
+      href: "/dashboard/faq",
+      key: "hasKnowledge" as keyof OnboardingStatus,
+      icon: BookOpen,
+      color: "orange",
+    },
+    {
+      id: "prompt",
+      title: "AI-сотрудник",
+      desc: "Настройте промпт",
+      href: "/dashboard/bot",
+      key: "hasPrompt" as keyof OnboardingStatus,
+      icon: Brain,
+      color: "green",
+    },
+  ];
+}
 
 export default function OnboardingWizard() {
   const { theme } = useTheme();
@@ -116,6 +129,8 @@ export default function OnboardingWizard() {
 
   if (loading || dismissed || !status) return null;
 
+  const isSales = isSalesType(status.businessType);
+  const STEPS = getSteps(isSales);
   const completedCount = STEPS.filter((s) => status[s.key]).length;
   const allDone = completedCount === STEPS.length;
   const progress = Math.round((completedCount / STEPS.length) * 100);
