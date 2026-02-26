@@ -133,6 +133,15 @@ model Business {
   fbVerifyToken     String?   // Random secret для верификации webhook
   fbActive          Boolean   @default(false)
 
+  // Instagram (via connected Facebook Page)
+  igBusinessAccountId  String?   // Instagram Business Account ID
+  igUsername           String?   // @username для отображения
+  igActive             Boolean   @default(false)
+
+  // Meta OAuth (shared for FB + IG, managed by Facebook Login flow)
+  metaUserAccessToken  String?   // Long-lived User Access Token (60 дней)
+  metaTokenExpiresAt   DateTime? // Когда истекает
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -179,6 +188,10 @@ model Business {
 
   // Зоны доставки
   deliveryZonesRel   DeliveryZone[]
+
+  @@index([fbPageId])
+  @@index([igBusinessAccountId])
+  @@index([waPhoneNumberId])
 }
 
 // Зоны доставки

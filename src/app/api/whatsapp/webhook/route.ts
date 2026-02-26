@@ -1,15 +1,28 @@
 /**
- * Per-business WhatsApp webhook (Scenario B)
- * Each Staffix user registers their own WhatsApp number here.
+ * WhatsApp webhook — handles ALL scenarios via single URL:
+ *
+ * Routing (automatic via Phone Number ID lookup):
+ *   1. Incoming message → extract phoneNumberId from event metadata
+ *   2. Look up Business by waPhoneNumberId → if found, route to business AI
+ *   3. Legacy: ?businessId=xxx still supported for backwards compatibility
  *
  * Meta Developers → WhatsApp → Configuration → Webhook URL:
- * https://staffix.io/api/whatsapp/webhook?businessId=BUSINESS_ID
+ *   https://staffix.io/api/whatsapp/webhook
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { parseWAWebhook, sendWAMessage, markWAMessageRead } from "@/lib/whatsapp-utils";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
+
+// Deduplication: track recently processed WA message IDs (Meta retries if response is slow)
+const processedWAMessages = new Set<string>();
+function markWAProcessed(id: string): boolean {
+  if (!id || processedWAMessages.has(id)) return false;
+  processedWAMessages.add(id);
+  setTimeout(() => processedWAMessages.delete(id), 60_000);
+  return true;
+}
 
 // ─── GET: Webhook verification from Meta ────────────────────────────────────
 export async function GET(request: Request) {
@@ -20,41 +33,40 @@ export async function GET(request: Request) {
   const challenge = searchParams.get("hub.challenge");
   const businessId = searchParams.get("businessId");
 
-  if (!mode || !token || !challenge || !businessId) {
+  if (mode !== "subscribe" || !challenge) {
     return new Response("Bad Request", { status: 400 });
   }
 
-  if (mode !== "subscribe") {
+  // Legacy: per-business verification via ?businessId=xxx
+  if (businessId) {
+    try {
+      const business = await prisma.business.findUnique({
+        where: { id: businessId },
+        select: { waVerifyToken: true },
+      });
+      if (business?.waVerifyToken && business.waVerifyToken === token) {
+        return new Response(challenge, { status: 200 });
+      }
+    } catch {}
     return new Response("Forbidden", { status: 403 });
   }
 
-  try {
-    const business = await prisma.business.findUnique({
-      where: { id: businessId },
-      select: { waVerifyToken: true },
-    });
-
-    if (!business?.waVerifyToken || business.waVerifyToken !== token) {
-      return new Response("Forbidden", { status: 403 });
-    }
-
-    // Return challenge to confirm webhook
+  // App-level verify token (for auto-configured webhooks)
+  const expected =
+    process.env.META_WEBHOOK_VERIFY_TOKEN ||
+    process.env.STAFFIX_WA_VERIFY_TOKEN;
+  if (expected && token === expected) {
     return new Response(challenge, { status: 200 });
-  } catch (e) {
-    console.error("WA webhook verify error:", e);
-    return new Response("Internal Server Error", { status: 500 });
   }
+
+  return new Response("Forbidden", { status: 403 });
 }
 
 // ─── POST: Incoming message from WhatsApp ────────────────────────────────────
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
   const businessId = searchParams.get("businessId");
-
-  // Always return 200 immediately to Meta (prevent retries)
   const respond200 = () => NextResponse.json({ success: true }, { status: 200 });
-
-  if (!businessId) return respond200();
 
   let body: Record<string, unknown>;
   try {
@@ -67,10 +79,28 @@ export async function POST(request: Request) {
   const msg = parseWAWebhook(body);
   if (!msg || !msg.text.trim()) return respond200();
 
-  // Process in background (don't await — must return 200 fast)
-  processWAMessage(businessId, msg).catch((e) =>
-    console.error("WA process error:", e)
-  );
+  // Skip duplicate webhook deliveries
+  if (!markWAProcessed(msg.messageId)) return respond200();
+
+  // Process BEFORE returning 200 — Vercel kills serverless functions after response
+  try {
+    if (businessId) {
+      // Legacy: explicit businessId in URL
+      await processWAMessage(businessId, msg);
+    } else {
+      // Auto-route: look up business by phone number ID from event metadata
+      const business = await prisma.business.findFirst({
+        where: { waPhoneNumberId: msg.phoneNumberId, waActive: true },
+        select: { id: true },
+      });
+      if (business) {
+        await processWAMessage(business.id, msg);
+      }
+      // No fallback sales bot for WhatsApp (no Staffix WA number yet)
+    }
+  } catch (e) {
+    console.error("WA message processing error:", e);
+  }
 
   return respond200();
 }

@@ -1,18 +1,15 @@
 /**
- * Facebook Messenger webhook — handles BOTH scenarios:
+ * Facebook Messenger webhook — handles ALL scenarios via single URL:
  *
- * Scenario A (Staffix Sales Bot):
- *   Messages to Staffix's own FB Page → AI explains Staffix product
- *   ENV: STAFFIX_FB_PAGE_ID, STAFFIX_FB_PAGE_ACCESS_TOKEN, STAFFIX_FB_VERIFY_TOKEN
+ * Routing (automatic via Page ID lookup):
+ *   1. Incoming message → extract pageId from event
+ *   2. Look up Business by fbPageId → if found, route to business AI
+ *   3. No match → Staffix sales bot responds
  *
- * Scenario B (Per-business FB Messenger):
- *   Messages to user's FB Page → business AI bot responds
- *   URL: /api/facebook/webhook?businessId=xxx
- *   DB: business.fbPageId, business.fbPageAccessToken, business.fbVerifyToken
+ * Legacy: ?businessId=xxx still supported for backwards compatibility.
  *
  * Meta Developers → Messenger → Webhooks → Callback URL:
- *   https://staffix.io/api/facebook/webhook          (Scenario A — Staffix page)
- *   https://staffix.io/api/facebook/webhook?businessId=xxx  (Scenario B — user's page)
+ *   https://staffix.io/api/facebook/webhook
  */
 
 import { NextResponse } from "next/server";
@@ -93,9 +90,19 @@ export async function POST(request: Request) {
 
     try {
       if (businessId) {
+        // Legacy: explicit businessId in URL
         await processBusinessFBMessage(businessId, msg);
       } else {
-        await processStaffixFBMessage(msg);
+        // Auto-route: look up business by page ID from incoming event
+        const business = await prisma.business.findFirst({
+          where: { fbPageId: msg.pageId, fbActive: true },
+          select: { id: true },
+        });
+        if (business) {
+          await processBusinessFBMessage(business.id, msg);
+        } else {
+          await processStaffixFBMessage(msg);
+        }
       }
     } catch (e) {
       console.error("FB message processing error:", e);

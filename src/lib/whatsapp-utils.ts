@@ -3,7 +3,7 @@
  * Docs: https://developers.facebook.com/docs/whatsapp/cloud-api
  */
 
-const WA_API_VERSION = "v19.0";
+const WA_API_VERSION = "v21.0";
 const WA_API_BASE = `https://graph.facebook.com/${WA_API_VERSION}`;
 
 /**

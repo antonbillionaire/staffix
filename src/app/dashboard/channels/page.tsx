@@ -2,22 +2,20 @@
 
 import { useState, useEffect } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useSearchParams } from "next/navigation";
 import {
   MessageSquare,
-  Phone,
   Instagram,
   CheckCircle2,
   XCircle,
-  AlertCircle,
   Loader2,
-  ExternalLink,
   Settings,
-  RefreshCw,
   Zap,
   Users,
   TrendingUp,
-  Copy,
-  Check,
+  AlertTriangle,
+  Unlink,
+  Facebook,
 } from "lucide-react";
 
 // Telegram icon (custom)
@@ -41,21 +39,20 @@ interface ChannelStatus {
   details?: {
     username?: string;
     phoneNumber?: string;
-    lastActivity?: string;
+    phoneNumberId?: string;
+    pageId?: string;
   };
-  stats?: {
-    totalMessages: number;
-    totalClients: number;
-    leadsToday: number;
-  };
+  tokenWarning?: boolean;
 }
 
 export default function ChannelsPage() {
   const { theme } = useTheme();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [channels, setChannels] = useState<ChannelStatus[]>([]);
-  const [webhookUrl, setWebhookUrl] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Theme-aware styles
   const isDark = theme === "dark";
@@ -66,8 +63,50 @@ export default function ChannelsPage() {
   const textMuted = isDark ? "text-gray-500" : "text-gray-400";
 
   useEffect(() => {
+    // Handle OAuth callback params
+    const metaConnected = searchParams.get("meta_connected");
+    const metaError = searchParams.get("meta_error");
+
+    if (metaConnected) {
+      const channelNames = metaConnected
+        .split(",")
+        .map((c) =>
+          c === "instagram" ? "Instagram" : c === "facebook" ? "Facebook Messenger" : c
+        )
+        .join(" и ");
+      setSuccessMessage(`${channelNames} успешно подключены!`);
+      // Clean URL params
+      window.history.replaceState({}, "", "/dashboard/channels");
+    }
+    if (metaError) {
+      const errors: Record<string, string> = {
+        no_code: "Facebook не вернул код авторизации",
+        no_business: "Бизнес не найден",
+        no_pages: "У вашего Facebook аккаунта нет привязанных страниц",
+        exchange_failed: "Ошибка обмена токена",
+        forbidden: "Нет доступа к этому бизнесу",
+      };
+      setErrorMessage(errors[metaError] || `Ошибка подключения: ${metaError}`);
+      window.history.replaceState({}, "", "/dashboard/channels");
+    }
+
     fetchChannels();
-  }, []);
+  }, [searchParams]);
+
+  // Auto-hide messages
+  useEffect(() => {
+    if (successMessage) {
+      const t = setTimeout(() => setSuccessMessage(null), 8000);
+      return () => clearTimeout(t);
+    }
+  }, [successMessage]);
+
+  useEffect(() => {
+    if (errorMessage) {
+      const t = setTimeout(() => setErrorMessage(null), 10000);
+      return () => clearTimeout(t);
+    }
+  }, [errorMessage]);
 
   const fetchChannels = async () => {
     try {
@@ -75,7 +114,6 @@ export default function ChannelsPage() {
       if (res.ok) {
         const data = await res.json();
         setChannels(data.channels || []);
-        setWebhookUrl(data.webhookBaseUrl || window.location.origin);
       }
     } catch (error) {
       console.error("Error fetching channels:", error);
@@ -84,10 +122,27 @@ export default function ChannelsPage() {
     }
   };
 
-  const copyWebhook = (url: string) => {
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleDisconnect = async (channel: string) => {
+    if (!confirm("Отключить канал? AI-сотрудник перестанет отвечать в этом канале.")) return;
+    setDisconnecting(channel);
+    try {
+      const res = await fetch(`/api/channels?channel=${channel}`, { method: "DELETE" });
+      if (res.ok) {
+        setSuccessMessage(`Канал отключён`);
+        await fetchChannels();
+      } else {
+        setErrorMessage("Ошибка при отключении канала");
+      }
+    } catch {
+      setErrorMessage("Ошибка при отключении канала");
+    } finally {
+      setDisconnecting(null);
+    }
+  };
+
+  const handleConnectMeta = () => {
+    // Redirect to Meta OAuth flow
+    window.location.href = "/api/auth/meta";
   };
 
   const channelConfigs = [
@@ -98,34 +153,29 @@ export default function ChannelsPage() {
       color: "from-blue-500 to-cyan-500",
       description: "Telegram бот для общения с клиентами",
       setupLink: "/dashboard/bot",
-      docsLink: "https://core.telegram.org/bots",
-    },
-    {
-      id: "whatsapp",
-      name: "WhatsApp",
-      icon: WhatsAppIcon,
-      color: "from-green-500 to-emerald-500",
-      description: "WhatsApp Business API для бизнес-общения",
-      features: [
-        "Автоответы 24/7",
-        "Click-to-WhatsApp реклама",
-        "QR-коды",
-        "Шаблоны сообщений",
-      ],
-      comingSoon: true,
     },
     {
       id: "instagram",
       name: "Instagram",
       icon: Instagram,
       color: "from-pink-500 to-purple-500",
-      description: "Instagram DM для взаимодействия в соцсетях",
-      features: [
-        "Автоответы в Direct",
-        "Лиды из рекламы",
-        "Ответы на Stories",
-        "Комментарии",
-      ],
+      description: "AI-ассистент отвечает в Instagram Direct",
+      connectAction: "meta",
+    },
+    {
+      id: "facebook",
+      name: "Messenger",
+      icon: Facebook,
+      color: "from-blue-600 to-indigo-500",
+      description: "AI-ассистент отвечает в Facebook Messenger",
+      connectAction: "meta",
+    },
+    {
+      id: "whatsapp",
+      name: "WhatsApp",
+      icon: WhatsAppIcon,
+      color: "from-green-500 to-emerald-500",
+      description: "WhatsApp Business API (требует отдельную настройку)",
       comingSoon: true,
     },
   ];
@@ -150,40 +200,52 @@ export default function ChannelsPage() {
         </p>
       </div>
 
-      {/* Coming Soon Banner */}
-      <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-xl p-6">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Zap className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h3 className={`text-lg font-semibold ${textPrimary} mb-2`}>
-              WhatsApp и Instagram — скоро!
-            </h3>
-            <p className={`${textSecondary} mb-3`}>
-              Мы готовим интеграцию с WhatsApp Business API и Instagram Messaging API.
-              Ваш AI-сотрудник сможет отвечать клиентам во всех мессенджерах одновременно.
-            </p>
-            <div className="flex flex-wrap gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                <span className={textSecondary}>Единая база клиентов</span>
+      {/* Success Message */}
+      {successMessage && (
+        <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-4 flex items-center gap-3">
+          <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+          <p className="text-green-300 text-sm">{successMessage}</p>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {errorMessage && (
+        <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 flex items-center gap-3">
+          <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+          <p className="text-red-300 text-sm">{errorMessage}</p>
+        </div>
+      )}
+
+      {/* Meta Connect Banner — show when neither Instagram nor Facebook is connected */}
+      {!channels.find((c) => c.channel === "instagram")?.isConnected &&
+        !channels.find((c) => c.channel === "facebook")?.isConnected && (
+          <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-xl p-6">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Zap className="h-6 w-6 text-white" />
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                <span className={textSecondary}>Лиды из Instagram рекламы</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                <span className={textSecondary}>Click-to-WhatsApp</span>
+              <div className="flex-1">
+                <h3 className={`text-lg font-semibold ${textPrimary} mb-2`}>
+                  Подключите Instagram и Messenger за 1 клик
+                </h3>
+                <p className={`${textSecondary} mb-4`}>
+                  Нажмите кнопку — войдите через Facebook — выберите страницу.
+                  AI-сотрудник сразу начнёт отвечать клиентам в Instagram Direct и Facebook Messenger.
+                </p>
+                <button
+                  onClick={handleConnectMeta}
+                  className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-all flex items-center gap-2"
+                >
+                  <Facebook className="h-4 w-4" />
+                  Подключить через Facebook
+                </button>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        )}
 
       {/* Channel Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
         {channelConfigs.map((config) => {
           const channelStatus = channels.find((c) => c.channel === config.id);
           const isConnected = channelStatus?.isConnected || false;
@@ -193,24 +255,17 @@ export default function ChannelsPage() {
             <div
               key={config.id}
               className={`${cardBg} border ${borderColor} rounded-xl overflow-hidden ${
-                config.comingSoon ? "opacity-75" : ""
+                config.comingSoon ? "opacity-60" : ""
               }`}
             >
               {/* Header */}
               <div className={`bg-gradient-to-r ${config.color} p-4`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <IconComponent className="h-8 w-8 text-white" />
-                    <div>
-                      <h3 className="text-lg font-semibold text-white">
-                        {config.name}
-                      </h3>
-                      {config.comingSoon && (
-                        <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full">
-                          Скоро
-                        </span>
-                      )}
-                    </div>
+                    <IconComponent className="h-7 w-7 text-white" />
+                    <h3 className="text-lg font-semibold text-white">
+                      {config.name}
+                    </h3>
                   </div>
                   {!config.comingSoon && (
                     <div
@@ -225,6 +280,11 @@ export default function ChannelsPage() {
                       )}
                     </div>
                   )}
+                  {config.comingSoon && (
+                    <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full">
+                      Скоро
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -234,49 +294,33 @@ export default function ChannelsPage() {
                   {config.description}
                 </p>
 
-                {/* Features for coming soon */}
-                {config.features && (
-                  <div className="space-y-2 mb-4">
-                    {config.features.map((feature, idx) => (
-                      <div
-                        key={idx}
-                        className={`flex items-center gap-2 text-sm ${textMuted}`}
-                      >
-                        <CheckCircle2 className="h-4 w-4 text-green-500/50" />
-                        {feature}
-                      </div>
-                    ))}
+                {/* Connected details */}
+                {isConnected && channelStatus?.details && (
+                  <div className={`${isDark ? "bg-white/5" : "bg-gray-50"} rounded-lg p-3 mb-4`}>
+                    {channelStatus.details.username && (
+                      <p className={`text-sm ${textPrimary}`}>
+                        @{channelStatus.details.username}
+                      </p>
+                    )}
+                    {channelStatus.details.pageId && (
+                      <p className={`text-xs ${textMuted}`}>
+                        Page ID: {channelStatus.details.pageId}
+                      </p>
+                    )}
                   </div>
                 )}
 
-                {/* Stats if connected */}
-                {isConnected && channelStatus?.stats && (
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    <div className={`${isDark ? "bg-white/5" : "bg-gray-50"} rounded-lg p-3 text-center`}>
-                      <MessageSquare className={`h-4 w-4 ${textMuted} mx-auto mb-1`} />
-                      <p className={`text-lg font-semibold ${textPrimary}`}>
-                        {channelStatus.stats.totalMessages}
-                      </p>
-                      <p className={`text-xs ${textMuted}`}>Сообщений</p>
-                    </div>
-                    <div className={`${isDark ? "bg-white/5" : "bg-gray-50"} rounded-lg p-3 text-center`}>
-                      <Users className={`h-4 w-4 ${textMuted} mx-auto mb-1`} />
-                      <p className={`text-lg font-semibold ${textPrimary}`}>
-                        {channelStatus.stats.totalClients}
-                      </p>
-                      <p className={`text-xs ${textMuted}`}>Клиентов</p>
-                    </div>
-                    <div className={`${isDark ? "bg-white/5" : "bg-gray-50"} rounded-lg p-3 text-center`}>
-                      <TrendingUp className={`h-4 w-4 ${textMuted} mx-auto mb-1`} />
-                      <p className={`text-lg font-semibold ${textPrimary}`}>
-                        {channelStatus.stats.leadsToday}
-                      </p>
-                      <p className={`text-xs ${textMuted}`}>Лиды сегодня</p>
-                    </div>
+                {/* Token warning */}
+                {channelStatus?.tokenWarning && (
+                  <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3 mb-4 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-500 flex-shrink-0" />
+                    <p className="text-xs text-yellow-300">
+                      Токен скоро истечёт. Переподключите канал.
+                    </p>
                   </div>
                 )}
 
-                {/* Action button */}
+                {/* Action buttons */}
                 {config.comingSoon ? (
                   <button
                     disabled
@@ -286,84 +330,55 @@ export default function ChannelsPage() {
                   >
                     Скоро будет доступно
                   </button>
-                ) : config.setupLink ? (
-                  <a
-                    href={config.setupLink}
-                    className={`w-full py-2.5 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 ${
-                      isConnected
-                        ? `${isDark ? "bg-white/10 hover:bg-white/15" : "bg-gray-100 hover:bg-gray-200"} ${textPrimary}`
-                        : "bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90"
-                    } transition-all`}
-                  >
-                    {isConnected ? (
-                      <>
+                ) : isConnected ? (
+                  <div className="flex gap-2">
+                    {config.setupLink && (
+                      <a
+                        href={config.setupLink}
+                        className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 ${
+                          isDark ? "bg-white/10 hover:bg-white/15" : "bg-gray-100 hover:bg-gray-200"
+                        } ${textPrimary} transition-all`}
+                      >
                         <Settings className="h-4 w-4" />
                         Настройки
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="h-4 w-4" />
-                        Подключить
-                      </>
+                      </a>
                     )}
-                  </a>
-                ) : (
+                    <button
+                      onClick={() => handleDisconnect(config.id)}
+                      disabled={disconnecting === config.id}
+                      className={`${config.setupLink ? "" : "flex-1"} py-2.5 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 ${
+                        isDark ? "bg-red-500/20 hover:bg-red-500/30 text-red-400" : "bg-red-50 hover:bg-red-100 text-red-600"
+                      } transition-all`}
+                    >
+                      {disconnecting === config.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Unlink className="h-4 w-4" />
+                      )}
+                      Отключить
+                    </button>
+                  </div>
+                ) : config.connectAction === "meta" ? (
                   <button
+                    onClick={handleConnectMeta}
                     className="w-full py-2.5 px-4 rounded-lg text-sm font-medium bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90 transition-all flex items-center justify-center gap-2"
                   >
                     <Zap className="h-4 w-4" />
                     Подключить
                   </button>
-                )}
+                ) : config.setupLink ? (
+                  <a
+                    href={config.setupLink}
+                    className="w-full py-2.5 px-4 rounded-lg text-sm font-medium bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Zap className="h-4 w-4" />
+                    Подключить
+                  </a>
+                ) : null}
               </div>
             </div>
           );
         })}
-      </div>
-
-      {/* Webhook URLs Info */}
-      <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
-        <h3 className={`text-lg font-semibold ${textPrimary} mb-4 flex items-center gap-2`}>
-          <Settings className="h-5 w-5" />
-          Webhook URLs для интеграции
-        </h3>
-        <p className={`${textSecondary} text-sm mb-4`}>
-          Эти URL нужно будет указать в настройках Meta Business при подключении WhatsApp и Instagram.
-        </p>
-
-        <div className="space-y-3">
-          {/* WhatsApp Webhook */}
-          <div className={`${isDark ? "bg-white/5" : "bg-gray-50"} rounded-lg p-4`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className={`text-sm font-medium ${textPrimary}`}>WhatsApp Webhook</span>
-              <button
-                onClick={() => copyWebhook(`${webhookUrl}/api/webhooks/whatsapp`)}
-                className={`${textSecondary} hover:${textPrimary} transition-colors`}
-              >
-                {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-              </button>
-            </div>
-            <code className={`text-xs ${textMuted} break-all`}>
-              {webhookUrl}/api/webhooks/whatsapp
-            </code>
-          </div>
-
-          {/* Instagram Webhook */}
-          <div className={`${isDark ? "bg-white/5" : "bg-gray-50"} rounded-lg p-4`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className={`text-sm font-medium ${textPrimary}`}>Instagram Webhook</span>
-              <button
-                onClick={() => copyWebhook(`${webhookUrl}/api/webhooks/instagram`)}
-                className={`${textSecondary} hover:${textPrimary} transition-colors`}
-              >
-                {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-              </button>
-            </div>
-            <code className={`text-xs ${textMuted} break-all`}>
-              {webhookUrl}/api/webhooks/instagram
-            </code>
-          </div>
-        </div>
       </div>
 
       {/* Benefits Section */}
@@ -391,7 +406,7 @@ export default function ChannelsPage() {
             <div>
               <h4 className={`font-medium ${textPrimary} mb-1`}>Лиды из рекламы</h4>
               <p className={`text-sm ${textSecondary}`}>
-                Автоматический захват лидов из Instagram и WhatsApp рекламы
+                Автоматический захват лидов из Instagram и Facebook рекламы
               </p>
             </div>
           </div>
@@ -403,7 +418,7 @@ export default function ChannelsPage() {
             <div>
               <h4 className={`font-medium ${textPrimary} mb-1`}>Единый AI</h4>
               <p className={`text-sm ${textSecondary}`}>
-                Один AI-сотрудник отвечает во всех каналах
+                Один AI-сотрудник отвечает во всех каналах одновременно
               </p>
             </div>
           </div>

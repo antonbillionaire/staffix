@@ -63,7 +63,10 @@ function buildChannelSystemPrompt(
   biz: NonNullable<Awaited<ReturnType<typeof loadBusinessProfile>>>,
   channel: string
 ): string {
-  const channelName = channel === "whatsapp" ? "WhatsApp" : "Facebook Messenger";
+  const channelName =
+    channel === "whatsapp" ? "WhatsApp" :
+    channel === "instagram" ? "Instagram DM" :
+    "Facebook Messenger";
   const tone = biz.aiTone === "professional"
     ? "профессиональным и деловым"
     : biz.aiTone === "casual"

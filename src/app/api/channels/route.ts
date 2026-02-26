@@ -1,12 +1,15 @@
 /**
- * API endpoint for managing channel connections
+ * API endpoint for managing channel connections.
+ * Reads channel status from Business model fields (fbActive, igActive, waActive).
+ * DELETE disconnects channels and clears tokens via Meta API.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { disconnectPage } from "@/lib/meta-oauth";
 
-// GET - Get all channel connections for user's business
+// GET - Get all channel statuses for user's business
 export async function GET() {
   try {
     const session = await auth();
@@ -15,13 +18,24 @@ export async function GET() {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
     }
 
-    // Get user's business
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       include: {
         businesses: {
-          include: {
-            channelConnections: true,
+          select: {
+            id: true,
+            botActive: true,
+            botToken: true,
+            botUsername: true,
+            fbPageId: true,
+            fbPageAccessToken: true,
+            fbActive: true,
+            igBusinessAccountId: true,
+            igUsername: true,
+            igActive: true,
+            waPhoneNumberId: true,
+            waActive: true,
+            metaTokenExpiresAt: true,
           },
         },
       },
@@ -31,139 +45,47 @@ export async function GET() {
       return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
     }
 
-    const business = user.businesses[0];
-    const connections = business.channelConnections || [];
+    const biz = user.businesses[0];
 
-    // Build channel statuses
-    const channels = [];
+    // Check if Meta token is expiring soon (< 7 days)
+    const tokenWarning =
+      biz.metaTokenExpiresAt &&
+      new Date(biz.metaTokenExpiresAt).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000;
 
-    // Telegram (from existing bot settings)
-    channels.push({
-      channel: "telegram",
-      isConnected: business.botActive || false,
-      isVerified: !!business.botToken,
-      details: {
-        username: business.botUsername,
+    const channels = [
+      {
+        channel: "telegram",
+        isConnected: biz.botActive || false,
+        isVerified: !!biz.botToken,
+        details: { username: biz.botUsername },
       },
-      stats: {
-        totalMessages: 0, // TODO: Calculate from messages
-        totalClients: 0,
-        leadsToday: 0,
+      {
+        channel: "facebook",
+        isConnected: biz.fbActive || false,
+        isVerified: !!biz.fbPageAccessToken,
+        details: { pageId: biz.fbPageId },
+        tokenWarning: biz.fbActive && tokenWarning,
       },
-    });
+      {
+        channel: "instagram",
+        isConnected: biz.igActive || false,
+        isVerified: !!biz.igBusinessAccountId,
+        details: { username: biz.igUsername },
+        tokenWarning: biz.igActive && tokenWarning,
+      },
+      {
+        channel: "whatsapp",
+        isConnected: biz.waActive || false,
+        isVerified: !!biz.waPhoneNumberId,
+        details: { phoneNumberId: biz.waPhoneNumberId },
+      },
+    ];
 
-    // WhatsApp
-    const whatsappConnection = connections.find((c) => c.channel === "whatsapp");
-    channels.push({
-      channel: "whatsapp",
-      isConnected: whatsappConnection?.isConnected || false,
-      isVerified: whatsappConnection?.isVerified || false,
-      details: {
-        phoneNumber: whatsappConnection?.whatsappPhoneNumber,
-      },
-      stats: {
-        totalMessages: 0,
-        totalClients: 0,
-        leadsToday: 0,
-      },
-    });
-
-    // Instagram
-    const instagramConnection = connections.find((c) => c.channel === "instagram");
-    channels.push({
-      channel: "instagram",
-      isConnected: instagramConnection?.isConnected || false,
-      isVerified: instagramConnection?.isVerified || false,
-      details: {
-        username: instagramConnection?.instagramUsername,
-      },
-      stats: {
-        totalMessages: 0,
-        totalClients: 0,
-        leadsToday: 0,
-      },
-    });
-
-    // Get stats from ChannelMessage and Lead tables
-    // TODO: Implement proper stats calculation
-
-    return NextResponse.json({
-      channels,
-      webhookBaseUrl: process.env.NEXT_PUBLIC_APP_URL || "",
-    });
+    return NextResponse.json({ channels });
   } catch (error) {
     console.error("Error fetching channels:", error);
     return NextResponse.json(
       { error: "Ошибка получения каналов" },
-      { status: 500 }
-    );
-  }
-}
-
-// POST - Connect a new channel
-export async function POST(request: NextRequest) {
-  try {
-    const session = await auth();
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const { channel, ...connectionData } = body;
-
-    if (!channel || !["whatsapp", "instagram"].includes(channel)) {
-      return NextResponse.json(
-        { error: "Неверный канал" },
-        { status: 400 }
-      );
-    }
-
-    // Get user's business
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: {
-        businesses: true,
-      },
-    });
-
-    if (!user || !user.businesses[0]) {
-      return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
-    }
-
-    const businessId = user.businesses[0].id;
-
-    // Upsert channel connection
-    const connection = await prisma.channelConnection.upsert({
-      where: {
-        businessId_channel: {
-          businessId,
-          channel,
-        },
-      },
-      create: {
-        businessId,
-        channel,
-        isConnected: true,
-        ...connectionData,
-        connectedAt: new Date(),
-        lastActivityAt: new Date(),
-      },
-      update: {
-        isConnected: true,
-        ...connectionData,
-        lastActivityAt: new Date(),
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      connection,
-    });
-  } catch (error) {
-    console.error("Error connecting channel:", error);
-    return NextResponse.json(
-      { error: "Ошибка подключения канала" },
       { status: 500 }
     );
   }
@@ -181,18 +103,24 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const channel = searchParams.get("channel");
 
-    if (!channel || !["whatsapp", "instagram"].includes(channel)) {
+    if (!channel || !["facebook", "instagram", "whatsapp"].includes(channel)) {
       return NextResponse.json(
         { error: "Неверный канал" },
         { status: 400 }
       );
     }
 
-    // Get user's business
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       include: {
-        businesses: true,
+        businesses: {
+          select: {
+            id: true,
+            fbPageId: true,
+            fbPageAccessToken: true,
+            igBusinessAccountId: true,
+          },
+        },
       },
     });
 
@@ -200,23 +128,44 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
     }
 
-    const businessId = user.businesses[0].id;
+    const biz = user.businesses[0];
 
-    // Update connection to disconnected
-    await prisma.channelConnection.updateMany({
-      where: {
-        businessId,
-        channel,
-      },
-      data: {
-        isConnected: false,
-        metaAccessToken: null,
-      },
-    });
+    if (channel === "facebook" || channel === "instagram") {
+      // Disconnect Meta channels — both FB and IG use the same Page token
+      // Unsubscribe page webhooks via Meta API
+      if (biz.fbPageId && biz.fbPageAccessToken) {
+        await disconnectPage(biz.fbPageId, biz.fbPageAccessToken).catch((e) =>
+          console.error("disconnectPage error:", e)
+        );
+      }
 
-    return NextResponse.json({
-      success: true,
-    });
+      // If disconnecting one Meta channel, disconnect both (they share the same token)
+      await prisma.business.update({
+        where: { id: biz.id },
+        data: {
+          fbPageId: null,
+          fbPageAccessToken: null,
+          fbActive: false,
+          igBusinessAccountId: null,
+          igUsername: null,
+          igActive: false,
+          metaUserAccessToken: null,
+          metaTokenExpiresAt: null,
+        },
+      });
+    } else if (channel === "whatsapp") {
+      await prisma.business.update({
+        where: { id: biz.id },
+        data: {
+          waPhoneNumberId: null,
+          waAccessToken: null,
+          waActive: false,
+          waVerifyToken: null,
+        },
+      });
+    }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error disconnecting channel:", error);
     return NextResponse.json(

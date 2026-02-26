@@ -30,6 +30,10 @@
     {
       "path": "/api/cron/admin-automations",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/refresh-meta-tokens",
+      "schedule": "0 3 * * *"
     }
   ]
 }
