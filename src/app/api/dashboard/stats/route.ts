@@ -106,6 +106,7 @@ export async function GET(request: Request) {
       channels,
       readiness,
       businessType: business.businessType || null,
+      dashboardMode: business.dashboardMode || "service",
     });
   } catch (error) {
     console.error("Dashboard stats error:", error);

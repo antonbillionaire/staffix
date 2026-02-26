@@ -46,6 +46,7 @@ interface StatsData {
     knowledge: boolean;
   };
   businessType: string | null;
+  dashboardMode: string;
 }
 
 interface BizData {
@@ -132,15 +133,8 @@ export default function DashboardPage() {
     { id: "all", key: "dashboard.all" },
   ];
 
-  // Detect sales vs service business
-  const isSales = (() => {
-    const bt = statsData?.businessType?.toLowerCase();
-    if (!bt) return false;
-    const salesIds = ["online_shop", "flowers", "restaurant", "delivery", "other_sales"];
-    if (salesIds.includes(bt)) return true;
-    const salesKeywords = ["shop", "store", "retail", "магазин", "цветоч", "ресторан", "кафе", "доставк"];
-    return salesKeywords.some(kw => bt.includes(kw));
-  })();
+  // Use explicit dashboardMode from business record
+  const isSales = statsData?.dashboardMode === "sales";
 
   const readinessItems = [
     {

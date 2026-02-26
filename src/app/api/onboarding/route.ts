@@ -40,6 +40,11 @@ export async function POST(request: Request) {
       );
     }
 
+    // Determine dashboard mode from business type
+    const SALES_IDS = ["online_shop", "flowers", "other_sales"];
+    const resolvedType = businessType || (Array.isArray(businessTypes) && businessTypes[0]) || null;
+    const dashboardMode = resolvedType && SALES_IDS.includes(resolvedType) ? "sales" : "service";
+
     // Find or create business for user
     let business = await prisma.business.findFirst({
       where: { userId },
@@ -53,8 +58,9 @@ export async function POST(request: Request) {
           name: businessName,
           phone: phone || null,
           address: address || null,
-          businessType: businessType || (Array.isArray(businessTypes) && businessTypes[0]) || null,
+          businessType: resolvedType,
           businessTypes: Array.isArray(businessTypes) ? businessTypes : [],
+          dashboardMode,
           staffCount: staffCount ? parseInt(staffCount) || null : null,
           language: language || "ru",
           crmSystem: crmSystem || null,
@@ -69,8 +75,9 @@ export async function POST(request: Request) {
           name: businessName,
           phone: phone || null,
           address: address || null,
-          businessType: businessType || (Array.isArray(businessTypes) && businessTypes[0]) || null,
+          businessType: resolvedType,
           businessTypes: Array.isArray(businessTypes) ? businessTypes : [],
+          dashboardMode,
           staffCount: staffCount ? parseInt(staffCount) || null : null,
           language: language || "ru",
           crmSystem: crmSystem || null,

@@ -54,6 +54,7 @@ interface BusinessContext {
   staff: Array<{ name: string; role: string | null }>;
   faqs: Array<{ question: string; answer: string }>;
   documents: Array<{ name: string; extractedText: string | null }>;
+  dashboardMode: string;
   loyalty: {
     enabled: boolean;
     type: string;
@@ -233,6 +234,7 @@ export async function buildBusinessContext(
       staff: business.staff,
       faqs: business.faqs,
       documents: business.documents,
+      dashboardMode: (business as Record<string, unknown>).dashboardMode as string || "service",
       loyalty: firstProgram ? {
         enabled: firstProgram.enabled,
         type: firstProgram.type,

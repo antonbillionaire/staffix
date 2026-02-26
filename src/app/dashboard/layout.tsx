@@ -76,14 +76,9 @@ interface NavSingle {
 
 type NavEntry = NavGroup | NavSingle;
 
-// Detect if business type is sales/shop mode
-function isSalesDashboard(businessType: string | null): boolean {
-  if (!businessType) return false;
-  const bt = businessType.toLowerCase();
-  const salesIds = ["online_shop", "flowers", "restaurant", "delivery", "other_sales"];
-  if (salesIds.includes(bt)) return true;
-  const salesKeywords = ["shop", "store", "retail", "магазин", "цветоч", "ресторан", "кафе", "доставк"];
-  return salesKeywords.some(kw => bt.includes(kw));
+// Detect if business is in sales mode using explicit dashboardMode field
+function isSalesDashboard(dashboardMode: string | null): boolean {
+  return dashboardMode === "sales";
 }
 
 function buildNavConfig(isSales: boolean): NavEntry[] {
@@ -152,6 +147,7 @@ export default function DashboardLayout({
   const [loading, setLoading] = useState(true);
   const [businessName, setBusinessName] = useState("");
   const [businessType, setBusinessType] = useState<string | null>(null);
+  const [dashboardMode, setDashboardMode] = useState<string | null>(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [notifMenuOpen, setNotifMenuOpen] = useState(false);
@@ -166,8 +162,8 @@ export default function DashboardLayout({
     isExpired: false,
   });
 
-  // Build nav config based on business type
-  const isSales = isSalesDashboard(businessType);
+  // Build nav config based on dashboard mode
+  const isSales = isSalesDashboard(dashboardMode);
   const navConfig = useMemo(() => buildNavConfig(isSales), [isSales]);
 
   // Determine which groups are open based on current pathname
@@ -225,6 +221,7 @@ export default function DashboardLayout({
             }
             setBusinessName(data.business.name);
             setBusinessType(data.business.businessType || null);
+            setDashboardMode(data.business.dashboardMode || "service");
             if (data.business.subscription) {
               const sub = data.business.subscription;
               const expiresAt = new Date(sub.expiresAt);

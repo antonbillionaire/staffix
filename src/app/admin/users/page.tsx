@@ -33,6 +33,7 @@ interface User {
     id: string;
     name: string;
     businessType: string | null;
+    dashboardMode: string;
     botActive: boolean;
     botUsername: string | null;
     bookingsCount: number;
@@ -193,13 +194,11 @@ export default function AdminUsersPage() {
     return days;
   };
 
-  const isSalesType = (type: string | null) => {
-    if (!type) return false;
-    const salesTypes = ["online_shop", "flowers", "restaurant"];
-    return salesTypes.includes(type) || ["shop", "store", "магазин"].some(k => type.toLowerCase().includes(k));
+  const isSalesType = (_type: string | null, mode?: string) => {
+    return mode === "sales";
   };
 
-  const getTypeBadge = (type: string | null) => {
+  const getTypeBadge = (type: string | null, mode?: string) => {
     if (!type) return <span className="text-gray-600 text-xs">—</span>;
     const typeLabels: Record<string, string> = {
       salon: "Салон", barbershop: "Барбершоп", clinic: "Клиника",
@@ -211,7 +210,7 @@ export default function AdminUsersPage() {
       education: "Образование", events: "Ивент", other: "Другое",
     };
     const label = typeLabels[type] || type;
-    const isSales = isSalesType(type);
+    const isSales = isSalesType(type, mode);
     return (
       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
         isSales ? "bg-purple-500/10 text-purple-400" : "bg-blue-500/10 text-blue-400"
@@ -379,8 +378,9 @@ export default function AdminUsersPage() {
                 {users.filter((user) => {
                   if (typeFilter === "all") return true;
                   const type = user.business?.businessType || null;
-                  if (typeFilter === "shops") return isSalesType(type);
-                  if (typeFilter === "services") return !isSalesType(type);
+                  const mode = user.business?.dashboardMode;
+                  if (typeFilter === "shops") return isSalesType(type, mode);
+                  if (typeFilter === "services") return !isSalesType(type, mode);
                   return true;
                 }).map((user) => (
                   <tr key={user.id} className="border-b border-white/5 hover:bg-white/5">
@@ -406,7 +406,7 @@ export default function AdminUsersPage() {
                       )}
                     </td>
                     <td className="py-3 px-4">
-                      {getTypeBadge(user.business?.businessType || null)}
+                      {getTypeBadge(user.business?.businessType || null, user.business?.dashboardMode)}
                     </td>
                     <td className="py-3 px-4">
                       {user.subscription ? (

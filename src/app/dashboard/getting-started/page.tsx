@@ -28,6 +28,7 @@ interface Business {
   id: string;
   name: string;
   businessType: string | null;
+  dashboardMode?: string;
   botToken: string | null;
   botActive: boolean;
   services?: { id: string }[];
@@ -214,9 +215,7 @@ export default function GettingStartedPage() {
       .catch(() => setLoading(false));
   }, []);
 
-  const isStore =
-    business?.businessType === "online_shop" ||
-    (business?.products && business.products.length > 0);
+  const isStore = business?.dashboardMode === "sales";
 
   const baseSteps = isStore ? STORE_STEPS : SERVICE_STEPS;
 

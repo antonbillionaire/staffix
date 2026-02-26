@@ -24,15 +24,7 @@ interface OnboardingStatus {
   hasKnowledge: boolean;
   hasPrompt: boolean;
   businessType: string | null;
-}
-
-function isSalesType(businessType: string | null): boolean {
-  if (!businessType) return false;
-  const bt = businessType.toLowerCase();
-  const salesIds = ["online_shop", "flowers", "restaurant", "delivery", "other_sales"];
-  if (salesIds.includes(bt)) return true;
-  const salesKeywords = ["shop", "store", "retail", "магазин", "цветоч", "ресторан", "кафе", "доставк"];
-  return salesKeywords.some(kw => bt.includes(kw));
+  dashboardMode: string;
 }
 
 function getSteps(isSales: boolean) {
@@ -129,7 +121,7 @@ export default function OnboardingWizard() {
 
   if (loading || dismissed || !status) return null;
 
-  const isSales = isSalesType(status.businessType);
+  const isSales = status.dashboardMode === "sales";
   const STEPS = getSteps(isSales);
   const completedCount = STEPS.filter((s) => status[s.key]).length;
   const allDone = completedCount === STEPS.length;

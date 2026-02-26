@@ -54,6 +54,7 @@ model Business {
   // Onboarding
   businessType  String?   // salon, clinic, barbershop, auto_service, other
   businessTypes String[]  @default([])  // массив типов бизнеса (мульти-выбор)
+  dashboardMode String    @default("service") // "service" or "sales" — determines dashboard layout
   staffCount    Int?      // количество сотрудников
   language      String    @default("ru") // ru, uz, kz, kg, tj, am, ge
   onboardingCompleted Boolean @default(false)

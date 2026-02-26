@@ -166,21 +166,14 @@ ${business.categories && business.categories.length > 0
 }
 
 /**
- * Определяет является ли бизнес "магазином" (нужен sales mode)
+ * Определяет является ли бизнес "магазином" (нужен sales mode).
+ * Uses explicit dashboardMode field; falls back to businessType for backward compat.
  */
-export function isSalesMode(businessType: string | null): boolean {
+export function isSalesMode(businessType: string | null, dashboardMode?: string | null): boolean {
+  // Prefer explicit dashboardMode field
+  if (dashboardMode) return dashboardMode === "sales";
+  // Fallback: check businessType ID (no keyword matching)
   if (!businessType) return false;
-  // Exact ID matches (onboarding business type IDs)
-  const salesIds = ["online_shop", "flowers", "restaurant", "delivery", "other_sales"];
-  if (salesIds.includes(businessType.toLowerCase())) return true;
-  // Keyword matches for custom types
-  const salesKeywords = [
-    "shop", "ecommerce", "store", "retail", "marketplace",
-    "магазин", "онлайн-магазин", "интернет-магазин",
-    "flowers", "цветоч", "гүл", "gullar",
-    "restaurant", "ресторан", "кафе", "мейрамхана",
-  ];
-  return salesKeywords.some((kw) =>
-    businessType.toLowerCase().includes(kw.toLowerCase())
-  );
+  const salesIds = ["online_shop", "flowers", "other_sales"];
+  return salesIds.includes(businessType.toLowerCase());
 }

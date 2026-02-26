@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
               id: business.id,
               name: business.name,
               businessType: business.businessType,
+              dashboardMode: (business as Record<string, unknown>).dashboardMode as string || "service",
               botActive: business.botActive,
               botUsername: business.botUsername,
               bookingsCount: business._count.bookings,

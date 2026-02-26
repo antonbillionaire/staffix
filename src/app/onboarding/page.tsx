@@ -107,18 +107,18 @@ export default function OnboardingPage() {
   const totalSteps = 6;
 
   // Types that are clearly "sales" or "service" — so we don't need to ask
-  const knownSalesIds = ["online_shop", "delivery", "restaurant", "flowers"];
+  const knownSalesIds = ["online_shop", "flowers"];
   const knownServiceIds = [
     "salon", "barbershop", "clinic", "spa", "fitness", "auto_service",
-    "cleaning", "pet_care", "repair", "real_estate", "travel",
-    "photo_video", "legal", "professional", "education", "events",
+    "delivery", "cleaning", "pet_care", "restaurant", "repair",
+    "real_estate", "travel", "photo_video", "legal", "professional",
+    "education", "events",
   ];
 
   const needsModeQuestion = () => {
-    const types = formData.businessTypes;
-    if (!types.includes("other")) return false;
-    // If there's at least one clearly categorized type, no need to ask
-    return !types.some(t => knownSalesIds.includes(t) || knownServiceIds.includes(t));
+    const type = formData.businessType;
+    // Only ask for "other" type when it's not clearly categorized
+    return type === "other";
   };
 
   const handleNext = () => {
@@ -338,10 +338,9 @@ export default function OnboardingPage() {
                   <button
                     key={type.id}
                     onClick={() => {
-                      const types = formData.businessTypes.includes(type.id)
-                        ? formData.businessTypes.filter((t) => t !== type.id)
-                        : [...formData.businessTypes, type.id];
-                      setFormData({ ...formData, businessTypes: types, businessType: types[0] || "", businessMode: "" });
+                      // Single select — only one type at a time
+                      const selected = formData.businessTypes.includes(type.id) ? [] : [type.id];
+                      setFormData({ ...formData, businessTypes: selected, businessType: selected[0] || "", businessMode: "" });
                       setShowModeQuestion(false);
                     }}
                     className={`p-3 sm:p-4 rounded-xl border-2 transition-all ${

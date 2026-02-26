@@ -489,7 +489,7 @@ async function generateAIResponse(
     console.log(`[Webhook] Client context: ${clientContext ? 'loaded' : 'null (new client)'}`);
 
     // 3. Определяем режим бота: продажи или запись
-    const salesMode = isSalesMode(businessContext.businessType);
+    const salesMode = isSalesMode(businessContext.businessType, businessContext.dashboardMode);
     console.log(`[Webhook] Mode: ${salesMode ? 'sales' : 'service'}, type=${businessContext.businessType}`);
 
     // 4. Строим системный промпт
