@@ -82,22 +82,23 @@ export async function POST(request: Request) {
   const messages = parseFBWebhookAll(body);
   if (messages.length === 0) return respond200();
 
+  // Process messages BEFORE returning 200 — Vercel kills serverless functions
+  // after response is sent, so fire-and-forget doesn't work reliably.
+  // Meta allows up to 20s before timeout, Claude API takes ~3-5s.
   for (const msg of messages) {
     if (!msg.text.trim()) continue;
 
     // Skip duplicate webhook deliveries (Meta retries if response >5s)
     if (!markFBProcessed(msg.messageId)) continue;
 
-    if (businessId) {
-      // Scenario B: user's business
-      processBusinessFBMessage(businessId, msg).catch((e) =>
-        console.error("FB business error:", e)
-      );
-    } else {
-      // Scenario A: Staffix sales
-      processStaffixFBMessage(msg).catch((e) =>
-        console.error("FB sales error:", e)
-      );
+    try {
+      if (businessId) {
+        await processBusinessFBMessage(businessId, msg);
+      } else {
+        await processStaffixFBMessage(msg);
+      }
+    } catch (e) {
+      console.error("FB message processing error:", e);
     }
   }
 
@@ -116,6 +117,8 @@ async function processStaffixFBMessage(msg: {
     return;
   }
 
+  console.log(`FB Sales: processing message from ${msg.senderId}: "${msg.text.slice(0, 50)}"`);
+
   await sendFBTyping(accessToken, msg.senderId);
 
   const reply = await generateStaffixSalesResponse(
@@ -124,7 +127,10 @@ async function processStaffixFBMessage(msg: {
     msg.text
   );
 
-  await sendFBMessage(accessToken, msg.senderId, reply);
+  console.log(`FB Sales: AI reply generated (${reply.length} chars), sending...`);
+
+  const sent = await sendFBMessage(accessToken, msg.senderId, reply);
+  console.log(`FB Sales: message sent = ${sent}`);
 }
 
 // ─── Scenario B: per-business FB bot ─────────────────────────────────────────
