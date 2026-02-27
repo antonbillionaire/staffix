@@ -131,8 +131,8 @@ async function processIGMessage(
 
     const reply = await generateStaffixSalesResponse("instagram", senderId, text);
     const pageId =
-      process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID ||
-      process.env.FACEBOOK_PAGE_ID;
+      process.env.FACEBOOK_PAGE_ID ||
+      process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
     console.log(`[IG Webhook] Sales bot reply to ${senderId} via pageId=${pageId}`);
     if (pageId) {
       await sendIGSenderAction(pageId, staffixToken, senderId, "mark_seen");
