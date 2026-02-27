@@ -9,6 +9,7 @@ import {
   showTypingIndicator,
   verifyMetaWebhook,
 } from "@/lib/sales-bot/meta-api";
+import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
 
 // In-memory conversation history (keyed by Instagram-scoped user ID)
 const conversationHistory: Map<
@@ -114,7 +115,15 @@ export async function GET(request: NextRequest) {
 // Webhook handler (POST)
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Verify webhook signature (HMAC-SHA256 from Meta)
+    const rawBody = await request.text();
+    const signature = request.headers.get("x-hub-signature-256");
+    if (!verifyMetaWebhookSignature(rawBody, signature)) {
+      console.warn("[Sales IG] Invalid webhook signature, rejecting");
+      return new Response("Forbidden", { status: 403 });
+    }
+
+    const body = JSON.parse(rawBody);
 
     // Accept both instagram and page object types
     if (body.object !== "instagram" && body.object !== "page") {

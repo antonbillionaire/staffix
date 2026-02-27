@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { parseFBWebhookAll, sendFBMessage, sendFBTyping } from "@/lib/facebook-utils";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
 import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
+import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
 
 // Deduplication: track recently processed FB message IDs (Meta retries if response is slow)
 const processedFBMessages = new Set<string>();
@@ -69,9 +70,17 @@ export async function POST(request: Request) {
   const businessId = searchParams.get("businessId");
   const respond200 = () => NextResponse.json({ success: true }, { status: 200 });
 
+  // Verify webhook signature (HMAC-SHA256 from Meta)
+  const rawBody = await request.text();
+  const signature = request.headers.get("x-hub-signature-256");
+  if (!verifyMetaWebhookSignature(rawBody, signature)) {
+    console.warn("FB webhook: invalid signature, rejecting");
+    return new Response("Forbidden", { status: 403 });
+  }
+
   let body: Record<string, unknown>;
   try {
-    body = await request.json();
+    body = JSON.parse(rawBody);
   } catch {
     return respond200();
   }
@@ -83,7 +92,18 @@ export async function POST(request: Request) {
   // after response is sent, so fire-and-forget doesn't work reliably.
   // Meta allows up to 20s before timeout, Claude API takes ~3-5s.
   for (const msg of messages) {
-    if (!msg.text.trim()) continue;
+    // Handle non-text messages (images, audio, stickers, etc.)
+    if (!msg.text.trim()) {
+      if (!markFBProcessed(msg.messageId)) continue;
+      const biz = await prisma.business.findFirst({
+        where: businessId ? { id: businessId } : { fbPageId: msg.pageId, fbActive: true },
+        select: { fbPageAccessToken: true },
+      });
+      if (biz?.fbPageAccessToken) {
+        sendFBMessage(biz.fbPageAccessToken, msg.senderId, "Извините, я пока могу работать только с текстовыми сообщениями. Напишите ваш вопрос текстом.").catch(() => {});
+      }
+      continue;
+    }
 
     // Skip duplicate webhook deliveries (Meta retries if response >5s)
     if (!markFBProcessed(msg.messageId)) continue;

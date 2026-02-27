@@ -60,6 +60,13 @@ export async function GET(request: Request) {
         const page = pages.find((p) => p.id === biz.fbPageId);
         if (page) {
           updateData.fbPageAccessToken = page.access_token;
+          // Also refresh Instagram data if IG account is linked
+          if (page.instagram_business_account) {
+            updateData.igBusinessAccountId = page.instagram_business_account.id;
+            if (page.instagram_business_account.username) {
+              updateData.igUsername = page.instagram_business_account.username;
+            }
+          }
         }
       } catch (e) {
         console.error(`Page token refresh failed for business ${biz.id}:`, e);

@@ -61,8 +61,8 @@ async function processSalesMessage(msg: {
   text: string;
   messageId: string;
 }) {
-  const phoneNumberId = process.env.STAFFIX_WA_PHONE_NUMBER_ID;
-  const accessToken = process.env.STAFFIX_WA_ACCESS_TOKEN;
+  const phoneNumberId = process.env.STAFFIX_WA_PHONE_NUMBER_ID || process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const accessToken = process.env.STAFFIX_WA_ACCESS_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN;
 
   if (!phoneNumberId || !accessToken) {
     console.error("Staffix WA sales: missing ENV vars");

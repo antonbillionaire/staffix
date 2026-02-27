@@ -80,6 +80,7 @@ export interface WAIncomingMessage {
   text: string;        // message text
   messageId: string;   // WA message ID (for read receipts)
   phoneNumberId: string; // which number received this
+  type: string;        // message type: "text", "image", "audio", etc.
 }
 
 export function parseWAWebhook(body: Record<string, unknown>): WAIncomingMessage | null {
@@ -97,18 +98,18 @@ export function parseWAWebhook(body: Record<string, unknown>): WAIncomingMessage
     if (!messages || messages.length === 0) return null;
 
     const msg = messages[0];
-    if (msg.type !== "text") return null; // skip audio, images for now
-
-    const textObj = msg.text as Record<string, string>;
+    const msgType = String(msg.type || "unknown");
+    const textObj = msg.text as Record<string, string> | undefined;
     const contact = contacts?.[0];
     const profile = contact?.profile as Record<string, string>;
 
     return {
       waId: String(msg.from),
       name: profile?.name || String(msg.from),
-      text: textObj?.body || "",
+      text: msgType === "text" ? (textObj?.body || "") : "",
       messageId: String(msg.id),
       phoneNumberId: String(metadata?.phone_number_id || ""),
+      type: msgType,
     };
   } catch {
     return null;

@@ -7,6 +7,7 @@ import {
   markWhatsAppRead,
   verifyMetaWebhook,
 } from "@/lib/sales-bot/meta-api";
+import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
 
 // In-memory conversation history
 const conversationHistory: Map<
@@ -81,7 +82,15 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   console.log("[WA Sales Webhook] POST received");
   try {
-    const body = await request.json();
+    // Verify webhook signature (HMAC-SHA256 from Meta)
+    const rawBody = await request.text();
+    const signature = request.headers.get("x-hub-signature-256");
+    if (!verifyMetaWebhookSignature(rawBody, signature)) {
+      console.warn("[WA Sales Webhook] Invalid signature, rejecting");
+      return new Response("Forbidden", { status: 403 });
+    }
+
+    const body = JSON.parse(rawBody);
     console.log("[WA Sales Webhook] object:", body.object);
 
     // WhatsApp webhook payload structure

@@ -24,6 +24,7 @@ export function buildMetaOAuthUrl(businessId: string): string {
     "pages_manage_metadata",
     "instagram_basic",
     "instagram_manage_messages",
+    "instagram_manage_comments",
   ].join(",");
 
   const state = Buffer.from(JSON.stringify({ businessId })).toString("base64url");

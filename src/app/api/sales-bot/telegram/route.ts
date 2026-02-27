@@ -37,11 +37,31 @@ interface TelegramUpdate {
   };
 }
 
-// In-memory conversation history (for serverless, consider DB-backed approach)
-const conversationHistory: Map<
-  number,
-  Array<{ role: "user" | "assistant"; content: string }>
-> = new Map();
+// Conversation history helpers — persisted in SalesLead.history (DB-backed)
+type HistoryMessage = { role: "user" | "assistant"; content: string };
+
+async function getLeadHistory(chatId: number): Promise<HistoryMessage[]> {
+  try {
+    const lead = await prisma.salesLead.findUnique({
+      where: { telegramChatId: BigInt(chatId) },
+      select: { history: true },
+    });
+    return (lead?.history as HistoryMessage[]) || [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveLeadHistory(chatId: number, history: HistoryMessage[]): Promise<void> {
+  try {
+    await prisma.salesLead.updateMany({
+      where: { telegramChatId: BigInt(chatId) },
+      data: { history: history.slice(-40) as unknown as [] },
+    });
+  } catch {
+    // Lead may not exist yet — will be created on next upsert
+  }
+}
 
 // Send message to Telegram
 async function sendTelegramMessage(
@@ -182,8 +202,8 @@ async function generateAIResponse(
   try {
     const anthropic = new Anthropic({ apiKey });
 
-    // Get or create conversation history
-    let history = conversationHistory.get(chatId) || [];
+    // Get conversation history from DB (persisted across restarts)
+    let history = await getLeadHistory(chatId);
 
     // Keep last 20 messages for context
     if (history.length > 20) {
@@ -209,9 +229,9 @@ async function generateAIResponse(
         ? response.content[0].text
         : "Извините, не могу обработать ваш запрос.";
 
-    // Add assistant response to history
+    // Add assistant response to history and persist to DB
     history.push({ role: "assistant", content: assistantMessage });
-    conversationHistory.set(chatId, history);
+    await saveLeadHistory(chatId, history);
 
     // Detect lead stage transitions based on AI response content
     const lowerMsg = (userMessage + " " + assistantMessage).toLowerCase();

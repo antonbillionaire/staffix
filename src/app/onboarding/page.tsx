@@ -107,7 +107,7 @@ export default function OnboardingPage() {
   const totalSteps = 6;
 
   // Types that are clearly "sales" or "service" — so we don't need to ask
-  const knownSalesIds = ["online_shop", "flowers"];
+  const knownSalesIds = ["online_shop", "flowers", "other_sales"];
   const knownServiceIds = [
     "salon", "barbershop", "clinic", "spa", "fitness", "auto_service",
     "delivery", "cleaning", "pet_care", "restaurant", "repair",
@@ -385,7 +385,7 @@ export default function OnboardingPage() {
             <div className="space-y-3">
               <button
                 onClick={() => {
-                  setFormData({ ...formData, businessMode: "service", businessType: "other" });
+                  setFormData({ ...formData, businessMode: "service", businessType: "other", businessTypes: ["other"] });
                   setShowModeQuestion(false);
                   setStep(2);
                 }}
@@ -410,7 +410,7 @@ export default function OnboardingPage() {
 
               <button
                 onClick={() => {
-                  setFormData({ ...formData, businessMode: "sales", businessType: "other_sales" });
+                  setFormData({ ...formData, businessMode: "sales", businessType: "other_sales", businessTypes: ["other_sales"] });
                   setShowModeQuestion(false);
                   setStep(2);
                 }}

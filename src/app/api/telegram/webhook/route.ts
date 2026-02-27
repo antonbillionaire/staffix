@@ -99,23 +99,43 @@ async function sendTelegramMessage(
   text: string
 ): Promise<boolean> {
   try {
-    const response = await fetch(
-      `https://api.telegram.org/bot${botToken}/sendMessage`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text,
-          parse_mode: "HTML",
-        }),
-      }
-    );
-    return response.ok;
+    // Telegram limit is 4096 chars — split if needed
+    const chunks = text.length > 4096 ? splitTelegramMessage(text) : [text];
+    let ok = true;
+    for (const chunk of chunks) {
+      const response = await fetch(
+        `https://api.telegram.org/bot${botToken}/sendMessage`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: chunk,
+            parse_mode: "HTML",
+          }),
+        }
+      );
+      if (!response.ok) ok = false;
+    }
+    return ok;
   } catch (error) {
     console.error("Error sending Telegram message:", error);
     return false;
   }
+}
+
+function splitTelegramMessage(text: string, maxLen = 4096): string[] {
+  const chunks: string[] = [];
+  let remaining = text;
+  while (remaining.length > maxLen) {
+    // Try to split at last newline before limit
+    let splitAt = remaining.lastIndexOf("\n", maxLen);
+    if (splitAt < maxLen * 0.3) splitAt = maxLen; // no good newline found
+    chunks.push(remaining.slice(0, splitAt));
+    remaining = remaining.slice(splitAt).trimStart();
+  }
+  if (remaining) chunks.push(remaining);
+  return chunks;
 }
 
 async function sendTelegramMessageWithButtons(

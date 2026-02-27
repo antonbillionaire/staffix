@@ -7,6 +7,18 @@ import { prisma } from "./prisma";
 import Anthropic from "@anthropic-ai/sdk";
 
 // ========================================
+// HELPERS
+// ========================================
+
+const COUNTRY_CURRENCY: Record<string, string> = {
+  UZ: "сум", KZ: "тенге", RU: "руб.", KG: "сом", TJ: "сомони",
+  AM: "драм", GE: "лари", US: "$", GB: "£",
+};
+function currencyLabel(country?: string | null): string {
+  return COUNTRY_CURRENCY[country || "UZ"] || "сум";
+}
+
+// ========================================
 // ТИПЫ
 // ========================================
 
@@ -54,6 +66,7 @@ interface BusinessContext {
   staff: Array<{ name: string; role: string | null }>;
   faqs: Array<{ question: string; answer: string }>;
   documents: Array<{ name: string; extractedText: string | null }>;
+  country: string;
   dashboardMode: string;
   loyalty: {
     enabled: boolean;
@@ -234,6 +247,7 @@ export async function buildBusinessContext(
       staff: business.staff,
       faqs: business.faqs,
       documents: business.documents,
+      country: (business as Record<string, unknown>).country as string || "UZ",
       dashboardMode: (business as Record<string, unknown>).dashboardMode as string || "service",
       loyalty: firstProgram ? {
         enabled: firstProgram.enabled,
@@ -300,7 +314,7 @@ ${langInstruction}
 ${
   business.services.length > 0
     ? business.services
-        .map((s) => `- ${s.name}: ${s.price} сум (${s.duration} мин)`)
+        .map((s) => `- ${s.name}: ${s.price} ${currencyLabel(business.country)} (${s.duration} мин)`)
         .join("\n")
     : "Услуги пока не добавлены в систему"
 }
@@ -326,7 +340,13 @@ ${
   business.documents.length > 0
     ? business.documents
         .filter((d) => d.extractedText)
-        .map((d) => `### ${d.name}:\n${d.extractedText}`)
+        .slice(0, 5)
+        .map((d) => {
+          const text = d.extractedText!.length > 4000
+            ? d.extractedText!.substring(0, 4000) + "..."
+            : d.extractedText!;
+          return `### ${d.name}:\n${text}`;
+        })
         .join("\n\n")
     : ""
 }

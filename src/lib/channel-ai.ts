@@ -52,6 +52,7 @@ async function loadBusinessProfile(businessId: string) {
       services: { select: { name: true, price: true, duration: true }, take: 20 },
       faqs: { select: { question: true, answer: true }, take: 20 },
       staff: { select: { name: true, role: true }, take: 10 },
+      documents: { where: { parsed: true }, select: { name: true, extractedText: true }, take: 5 },
     },
   });
 }
@@ -99,6 +100,17 @@ function buildChannelSystemPrompt(
   if (staffList) prompt += `\n\nСпециалисты:\n${staffList}`;
 
   if (faqList) prompt += `\n\nЧасто задаваемые вопросы:\n${faqList}`;
+
+  // Add knowledge base documents
+  const docs = biz.documents
+    .filter((d) => d.extractedText)
+    .map((d) => {
+      const text = d.extractedText!.length > 4000 ? d.extractedText!.substring(0, 4000) + "..." : d.extractedText!;
+      return `### ${d.name}:\n${text}`;
+    });
+  if (docs.length > 0) {
+    prompt += `\n\nДокументы базы знаний:\n${docs.join("\n\n")}`;
+  }
 
   if (biz.welcomeMessage) {
     prompt += `\n\nПриветственное сообщение для новых клиентов:\n${biz.welcomeMessage}`;

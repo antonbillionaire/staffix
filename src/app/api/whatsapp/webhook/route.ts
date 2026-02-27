@@ -14,6 +14,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { parseWAWebhook, sendWAMessage, markWAMessageRead } from "@/lib/whatsapp-utils";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
+import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
 
 // Deduplication: track recently processed WA message IDs (Meta retries if response is slow)
 const processedWAMessages = new Set<string>();
@@ -68,16 +69,37 @@ export async function POST(request: Request) {
   const businessId = searchParams.get("businessId");
   const respond200 = () => NextResponse.json({ success: true }, { status: 200 });
 
+  // Verify webhook signature (HMAC-SHA256 from Meta)
+  const rawBody = await request.text();
+  const signature = request.headers.get("x-hub-signature-256");
+  if (!verifyMetaWebhookSignature(rawBody, signature)) {
+    console.warn("[WA Webhook] Invalid signature, rejecting");
+    return new Response("Forbidden", { status: 403 });
+  }
+
   let body: Record<string, unknown>;
   try {
-    body = await request.json();
+    body = JSON.parse(rawBody);
   } catch {
     return respond200();
   }
 
   // Parse incoming message
   const msg = parseWAWebhook(body);
-  if (!msg || !msg.text.trim()) return respond200();
+  if (!msg) return respond200();
+
+  // Handle non-text messages (images, audio, stickers, etc.)
+  if (msg.type !== "text" || !msg.text.trim()) {
+    // Find business to get WA credentials and reply
+    const biz = await prisma.business.findFirst({
+      where: businessId ? { id: businessId } : { waPhoneNumberId: msg.phoneNumberId, waActive: true },
+      select: { waPhoneNumberId: true, waAccessToken: true },
+    });
+    if (biz?.waPhoneNumberId && biz.waAccessToken) {
+      sendWAMessage(biz.waPhoneNumberId, biz.waAccessToken, msg.waId, "Извините, я пока могу работать только с текстовыми сообщениями. Напишите ваш вопрос текстом.").catch(() => {});
+    }
+    return respond200();
+  }
 
   // Skip duplicate webhook deliveries
   if (!markWAProcessed(msg.messageId)) return respond200();

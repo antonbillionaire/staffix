@@ -1,10 +1,12 @@
 /**
  * Notification System for Staffix
- * Sends Telegram notifications to business owners and staff,
- * and creates in-app notifications for the dashboard bell icon.
+ * Multi-channel: Telegram, WhatsApp, in-app dashboard notifications.
+ * FB Messenger / Instagram DM notifications require owner PSID (future).
  */
 
 import { prisma } from "./prisma";
+import { sendWAMessage } from "./whatsapp-utils";
+import { sendFBMessage } from "./facebook-utils";
 
 // ========================================
 // TELEGRAM HELPER
@@ -36,6 +38,65 @@ export async function sendTelegramMsg(
 }
 
 // ========================================
+// MULTI-CHANNEL OWNER NOTIFICATION
+// ========================================
+
+/**
+ * Send notification to business owner via ALL available channels.
+ * Currently: Telegram + WhatsApp (if connected) + in-app.
+ * Future: FB Messenger, Instagram DM (need owner PSID/IG ID).
+ */
+export async function sendOwnerNotification(
+  businessId: string,
+  text: string,
+  plainText?: string
+): Promise<void> {
+  try {
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: {
+        botToken: true,
+        ownerTelegramChatId: true,
+        phone: true,
+        waPhoneNumberId: true,
+        waAccessToken: true,
+        waActive: true,
+        fbPageAccessToken: true,
+        fbActive: true,
+      },
+    });
+    if (!business) return;
+
+    // Plain text version (strip HTML tags for non-Telegram channels)
+    const plain = plainText || text.replace(/<[^>]+>/g, "");
+
+    // 1. Telegram (primary)
+    if (business.botToken && business.ownerTelegramChatId) {
+      sendTelegramMsg(business.botToken, business.ownerTelegramChatId, text).catch(
+        (err) => console.error("Owner notify TG error:", err)
+      );
+    }
+
+    // 2. WhatsApp (if connected and owner phone is available)
+    if (business.waActive && business.waPhoneNumberId && business.waAccessToken && business.phone) {
+      // Normalize phone: remove spaces, dashes, ensure starts with country code
+      const ownerPhone = business.phone.replace(/[\s\-()]/g, "");
+      if (ownerPhone.length >= 10) {
+        sendWAMessage(business.waPhoneNumberId, business.waAccessToken, ownerPhone, plain).catch(
+          (err) => console.error("Owner notify WA error:", err)
+        );
+      }
+    }
+
+    // 3. FB Messenger — requires owner's PSID (not stored yet)
+    // Future: if (business.fbActive && business.ownerFbPsid) { sendFBMessage(...) }
+
+  } catch (error) {
+    console.error("sendOwnerNotification error:", error);
+  }
+}
+
+// ========================================
 // BOOKING NOTIFICATION
 // ========================================
 
@@ -63,6 +124,10 @@ export async function sendBookingNotification(
         botToken: true,
         ownerTelegramChatId: true,
         name: true,
+        phone: true,
+        waPhoneNumberId: true,
+        waAccessToken: true,
+        waActive: true,
         userId: true,
         user: {
           select: {
@@ -107,8 +172,19 @@ export async function sendBookingNotification(
     // 2. Send Telegram to owner
     if (business.ownerTelegramChatId) {
       sendTelegramMsg(business.botToken, business.ownerTelegramChatId, ownerMsg).catch(
-        (err) => console.error("Failed to notify owner:", err)
+        (err) => console.error("Failed to notify owner via TG:", err)
       );
+    }
+
+    // 2b. Send WhatsApp to owner (if WA connected and phone available)
+    if (business.waActive && business.waPhoneNumberId && business.waAccessToken && business.phone) {
+      const ownerPhone = business.phone.replace(/[\s\-()]/g, "");
+      if (ownerPhone.length >= 10) {
+        const plainMsg = ownerMsg.replace(/<[^>]+>/g, "");
+        sendWAMessage(business.waPhoneNumberId, business.waAccessToken, ownerPhone, plainMsg).catch(
+          (err) => console.error("Failed to notify owner via WA:", err)
+        );
+      }
     }
 
     // 3. Send Telegram to assigned staff (master)

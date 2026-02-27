@@ -11,6 +11,19 @@ import { dispatchCrmEvent } from "./crm-integrations";
 import { getPaymentButtons } from "./payment-links";
 
 // ========================================
+// HELPERS
+// ========================================
+
+const COUNTRY_CURRENCY: Record<string, string> = {
+  UZ: "сум", KZ: "тенге", RU: "руб.", KG: "сом", TJ: "сомони",
+  AM: "драм", GE: "лари", US: "$", GB: "£",
+};
+
+function currencyLabel(country?: string | null): string {
+  return COUNTRY_CURRENCY[country || "UZ"] || "сум";
+}
+
+// ========================================
 // ТИПЫ
 // ========================================
 
@@ -656,10 +669,15 @@ async function notifyNewOrder(
         botToken: true,
         ownerTelegramChatId: true,
         name: true,
+        phone: true,
+        waPhoneNumberId: true,
+        waAccessToken: true,
+        waActive: true,
         paymeId: true,
         clickServiceId: true,
         clickMerchantId: true,
         kaspiPayLink: true,
+        country: true,
       },
     });
 
@@ -700,6 +718,18 @@ async function notifyNewOrder(
       }
     } else {
       console.log(`[Notify] No ownerTelegramChatId for business ${businessId} — owner needs to /start the bot`);
+    }
+
+    // WhatsApp уведомление владельцу (if WA connected and phone available)
+    if (business.waActive && business.waPhoneNumberId && business.waAccessToken && business.phone) {
+      const ownerPhone = business.phone.replace(/[\s\-()]/g, "");
+      if (ownerPhone.length >= 10) {
+        const plainMessage = message.replace(/<[^>]+>/g, "");
+        const { sendWAMessage } = await import("./whatsapp-utils");
+        sendWAMessage(business.waPhoneNumberId, business.waAccessToken, ownerPhone, plainMessage).catch(
+          (e) => console.error("[Notify] Owner WA notify error:", e)
+        );
+      }
     }
 
     // Уведомляем сотрудников (admin/manager с включёнными уведомлениями)
@@ -751,7 +781,7 @@ async function notifyNewOrder(
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               chat_id: clientTelegramId.toString(),
-              text: `💳 Оплатите заказ #${order.orderNumber} — ${order.totalPrice.toLocaleString("ru-RU")} сум:`,
+              text: `💳 Оплатите заказ #${order.orderNumber} — ${order.totalPrice.toLocaleString("ru-RU")} ${currencyLabel(business.country)}:`,
               reply_markup: { inline_keyboard: paymentButtons },
             }),
           }

@@ -165,7 +165,12 @@ export async function DELETE(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ success: true });
+    // Warn that FB and IG are linked (disconnecting one disconnects both)
+    const warning = (channel === "facebook" || channel === "instagram")
+      ? "Facebook и Instagram используют один токен. Оба канала были отключены."
+      : undefined;
+
+    return NextResponse.json({ success: true, warning, disconnectedChannels: (channel === "facebook" || channel === "instagram") ? ["facebook", "instagram"] : [channel] });
   } catch (error) {
     console.error("Error disconnecting channel:", error);
     return NextResponse.json(

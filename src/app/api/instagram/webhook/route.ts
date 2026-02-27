@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
 import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
+import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
 
 const META_API_BASE = "https://graph.facebook.com/v21.0";
 
@@ -52,9 +53,17 @@ export async function POST(request: Request) {
 
   console.log("[IG Webhook] POST received");
 
+  // Verify webhook signature (HMAC-SHA256 from Meta)
+  const rawBody = await request.text();
+  const signature = request.headers.get("x-hub-signature-256");
+  if (!verifyMetaWebhookSignature(rawBody, signature)) {
+    console.warn("[IG Webhook] Invalid signature, rejecting");
+    return new Response("Forbidden", { status: 403 });
+  }
+
   let body: Record<string, unknown>;
   try {
-    body = await request.json();
+    body = JSON.parse(rawBody);
   } catch (e) {
     console.error("[IG Webhook] Failed to parse body:", e);
     return respond200();
@@ -76,8 +85,23 @@ export async function POST(request: Request) {
       const sender = messaging.sender as Record<string, string> | undefined;
       const message = messaging.message as Record<string, unknown> | undefined;
 
-      if (!sender?.id || !message?.text) continue;
+      if (!sender?.id || !message) continue;
       if (message.is_echo) continue;
+
+      // Handle non-text messages (images, audio, stickers, etc.)
+      if (!message.text) {
+        const messageId = String(message.mid || "");
+        if (!markIGProcessed(messageId)) continue;
+        // Find business to reply
+        const biz = await prisma.business.findFirst({
+          where: { OR: [{ igBusinessAccountId: accountId, igActive: true }, { fbPageId: accountId, igActive: true }] },
+          select: { fbPageAccessToken: true, igBusinessAccountId: true },
+        });
+        if (biz?.fbPageAccessToken && biz.igBusinessAccountId) {
+          await sendIGMessage(biz.igBusinessAccountId, biz.fbPageAccessToken, sender.id, "Извините, я пока могу работать только с текстовыми сообщениями. Напишите ваш вопрос текстом.").catch(() => {});
+        }
+        continue;
+      }
 
       const messageId = String(message.mid || "");
       if (!markIGProcessed(messageId)) continue;

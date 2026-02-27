@@ -333,6 +333,17 @@ export async function GET(request: NextRequest) {
       },
     }) : 0;
 
+    // Channel-specific message counts
+    const channelMessageCounts = await prisma.channelMessage.groupBy({
+      by: ["channel"],
+      where: { businessId: business.id, createdAt: { gte: startDate } },
+      _count: true,
+    });
+    const messagesByChannel: Record<string, number> = {};
+    channelMessageCounts.forEach((item) => {
+      messagesByChannel[item.channel] = item._count;
+    });
+
     // Calculate average response time from message pairs
     const recentConversations = await prisma.conversation.findMany({
       where: { businessId: business.id },
@@ -384,6 +395,8 @@ export async function GET(request: NextRequest) {
       totalRevenue,
       broadcastsSent,
       avgRating,
+      // Channel breakdown
+      messagesByChannel,
       // Order statistics (for sales/shop businesses)
       totalOrders,
       ordersByStatus,

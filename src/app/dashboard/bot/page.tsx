@@ -65,6 +65,7 @@ export default function AIEmployeePage() {
   });
   const [savingWa, setSavingWa] = useState(false);
   const [waSaved, setWaSaved] = useState(false);
+  const [waError, setWaError] = useState("");
   const [waOpen, setWaOpen] = useState(false);
 
   // Facebook Messenger settings
@@ -76,6 +77,7 @@ export default function AIEmployeePage() {
   });
   const [savingFb, setSavingFb] = useState(false);
   const [fbSaved, setFbSaved] = useState(false);
+  const [fbError, setFbError] = useState("");
   const [fbOpen, setFbOpen] = useState(false);
 
   // Business ID for webhook URLs
@@ -855,14 +857,21 @@ export default function AIEmployeePage() {
                     waActive: waSettings.active,
                   };
                   if (waSettings.accessToken) body.waAccessToken = waSettings.accessToken;
-                  await fetch("/api/business", {
+                  setWaError("");
+                  const res = await fetch("/api/business", {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(body),
                   });
+                  if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || "Ошибка сохранения");
+                  }
                   setWaSaved(true);
                   setTimeout(() => setWaSaved(false), 3000);
-                } catch {}
+                } catch (err) {
+                  setWaError(err instanceof Error ? err.message : "Ошибка сохранения настроек WhatsApp");
+                }
                 setSavingWa(false);
               }}
               disabled={savingWa}
@@ -876,6 +885,9 @@ export default function AIEmployeePage() {
                 <><Save className="h-4 w-4" /> Сохранить WhatsApp</>
               )}
             </button>
+            {waError && (
+              <p className="text-red-400 text-sm mt-2">{waError}</p>
+            )}
           </div>
         )}
       </div>
@@ -995,14 +1007,21 @@ export default function AIEmployeePage() {
                     fbActive: fbSettings.active,
                   };
                   if (fbSettings.pageAccessToken) body.fbPageAccessToken = fbSettings.pageAccessToken;
-                  await fetch("/api/business", {
+                  setFbError("");
+                  const res = await fetch("/api/business", {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(body),
                   });
+                  if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || "Ошибка сохранения");
+                  }
                   setFbSaved(true);
                   setTimeout(() => setFbSaved(false), 3000);
-                } catch {}
+                } catch (err) {
+                  setFbError(err instanceof Error ? err.message : "Ошибка сохранения настроек Facebook");
+                }
                 setSavingFb(false);
               }}
               disabled={savingFb}
@@ -1016,6 +1035,9 @@ export default function AIEmployeePage() {
                 <><Save className="h-4 w-4" /> Сохранить Facebook Messenger</>
               )}
             </button>
+            {fbError && (
+              <p className="text-red-400 text-sm mt-2">{fbError}</p>
+            )}
           </div>
         )}
       </div>
