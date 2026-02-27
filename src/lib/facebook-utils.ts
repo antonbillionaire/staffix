@@ -6,18 +6,57 @@
 const FB_API_VERSION = "v21.0";
 const FB_API_BASE = `https://graph.facebook.com/${FB_API_VERSION}`;
 
+// Cache page access tokens (System User token → Page Access Token)
+const pageTokenCache = new Map<string, { token: string; expiresAt: number }>();
+
+/**
+ * Get a Page Access Token from a System User token.
+ * System User tokens can't call /me/messages — need page-specific tokens.
+ * Caches the result for 30 minutes.
+ */
+export async function getPageAccessToken(
+  pageId: string,
+  systemUserToken: string
+): Promise<string> {
+  const cacheKey = `${pageId}:${systemUserToken.slice(-10)}`;
+  const cached = pageTokenCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.token;
+
+  try {
+    const res = await fetch(
+      `${FB_API_BASE}/${pageId}?fields=access_token&access_token=${systemUserToken}`
+    );
+    const data = await res.json();
+    if (data.access_token) {
+      pageTokenCache.set(cacheKey, {
+        token: data.access_token,
+        expiresAt: Date.now() + 30 * 60 * 1000, // 30 min cache
+      });
+      return data.access_token;
+    }
+  } catch (e) {
+    console.error("getPageAccessToken error:", e);
+  }
+  // Fallback: return original token
+  return systemUserToken;
+}
+
 /**
  * Send a text message to a Facebook Messenger user
  */
 export async function sendFBMessage(
   pageAccessToken: string,
   recipientId: string,
-  text: string
+  text: string,
+  pageId?: string
 ): Promise<boolean> {
   try {
     const chunks = splitMessage(text, 2000); // FB limit 2000 chars
+    // Resolve page access token if we have pageId (System User tokens need this)
+    const token = pageId ? await getPageAccessToken(pageId, pageAccessToken) : pageAccessToken;
+    const endpoint = pageId ? `${FB_API_BASE}/${pageId}/messages` : `${FB_API_BASE}/me/messages`;
     for (const chunk of chunks) {
-      const res = await fetch(`${FB_API_BASE}/me/messages?access_token=${pageAccessToken}`, {
+      const res = await fetch(`${endpoint}?access_token=${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -44,10 +83,13 @@ export async function sendFBMessage(
  */
 export async function sendFBTyping(
   pageAccessToken: string,
-  recipientId: string
+  recipientId: string,
+  pageId?: string
 ): Promise<void> {
   try {
-    await fetch(`${FB_API_BASE}/me/messages?access_token=${pageAccessToken}`, {
+    const token = pageId ? await getPageAccessToken(pageId, pageAccessToken) : pageAccessToken;
+    const endpoint = pageId ? `${FB_API_BASE}/${pageId}/messages` : `${FB_API_BASE}/me/messages`;
+    await fetch(`${endpoint}?access_token=${token}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

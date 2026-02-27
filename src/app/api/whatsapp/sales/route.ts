@@ -14,6 +14,7 @@
 import { NextResponse } from "next/server";
 import { parseWAWebhook, sendWAMessage, markWAMessageRead } from "@/lib/whatsapp-utils";
 import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
+import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
 
 // ─── GET: Webhook verification ───────────────────────────────────────────────
 export async function GET(request: Request) {
@@ -41,13 +42,19 @@ export async function POST(request: Request) {
 
   let body: Record<string, unknown>;
   try {
-    body = await request.json();
+    const rawBody = await request.text();
+    const signature = request.headers.get("x-hub-signature-256");
+    if (!verifyMetaWebhookSignature(rawBody, signature)) {
+      console.warn("[WA Sales /sales] Signature mismatch (processing anyway)");
+    }
+    body = JSON.parse(rawBody);
   } catch {
     return respond200();
   }
 
   const msg = parseWAWebhook(body);
-  if (!msg || !msg.text.trim()) return respond200();
+  if (!msg) return respond200();
+  if (msg.type !== "text" || !msg.text.trim()) return respond200();
 
   // Process in background
   processSalesMessage(msg).catch((e) => console.error("WA sales error:", e));

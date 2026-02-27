@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
 import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
+import { getPageAccessToken } from "@/lib/facebook-utils";
 
 const META_API_BASE = "https://graph.facebook.com/v21.0";
 
@@ -97,7 +98,8 @@ export async function POST(request: Request) {
           select: { fbPageAccessToken: true, igBusinessAccountId: true },
         });
         if (biz?.fbPageAccessToken && biz.igBusinessAccountId) {
-          await sendIGMessage(biz.igBusinessAccountId, biz.fbPageAccessToken, sender.id, "Извините, я пока могу работать только с текстовыми сообщениями. Напишите ваш вопрос текстом.").catch(() => {});
+          const pgToken = await getPageAccessToken(accountId, biz.fbPageAccessToken).catch(() => biz.fbPageAccessToken!);
+          await sendIGMessage(biz.igBusinessAccountId, pgToken, sender.id, "Извините, я пока могу работать только с текстовыми сообщениями. Напишите ваш вопрос текстом.").catch(() => {});
         }
         continue;
       }
@@ -158,9 +160,11 @@ async function processIGMessage(
       process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
     console.log(`[IG Webhook] Sales bot reply to ${senderId} via pageId=${pageId}`);
     if (pageId) {
-      await sendIGSenderAction(pageId, staffixToken, senderId, "mark_seen");
-      await sendIGSenderAction(pageId, staffixToken, senderId, "typing_on");
-      await sendIGMessage(pageId, staffixToken, senderId, reply);
+      // System User token → Page Access Token (required for IG Messages API)
+      const pageToken = await getPageAccessToken(pageId, staffixToken);
+      await sendIGSenderAction(pageId, pageToken, senderId, "mark_seen");
+      await sendIGSenderAction(pageId, pageToken, senderId, "typing_on");
+      await sendIGMessage(pageId, pageToken, senderId, reply);
     }
     return;
   }

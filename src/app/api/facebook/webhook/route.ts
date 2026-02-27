@@ -99,7 +99,7 @@ export async function POST(request: Request) {
         select: { fbPageAccessToken: true },
       });
       if (biz?.fbPageAccessToken) {
-        sendFBMessage(biz.fbPageAccessToken, msg.senderId, "Извините, я пока могу работать только с текстовыми сообщениями. Напишите ваш вопрос текстом.").catch(() => {});
+        sendFBMessage(biz.fbPageAccessToken, msg.senderId, "Извините, я пока могу работать только с текстовыми сообщениями. Напишите ваш вопрос текстом.", msg.pageId).catch(() => {});
       }
       continue;
     }
@@ -145,7 +145,7 @@ async function processStaffixFBMessage(msg: {
 
   console.log(`FB Sales: processing message from ${msg.senderId}: "${msg.text.slice(0, 50)}"`);
 
-  await sendFBTyping(accessToken, msg.senderId);
+  await sendFBTyping(accessToken, msg.senderId, msg.pageId);
 
   const reply = await generateStaffixSalesResponse(
     "facebook",
@@ -155,7 +155,7 @@ async function processStaffixFBMessage(msg: {
 
   console.log(`FB Sales: AI reply generated (${reply.length} chars), sending...`);
 
-  const sent = await sendFBMessage(accessToken, msg.senderId, reply);
+  const sent = await sendFBMessage(accessToken, msg.senderId, reply, msg.pageId);
   console.log(`FB Sales: message sent = ${sent}`);
 }
 
@@ -187,13 +187,14 @@ async function processBusinessFBMessage(
         await sendFBMessage(
           business.fbPageAccessToken,
           msg.senderId,
-          "Извините, временно не можем обработать ваш запрос. Свяжитесь с нами напрямую."
+          "Извините, временно не можем обработать ваш запрос. Свяжитесь с нами напрямую.",
+          msg.pageId
         );
         return;
       }
     }
 
-    await sendFBTyping(business.fbPageAccessToken, msg.senderId);
+    await sendFBTyping(business.fbPageAccessToken, msg.senderId, msg.pageId);
 
     const reply = await generateChannelAIResponse(
       businessId,
@@ -202,7 +203,7 @@ async function processBusinessFBMessage(
       msg.text
     );
 
-    await sendFBMessage(business.fbPageAccessToken, msg.senderId, reply);
+    await sendFBMessage(business.fbPageAccessToken, msg.senderId, reply, msg.pageId);
 
     if (sub) {
       await prisma.subscription.update({
