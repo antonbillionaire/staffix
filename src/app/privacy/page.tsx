@@ -29,8 +29,8 @@ export default function PrivacyPolicyPage() {
 
       {/* Content */}
       <main className="container mx-auto px-4 py-12 max-w-4xl">
-        <h1 className="text-4xl font-bold mb-8">Политика конфиденциальности</h1>
-        <p className="text-gray-400 mb-8">Последнее обновление: 31 января 2025 г.</p>
+        <h1 className="text-4xl font-bold mb-8">Политика конфиденциальности / Privacy Policy</h1>
+        <p className="text-gray-400 mb-8">Последнее обновление / Last updated: February 27, 2026</p>
 
         <div className="prose prose-invert prose-gray max-w-none space-y-8">
           <section>
@@ -93,7 +93,47 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">5. Хранение и защита данных</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">5. Meta Platform Data (Instagram, Facebook Messenger, WhatsApp)</h2>
+            <p className="text-gray-300 leading-relaxed">
+              Staffix integrates with Meta platforms (Instagram, Facebook Messenger, WhatsApp) to enable
+              AI-powered customer communication for your business. When you connect your Meta accounts:
+            </p>
+            <h3 className="text-xl font-medium text-white mb-3 mt-6">5.1. Data We Collect from Meta Platforms:</h3>
+            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4">
+              <li>Facebook Page ID, name, and page access tokens (to send/receive messages on your behalf)</li>
+              <li>Instagram Business Account ID and username</li>
+              <li>Direct messages and conversation history from Instagram DM and Facebook Messenger</li>
+              <li>Sender profile information (name, profile ID) from incoming messages</li>
+            </ul>
+            <h3 className="text-xl font-medium text-white mb-3 mt-6">5.2. How We Use Meta Platform Data:</h3>
+            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4">
+              <li>To process incoming messages and generate AI-powered responses</li>
+              <li>To provide you with conversation analytics and customer insights</li>
+              <li>To maintain conversation context for better customer service</li>
+            </ul>
+            <h3 className="text-xl font-medium text-white mb-3 mt-6">5.3. What We Do NOT Do:</h3>
+            <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4">
+              <li>We do NOT sell Meta platform data to third parties</li>
+              <li>We do NOT use message content to train general-purpose AI models</li>
+              <li>We do NOT share conversation data between different businesses</li>
+              <li>We do NOT use Meta data for advertising or profiling purposes</li>
+            </ul>
+            <h3 className="text-xl font-medium text-white mb-3 mt-6">5.4. Data Deletion:</h3>
+            <p className="text-gray-300 leading-relaxed">
+              When you disconnect your Meta accounts or when Meta sends a data deletion request,
+              we permanently delete all associated data including: messages, conversation history,
+              page tokens, and account identifiers. You can also request data deletion at any time by
+              contacting{" "}
+              <a href="mailto:support@staffix.io" className="text-blue-400 hover:text-blue-300">support@staffix.io</a>.
+            </p>
+            <p className="text-gray-300 leading-relaxed mt-2">
+              Meta data deletion callback URL:{" "}
+              <span className="text-blue-400 font-mono text-sm">https://staffix.io/api/meta/data-deletion</span>
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-white mb-4">6. Хранение и защита данных / Data Storage &amp; Security</h2>
             <p className="text-gray-300 leading-relaxed">
               Мы применяем современные меры безопасности для защиты вашей информации:
             </p>
@@ -112,12 +152,12 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">6. Передача данных третьим лицам</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">7. Передача данных третьим лицам / Third-Party Data Sharing</h2>
             <p className="text-gray-300 leading-relaxed">
               Мы не продаем вашу личную информацию. Мы можем передавать данные:
             </p>
             <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-4">
-              <li>Поставщикам услуг, которые помогают нам предоставлять Сервис (хостинг, платежи, аналитика)</li>
+              <li>Поставщикам услуг: Vercel (хостинг), PayPro Global (платежи), Meta Platforms (Instagram, Facebook Messenger), Anthropic (AI), OpenAI (AI)</li>
               <li>По требованию законодательства или в ответ на законные запросы властей</li>
               <li>Для защиты наших прав, собственности или безопасности</li>
               <li>В случае слияния, приобретения или продажи активов (с уведомлением пользователей)</li>
@@ -125,7 +165,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">7. Ваши права</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">8. Ваши права / Your Rights</h2>
             <p className="text-gray-300 leading-relaxed">Вы имеете право:</p>
             <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-4">
               <li>Получить доступ к своим персональным данным</li>
@@ -144,7 +184,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">8. Файлы cookie</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">9. Файлы cookie</h2>
             <p className="text-gray-300 leading-relaxed">
               Мы используем cookie и аналогичные технологии для:
             </p>
@@ -159,7 +199,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">9. Изменения политики</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">10. Изменения политики</h2>
             <p className="text-gray-300 leading-relaxed">
               Мы можем обновлять эту Политику конфиденциальности. При существенных изменениях
               мы уведомим вас по email или через Сервис. Продолжение использования Сервиса
@@ -168,16 +208,22 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">10. Контакты</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">11. Контакты / Contact Us</h2>
             <p className="text-gray-300 leading-relaxed">
               По вопросам конфиденциальности обращайтесь:
             </p>
             <div className="mt-4 p-4 bg-white/5 rounded-xl border border-white/10">
-              <p className="text-white font-medium">Staffix</p>
+              <p className="text-white font-medium">Staffix — K-BRIDGE Co., Ltd.</p>
               <p className="text-gray-300 mt-2">
                 Email:{" "}
                 <a href="mailto:support@staffix.io" className="text-blue-400 hover:text-blue-300">
                   support@staffix.io
+                </a>
+              </p>
+              <p className="text-gray-300">
+                Website:{" "}
+                <a href="https://staffix.io" className="text-blue-400 hover:text-blue-300">
+                  https://staffix.io
                 </a>
               </p>
               <p className="text-gray-300">
@@ -199,7 +245,7 @@ export default function PrivacyPolicyPage() {
       {/* Footer */}
       <footer className="border-t border-white/5 py-8 mt-12">
         <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-          © 2025 Staffix. Все права защищены.
+          © 2026 Staffix (K-BRIDGE Co., Ltd.). All rights reserved.
         </div>
       </footer>
     </div>
