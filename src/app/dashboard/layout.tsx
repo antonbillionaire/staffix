@@ -46,6 +46,9 @@ import {
   Briefcase,
   Gift,
   Truck,
+  Instagram,
+  Facebook,
+  Phone,
   type LucideIcon,
 } from "lucide-react";
 const ChatWidget = dynamic(() => import("@/components/ChatWidget"), { ssr: false });
@@ -59,6 +62,7 @@ interface NavChild {
   icon: LucideIcon;
   requiredPlan?: PlanId;
   badge?: "messages";
+  children?: NavChild[];
 }
 
 interface NavGroup {
@@ -90,10 +94,17 @@ function buildNavConfig(isSales: boolean): NavEntry[] {
       href: "/dashboard/channels",
       icon: Brain,
       children: [
-        { nameKey: "nav.telegram", href: "/dashboard/bot", icon: MessageSquare },
-        { nameKey: "nav.whatsapp", href: "/dashboard/channels", icon: Globe },
-        { nameKey: "nav.instagram", href: "/dashboard/channels", icon: Send },
-        { nameKey: "nav.knowledge", href: "/dashboard/faq", icon: FileText },
+        {
+          nameKey: "nav.channelsGroup",
+          href: "/dashboard/channels",
+          icon: Globe,
+          children: [
+            { nameKey: "nav.telegram", href: "/dashboard/channels/telegram", icon: MessageSquare },
+            { nameKey: "nav.whatsapp", href: "/dashboard/channels/whatsapp", icon: Phone },
+            { nameKey: "nav.instagramFacebook", href: "/dashboard/channels/meta", icon: Instagram },
+          ],
+        },
+        { nameKey: "nav.knowledge", href: "/dashboard/knowledge", icon: FileText },
       ],
     },
     {
@@ -167,14 +178,27 @@ export default function DashboardLayout({
   const isSales = isSalesDashboard(dashboardMode);
   const navConfig = useMemo(() => buildNavConfig(isSales), [isSales]);
 
+  // Check if a child (or its nested children) matches current path
+  const isChildOrNestedActive = (child: NavChild): boolean => {
+    if (pathname === child.href || pathname.startsWith(child.href + "/")) return true;
+    if (child.children) return child.children.some(c => pathname === c.href || pathname.startsWith(c.href + "/"));
+    return false;
+  };
+
   // Determine which groups are open based on current pathname
   const getInitialOpenGroups = () => {
     const open: string[] = [];
     for (const entry of navConfig) {
       if ("children" in entry) {
-        const isChildActive = entry.children.some(child => pathname === child.href || pathname.startsWith(child.href + "/"));
+        const isChildActive = entry.children.some(child => isChildOrNestedActive(child));
         if (isChildActive || pathname === entry.href) {
           open.push(entry.nameKey);
+          // Also open nested sub-groups
+          for (const child of entry.children) {
+            if (child.children && child.children.some(c => pathname === c.href || pathname.startsWith(c.href + "/"))) {
+              open.push(child.nameKey);
+            }
+          }
         }
       }
     }
@@ -409,7 +433,7 @@ export default function DashboardLayout({
             // Group with children
             const group = entry as NavGroup;
             const isGroupOpen = openGroups.includes(group.nameKey);
-            const isGroupActive = pathname === group.href || group.children.some(c => pathname === c.href || pathname.startsWith(c.href + "/"));
+            const isGroupActive = pathname === group.href || group.children.some(c => isChildOrNestedActive(c));
 
             return (
               <div key={group.nameKey}>
@@ -435,13 +459,78 @@ export default function DashboardLayout({
 
                 {/* Children */}
                 {isGroupOpen && (
-                  <div className="mt-0.5 ml-3 pl-3 border-l border-white/10 space-y-0.5">
+                  <div className={`mt-0.5 ml-3 pl-3 border-l ${isDark ? "border-white/10" : "border-gray-200"} space-y-0.5`}>
                     {group.children.map((child) => {
-                      const isChildActive = pathname === child.href;
+                      const isChildActive = pathname === child.href || pathname.startsWith(child.href + "/");
                       const isMessages = child.badge === "messages";
                       const userPlan = subscription.plan as PlanId;
                       const hasAccess = !child.requiredPlan || hasMenuAccess(userPlan, child.requiredPlan);
                       const isLocked = !hasAccess;
+
+                      // If child has nested children, render as sub-group
+                      if (child.children) {
+                        const isSubGroupOpen = openGroups.includes(child.nameKey);
+                        const isSubGroupActive = child.children.some(c => pathname === c.href || pathname.startsWith(c.href + "/"));
+
+                        return (
+                          <div key={child.nameKey}>
+                            <button
+                              onClick={() => {
+                                toggleGroup(child.nameKey);
+                                // Also navigate to overview page
+                                if (!isSubGroupOpen) {
+                                  setSidebarOpen(false);
+                                }
+                              }}
+                              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
+                                isSubGroupActive
+                                  ? `${isDark ? "text-white" : "text-gray-900"} font-medium`
+                                  : `${textSecondary} ${hoverBg}`
+                              }`}
+                            >
+                              <child.icon className={`h-4 w-4 flex-shrink-0 ${isSubGroupActive ? "text-blue-400" : ""}`} />
+                              <span className="flex-1 text-left">{t(child.nameKey)}</span>
+                              <ChevronDown className={`h-3.5 w-3.5 flex-shrink-0 transition-transform ${isSubGroupOpen ? "rotate-180" : ""} ${isSubGroupActive ? "text-blue-400" : ""}`} />
+                            </button>
+
+                            {isSubGroupOpen && (
+                              <div className={`mt-0.5 ml-3 pl-3 border-l ${isDark ? "border-white/10" : "border-gray-200"} space-y-0.5`}>
+                                {/* Overview link */}
+                                <Link
+                                  href={child.href}
+                                  onClick={() => setSidebarOpen(false)}
+                                  className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-all ${
+                                    pathname === child.href
+                                      ? "bg-blue-500/15 text-blue-400 font-medium"
+                                      : `${textSecondary} ${hoverBg}`
+                                  }`}
+                                >
+                                  <Globe className={`h-3.5 w-3.5 flex-shrink-0 ${pathname === child.href ? "text-blue-400" : ""}`} />
+                                  <span>Обзор</span>
+                                </Link>
+                                {child.children.map((nested) => {
+                                  const isNestedActive = pathname === nested.href || pathname.startsWith(nested.href + "/");
+                                  return (
+                                    <Link
+                                      key={nested.nameKey}
+                                      href={nested.href}
+                                      onClick={() => setSidebarOpen(false)}
+                                      className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-all ${
+                                        isNestedActive
+                                          ? "bg-blue-500/15 text-blue-400 font-medium"
+                                          : `${textSecondary} ${hoverBg}`
+                                      }`}
+                                    >
+                                      <nested.icon className={`h-3.5 w-3.5 flex-shrink-0 ${isNestedActive ? "text-blue-400" : ""}`} />
+                                      <span>{t(nested.nameKey)}</span>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
 
                       if (isLocked) {
                         return (

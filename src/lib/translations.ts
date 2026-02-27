@@ -54,6 +54,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.telegram": "Телеграм",
     "nav.whatsapp": "Ватсап",
     "nav.instagram": "Инстаграм",
+    "nav.channelsGroup": "Каналы",
+    "nav.instagramFacebook": "Instagram & Facebook",
 
     // Dashboard stats (new)
     "dashboard.today": "Сегодня",
@@ -69,6 +71,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "dashboard.connected": "Подключён",
     "dashboard.notConnected": "Не подключён",
     "dashboard.comingSoon": "Скоро",
+    "dashboard.configure": "Настроить",
 
     // Sidebar
     "sidebar.yourBusiness": "Ваш бизнес",
@@ -734,6 +737,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.telegram": "Telegram",
     "nav.whatsapp": "WhatsApp",
     "nav.instagram": "Instagram",
+    "nav.channelsGroup": "Channels",
+    "nav.instagramFacebook": "Instagram & Facebook",
 
     // Dashboard stats (new)
     "dashboard.today": "Today",
@@ -749,6 +754,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "dashboard.connected": "Connected",
     "dashboard.notConnected": "Not connected",
     "dashboard.comingSoon": "Coming soon",
+    "dashboard.configure": "Configure",
 
     // Sidebar
     "sidebar.yourBusiness": "Your business",
@@ -1414,6 +1420,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.telegram": "Telegram",
     "nav.whatsapp": "WhatsApp",
     "nav.instagram": "Instagram",
+    "nav.channelsGroup": "Kanallar",
+    "nav.instagramFacebook": "Instagram & Facebook",
 
     // Dashboard stats (new)
     "dashboard.today": "Bugun",
@@ -1429,6 +1437,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "dashboard.connected": "Ulangan",
     "dashboard.notConnected": "Ulanmagan",
     "dashboard.comingSoon": "Tez kunda",
+    "dashboard.configure": "Sozlash",
 
     // Sidebar
     "sidebar.yourBusiness": "Sizning biznesingiz",
@@ -2094,6 +2103,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.telegram": "Телеграм",
     "nav.whatsapp": "Ватсап",
     "nav.instagram": "Инстаграм",
+    "nav.channelsGroup": "Арналар",
+    "nav.instagramFacebook": "Instagram & Facebook",
 
     // Dashboard stats (new)
     "dashboard.today": "Бүгін",
@@ -2109,6 +2120,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "dashboard.connected": "Қосылған",
     "dashboard.notConnected": "Қосылмаған",
     "dashboard.comingSoon": "Жақында",
+    "dashboard.configure": "Баптау",
 
     // Sidebar
     "sidebar.yourBusiness": "Сіздің бизнесіңіз",

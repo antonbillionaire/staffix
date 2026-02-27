@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { encryptConfig, validateExternalUrl } from "@/lib/crm-integrations";
 
 async function getUserId(): Promise<string | null> {
   const session = await auth();
@@ -112,12 +113,15 @@ export async function POST(request: NextRequest) {
     // Валидация config по типу
     validateConfig(type, config);
 
+    // Encrypt sensitive fields before storing
+    const encryptedConfig = encryptConfig(config);
+
     const integration = await prisma.crmIntegration.create({
       data: {
         businessId,
         type,
         name,
-        config,
+        config: encryptedConfig as Record<string, string>,
         events: sanitizedEvents,
         isActive: true,
       },
@@ -146,9 +150,9 @@ function validateConfig(type: string, config: Record<string, unknown>): void {
         throw new ConfigValidationError("Webhook: необходим URL");
       }
       try {
-        new URL(config.url as string);
-      } catch {
-        throw new ConfigValidationError("Webhook: некорректный URL");
+        validateExternalUrl(config.url as string);
+      } catch (e) {
+        throw new ConfigValidationError(`Webhook: ${e instanceof Error ? e.message : "некорректный URL"}`);
       }
       break;
 
@@ -180,12 +184,22 @@ function validateConfig(type: string, config: Record<string, unknown>): void {
           "Bitrix24: необходимы domain (например: mycompany.bitrix24.ru) и token (webhook token)"
         );
       }
+      if (!/^[\w.-]+\.bitrix24\.\w+$/.test(config.domain as string)) {
+        throw new ConfigValidationError(
+          "Bitrix24: домен должен быть в формате mycompany.bitrix24.ru"
+        );
+      }
       break;
 
     case "amocrm":
       if (!config.domain || !config.token) {
         throw new ConfigValidationError(
           "AmoCRM: необходимы domain (например: mycompany) и token (access token)"
+        );
+      }
+      if (!/^[\w-]+$/.test(config.domain as string)) {
+        throw new ConfigValidationError(
+          "AmoCRM: домен должен содержать только буквы, цифры и дефис (например: mycompany)"
         );
       }
       break;

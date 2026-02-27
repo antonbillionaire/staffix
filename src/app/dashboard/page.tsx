@@ -140,7 +140,7 @@ export default function DashboardPage() {
     {
       key: "telegram",
       label: t("nav.telegram"),
-      href: "/dashboard/bot",
+      href: "/dashboard/channels/telegram",
       icon: MessageSquare,
       done: statsData?.readiness.telegram,
     },
@@ -171,7 +171,7 @@ export default function DashboardPage() {
     {
       key: "knowledge",
       label: t("nav.knowledge"),
-      href: "/dashboard/faq",
+      href: "/dashboard/knowledge",
       icon: FileText,
       done: statsData?.readiness.knowledge,
     },
@@ -211,7 +211,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Telegram */}
           <Link
-            href="/dashboard/bot"
+            href="/dashboard/channels/telegram"
             className={`${cardBg} border ${bizData?.botActive ? "border-green-500/30 hover:border-green-500/50" : `${borderColor} hover:border-blue-500/30`} rounded-xl p-4 flex items-center gap-3 transition-all group`}
           >
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bizData?.botActive ? "bg-green-500/20" : isDark ? "bg-white/5" : "bg-gray-100"}`}>
@@ -232,28 +232,34 @@ export default function DashboardPage() {
           </Link>
 
           {/* WhatsApp */}
-          <div className={`${cardBg} border ${borderColor} rounded-xl p-4 flex items-center gap-3 opacity-60`}>
+          <Link
+            href="/dashboard/channels/whatsapp"
+            className={`${cardBg} border ${borderColor} hover:border-green-500/30 rounded-xl p-4 flex items-center gap-3 transition-all group`}
+          >
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? "bg-white/5" : "bg-gray-100"}`}>
               <Globe className={`h-5 w-5 ${textMuted}`} />
             </div>
             <div className="flex-1">
               <p className={`font-medium ${textPrimary}`}>{t("nav.whatsapp")}</p>
-              <p className={`text-xs ${textMuted}`}>{t("dashboard.comingSoon")}</p>
+              <p className={`text-xs ${textMuted}`}>{t("dashboard.configure")}</p>
             </div>
-            <Clock className={`h-4 w-4 ${textMuted} flex-shrink-0`} />
-          </div>
+            <ArrowRight className={`h-4 w-4 ${textMuted} group-hover:text-green-400 transition-colors flex-shrink-0`} />
+          </Link>
 
-          {/* Instagram */}
-          <div className={`${cardBg} border ${borderColor} rounded-xl p-4 flex items-center gap-3 opacity-60`}>
+          {/* Instagram & Facebook */}
+          <Link
+            href="/dashboard/channels/meta"
+            className={`${cardBg} border ${borderColor} hover:border-purple-500/30 rounded-xl p-4 flex items-center gap-3 transition-all group`}
+          >
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? "bg-white/5" : "bg-gray-100"}`}>
               <Send className={`h-5 w-5 ${textMuted}`} />
             </div>
             <div className="flex-1">
-              <p className={`font-medium ${textPrimary}`}>{t("nav.instagram")}</p>
-              <p className={`text-xs ${textMuted}`}>{t("dashboard.comingSoon")}</p>
+              <p className={`font-medium ${textPrimary}`}>Instagram & FB</p>
+              <p className={`text-xs ${textMuted}`}>{t("dashboard.configure")}</p>
             </div>
-            <Clock className={`h-4 w-4 ${textMuted} flex-shrink-0`} />
-          </div>
+            <ArrowRight className={`h-4 w-4 ${textMuted} group-hover:text-purple-400 transition-colors flex-shrink-0`} />
+          </Link>
         </div>
       </div>
 

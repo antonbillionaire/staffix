@@ -27,6 +27,11 @@ async function getUserBusiness() {
       aiRules: true,
       businessType: true,
       dashboardMode: true,
+      waPhoneNumberId: true,
+      waActive: true,
+      igBusinessAccountId: true,
+      fbPageId: true,
+      fbActive: true,
       _count: {
         select: {
           services: true,
@@ -50,10 +55,11 @@ export async function GET() {
 
     return NextResponse.json({
       botConnected: !!business.botToken,
+      waConnected: !!(business.waPhoneNumberId && business.waActive),
+      metaConnected: !!(business.igBusinessAccountId || (business.fbPageId && business.fbActive)),
       hasCatalog: business._count.services + business._count.products > 0,
       hasStaff: business._count.staff > 0,
       hasKnowledge: business._count.faqs + business._count.documents > 0,
-      hasPrompt: !!business.aiRules && business.aiRules.trim().length > 10,
       businessType: business.businessType || null,
       dashboardMode: business.dashboardMode || "service",
     });

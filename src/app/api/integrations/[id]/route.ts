@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { encryptConfig } from "@/lib/crm-integrations";
 
 async function getUserId(): Promise<string | null> {
   const session = await auth();
@@ -47,7 +48,7 @@ export async function PATCH(
     if (typeof body.isActive === "boolean") updateData.isActive = body.isActive;
     if (body.name) updateData.name = body.name;
     if (Array.isArray(body.events)) updateData.events = body.events;
-    if (body.config) updateData.config = body.config;
+    if (body.config) updateData.config = encryptConfig(body.config);
 
     const updated = await prisma.crmIntegration.update({
       where: { id },

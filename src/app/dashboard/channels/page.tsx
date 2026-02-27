@@ -152,7 +152,15 @@ export default function ChannelsPage() {
       icon: TelegramIcon,
       color: "from-blue-500 to-cyan-500",
       description: "Telegram бот для общения с клиентами",
-      setupLink: "/dashboard/bot",
+      setupLink: "/dashboard/channels/telegram",
+    },
+    {
+      id: "whatsapp",
+      name: "WhatsApp",
+      icon: WhatsAppIcon,
+      color: "from-green-500 to-emerald-500",
+      description: "WhatsApp Business API для автоматических ответов",
+      setupLink: "/dashboard/channels/whatsapp",
     },
     {
       id: "instagram",
@@ -160,6 +168,7 @@ export default function ChannelsPage() {
       icon: Instagram,
       color: "from-pink-500 to-purple-500",
       description: "AI-ассистент отвечает в Instagram Direct",
+      setupLink: "/dashboard/channels/meta",
       connectAction: "meta",
     },
     {
@@ -168,15 +177,8 @@ export default function ChannelsPage() {
       icon: Facebook,
       color: "from-blue-600 to-indigo-500",
       description: "AI-ассистент отвечает в Facebook Messenger",
+      setupLink: "/dashboard/channels/meta",
       connectAction: "meta",
-    },
-    {
-      id: "whatsapp",
-      name: "WhatsApp",
-      icon: WhatsAppIcon,
-      color: "from-green-500 to-emerald-500",
-      description: "WhatsApp Business API (требует отдельную настройку)",
-      comingSoon: true,
     },
   ];
 
@@ -254,9 +256,7 @@ export default function ChannelsPage() {
           return (
             <div
               key={config.id}
-              className={`${cardBg} border ${borderColor} rounded-xl overflow-hidden ${
-                config.comingSoon ? "opacity-60" : ""
-              }`}
+              className={`${cardBg} border ${borderColor} rounded-xl overflow-hidden`}
             >
               {/* Header */}
               <div className={`bg-gradient-to-r ${config.color} p-4`}>
@@ -267,24 +267,17 @@ export default function ChannelsPage() {
                       {config.name}
                     </h3>
                   </div>
-                  {!config.comingSoon && (
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        isConnected ? "bg-green-500" : "bg-white/20"
-                      }`}
-                    >
-                      {isConnected ? (
-                        <CheckCircle2 className="h-5 w-5 text-white" />
-                      ) : (
-                        <XCircle className="h-5 w-5 text-white/60" />
-                      )}
-                    </div>
-                  )}
-                  {config.comingSoon && (
-                    <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full">
-                      Скоро
-                    </span>
-                  )}
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      isConnected ? "bg-green-500" : "bg-white/20"
+                    }`}
+                  >
+                    {isConnected ? (
+                      <CheckCircle2 className="h-5 w-5 text-white" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-white/60" />
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -321,16 +314,7 @@ export default function ChannelsPage() {
                 )}
 
                 {/* Action buttons */}
-                {config.comingSoon ? (
-                  <button
-                    disabled
-                    className={`w-full py-2.5 px-4 rounded-lg text-sm font-medium ${
-                      isDark ? "bg-white/5 text-gray-500" : "bg-gray-100 text-gray-400"
-                    } cursor-not-allowed`}
-                  >
-                    Скоро будет доступно
-                  </button>
-                ) : isConnected ? (
+                {isConnected ? (
                   <div className="flex gap-2">
                     {config.setupLink && (
                       <a

@@ -14,15 +14,18 @@ import {
   BookOpen,
   Brain,
   Package,
+  Phone,
+  Instagram,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 
 interface OnboardingStatus {
   botConnected: boolean;
+  waConnected: boolean;
+  metaConnected: boolean;
   hasCatalog: boolean;
   hasStaff: boolean;
   hasKnowledge: boolean;
-  hasPrompt: boolean;
   businessType: string | null;
   dashboardMode: string;
 }
@@ -30,13 +33,31 @@ interface OnboardingStatus {
 function getSteps(isSales: boolean) {
   return [
     {
-      id: "bot",
-      title: "Telegram бот",
+      id: "telegram",
+      title: "Telegram",
       desc: "Подключите бота",
-      href: "/dashboard/bot",
+      href: "/dashboard/channels/telegram",
       key: "botConnected" as keyof OnboardingStatus,
       icon: MessageSquare,
       color: "blue",
+    },
+    {
+      id: "whatsapp",
+      title: "WhatsApp",
+      desc: "Подключите WA API",
+      href: "/dashboard/channels/whatsapp",
+      key: "waConnected" as keyof OnboardingStatus,
+      icon: Phone,
+      color: "green",
+    },
+    {
+      id: "meta",
+      title: "IG & Facebook",
+      desc: "Подключите Meta",
+      href: "/dashboard/channels/meta",
+      key: "metaConnected" as keyof OnboardingStatus,
+      icon: Instagram,
+      color: "pink",
     },
     {
       id: "catalog",
@@ -54,25 +75,16 @@ function getSteps(isSales: boolean) {
       href: "/dashboard/staff",
       key: "hasStaff" as keyof OnboardingStatus,
       icon: Users,
-      color: "pink",
+      color: "orange",
     },
     {
       id: "knowledge",
       title: "База знаний",
-      desc: "FAQ, доп. документы, условия",
-      href: "/dashboard/faq",
+      desc: "Промпт, FAQ, документы",
+      href: "/dashboard/knowledge",
       key: "hasKnowledge" as keyof OnboardingStatus,
       icon: BookOpen,
-      color: "orange",
-    },
-    {
-      id: "prompt",
-      title: "AI-сотрудник",
-      desc: "Настройте промпт",
-      href: "/dashboard/bot",
-      key: "hasPrompt" as keyof OnboardingStatus,
-      icon: Brain,
-      color: "green",
+      color: "yellow",
     },
   ];
 }
@@ -223,7 +235,7 @@ export default function OnboardingWizard() {
       {/* Steps grid — shown when expanded */}
       {!collapsed && (
         <div
-          className={`px-5 pb-4 grid grid-cols-1 sm:grid-cols-5 gap-2 border-t ${
+          className={`px-5 pb-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 border-t ${
             isDark ? "border-white/5" : "border-gray-100"
           }`}
           style={{ paddingTop: "12px" }}
