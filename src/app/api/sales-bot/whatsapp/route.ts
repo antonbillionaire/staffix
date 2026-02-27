@@ -79,11 +79,14 @@ export async function GET(request: NextRequest) {
 
 // Webhook handler (POST)
 export async function POST(request: NextRequest) {
+  console.log("[WA Sales Webhook] POST received");
   try {
     const body = await request.json();
+    console.log("[WA Sales Webhook] object:", body.object);
 
     // WhatsApp webhook payload structure
     if (body.object !== "whatsapp_business_account") {
+      console.log("[WA Sales Webhook] Ignoring non-WA object:", body.object);
       return NextResponse.json({ ok: true });
     }
 
@@ -103,6 +106,8 @@ export async function POST(request: NextRequest) {
           const messageId = message.id;
 
           if (!senderPhone || !messageText) continue;
+
+          console.log(`[WA Sales Webhook] Message from ${senderPhone}: "${messageText.slice(0, 50)}"`);
 
           // Mark as read
           if (messageId) {
