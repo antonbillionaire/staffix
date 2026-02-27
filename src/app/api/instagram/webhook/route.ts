@@ -50,15 +50,23 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const respond200 = () => NextResponse.json({ success: true }, { status: 200 });
 
+  console.log("[IG Webhook] POST received");
+
   let body: Record<string, unknown>;
   try {
     body = await request.json();
-  } catch {
+  } catch (e) {
+    console.error("[IG Webhook] Failed to parse body:", e);
     return respond200();
   }
 
+  console.log("[IG Webhook] object:", body.object, "entries:", (body.entry as unknown[])?.length || 0);
+
   // Instagram events have object: "instagram"
-  if (body.object !== "instagram" && body.object !== "page") return respond200();
+  if (body.object !== "instagram" && body.object !== "page") {
+    console.log("[IG Webhook] Ignoring non-instagram object:", body.object);
+    return respond200();
+  }
 
   for (const entry of (body.entry as Array<Record<string, unknown>>) || []) {
     const accountId = String(entry.id); // IG Business Account ID or Page ID
@@ -74,10 +82,12 @@ export async function POST(request: Request) {
       const messageId = String(message.mid || "");
       if (!markIGProcessed(messageId)) continue;
 
+      console.log(`[IG Webhook] DM from ${sender.id} to account ${accountId}: "${String(message.text).slice(0, 50)}"`);
+
       try {
         await processIGMessage(accountId, sender.id, String(message.text));
       } catch (e) {
-        console.error("IG webhook processing error:", e);
+        console.error("[IG Webhook] processing error:", e);
       }
     }
   }
@@ -110,15 +120,20 @@ async function processIGMessage(
 
   if (!business || !business.fbPageAccessToken) {
     // Not a customer business — fall back to Staffix sales bot
+    console.log(`[IG Webhook] No business found for account ${accountId}, falling back to sales bot`);
     const staffixToken =
       process.env.FACEBOOK_PAGE_ACCESS_TOKEN ||
       process.env.STAFFIX_FB_PAGE_ACCESS_TOKEN;
-    if (!staffixToken) return;
+    if (!staffixToken) {
+      console.error("[IG Webhook] No FACEBOOK_PAGE_ACCESS_TOKEN or STAFFIX_FB_PAGE_ACCESS_TOKEN set!");
+      return;
+    }
 
     const reply = await generateStaffixSalesResponse("instagram", senderId, text);
     const pageId =
       process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID ||
       process.env.FACEBOOK_PAGE_ID;
+    console.log(`[IG Webhook] Sales bot reply to ${senderId} via pageId=${pageId}`);
     if (pageId) {
       await sendIGSenderAction(pageId, staffixToken, senderId, "mark_seen");
       await sendIGSenderAction(pageId, staffixToken, senderId, "typing_on");
