@@ -95,11 +95,11 @@ export async function POST(request: Request) {
         // Find business to reply
         const biz = await prisma.business.findFirst({
           where: { OR: [{ igBusinessAccountId: accountId, igActive: true }, { fbPageId: accountId, igActive: true }] },
-          select: { fbPageAccessToken: true, igBusinessAccountId: true },
+          select: { fbPageAccessToken: true, fbPageId: true },
         });
-        if (biz?.fbPageAccessToken && biz.igBusinessAccountId) {
-          const pgToken = await getPageAccessToken(accountId, biz.fbPageAccessToken).catch(() => biz.fbPageAccessToken!);
-          await sendIGMessage(biz.igBusinessAccountId, pgToken, sender.id, "Извините, я пока могу работать только с текстовыми сообщениями. Напишите ваш вопрос текстом.").catch(() => {});
+        if (biz?.fbPageAccessToken && biz.fbPageId) {
+          const pgToken = await getPageAccessToken(biz.fbPageId, biz.fbPageAccessToken).catch(() => biz.fbPageAccessToken!);
+          await sendIGMessage(biz.fbPageId, pgToken, sender.id, "Извините, я пока могу работать только с текстовыми сообщениями. Напишите ваш вопрос текстом.").catch(() => {});
         }
         continue;
       }
@@ -135,8 +135,8 @@ async function processIGMessage(
     },
     select: {
       id: true,
+      fbPageId: true,
       fbPageAccessToken: true,
-      igBusinessAccountId: true,
       subscription: {
         select: { messagesUsed: true, messagesLimit: true, expiresAt: true },
       },
@@ -176,7 +176,7 @@ async function processIGMessage(
     const limitReached = sub.messagesLimit !== -1 && sub.messagesUsed >= sub.messagesLimit;
     if (isExpired || limitReached) {
       await sendIGMessage(
-        business.igBusinessAccountId || accountId,
+        business.fbPageId || accountId,
         business.fbPageAccessToken,
         senderId,
         "Извините, временно не можем обработать ваш запрос. Свяжитесь с нами напрямую."
@@ -185,9 +185,9 @@ async function processIGMessage(
     }
   }
 
-  const igId = business.igBusinessAccountId || accountId;
-  await sendIGSenderAction(igId, business.fbPageAccessToken, senderId, "mark_seen");
-  await sendIGSenderAction(igId, business.fbPageAccessToken, senderId, "typing_on");
+  const pageId = business.fbPageId || accountId;
+  await sendIGSenderAction(pageId, business.fbPageAccessToken, senderId, "mark_seen");
+  await sendIGSenderAction(pageId, business.fbPageAccessToken, senderId, "typing_on");
 
   const reply = await generateChannelAIResponse(
     business.id,
@@ -196,7 +196,7 @@ async function processIGMessage(
     text
   );
 
-  await sendIGMessage(igId, business.fbPageAccessToken, senderId, reply);
+  await sendIGMessage(pageId, business.fbPageAccessToken, senderId, reply);
 
   // Increment message usage
   if (sub) {
