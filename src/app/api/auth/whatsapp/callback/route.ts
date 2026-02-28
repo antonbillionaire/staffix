@@ -1,7 +1,7 @@
 /**
  * POST /api/auth/whatsapp/callback
- * Body: { code: string, businessId: string }
- * Completes WhatsApp Embedded Signup: exchanges code for token,
+ * Body: { accessToken?: string, code?: string, businessId: string, phoneNumberId?: string }
+ * Completes WhatsApp Embedded Signup: uses token directly (or exchanges code),
  * discovers WABA and phone numbers, subscribes webhooks, saves to DB.
  */
 
@@ -22,11 +22,16 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { code, businessId, phoneNumberId: selectedPhoneId } = body;
+  const {
+    accessToken: directToken,
+    code,
+    businessId,
+    phoneNumberId: selectedPhoneId,
+  } = body;
 
-  if (!code || !businessId) {
+  if ((!directToken && !code) || !businessId) {
     return NextResponse.json(
-      { error: "Missing code or businessId" },
+      { error: "Missing accessToken/code or businessId" },
       { status: 400 }
     );
   }
@@ -34,16 +39,32 @@ export async function POST(request: NextRequest) {
   // Verify ownership
   const business = await prisma.business.findFirst({
     where: { id: businessId, userId: session.user.id },
-    select: { id: true },
+    select: { id: true, waAccessToken: true },
   });
   if (!business) {
     return NextResponse.json({ error: "Business not found" }, { status: 404 });
   }
 
   try {
-    // 1. Exchange code for access token
-    const { accessToken, expiresIn } = await exchangeWACodeForToken(code);
-    console.log("[WA Signup] Token received, expiresIn:", expiresIn);
+    // 1. Get access token — direct from FB.login() or exchange code
+    let accessToken: string;
+    let expiresIn = 5184000; // default 60 days
+
+    if (directToken) {
+      // Token came directly from FB.login() (default response_type)
+      accessToken = directToken;
+      console.log("[WA Signup] Using direct token from FB.login()");
+    } else if (selectedPhoneId && business.waAccessToken) {
+      // Phone selection step — token was saved earlier
+      accessToken = business.waAccessToken;
+      console.log("[WA Signup] Using saved token for phone selection");
+    } else {
+      // Code flow fallback
+      const result = await exchangeWACodeForToken(code);
+      accessToken = result.accessToken;
+      expiresIn = result.expiresIn;
+      console.log("[WA Signup] Token from code exchange, expiresIn:", expiresIn);
+    }
 
     // 2. Discover WABAs and phone numbers
     const wabas = await getWABusinessAccounts(accessToken);

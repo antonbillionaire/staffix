@@ -28,7 +28,7 @@ declare global {
     FB: {
       init: (params: Record<string, unknown>) => void;
       login: (
-        callback: (response: { authResponse?: { code?: string } }) => void,
+        callback: (response: { authResponse?: { code?: string; accessToken?: string } }) => void,
         options: Record<string, unknown>
       ) => void;
     };
@@ -155,20 +155,25 @@ export default function WhatsAppChannelPage() {
 
     window.FB.login(
       (response) => {
-        if (response.authResponse?.code) {
-          const code = response.authResponse.code;
-          setSavedCode(code);
+        const token = response.authResponse?.accessToken;
+        const code = response.authResponse?.code;
 
-          // Send code to backend
+        if (token || code) {
+          // Save for phone selection step
+          setSavedCode(token || code || "");
+
+          // Send to backend — prefer token, fallback to code
           fetch("/api/auth/whatsapp/callback", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ code, businessId }),
+            body: JSON.stringify({
+              ...(token ? { accessToken: token } : { code }),
+              businessId,
+            }),
           })
             .then((res) => res.json())
             .then((data) => {
               if (data.needsSelection) {
-                // Multiple phones — show selection
                 setPhones(data.phones);
                 setConnecting(false);
               } else if (data.success) {
@@ -187,7 +192,6 @@ export default function WhatsAppChannelPage() {
             });
         } else {
           setConnecting(false);
-          // User cancelled or denied
         }
       },
       {
@@ -211,7 +215,7 @@ export default function WhatsAppChannelPage() {
       const res = await fetch("/api/auth/whatsapp/callback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: savedCode, businessId, phoneNumberId: phoneId }),
+        body: JSON.stringify({ accessToken: savedCode, businessId, phoneNumberId: phoneId }),
       });
       const data = await res.json();
       if (data.success) {
