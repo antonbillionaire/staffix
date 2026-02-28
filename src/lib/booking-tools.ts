@@ -403,7 +403,7 @@ export async function createBooking(
   dateStr: string, // "YYYY-MM-DD"
   time: string, // "HH:MM"
   clientName: string,
-  clientTelegramId: bigint,
+  clientTelegramId: bigint | null,
   serviceId?: string,
   staffId?: string,
   clientPhone?: string
@@ -484,7 +484,7 @@ export async function createBooking(
 
       if (bookingDate < existingEnd && slotEnd > existingStart) {
         // If same client already booked this slot — return existing booking (idempotent)
-        if (existing.clientTelegramId === clientTelegramId) {
+        if (clientTelegramId && existing.clientTelegramId === clientTelegramId) {
           return {
             success: true,
             bookingId: existing.id,
@@ -506,7 +506,7 @@ export async function createBooking(
       data: {
         clientName,
         clientPhone: clientPhone || null,
-        clientTelegramId,
+        clientTelegramId: clientTelegramId || undefined,
         date: bookingDate,
         status: "confirmed",
         businessId,
@@ -521,29 +521,31 @@ export async function createBooking(
       data: { totalBookings: { increment: 1 } },
     });
 
-    // Update client record: mark as active with visit
-    await prisma.client.upsert({
-      where: {
-        businessId_telegramId: {
+    // Update client record (only if we have a telegramId-compatible identifier)
+    if (clientTelegramId) {
+      await prisma.client.upsert({
+        where: {
+          businessId_telegramId: {
+            businessId,
+            telegramId: clientTelegramId,
+          },
+        },
+        create: {
           businessId,
           telegramId: clientTelegramId,
+          name: clientName,
+          phone: clientPhone || null,
+          lastVisitDate: bookingDate,
+          totalVisits: 1,
         },
-      },
-      create: {
-        businessId,
-        telegramId: clientTelegramId,
-        name: clientName,
-        phone: clientPhone || null,
-        lastVisitDate: bookingDate,
-        totalVisits: 1,
-      },
-      update: {
-        name: clientName || undefined,
-        phone: clientPhone || undefined,
-        lastVisitDate: bookingDate,
-        totalVisits: { increment: 1 },
-      },
-    });
+        update: {
+          name: clientName || undefined,
+          phone: clientPhone || undefined,
+          lastVisitDate: bookingDate,
+          totalVisits: { increment: 1 },
+        },
+      });
+    }
 
     // Send notification to business owner and staff via Telegram + Dashboard (non-blocking)
     notifyBooking(businessId, "new_booking", clientName, serviceName, staffName, dateStr, time, booking.id, actualStaffId, clientPhone);
@@ -563,6 +565,26 @@ export async function createBooking(
     console.error("Error creating booking:", error);
     return { success: false, error: "Ошибка при создании записи" };
   }
+}
+
+/**
+ * Wrapper for channel-based bookings (Instagram, Facebook, WhatsApp).
+ * Converts string clientId to BigInt for idempotency and client tracking.
+ */
+export async function createBookingFromChannel(
+  businessId: string,
+  dateStr: string,
+  time: string,
+  clientName: string,
+  channelClientId: string,
+  channel: string,
+  serviceId?: string,
+  staffId?: string,
+  clientPhone?: string
+): Promise<BookingResult> {
+  const numericId = /^\d+$/.test(channelClientId) ? BigInt(channelClientId) : null;
+  console.log(`[Booking] Creating booking from ${channel}, clientId=${channelClientId}, numericId=${numericId}`);
+  return createBooking(businessId, dateStr, time, clientName, numericId, serviceId, staffId, clientPhone);
 }
 
 // ========================================

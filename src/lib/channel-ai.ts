@@ -1,15 +1,30 @@
 /**
- * AI response engine for WhatsApp and Facebook Messenger channels.
- * Reuses business context logic from Telegram webhook but stores
- * conversation history in ChannelConversation model (JSON).
+ * AI response engine for WhatsApp, Instagram DM, and Facebook Messenger channels.
+ * Now includes booking tools (check_availability, create_booking, etc.)
+ * so all channels share the same booking database with conflict checking
+ * and notifications.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
+import {
+  bookingToolDefinitions,
+  checkAvailability,
+  createBookingFromChannel,
+  getServicesList,
+  getStaffList,
+} from "@/lib/booking-tools";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 type HistoryMessage = { role: "user" | "assistant"; content: string };
+
+// Channel booking tools — subset of full booking tools (no cancel, no get_my_bookings, no notify_manager)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const channelBookingTools: any[] = bookingToolDefinitions.filter(
+  (t: { name: string }) =>
+    ["check_availability", "create_booking", "get_services", "get_staff"].includes(t.name)
+);
 
 /**
  * Get or create a ChannelConversation record for this client
@@ -120,21 +135,80 @@ function buildChannelSystemPrompt(
     prompt += `\n\nВажные правила:\n${biz.aiRules}`;
   }
 
-  prompt += `\n\nЕсли клиент хочет записаться — уточни имя, желаемую услугу, специалиста (если важно) и удобное время. Затем сообщи что передашь информацию и с ними свяжутся для подтверждения (или скажи позвонить по телефону если нет онлайн-записи).
+  prompt += `\n\nУ тебя есть инструменты для записи клиентов. Когда клиент хочет записаться:
+1. Уточни имя, желаемую услугу, мастера (если важно) и удобную дату
+2. Проверь доступные слоты через check_availability
+3. Предложи свободное время
+4. После подтверждения клиентом — создай запись через create_booking
+Записи создаются автоматически, клиенту не нужно звонить.
 
 Отвечай на языке клиента (русский, узбекский, казахский, английский).`;
 
-  const today = new Date().toLocaleDateString("ru-RU", {
-    weekday: "long", day: "numeric", month: "long",
-  });
-  prompt += `\n\nСегодня: ${today}.`;
+  const today = new Date().toISOString().split("T")[0];
+  prompt += `\n\nСегодняшняя дата: ${today}. Используй инструменты для работы с записями.`;
 
   return prompt;
 }
 
 /**
- * Generate AI response for a WhatsApp/FB message
- * Returns the assistant reply text
+ * Handle tool calls from Claude for channel conversations
+ */
+async function handleChannelToolCall(
+  toolName: string,
+  toolInput: Record<string, string>,
+  businessId: string,
+  clientId: string,
+  channel: string
+): Promise<string> {
+  try {
+    switch (toolName) {
+      case "check_availability": {
+        const results = await checkAvailability(
+          businessId,
+          toolInput.date,
+          toolInput.service_id,
+          toolInput.staff_id
+        );
+        return JSON.stringify(results);
+      }
+
+      case "create_booking": {
+        const result = await createBookingFromChannel(
+          businessId,
+          toolInput.date,
+          toolInput.time,
+          toolInput.client_name,
+          clientId,
+          channel,
+          toolInput.service_id,
+          toolInput.staff_id,
+          toolInput.client_phone
+        );
+        return JSON.stringify(result);
+      }
+
+      case "get_services": {
+        const services = await getServicesList(businessId);
+        return JSON.stringify(services);
+      }
+
+      case "get_staff": {
+        const staff = await getStaffList(businessId);
+        return JSON.stringify(staff);
+      }
+
+      default:
+        return JSON.stringify({ error: `Unknown tool: ${toolName}` });
+    }
+  } catch (error) {
+    console.error(`[Channel AI] Error in tool ${toolName}:`, error);
+    return JSON.stringify({ error: "Ошибка выполнения инструмента" });
+  }
+}
+
+/**
+ * Generate AI response for a WhatsApp/Instagram/FB message.
+ * Now supports booking tools for real appointment creation with conflict checking.
  */
 export async function generateChannelAIResponse(
   businessId: string,
@@ -158,23 +232,88 @@ export async function generateChannelAIResponse(
 
     // Keep last 20 messages to avoid token overflow
     const recentHistory = history.slice(-20);
-    const messages: Array<{ role: "user" | "assistant"; content: string }> = [
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const messages: any[] = [
       ...recentHistory,
       { role: "user", content: userMessage },
     ];
 
-    const response = await anthropic.messages.create({
+    // Call Claude with booking tools
+    let response = await anthropic.messages.create({
       model: "claude-sonnet-4-5-20250929",
       max_tokens: 1024,
       system: systemPrompt,
       messages,
+      tools: channelBookingTools,
     });
 
-    const replyText =
-      response.content.find((b) => b.type === "text")?.text ||
-      "Извините, не удалось сформировать ответ. Пожалуйста, попробуйте ещё раз.";
+    // Tool loop — process tool_use responses (max 5 iterations)
+    let iterations = 0;
+    const maxIterations = 5;
 
-    // Save messages to history
+    while (response.stop_reason === "tool_use" && iterations < maxIterations) {
+      iterations++;
+
+      const toolUseBlocks = response.content.filter(
+        (block) => block.type === "tool_use"
+      );
+
+      // Add assistant response to messages
+      messages.push({
+        role: "assistant",
+        content: response.content,
+      });
+
+      // Execute each tool call
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const toolResults: any[] = [];
+
+      for (const block of toolUseBlocks) {
+        if (block.type === "tool_use") {
+          console.log(`[Channel AI] Tool call: ${block.name} (${channel})`);
+          const result = await handleChannelToolCall(
+            block.name,
+            block.input as Record<string, string>,
+            businessId,
+            clientId,
+            channel
+          );
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: block.id,
+            content: result,
+          });
+        }
+      }
+
+      // Add tool results to messages
+      messages.push({
+        role: "user",
+        content: toolResults,
+      });
+
+      // Call Claude again with tool results
+      try {
+        response = await anthropic.messages.create({
+          model: "claude-sonnet-4-5-20250929",
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages,
+          tools: channelBookingTools,
+        });
+      } catch (apiError) {
+        console.error("[Channel AI] API error after tool execution:", apiError);
+        break;
+      }
+    }
+
+    // Extract final text response
+    const textBlocks = response.content.filter((block) => block.type === "text");
+    const replyText = textBlocks.length > 0 && textBlocks[0].type === "text"
+      ? textBlocks[0].text
+      : "Извините, не удалось сформировать ответ. Пожалуйста, попробуйте ещё раз.";
+
+    // Save only text messages to history (not tool_use/tool_result blocks)
     const updatedHistory = ([
       ...history,
       { role: "user" as const, content: userMessage },
