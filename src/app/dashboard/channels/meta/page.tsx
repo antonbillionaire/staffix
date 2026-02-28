@@ -17,6 +17,7 @@ import {
   Target,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import ChannelGuideModal from "@/components/ChannelGuideModal";
 
 interface ChannelStatus {
   channel: string;
@@ -229,6 +230,9 @@ export default function MetaChannelsPage() {
           </div>
         </div>
       </div>
+
+      {/* Guide */}
+      {!isAnyConnected && <ChannelGuideModal channel="meta" />}
 
       {/* Connect button */}
       {!isAnyConnected && (

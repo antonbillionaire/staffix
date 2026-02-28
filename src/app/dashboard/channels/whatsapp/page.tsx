@@ -20,6 +20,7 @@ import {
   Unplug,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import ChannelGuideModal from "@/components/ChannelGuideModal";
 
 // Extend Window for Facebook SDK
 declare global {
@@ -452,6 +453,9 @@ export default function WhatsAppChannelPage() {
               ))}
             </div>
           </div>
+
+          {/* Guide */}
+          <ChannelGuideModal channel="whatsapp" />
 
           {/* Connect via Embedded Signup */}
           {configId && (
