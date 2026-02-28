@@ -1,19 +1,55 @@
 /**
  * POST /api/auth/whatsapp/callback
- * Body: { accessToken?: string, code?: string, businessId: string, phoneNumberId?: string }
- * Completes WhatsApp Embedded Signup: uses token directly (or exchanges code),
- * discovers WABA and phone numbers, subscribes webhooks, saves to DB.
+ * Body: { accessToken: string, businessId: string, wabaId?: string, phoneNumberId?: string }
+ * Completes WhatsApp Embedded Signup: uses token + IDs from the signup event,
+ * subscribes webhooks, registers phone, saves to DB.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import {
-  exchangeWACodeForToken,
-  getWABusinessAccounts,
   subscribeWABA,
   registerWAPhoneNumber,
 } from "@/lib/meta-oauth";
+
+const META_API_VERSION = "v21.0";
+const META_GRAPH_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
+
+/**
+ * Fetch phone number details (display number, verified name) by phone number ID.
+ */
+async function getPhoneNumberDetails(
+  phoneNumberId: string,
+  accessToken: string
+): Promise<{ display_phone_number: string; verified_name: string }> {
+  const res = await fetch(
+    `${META_GRAPH_BASE}/${phoneNumberId}?fields=display_phone_number,verified_name&access_token=${accessToken}`
+  );
+  const data = await res.json();
+  if (data.error) {
+    console.error("[WA] getPhoneNumberDetails error:", data.error);
+    return { display_phone_number: "", verified_name: "" };
+  }
+  return {
+    display_phone_number: data.display_phone_number || "",
+    verified_name: data.verified_name || "",
+  };
+}
+
+/**
+ * Fetch WABA name by WABA ID.
+ */
+async function getWABAName(
+  wabaId: string,
+  accessToken: string
+): Promise<string> {
+  const res = await fetch(
+    `${META_GRAPH_BASE}/${wabaId}?fields=name&access_token=${accessToken}`
+  );
+  const data = await res.json();
+  return data.name || "WhatsApp Business";
+}
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -22,16 +58,11 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const {
-    accessToken: directToken,
-    code,
-    businessId,
-    phoneNumberId: selectedPhoneId,
-  } = body;
+  const { accessToken, businessId, wabaId, phoneNumberId } = body;
 
-  if ((!directToken && !code) || !businessId) {
+  if (!accessToken || !businessId) {
     return NextResponse.json(
-      { error: "Missing accessToken/code or businessId" },
+      { error: "Missing accessToken or businessId" },
       { status: 400 }
     );
   }
@@ -39,152 +70,181 @@ export async function POST(request: NextRequest) {
   // Verify ownership
   const business = await prisma.business.findFirst({
     where: { id: businessId, userId: session.user.id },
-    select: { id: true, waAccessToken: true },
+    select: { id: true },
   });
   if (!business) {
     return NextResponse.json({ error: "Business not found" }, { status: 404 });
   }
 
   try {
-    // 1. Get access token — direct from FB.login() or exchange code
-    let accessToken: string;
-    let expiresIn = 5184000; // default 60 days
+    // If we have both IDs from Embedded Signup event — use them directly
+    if (wabaId && phoneNumberId) {
+      console.log("[WA Signup] Using IDs from Embedded Signup:", { wabaId, phoneNumberId });
 
-    if (directToken) {
-      // Token came directly from FB.login() (default response_type)
-      accessToken = directToken;
-      console.log("[WA Signup] Using direct token from FB.login()");
-    } else if (selectedPhoneId && business.waAccessToken) {
-      // Phone selection step — token was saved earlier
-      accessToken = business.waAccessToken;
-      console.log("[WA Signup] Using saved token for phone selection");
-    } else {
-      // Code flow fallback
-      const result = await exchangeWACodeForToken(code);
-      accessToken = result.accessToken;
-      expiresIn = result.expiresIn;
-      console.log("[WA Signup] Token from code exchange, expiresIn:", expiresIn);
-    }
+      // Get phone number details and WABA name
+      const [phoneDetails, wabaName] = await Promise.all([
+        getPhoneNumberDetails(phoneNumberId, accessToken),
+        getWABAName(wabaId, accessToken),
+      ]);
 
-    // 2. Discover WABAs and phone numbers
-    const wabas = await getWABusinessAccounts(accessToken);
-    console.log("[WA Signup] Found WABAs:", wabas.length);
+      // Subscribe WABA to webhooks
+      const subscribed = await subscribeWABA(wabaId, accessToken);
+      console.log("[WA Signup] Subscribed WABA:", wabaId, "result:", subscribed);
 
-    if (wabas.length === 0) {
-      return NextResponse.json(
-        { error: "No WhatsApp Business Account found. Please try again." },
-        { status: 404 }
-      );
-    }
+      // Register phone number for Cloud API
+      const registered = await registerWAPhoneNumber(phoneNumberId, accessToken);
+      console.log("[WA Signup] Registered phone:", phoneNumberId, "result:", registered);
 
-    // Collect all phone numbers across all WABAs
-    const allPhones: Array<{
-      wabaId: string;
-      wabaName: string;
-      phoneId: string;
-      phoneNumber: string;
-      verifiedName: string;
-    }> = [];
-
-    for (const waba of wabas) {
-      for (const phone of waba.phoneNumbers) {
-        allPhones.push({
-          wabaId: waba.id,
-          wabaName: waba.name,
-          phoneId: phone.id,
-          phoneNumber: phone.display_phone_number,
-          verifiedName: phone.verified_name,
-        });
-      }
-    }
-
-    if (allPhones.length === 0) {
-      return NextResponse.json(
-        { error: "No phone numbers found in your WhatsApp Business Account." },
-        { status: 404 }
-      );
-    }
-
-    // 3. If multiple phones and no selection yet — return list for user to choose
-    if (allPhones.length > 1 && !selectedPhoneId) {
-      // Save token temporarily (waActive stays false)
+      // Save to Business
+      const tokenExpiry = new Date(Date.now() + 5184000 * 1000); // ~60 days
       await prisma.business.update({
         where: { id: businessId },
         data: {
+          waPhoneNumberId: phoneNumberId,
           waAccessToken: accessToken,
+          waVerifyToken: `staffix_wa_${businessId.slice(0, 8)}`,
+          waActive: true,
         },
       });
+
+      // Upsert ChannelConnection
+      await prisma.channelConnection.upsert({
+        where: { businessId_channel: { businessId, channel: "whatsapp" } },
+        create: {
+          businessId,
+          channel: "whatsapp",
+          isConnected: true,
+          isVerified: true,
+          whatsappPhoneId: phoneNumberId,
+          whatsappPhoneNumber: phoneDetails.display_phone_number,
+          whatsappBusinessAccId: wabaId,
+          metaAccessToken: accessToken,
+          metaTokenExpiresAt: tokenExpiry,
+          webhookVerified: true,
+          connectedAt: new Date(),
+          lastActivityAt: new Date(),
+        },
+        update: {
+          isConnected: true,
+          isVerified: true,
+          whatsappPhoneId: phoneNumberId,
+          whatsappPhoneNumber: phoneDetails.display_phone_number,
+          whatsappBusinessAccId: wabaId,
+          metaAccessToken: accessToken,
+          metaTokenExpiresAt: tokenExpiry,
+          lastActivityAt: new Date(),
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        phoneNumber: phoneDetails.display_phone_number,
+        verifiedName: phoneDetails.verified_name,
+        wabaName,
+      });
+    }
+
+    // Fallback: no IDs from Embedded Signup — try to discover via API
+    // This requires business_management permission
+    console.log("[WA Signup] No Embedded Signup IDs, attempting API discovery...");
+
+    // Try debug_token to find granted WABAs
+    const debugRes = await fetch(
+      `${META_GRAPH_BASE}/debug_token?input_token=${accessToken}&access_token=${accessToken}`
+    );
+    const debugData = await debugRes.json();
+    console.log("[WA Signup] debug_token granular_scopes:", JSON.stringify(debugData.data?.granular_scopes || []).slice(0, 500));
+
+    // Look for whatsapp_business_management scope which includes WABA IDs
+    const waScope = debugData.data?.granular_scopes?.find(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (s: any) => s.scope === "whatsapp_business_management"
+    );
+
+    if (waScope?.target_ids?.length > 0) {
+      const discoveredWabaId = waScope.target_ids[0];
+      console.log("[WA Signup] Discovered WABA from debug_token:", discoveredWabaId);
+
+      // Get phone numbers for this WABA
+      const phoneRes = await fetch(
+        `${META_GRAPH_BASE}/${discoveredWabaId}/phone_numbers?fields=id,display_phone_number,verified_name&access_token=${accessToken}`
+      );
+      const phoneData = await phoneRes.json();
+      const phones = phoneData.data || [];
+
+      if (phones.length === 0) {
+        return NextResponse.json(
+          { error: "No phone numbers found in your WhatsApp Business Account." },
+          { status: 404 }
+        );
+      }
+
+      if (phones.length === 1) {
+        const phone = phones[0];
+        // Auto-connect single phone
+        await subscribeWABA(discoveredWabaId, accessToken);
+        await registerWAPhoneNumber(phone.id, accessToken);
+
+        const tokenExpiry = new Date(Date.now() + 5184000 * 1000);
+        await prisma.business.update({
+          where: { id: businessId },
+          data: {
+            waPhoneNumberId: phone.id,
+            waAccessToken: accessToken,
+            waVerifyToken: `staffix_wa_${businessId.slice(0, 8)}`,
+            waActive: true,
+          },
+        });
+
+        const wabaName = await getWABAName(discoveredWabaId, accessToken);
+        await prisma.channelConnection.upsert({
+          where: { businessId_channel: { businessId, channel: "whatsapp" } },
+          create: {
+            businessId, channel: "whatsapp", isConnected: true, isVerified: true,
+            whatsappPhoneId: phone.id, whatsappPhoneNumber: phone.display_phone_number,
+            whatsappBusinessAccId: discoveredWabaId, metaAccessToken: accessToken,
+            metaTokenExpiresAt: tokenExpiry, webhookVerified: true,
+            connectedAt: new Date(), lastActivityAt: new Date(),
+          },
+          update: {
+            isConnected: true, isVerified: true,
+            whatsappPhoneId: phone.id, whatsappPhoneNumber: phone.display_phone_number,
+            whatsappBusinessAccId: discoveredWabaId, metaAccessToken: accessToken,
+            metaTokenExpiresAt: tokenExpiry, lastActivityAt: new Date(),
+          },
+        });
+
+        return NextResponse.json({
+          success: true,
+          phoneNumber: phone.display_phone_number,
+          verifiedName: phone.verified_name,
+          wabaName,
+        });
+      }
+
+      // Multiple phones — return list
+      await prisma.business.update({
+        where: { id: businessId },
+        data: { waAccessToken: accessToken },
+      });
+
+      const wabaName = await getWABAName(discoveredWabaId, accessToken);
       return NextResponse.json({
         needsSelection: true,
-        phones: allPhones.map((p) => ({
-          phoneId: p.phoneId,
-          phoneNumber: p.phoneNumber,
-          verifiedName: p.verifiedName,
-          wabaName: p.wabaName,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        phones: phones.map((p: any) => ({
+          phoneId: p.id,
+          phoneNumber: p.display_phone_number,
+          verifiedName: p.verified_name,
+          wabaName,
         })),
       });
     }
 
-    // 4. Select phone (auto if single, or user-selected)
-    const selected = selectedPhoneId
-      ? allPhones.find((p) => p.phoneId === selectedPhoneId) || allPhones[0]
-      : allPhones[0];
-
-    // 5. Subscribe WABA to webhooks
-    await subscribeWABA(selected.wabaId, accessToken);
-    console.log("[WA Signup] Subscribed WABA:", selected.wabaId);
-
-    // 6. Register phone number for Cloud API
-    await registerWAPhoneNumber(selected.phoneId, accessToken);
-    console.log("[WA Signup] Registered phone:", selected.phoneId);
-
-    // 7. Save to Business
-    const tokenExpiry = new Date(Date.now() + expiresIn * 1000);
-    await prisma.business.update({
-      where: { id: businessId },
-      data: {
-        waPhoneNumberId: selected.phoneId,
-        waAccessToken: accessToken,
-        waVerifyToken: `staffix_wa_${businessId.slice(0, 8)}`,
-        waActive: true,
-      },
-    });
-
-    // 8. Upsert ChannelConnection
-    await prisma.channelConnection.upsert({
-      where: { businessId_channel: { businessId, channel: "whatsapp" } },
-      create: {
-        businessId,
-        channel: "whatsapp",
-        isConnected: true,
-        isVerified: true,
-        whatsappPhoneId: selected.phoneId,
-        whatsappPhoneNumber: selected.phoneNumber,
-        whatsappBusinessAccId: selected.wabaId,
-        metaAccessToken: accessToken,
-        metaTokenExpiresAt: tokenExpiry,
-        webhookVerified: true,
-        connectedAt: new Date(),
-        lastActivityAt: new Date(),
-      },
-      update: {
-        isConnected: true,
-        isVerified: true,
-        whatsappPhoneId: selected.phoneId,
-        whatsappPhoneNumber: selected.phoneNumber,
-        whatsappBusinessAccId: selected.wabaId,
-        metaAccessToken: accessToken,
-        metaTokenExpiresAt: tokenExpiry,
-        lastActivityAt: new Date(),
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      phoneNumber: selected.phoneNumber,
-      verifiedName: selected.verifiedName,
-      wabaName: selected.wabaName,
-    });
+    return NextResponse.json(
+      { error: "No WhatsApp Business Account found. Please complete the Embedded Signup flow." },
+      { status: 404 }
+    );
   } catch (err) {
     console.error("POST /api/auth/whatsapp/callback error:", err);
     return NextResponse.json(

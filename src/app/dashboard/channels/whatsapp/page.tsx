@@ -153,22 +153,46 @@ export default function WhatsAppChannelPage() {
     setConnecting(true);
     setError("");
 
+    // Capture WABA ID and Phone Number ID from Embedded Signup event
+    let embeddedData: { phone_number_id?: string; waba_id?: string } = {};
+
+    const sessionInfoListener = (event: MessageEvent) => {
+      if (!event.origin?.endsWith("facebook.com")) return;
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "WA_EMBEDDED_SIGNUP") {
+          if (data.event === "FINISH" && data.data) {
+            embeddedData = data.data;
+            console.log("[WA Embedded Signup] Got IDs:", embeddedData);
+          } else if (data.event === "CANCEL") {
+            console.log("[WA Embedded Signup] User cancelled");
+            setConnecting(false);
+          }
+        }
+      } catch {
+        // Non-JSON message, ignore
+      }
+    };
+
+    window.addEventListener("message", sessionInfoListener);
+
     window.FB.login(
       (response) => {
+        window.removeEventListener("message", sessionInfoListener);
         const token = response.authResponse?.accessToken;
-        const code = response.authResponse?.code;
 
-        if (token || code) {
-          // Save for phone selection step
-          setSavedCode(token || code || "");
+        if (token) {
+          setSavedCode(token);
 
-          // Send to backend — prefer token, fallback to code
+          // Send token + embedded signup IDs to backend
           fetch("/api/auth/whatsapp/callback", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              ...(token ? { accessToken: token } : { code }),
+              accessToken: token,
               businessId,
+              wabaId: embeddedData.waba_id,
+              phoneNumberId: embeddedData.phone_number_id,
             }),
           })
             .then((res) => res.json())
