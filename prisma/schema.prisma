@@ -143,6 +143,9 @@ model Business {
   metaUserAccessToken  String?   // Long-lived User Access Token (60 дней)
   metaTokenExpiresAt   DateTime? // Когда истекает
 
+  // Powered by Staffix (вирусный механизм)
+  hidePoweredBy Boolean   @default(false) // true = подпись скрыта (Pro+)
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -857,17 +860,22 @@ model ChannelMessage {
 model Lead {
   id                    String    @id @default(cuid())
 
-  source                String    // instagram_ad, whatsapp_ctwa, organic, referral
+  source                String    // instagram_ad, whatsapp_ctwa, organic, referral, channel_message
   adId                  String?   // ID рекламы
-  channel               String    // telegram, whatsapp, instagram
+  channel               String    // telegram, whatsapp, instagram, messenger
 
+  clientName            String?   // Имя клиента
   firstMessage          String?   // Первое сообщение клиента
-  status                String    @default("new") // new, contacted, qualified, converted, lost
+  status                String    @default("cold") // cold, warm, hot, client
 
   // Оценка
   score                 Int       @default(0)     // 0-100
-  qualifiedAt           DateTime?
+  qualifiedAt           DateTime?                 // когда стал hot или client
   convertedAt           DateTime?
+
+  // Взаимодействие
+  lastInteractionAt     DateTime?                 // последнее сообщение
+  statusReason          String?                   // почему изменён статус
 
   // Метаданные
   metadata              Json?
@@ -881,6 +889,7 @@ model Lead {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
+  @@unique([businessId, channel, clientId])
   @@index([businessId, source])
   @@index([businessId, status])
   @@index([businessId, createdAt])

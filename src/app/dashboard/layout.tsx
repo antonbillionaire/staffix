@@ -49,6 +49,7 @@ import {
   Instagram,
   Facebook,
   Phone,
+  Target,
   type LucideIcon,
 } from "lucide-react";
 const ChatWidget = dynamic(() => import("@/components/ChatWidget"), { ssr: false });
@@ -130,6 +131,7 @@ function buildNavConfig(isSales: boolean): NavEntry[] {
           { nameKey: "nav.myOrders", href: "/dashboard/orders", icon: ShoppingBag },
           { nameKey: "nav.myDelivery", href: "/dashboard/delivery", icon: Truck },
         ] : []),
+        { nameKey: "nav.myLeads", href: "/dashboard/leads", icon: Target },
         { nameKey: "nav.myClients", href: "/dashboard/customers", icon: UserCircle },
         { nameKey: "nav.myMessages", href: "/dashboard/messages", icon: Mail, badge: "messages" as const },
         { nameKey: "nav.myStats", href: "/dashboard/statistics", icon: BarChart3 },

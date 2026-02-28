@@ -13,17 +13,18 @@ import {
   createBookingFromChannel,
   getServicesList,
   getStaffList,
+  updateLeadStatus,
 } from "@/lib/booking-tools";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 type HistoryMessage = { role: "user" | "assistant"; content: string };
 
-// Channel booking tools — subset of full booking tools (no cancel, no get_my_bookings, no notify_manager)
+// Channel booking tools — subset of full booking tools + lead qualification
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const channelBookingTools: any[] = bookingToolDefinitions.filter(
   (t: { name: string }) =>
-    ["check_availability", "create_booking", "get_services", "get_staff"].includes(t.name)
+    ["check_availability", "create_booking", "get_services", "get_staff", "update_lead_status"].includes(t.name)
 );
 
 /**
@@ -142,6 +143,13 @@ function buildChannelSystemPrompt(
 4. После подтверждения клиентом — создай запись через create_booking
 Записи создаются автоматически, клиенту не нужно звонить.
 
+Квалификация лидов — после каждого сообщения оцени статус клиента и вызови update_lead_status если статус изменился:
+- cold: первое обращение, общий вопрос, приветствие
+- warm: интерес к конкретной услуге, спрашивает цены, детали, расписание
+- hot: хочет записаться, обсуждает конкретное время, готов к покупке
+- client: записался или купил услугу
+Статус можно только повышать, никогда не понижай. Вызывай update_lead_status тихо, не сообщай клиенту о квалификации.
+
 Отвечай на языке клиента (русский, узбекский, казахский, английский).`;
 
   const today = new Date().toISOString().split("T")[0];
@@ -195,6 +203,17 @@ async function handleChannelToolCall(
       case "get_staff": {
         const staff = await getStaffList(businessId);
         return JSON.stringify(staff);
+      }
+
+      case "update_lead_status": {
+        const result = await updateLeadStatus(
+          businessId,
+          clientId,
+          channel,
+          toolInput.status,
+          toolInput.reason
+        );
+        return JSON.stringify(result);
       }
 
       default:
@@ -309,9 +328,20 @@ export async function generateChannelAIResponse(
 
     // Extract final text response
     const textBlocks = response.content.filter((block) => block.type === "text");
-    const replyText = textBlocks.length > 0 && textBlocks[0].type === "text"
+    let replyText = textBlocks.length > 0 && textBlocks[0].type === "text"
       ? textBlocks[0].text
       : "Извините, не удалось сформировать ответ. Пожалуйста, попробуйте ещё раз.";
+
+    // Add "Powered by Staffix" signature for free/starter plans
+    if (biz) {
+      const bizSettings = await prisma.business.findUnique({
+        where: { id: businessId },
+        select: { hidePoweredBy: true },
+      });
+      if (!bizSettings?.hidePoweredBy) {
+        replyText += "\n\n— staffix.io";
+      }
+    }
 
     // Save only text messages to history (not tool_use/tool_result blocks)
     const updatedHistory = ([

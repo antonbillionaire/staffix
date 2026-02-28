@@ -803,5 +803,95 @@ export const bookingToolDefinitions: any[] = [
       required: ["reason"],
     },
   },
+  {
+    name: "update_lead_status",
+    description:
+      "Обновить статус квалификации лида. Вызывай после каждого сообщения клиента, если его статус изменился. Не понижай статус — только повышай (cold → warm → hot → client).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        status: {
+          type: "string",
+          enum: ["cold", "warm", "hot", "client"],
+          description:
+            "cold: первое обращение, общий вопрос. warm: интерес к конкретной услуге, спрашивает цены. hot: хочет записаться, обсуждает время. client: записался или купил.",
+        },
+        reason: {
+          type: "string",
+          description: "Почему статус изменён (кратко)",
+        },
+      },
+      required: ["status"],
+    },
+  },
 ];
+
+// ========================================
+// LEAD QUALIFICATION
+// ========================================
+
+const STATUS_ORDER: Record<string, number> = { cold: 0, warm: 1, hot: 2, client: 3 };
+
+/**
+ * Update lead qualification status. Only upgrades (never downgrades).
+ */
+export async function updateLeadStatus(
+  businessId: string,
+  clientId: string,
+  channel: string,
+  status: string,
+  reason?: string,
+  clientName?: string
+): Promise<{ success: boolean; previousStatus?: string; newStatus: string }> {
+  try {
+    // Find existing lead
+    const existing = await prisma.lead.findFirst({
+      where: { businessId, channel, clientId },
+    });
+
+    const prevStatus = existing?.status || "cold";
+    const prevOrder = STATUS_ORDER[prevStatus] ?? 0;
+    const newOrder = STATUS_ORDER[status] ?? 0;
+
+    // Don't downgrade
+    const finalStatus = newOrder >= prevOrder ? status : prevStatus;
+
+    const now = new Date();
+    const isQualified = finalStatus === "hot" || finalStatus === "client";
+
+    if (existing) {
+      await prisma.lead.update({
+        where: { id: existing.id },
+        data: {
+          status: finalStatus,
+          statusReason: reason,
+          lastInteractionAt: now,
+          ...(isQualified && !existing.qualifiedAt ? { qualifiedAt: now } : {}),
+          ...(finalStatus === "client" && !existing.convertedAt ? { convertedAt: now } : {}),
+          ...(clientName ? { clientName } : {}),
+        },
+      });
+    } else {
+      await prisma.lead.create({
+        data: {
+          businessId,
+          channel,
+          clientId,
+          clientName,
+          source: "channel_message",
+          status: finalStatus,
+          statusReason: reason,
+          lastInteractionAt: now,
+          ...(isQualified ? { qualifiedAt: now } : {}),
+          ...(finalStatus === "client" ? { convertedAt: now } : {}),
+        },
+      });
+    }
+
+    return { success: true, previousStatus: prevStatus, newStatus: finalStatus };
+  } catch (error) {
+    console.error("[Lead] Error updating status:", error);
+    return { success: false, newStatus: status };
+  }
+}
 
