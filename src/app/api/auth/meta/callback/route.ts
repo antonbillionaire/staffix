@@ -68,7 +68,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Use the first page (TODO: page selection UI if multiple)
+    // Multiple pages → redirect to selection UI
+    if (pages.length > 1) {
+      // Save user-level token only (fbActive stays false → business NOT "connected")
+      await prisma.business.update({
+        where: { id: businessId },
+        data: {
+          metaUserAccessToken: accessToken,
+          metaTokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
+        },
+      });
+      return NextResponse.redirect(
+        `${appUrl}/dashboard/channels/meta/select-page?businessId=${businessId}`
+      );
+    }
+
+    // Single page → auto-select
     const page = pages[0];
     const igAccount = page.instagram_business_account;
 
