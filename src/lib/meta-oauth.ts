@@ -1,6 +1,6 @@
 /**
- * Meta OAuth helpers for Facebook Login flow.
- * Handles token exchange, page listing, and webhook subscription.
+ * Meta OAuth helpers for Facebook Login flow and WhatsApp Embedded Signup.
+ * Handles token exchange, page listing, webhook subscription, and WABA management.
  */
 
 const META_API_VERSION = "v21.0";
@@ -151,4 +151,141 @@ export async function refreshLongLivedToken(
   } catch {
     return null;
   }
+}
+
+// ─── WhatsApp Embedded Signup ────────────────────────────────────────────────
+
+export interface WAPhoneNumber {
+  id: string;
+  display_phone_number: string;
+  verified_name: string;
+}
+
+export interface WABusinessAccount {
+  id: string;
+  name: string;
+  phoneNumbers: WAPhoneNumber[];
+}
+
+/**
+ * Exchange WhatsApp Embedded Signup code for access token.
+ * No redirect_uri needed — code comes from client-side FB.login().
+ */
+export async function exchangeWACodeForToken(code: string): Promise<{
+  accessToken: string;
+  expiresIn: number;
+}> {
+  const res = await fetch(
+    `${META_GRAPH_BASE}/oauth/access_token?` +
+      `client_id=${process.env.META_APP_ID}` +
+      `&client_secret=${process.env.META_APP_SECRET}` +
+      `&code=${code}`
+  );
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message || "WA code exchange failed");
+  return {
+    accessToken: data.access_token,
+    expiresIn: data.expires_in || 5184000,
+  };
+}
+
+/**
+ * Get WhatsApp Business Accounts and their phone numbers.
+ * Uses the debug_token endpoint to find the WABA ID from Embedded Signup,
+ * then fetches phone numbers.
+ */
+export async function getWABusinessAccounts(
+  accessToken: string
+): Promise<WABusinessAccount[]> {
+  // Get the user's businesses with owned WABAs
+  const res = await fetch(
+    `${META_GRAPH_BASE}/me/businesses?` +
+      `fields=id,name,owned_whatsapp_business_accounts{id,name}` +
+      `&access_token=${accessToken}`
+  );
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message || "Failed to fetch WABAs");
+
+  const results: WABusinessAccount[] = [];
+
+  for (const biz of data.data || []) {
+    const wabas = biz.owned_whatsapp_business_accounts?.data || [];
+    for (const waba of wabas) {
+      // Fetch phone numbers for this WABA
+      const phoneRes = await fetch(
+        `${META_GRAPH_BASE}/${waba.id}/phone_numbers?` +
+          `fields=id,display_phone_number,verified_name` +
+          `&access_token=${accessToken}`
+      );
+      const phoneData = await phoneRes.json();
+      const phones: WAPhoneNumber[] = (phoneData.data || []).map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (p: any) => ({
+          id: p.id,
+          display_phone_number: p.display_phone_number || "",
+          verified_name: p.verified_name || "",
+        })
+      );
+
+      results.push({
+        id: waba.id,
+        name: waba.name || biz.name || "WhatsApp Business",
+        phoneNumbers: phones,
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Subscribe our app to a WABA for webhook events.
+ */
+export async function subscribeWABA(
+  wabaId: string,
+  accessToken: string
+): Promise<boolean> {
+  const res = await fetch(
+    `${META_GRAPH_BASE}/${wabaId}/subscribed_apps`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+  const data = await res.json();
+  if (data.error) {
+    console.error("subscribeWABA error:", data.error);
+    return false;
+  }
+  return data.success === true;
+}
+
+/**
+ * Register a phone number for WhatsApp Cloud API messaging.
+ * This tells Meta to route messages through Cloud API.
+ */
+export async function registerWAPhoneNumber(
+  phoneNumberId: string,
+  accessToken: string
+): Promise<boolean> {
+  const res = await fetch(
+    `${META_GRAPH_BASE}/${phoneNumberId}/register`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        pin: "123456", // 6-digit PIN for 2FA (required)
+      }),
+    }
+  );
+  const data = await res.json();
+  if (data.error) {
+    console.error("registerWAPhoneNumber error:", data.error);
+    return false;
+  }
+  return data.success === true;
 }
