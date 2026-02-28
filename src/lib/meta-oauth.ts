@@ -170,21 +170,19 @@ export interface WABusinessAccount {
 /**
  * Exchange WhatsApp Embedded Signup code for access token.
  * Code comes from client-side FB.login() with response_type: 'code'.
- * redirect_uri must match the origin used in the JS SDK dialog.
+ * No redirect_uri for JS SDK codes.
  */
 export async function exchangeWACodeForToken(code: string): Promise<{
   accessToken: string;
   expiresIn: number;
 }> {
   const appId = process.env.META_APP_ID || process.env.NEXT_PUBLIC_META_APP_ID;
-  const redirectUri = `${getAppUrl()}/dashboard/channels/whatsapp`;
 
-  console.log("[WA Token Exchange] appId:", appId, "redirectUri:", redirectUri);
+  console.log("[WA Token Exchange] appId:", appId?.slice(0, 6) + "...");
 
   const res = await fetch(
     `${META_GRAPH_BASE}/oauth/access_token?` +
       `client_id=${appId}` +
-      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&client_secret=${process.env.META_APP_SECRET}` +
       `&code=${code}`
   );
