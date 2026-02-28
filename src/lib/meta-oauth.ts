@@ -169,19 +169,27 @@ export interface WABusinessAccount {
 
 /**
  * Exchange WhatsApp Embedded Signup code for access token.
- * No redirect_uri needed — code comes from client-side FB.login().
+ * Code comes from client-side FB.login() with response_type: 'code'.
+ * redirect_uri must match the origin used in the JS SDK dialog.
  */
 export async function exchangeWACodeForToken(code: string): Promise<{
   accessToken: string;
   expiresIn: number;
 }> {
+  const appId = process.env.META_APP_ID || process.env.NEXT_PUBLIC_META_APP_ID;
+  const redirectUri = `${getAppUrl()}/dashboard/channels/whatsapp`;
+
+  console.log("[WA Token Exchange] appId:", appId, "redirectUri:", redirectUri);
+
   const res = await fetch(
     `${META_GRAPH_BASE}/oauth/access_token?` +
-      `client_id=${process.env.META_APP_ID}` +
+      `client_id=${appId}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&client_secret=${process.env.META_APP_SECRET}` +
       `&code=${code}`
   );
   const data = await res.json();
+  console.log("[WA Token Exchange] response:", JSON.stringify(data).slice(0, 200));
   if (data.error) throw new Error(data.error.message || "WA code exchange failed");
   return {
     accessToken: data.access_token,
