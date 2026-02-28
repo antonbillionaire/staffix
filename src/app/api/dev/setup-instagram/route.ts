@@ -27,13 +27,13 @@ export async function POST(request: NextRequest) {
   const ok = await subscribePageToWebhooks(
     pageId,
     pageAccessToken,
-    "messages,comments,live_comments"
+    "messages,feed"
   );
 
   if (ok) {
     return NextResponse.json({
       success: true,
-      message: `Page ${pageId} subscribed to: messages, comments, live_comments`,
+      message: `Page ${pageId} subscribed to: messages, feed`,
     });
   }
 

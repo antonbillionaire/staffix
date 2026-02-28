@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
     const igAccount = page.instagram_business_account;
 
     // 3. Subscribe page to webhook events
-    await subscribePageWebhooks(page.id, page.access_token, "messages,messaging_postbacks,messaging_handovers,comments,live_comments");
+    await subscribePageWebhooks(page.id, page.access_token, "messages,messaging_postbacks,messaging_handovers,feed");
 
     // 4. Save to database
     const updateData: Record<string, unknown> = {

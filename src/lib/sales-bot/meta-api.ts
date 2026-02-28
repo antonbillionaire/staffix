@@ -147,12 +147,12 @@ export async function sendPrivateReply(
 /**
  * Subscribe a Facebook Page to Instagram webhook events.
  * Call this once after connecting a new Page/account.
- * fields: "messages,comments,live_comments"
+ * fields: "messages,feed"
  */
 export async function subscribePageToWebhooks(
   pageId: string,
   pageAccessToken: string,
-  fields = "messages,comments,live_comments"
+  fields = "messages,feed"
 ): Promise<boolean> {
   try {
     const response = await fetch(

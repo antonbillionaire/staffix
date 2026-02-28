@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     await subscribePageWebhooks(
       page.id,
       page.access_token,
-      "messages,messaging_postbacks,messaging_handovers,comments,live_comments"
+      "messages,messaging_postbacks,messaging_handovers,feed"
     );
 
     // Save to Business table
