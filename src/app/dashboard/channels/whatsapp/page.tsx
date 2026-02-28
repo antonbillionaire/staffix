@@ -196,8 +196,6 @@ export default function WhatsAppChannelPage() {
       },
       {
         config_id: configId,
-        response_type: "code",
-        override_default_response_type: true,
         extras: {
           setup: {},
           featureType: "",
