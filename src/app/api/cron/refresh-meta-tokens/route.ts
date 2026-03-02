@@ -1,11 +1,13 @@
 /**
  * Cron job: Refresh Meta tokens expiring within 7 days.
  * Runs daily. Long-lived tokens last 60 days — refreshing early prevents downtime.
+ * Also: cleans up old webhook dedup entries and sends failure alerts.
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { refreshLongLivedToken, getUserPages } from "@/lib/meta-oauth";
+import { cleanupWebhookDedup } from "@/lib/webhook-dedup";
 
 export const dynamic = "force-dynamic";
 
@@ -83,9 +85,35 @@ export async function GET(request: Request) {
 
   console.log(`Meta token refresh: ${refreshed} refreshed, ${failed} failed, ${businesses.length} total`);
 
+  // Alert on failures via email
+  if (failed > 0 && process.env.RESEND_API_KEY) {
+    try {
+      const { Resend } = await import("resend");
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      await resend.emails.send({
+        from: "Staffix Alerts <alerts@staffix.io>",
+        to: process.env.ADMIN_EMAIL || "admin@staffix.io",
+        subject: `⚠️ Meta token refresh failed: ${failed}/${businesses.length}`,
+        text: `Failed to refresh ${failed} out of ${businesses.length} Meta tokens.\n\nCheck Vercel logs for details.\n\nThis is an automated alert from Staffix cron.`,
+      });
+    } catch (emailErr) {
+      console.error("Failed to send alert email:", emailErr);
+    }
+  }
+
+  // Cleanup old webhook dedup entries (older than 24h)
+  let dedupCleaned = 0;
+  try {
+    dedupCleaned = await cleanupWebhookDedup();
+    if (dedupCleaned > 0) console.log(`Webhook dedup cleanup: ${dedupCleaned} old entries removed`);
+  } catch (e) {
+    console.error("Webhook dedup cleanup error:", e);
+  }
+
   return NextResponse.json({
     refreshed,
     failed,
     total: businesses.length,
+    dedupCleaned,
   });
 }

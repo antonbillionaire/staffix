@@ -10,20 +10,13 @@
  *   https://staffix.io/api/whatsapp/webhook
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { parseWAWebhook, sendWAMessage, markWAMessageRead } from "@/lib/whatsapp-utils";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
-
-// Deduplication: track recently processed WA message IDs (Meta retries if response is slow)
-const processedWAMessages = new Set<string>();
-function markWAProcessed(id: string): boolean {
-  if (!id || processedWAMessages.has(id)) return false;
-  processedWAMessages.add(id);
-  setTimeout(() => processedWAMessages.delete(id), 60_000);
-  return true;
-}
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { markWebhookProcessed } from "@/lib/webhook-dedup";
 
 // ─── GET: Webhook verification from Meta ────────────────────────────────────
 export async function GET(request: Request) {
@@ -69,11 +62,19 @@ export async function POST(request: Request) {
   const businessId = searchParams.get("businessId");
   const respond200 = () => NextResponse.json({ success: true }, { status: 200 });
 
+  // Rate limit: 120 requests per minute per IP
+  const ip = getClientIp(request as NextRequest);
+  const rl = await rateLimit(`webhook:wa:${ip}`, 120, 1);
+  if (!rl.allowed) {
+    return new Response("Too Many Requests", { status: 429 });
+  }
+
   // Verify webhook signature (HMAC-SHA256 from Meta)
   const rawBody = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
   if (!verifyMetaWebhookSignature(rawBody, signature)) {
-    console.warn("[WA Webhook] Signature mismatch (processing anyway)");
+    console.error("[WA Webhook] Invalid signature — REJECTED");
+    return new Response("Unauthorized", { status: 401 });
   }
 
   let body: Record<string, unknown>;
@@ -101,7 +102,7 @@ export async function POST(request: Request) {
   }
 
   // Skip duplicate webhook deliveries
-  if (!markWAProcessed(msg.messageId)) return respond200();
+  if (!(await markWebhookProcessed(msg.messageId))) return respond200();
 
   // Process BEFORE returning 200 — Vercel kills serverless functions after response
   try {

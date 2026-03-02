@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   // Disable trailing slash redirect to fix Telegram webhook 307 error
@@ -35,4 +36,11 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  // Suppress source map upload warnings when SENTRY_AUTH_TOKEN is not set
+  silent: true,
+  // Disable source map uploads until SENTRY_AUTH_TOKEN is configured
+  sourcemaps: {
+    disable: true,
+  },
+});

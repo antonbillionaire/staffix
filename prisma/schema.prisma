@@ -146,6 +146,10 @@ model Business {
   // Powered by Staffix (вирусный механизм)
   hidePoweredBy Boolean   @default(false) // true = подпись скрыта (Pro+)
 
+  // Claude API usage tracking
+  tokensUsedInput  Int     @default(0) // input tokens consumed
+  tokensUsedOutput Int     @default(0) // output tokens consumed
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -1400,4 +1404,13 @@ model CrmIntegration {
 
   @@index([businessId, isActive])
   @@index([businessId, type])
+}
+
+// Webhook deduplication — persistent (replaces in-memory Set)
+model WebhookDedup {
+  id          String   @id // messageId from Meta/Telegram
+  processedAt DateTime @default(now())
+
+  @@index([processedAt])
+  @@map("webhook_dedup")
 }

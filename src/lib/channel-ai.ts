@@ -326,6 +326,17 @@ export async function generateChannelAIResponse(
       }
     }
 
+    // Track Claude API token usage
+    if (response.usage) {
+      prisma.business.update({
+        where: { id: businessId },
+        data: {
+          tokensUsedInput: { increment: response.usage.input_tokens },
+          tokensUsedOutput: { increment: response.usage.output_tokens },
+        },
+      }).catch((e) => console.error("[Channel AI] Token tracking error:", e));
+    }
+
     // Extract final text response
     const textBlocks = response.content.filter((block) => block.type === "text");
     let replyText = textBlocks.length > 0 && textBlocks[0].type === "text"
@@ -340,6 +351,18 @@ export async function generateChannelAIResponse(
       });
       if (!bizSettings?.hidePoweredBy) {
         replyText += "\n\n— staffix.io";
+      }
+    }
+
+    // Check soft message limit (warn business owner at 80%)
+    const sub = await prisma.subscription.findUnique({
+      where: { businessId },
+      select: { messagesUsed: true, messagesLimit: true },
+    });
+    if (sub && sub.messagesLimit !== -1 && sub.messagesLimit > 0) {
+      const usage = sub.messagesUsed / sub.messagesLimit;
+      if (usage >= 0.8 && usage < 1.0) {
+        console.warn(`[Channel AI] Business ${businessId}: ${Math.round(usage * 100)}% messages used (${sub.messagesUsed}/${sub.messagesLimit})`);
       }
     }
 

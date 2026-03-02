@@ -9,22 +9,16 @@
  */
 
 import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
 import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
 import { getPageAccessToken } from "@/lib/facebook-utils";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { markWebhookProcessed } from "@/lib/webhook-dedup";
 
 const META_API_BASE = "https://graph.facebook.com/v21.0";
-
-// Deduplication
-const processedIGMessages = new Set<string>();
-function markIGProcessed(id: string): boolean {
-  if (!id || processedIGMessages.has(id)) return false;
-  processedIGMessages.add(id);
-  setTimeout(() => processedIGMessages.delete(id), 60_000);
-  return true;
-}
 
 // ─── GET: Webhook verification ───────────────────────────────────────────────
 export async function GET(request: Request) {
@@ -52,13 +46,21 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const respond200 = () => NextResponse.json({ success: true }, { status: 200 });
 
+  // Rate limit: 120 requests per minute per IP
+  const ip = getClientIp(request as NextRequest);
+  const rl = await rateLimit(`webhook:ig:${ip}`, 120, 1);
+  if (!rl.allowed) {
+    return new Response("Too Many Requests", { status: 429 });
+  }
+
   console.log("[IG Webhook] POST received");
 
   // Verify webhook signature (HMAC-SHA256 from Meta)
   const rawBody = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
   if (!verifyMetaWebhookSignature(rawBody, signature)) {
-    console.warn("[IG Webhook] Signature mismatch (processing anyway)");
+    console.error("[IG Webhook] Invalid signature — REJECTED");
+    return new Response("Unauthorized", { status: 401 });
   }
 
   let body: Record<string, unknown>;
@@ -91,7 +93,7 @@ export async function POST(request: Request) {
       // Handle non-text messages (images, audio, stickers, etc.)
       if (!message.text) {
         const messageId = String(message.mid || "");
-        if (!markIGProcessed(messageId)) continue;
+        if (!(await markWebhookProcessed(messageId))) continue;
         // Find business to reply
         const biz = await prisma.business.findFirst({
           where: { OR: [{ igBusinessAccountId: accountId, igActive: true }, { fbPageId: accountId, igActive: true }] },
@@ -105,7 +107,7 @@ export async function POST(request: Request) {
       }
 
       const messageId = String(message.mid || "");
-      if (!markIGProcessed(messageId)) continue;
+      if (!(await markWebhookProcessed(messageId))) continue;
 
       console.log(`[IG Webhook] DM from ${sender.id} to account ${accountId}: "${String(message.text).slice(0, 50)}"`);
 

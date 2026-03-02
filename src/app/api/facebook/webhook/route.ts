@@ -13,20 +13,14 @@
  */
 
 import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { parseFBWebhookAll, sendFBMessage, sendFBTyping } from "@/lib/facebook-utils";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
 import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
-
-// Deduplication: track recently processed FB message IDs (Meta retries if response is slow)
-const processedFBMessages = new Set<string>();
-function markFBProcessed(id: string): boolean {
-  if (!id || processedFBMessages.has(id)) return false;
-  processedFBMessages.add(id);
-  setTimeout(() => processedFBMessages.delete(id), 60_000);
-  return true;
-}
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { markWebhookProcessed } from "@/lib/webhook-dedup";
 
 // ─── GET: Webhook verification ───────────────────────────────────────────────
 export async function GET(request: Request) {
@@ -70,11 +64,19 @@ export async function POST(request: Request) {
   const businessId = searchParams.get("businessId");
   const respond200 = () => NextResponse.json({ success: true }, { status: 200 });
 
+  // Rate limit: 120 requests per minute per IP
+  const ip = getClientIp(request as NextRequest);
+  const rl = await rateLimit(`webhook:fb:${ip}`, 120, 1);
+  if (!rl.allowed) {
+    return new Response("Too Many Requests", { status: 429 });
+  }
+
   // Verify webhook signature (HMAC-SHA256 from Meta)
   const rawBody = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
   if (!verifyMetaWebhookSignature(rawBody, signature)) {
-    console.warn("FB webhook: signature mismatch (processing anyway)");
+    console.error("[FB Webhook] Invalid signature — REJECTED");
+    return new Response("Unauthorized", { status: 401 });
   }
 
   let body: Record<string, unknown>;
@@ -93,7 +95,7 @@ export async function POST(request: Request) {
   for (const msg of messages) {
     // Handle non-text messages (images, audio, stickers, etc.)
     if (!msg.text.trim()) {
-      if (!markFBProcessed(msg.messageId)) continue;
+      if (!(await markWebhookProcessed(msg.messageId))) continue;
       const biz = await prisma.business.findFirst({
         where: businessId ? { id: businessId } : { fbPageId: msg.pageId, fbActive: true },
         select: { fbPageAccessToken: true },
@@ -105,7 +107,7 @@ export async function POST(request: Request) {
     }
 
     // Skip duplicate webhook deliveries (Meta retries if response >5s)
-    if (!markFBProcessed(msg.messageId)) continue;
+    if (!(await markWebhookProcessed(msg.messageId))) continue;
 
     try {
       if (businessId) {

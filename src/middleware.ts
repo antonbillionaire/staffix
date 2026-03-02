@@ -1,8 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  // ─── CSRF: Origin check for API mutations (not webhooks/cron/auth) ───
+  if (
+    pathname.startsWith("/api/") &&
+    !pathname.includes("/webhook") &&
+    !pathname.startsWith("/api/cron/") &&
+    !pathname.startsWith("/api/auth/") &&
+    ["POST", "PUT", "DELETE", "PATCH"].includes(request.method)
+  ) {
+    const origin = request.headers.get("origin");
+    if (origin) {
+      const allowed = ["https://www.staffix.io", "https://staffix.io"];
+      if (process.env.NODE_ENV === "development") allowed.push("http://localhost:3000");
+      if (!allowed.includes(origin)) {
+        return new Response("Forbidden: invalid origin", { status: 403 });
+      }
+    }
+  }
+
   // PayPro redirects via POST after payment — convert to GET
-  if (request.method === "POST" && !request.nextUrl.pathname.startsWith("/api/")) {
+  if (request.method === "POST" && !pathname.startsWith("/api/")) {
     const url = request.nextUrl.clone();
     return NextResponse.redirect(url, 303); // 303 = See Other (forces GET)
   }
@@ -25,6 +45,8 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Only match page routes, not API or auth routes
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    // Page routes (existing)
+    "/((?!_next/static|_next/image|favicon.ico).*)",
+  ],
 };
