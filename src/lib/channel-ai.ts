@@ -354,15 +354,36 @@ export async function generateChannelAIResponse(
       }
     }
 
-    // Check soft message limit (warn business owner at 80%)
+    // Check soft message limit (warn business owner at 80%, once)
     const sub = await prisma.subscription.findUnique({
       where: { businessId },
-      select: { messagesUsed: true, messagesLimit: true },
+      select: { messagesUsed: true, messagesLimit: true, limitWarning80Sent: true },
     });
     if (sub && sub.messagesLimit !== -1 && sub.messagesLimit > 0) {
       const usage = sub.messagesUsed / sub.messagesLimit;
-      if (usage >= 0.8 && usage < 1.0) {
-        console.warn(`[Channel AI] Business ${businessId}: ${Math.round(usage * 100)}% messages used (${sub.messagesUsed}/${sub.messagesLimit})`);
+      if (usage >= 0.8 && !sub.limitWarning80Sent) {
+        // Mark as sent first to prevent duplicate emails
+        await prisma.subscription.update({
+          where: { businessId },
+          data: { limitWarning80Sent: true },
+        });
+        // Send email to business owner
+        const owner = await prisma.business.findUnique({
+          where: { id: businessId },
+          select: { name: true, user: { select: { email: true, name: true } } },
+        });
+        if (owner?.user?.email) {
+          const remaining = sub.messagesLimit - sub.messagesUsed;
+          sendLimitWarningEmail(
+            owner.user.email,
+            owner.user.name,
+            owner.name,
+            sub.messagesUsed,
+            sub.messagesLimit,
+            remaining
+          ).catch((e) => console.error("[Channel AI] Limit warning email error:", e));
+        }
+        console.warn(`[Channel AI] Business ${businessId}: 80% limit reached (${sub.messagesUsed}/${sub.messagesLimit}), email sent`);
       }
     }
 
@@ -387,4 +408,41 @@ export async function generateChannelAIResponse(
     console.error(`Channel AI error (${channel}):`, e);
     return "Извините, произошла техническая ошибка. Пожалуйста, напишите нам позже.";
   }
+}
+
+/**
+ * Send email warning when business reaches 80% of message limit
+ */
+async function sendLimitWarningEmail(
+  email: string,
+  userName: string,
+  businessName: string,
+  used: number,
+  limit: number,
+  remaining: number
+): Promise<void> {
+  if (!process.env.RESEND_API_KEY) return;
+
+  const { Resend } = await import("resend");
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
+  await resend.emails.send({
+    from: process.env.FROM_EMAIL || "Staffix <noreply@staffix.io>",
+    to: email,
+    subject: `⚠️ ${businessName}: осталось ${remaining} сообщений из ${limit}`,
+    html: `
+      <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #1a1a1a;">Лимит сообщений почти исчерпан</h2>
+        <p>Здравствуйте, ${userName}!</p>
+        <p>Ваш AI-бот для <strong>${businessName}</strong> использовал <strong>${used} из ${limit}</strong> сообщений (${Math.round((used / limit) * 100)}%).</p>
+        <p>Осталось: <strong>${remaining} сообщений</strong>.</p>
+        <p>Когда лимит будет исчерпан, бот перестанет отвечать клиентам.</p>
+        <a href="https://www.staffix.io/dashboard/subscription"
+           style="display: inline-block; background: #4f46e5; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 12px;">
+          Увеличить лимит
+        </a>
+        <p style="color: #666; font-size: 13px; margin-top: 24px;">— Команда Staffix</p>
+      </div>
+    `,
+  });
 }

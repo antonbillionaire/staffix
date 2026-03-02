@@ -375,6 +375,9 @@ model Subscription {
   reminder3dSent       Boolean   @default(false)
   reminder1dSent       Boolean   @default(false)
 
+  // Message limit warning (sent once at 80%)
+  limitWarning80Sent   Boolean   @default(false)
+
   businessId      String    @unique
   business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
