@@ -7,11 +7,9 @@ import Anthropic from "@anthropic-ai/sdk";
 // Temporary diagnostic endpoint — admin only
 export async function GET(request: NextRequest) {
   const session = await auth();
-  // Allow access for admin OR via secret header (for CLI debugging)
-  const debugSecret = request.headers.get("x-debug-secret");
   const isAdminUser = session?.user?.email && isAdmin(session.user.email);
 
-  if (!isAdminUser && debugSecret !== process.env.NEXTAUTH_SECRET) {
+  if (!isAdminUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

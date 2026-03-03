@@ -10,6 +10,8 @@
  *   https://staffix.io/api/whatsapp/webhook
  */
 
+export const maxDuration = 60;
+
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { parseWAWebhook, sendWAMessage, markWAMessageRead } from "@/lib/whatsapp-utils";
@@ -88,6 +90,9 @@ export async function POST(request: Request) {
   const msg = parseWAWebhook(body);
   if (!msg) return respond200();
 
+  // Skip duplicate webhook deliveries (before any processing)
+  if (!(await markWebhookProcessed(msg.messageId))) return respond200();
+
   // Handle non-text messages (images, audio, stickers, etc.)
   if (msg.type !== "text" || !msg.text.trim()) {
     // Find business to get WA credentials and reply
@@ -100,9 +105,6 @@ export async function POST(request: Request) {
     }
     return respond200();
   }
-
-  // Skip duplicate webhook deliveries
-  if (!(await markWebhookProcessed(msg.messageId))) return respond200();
 
   // Process BEFORE returning 200 — Vercel kills serverless functions after response
   try {

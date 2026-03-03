@@ -14,6 +14,8 @@ import {
   getServicesList,
   getStaffList,
   updateLeadStatus,
+  getClientBookings,
+  cancelBooking,
 } from "@/lib/booking-tools";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -24,7 +26,7 @@ type HistoryMessage = { role: "user" | "assistant"; content: string };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const channelBookingTools: any[] = bookingToolDefinitions.filter(
   (t: { name: string }) =>
-    ["check_availability", "create_booking", "get_services", "get_staff", "update_lead_status"].includes(t.name)
+    ["check_availability", "create_booking", "get_services", "get_staff", "update_lead_status", "get_my_bookings", "cancel_booking", "notify_manager"].includes(t.name)
 );
 
 /**
@@ -216,6 +218,38 @@ async function handleChannelToolCall(
           toolInput.reason
         );
         return JSON.stringify(result);
+      }
+
+      case "get_my_bookings": {
+        // Channel clients use string clientId, convert for Telegram-based booking lookup
+        const bookings = await getClientBookings(businessId, BigInt(clientId));
+        return JSON.stringify(bookings);
+      }
+
+      case "cancel_booking": {
+        const result = await cancelBooking(toolInput.booking_id, BigInt(clientId));
+        return JSON.stringify(result);
+      }
+
+      case "notify_manager": {
+        // Send notification to business owner about client needing human help
+        const business = await prisma.business.findUnique({
+          where: { id: businessId },
+          select: { ownerTelegramChatId: true, botToken: true, name: true },
+        });
+        if (business?.ownerTelegramChatId && business?.botToken) {
+          const urgencyLabel = toolInput.urgency === "urgent" ? "🔴 СРОЧНО" : "📩";
+          const message = `${urgencyLabel} Запрос от клиента\n\nКлиент: ${toolInput.client_name || "Неизвестен"}\nКанал: ${channel}\nПричина: ${toolInput.reason}`;
+          fetch(`https://api.telegram.org/bot${business.botToken}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: business.ownerTelegramChatId.toString(),
+              text: message,
+            }),
+          }).catch((e) => console.error("[Channel AI] notify_manager error:", e));
+        }
+        return JSON.stringify({ success: true, message: "Менеджер уведомлён" });
       }
 
       default:

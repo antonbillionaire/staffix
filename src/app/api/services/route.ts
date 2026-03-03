@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
 import { auth } from "@/auth";
 
 // Helper to get user ID
@@ -15,9 +14,7 @@ async function getUserId(): Promise<string | null> {
     if (user?.id) return user.id;
   }
 
-  // Fallback to cookie-based auth
-  const cookieStore = await cookies();
-  return cookieStore.get("userId")?.value || null;
+  return null;
 }
 
 // GET - получить услуги текущего бизнеса
@@ -91,12 +88,29 @@ export async function POST(request: Request) {
       );
     }
 
+    const parsedPrice = parseInt(price, 10);
+    const parsedDuration = parseInt(duration, 10);
+
+    if (isNaN(parsedPrice) || parsedPrice < 0) {
+      return NextResponse.json(
+        { error: "Некорректная цена" },
+        { status: 400 }
+      );
+    }
+
+    if (isNaN(parsedDuration) || parsedDuration <= 0) {
+      return NextResponse.json(
+        { error: "Некорректная длительность" },
+        { status: 400 }
+      );
+    }
+
     const service = await prisma.service.create({
       data: {
         name,
         description: description || null,
-        price: parseInt(price),
-        duration: parseInt(duration),
+        price: parsedPrice,
+        duration: parsedDuration,
         businessId: business.id,
       },
     });

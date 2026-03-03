@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-
-// ONE-TIME endpoint — DELETE AFTER USE
-const SECRET = "staffix_admin_del_2025";
+import { auth } from "@/auth";
+import { isAdmin } from "@/lib/admin";
 
 export async function GET(req: NextRequest) {
-  const secret = req.nextUrl.searchParams.get("secret");
-  const email = req.nextUrl.searchParams.get("email");
-
-  if (secret !== SECRET || !email) {
+  const session = await auth();
+  if (!session?.user?.email || !isAdmin(session.user.email)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const email = req.nextUrl.searchParams.get("email");
+  if (!email) {
+    return NextResponse.json({ error: "Email required" }, { status: 400 });
   }
 
   const user = await prisma.user.findUnique({ where: { email } });
@@ -20,11 +22,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const secret = req.nextUrl.searchParams.get("secret");
-  const email = req.nextUrl.searchParams.get("email");
-
-  if (secret !== SECRET || !email) {
+  const session = await auth();
+  if (!session?.user?.email || !isAdmin(session.user.email)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const email = req.nextUrl.searchParams.get("email");
+  if (!email) {
+    return NextResponse.json({ error: "Email required" }, { status: 400 });
   }
 
   try {

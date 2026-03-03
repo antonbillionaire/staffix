@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
 import { auth } from "@/auth";
 
 async function getUserId(): Promise<string | null> {
@@ -11,8 +10,7 @@ async function getUserId(): Promise<string | null> {
     });
     if (user?.id) return user.id;
   }
-  const cookieStore = await cookies();
-  return cookieStore.get("userId")?.value || null;
+  return null;
 }
 
 // GET — список отгулов мастера

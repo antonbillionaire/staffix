@@ -10,21 +10,13 @@ import {
   verifyMetaWebhook,
 } from "@/lib/sales-bot/meta-api";
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
+import { markWebhookProcessed } from "@/lib/webhook-dedup";
 
 // In-memory conversation history (keyed by Instagram-scoped user ID)
 const conversationHistory: Map<
   string,
   Array<{ role: "user" | "assistant"; content: string }>
 > = new Map();
-
-// Deduplication: track recently processed message IDs (Meta retries if response is slow)
-const processedMessages = new Set<string>();
-function markProcessed(id: string): boolean {
-  if (processedMessages.has(id)) return false; // already seen
-  processedMessages.add(id);
-  setTimeout(() => processedMessages.delete(id), 60_000); // cleanup after 1 min
-  return true; // first time
-}
 
 // Generate AI response for any Instagram interaction
 async function generateAIResponse(
@@ -119,7 +111,7 @@ export async function POST(request: NextRequest) {
     const rawBody = await request.text();
     const signature = request.headers.get("x-hub-signature-256");
     if (!verifyMetaWebhookSignature(rawBody, signature)) {
-      console.warn("[Sales IG] Signature mismatch (processing anyway)");
+      return new Response("Unauthorized", { status: 401 });
     }
 
     const body = JSON.parse(rawBody);
@@ -144,7 +136,7 @@ export async function POST(request: NextRequest) {
         if (messaging.message.is_echo) continue;
 
         // Skip duplicate webhook deliveries (Meta retries if response >5s)
-        if (messageId && !markProcessed(messageId)) continue;
+        if (messageId && !(await markWebhookProcessed(messageId))) continue;
 
         await upsertLead(senderId, "instagram_dm");
 
@@ -185,7 +177,7 @@ export async function POST(request: NextRequest) {
         if (value.parent_id) continue;
 
         // Skip duplicate webhook deliveries
-        if (!markProcessed(commentId)) continue;
+        if (!(await markWebhookProcessed(commentId))) continue;
 
         const contextLabel = isAdComment
           ? `Instagram Ad Comment (ad: ${value.ad_title || value.ad_id})`

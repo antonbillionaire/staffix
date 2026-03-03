@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import {
   exchangeCodeForLongLivedToken,
+  getMetaUserId,
   getUserPages,
   subscribePageWebhooks,
 } from "@/lib/meta-oauth";
@@ -68,12 +69,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Fetch Meta user ID for data deletion scoping
+    const metaUserId = await getMetaUserId(accessToken);
+
     // Multiple pages → redirect to selection UI
     if (pages.length > 1) {
       // Save user-level token only (fbActive stays false → business NOT "connected")
       await prisma.business.update({
         where: { id: businessId },
         data: {
+          metaUserId,
           metaUserAccessToken: accessToken,
           metaTokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
         },
@@ -93,6 +98,7 @@ export async function GET(request: NextRequest) {
     // 4. Save to database
     const updateData: Record<string, unknown> = {
       // Meta OAuth
+      metaUserId,
       metaUserAccessToken: accessToken,
       metaTokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
       // Facebook Messenger

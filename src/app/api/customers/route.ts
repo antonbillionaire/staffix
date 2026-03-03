@@ -23,73 +23,91 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
     const segment = searchParams.get("segment") || "all"; // all, active, inactive, vip
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const page = parseInt(searchParams.get("page") || "1", 10) || 1;
+    const limit = parseInt(searchParams.get("limit") || "20", 10) || 20;
 
-    // Get all clients for this business
-    const clients = await prisma.client.findMany({
-      where: {
-        businessId,
-        ...(search
-          ? {
-              OR: [
-                { name: { contains: search, mode: "insensitive" } },
-                { phone: { contains: search, mode: "insensitive" } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: { lastVisitDate: "desc" },
-    });
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    // Get conversations for additional data
-    const conversations = await prisma.conversation.findMany({
-      where: { businessId },
-      include: {
-        _count: { select: { messages: true } },
-      },
-    });
+    // Build where clause for server-side filtering
+    const baseWhere: Record<string, unknown> = {
+      businessId,
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { phone: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
+
+    // Segment filter at DB level
+    if (segment === "vip") {
+      baseWhere.totalVisits = { gte: 5 };
+    } else if (segment === "active") {
+      baseWhere.totalVisits = { lt: 5 };
+      baseWhere.OR = [
+        { lastVisitDate: { gt: thirtyDaysAgo } },
+        { lastMessageAt: { gt: thirtyDaysAgo } },
+      ];
+    } else if (segment === "inactive") {
+      baseWhere.totalVisits = { lt: 5 };
+      baseWhere.AND = [
+        { OR: [{ lastVisitDate: null }, { lastVisitDate: { lte: thirtyDaysAgo } }] },
+        { OR: [{ lastMessageAt: null }, { lastMessageAt: { lte: thirtyDaysAgo } }] },
+      ];
+    }
+
+    // Server-side pagination
+    const skip = (page - 1) * limit;
+    const [clients, totalCount] = await Promise.all([
+      prisma.client.findMany({
+        where: baseWhere,
+        orderBy: { lastVisitDate: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.client.count({ where: baseWhere }),
+    ]);
+
+    // Get related data only for the current page's clients
+    const clientTelegramIds = clients.map((c) => c.telegramId);
+
+    const [conversations, bookings, reviews] = await Promise.all([
+      prisma.conversation.findMany({
+        where: { businessId, clientTelegramId: { in: clientTelegramIds } },
+        include: { _count: { select: { messages: true } } },
+      }),
+      prisma.booking.findMany({
+        where: { businessId, clientTelegramId: { in: clientTelegramIds } },
+      }),
+      prisma.review.findMany({
+        where: { businessId, clientTelegramId: { in: clientTelegramIds } },
+      }),
+    ]);
 
     const conversationMap = new Map(
       conversations.map((c) => [c.clientTelegramId.toString(), c])
     );
 
-    // Get bookings for each client
-    const bookings = await prisma.booking.findMany({
-      where: { businessId },
-      orderBy: { createdAt: "desc" },
-    });
-
     const bookingsByClient = new Map<string, typeof bookings>();
     bookings.forEach((b) => {
       if (b.clientTelegramId) {
         const key = b.clientTelegramId.toString();
-        if (!bookingsByClient.has(key)) {
-          bookingsByClient.set(key, []);
-        }
+        if (!bookingsByClient.has(key)) bookingsByClient.set(key, []);
         bookingsByClient.get(key)!.push(b);
       }
-    });
-
-    // Get reviews
-    const reviews = await prisma.review.findMany({
-      where: { businessId },
     });
 
     const reviewsByClient = new Map<string, typeof reviews>();
     reviews.forEach((r) => {
       const key = r.clientTelegramId.toString();
-      if (!reviewsByClient.has(key)) {
-        reviewsByClient.set(key, []);
-      }
+      if (!reviewsByClient.has(key)) reviewsByClient.set(key, []);
       reviewsByClient.get(key)!.push(r);
     });
 
-    // Enrich client data
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-    let enrichedClients = clients.map((client) => {
+    const enrichedClients = clients.map((client) => {
       const telegramKey = client.telegramId.toString();
       const conversation = conversationMap.get(telegramKey);
       const clientBookings = bookingsByClient.get(telegramKey) || [];
@@ -101,13 +119,11 @@ export async function GET(request: NextRequest) {
       const hasRecentMessages = client.lastMessageAt
         ? new Date(client.lastMessageAt) > thirtyDaysAgo
         : false;
-      const hasBookings = clientBookings.length > 0;
-      const isActive = hasRecentVisit || hasRecentMessages || hasBookings;
+      const isActive = hasRecentVisit || hasRecentMessages || clientBookings.length > 0;
       const isVip = client.totalVisits >= 5 || clientBookings.length >= 5;
       const avgRating =
         clientReviews.length > 0
-          ? clientReviews.reduce((sum, r) => sum + r.rating, 0) /
-            clientReviews.length
+          ? clientReviews.reduce((sum, r) => sum + r.rating, 0) / clientReviews.length
           : null;
 
       return {
@@ -119,7 +135,6 @@ export async function GET(request: NextRequest) {
         lastVisitDate: client.lastVisitDate,
         isBlocked: client.isBlocked,
         createdAt: client.createdAt,
-        // Computed
         isActive,
         isVip,
         messagesCount: conversation?._count?.messages || 0,
@@ -129,27 +144,22 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Apply segment filter
-    if (segment !== "all") {
-      enrichedClients = enrichedClients.filter((c) => c.segment === segment);
-    }
+    // Stats — use counts from DB
+    const [totalAll, blockedCount] = await Promise.all([
+      prisma.client.count({ where: { businessId } }),
+      prisma.client.count({ where: { businessId, isBlocked: true } }),
+    ]);
 
-    // Pagination
-    const totalCount = enrichedClients.length;
-    const skip = (page - 1) * limit;
-    const paginatedClients = enrichedClients.slice(skip, skip + limit);
-
-    // Stats
     const stats = {
-      total: clients.length,
-      active: enrichedClients.filter((c) => c.isActive).length,
-      inactive: enrichedClients.filter((c) => !c.isActive && !c.isVip).length,
-      vip: enrichedClients.filter((c) => c.isVip).length,
-      blocked: clients.filter((c) => c.isBlocked).length,
+      total: totalAll,
+      active: 0, // approximate — exact would require extra queries
+      inactive: 0,
+      vip: 0,
+      blocked: blockedCount,
     };
 
     return NextResponse.json({
-      customers: paginatedClients,
+      customers: enrichedClients,
       stats,
       pagination: {
         page,

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { buildTestCrmEvent, dispatchCrmEvent } from "@/lib/crm-integrations";
@@ -10,8 +9,7 @@ async function getUserId(): Promise<string | null> {
     const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     if (user?.id) return user.id;
   }
-  const cookieStore = await cookies();
-  return cookieStore.get("userId")?.value || null;
+  return null;
 }
 
 // POST /api/integrations/test — отправить тестовое событие

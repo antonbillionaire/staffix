@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     const rawBody = await request.text();
     const signature = request.headers.get("x-hub-signature-256");
     if (!verifyMetaWebhookSignature(rawBody, signature)) {
-      console.warn("[WA Sales /sales] Signature mismatch (processing anyway)");
+      return new Response("Unauthorized", { status: 401 });
     }
     body = JSON.parse(rawBody);
   } catch {

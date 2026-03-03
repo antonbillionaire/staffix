@@ -4,7 +4,7 @@
  * Uses X-Hub-Signature-256 header with META_APP_SECRET.
  */
 
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 
 /**
  * Verify the X-Hub-Signature-256 header from Meta webhooks.
@@ -26,5 +26,9 @@ export function verifyMetaWebhookSignature(
   const expectedSignature =
     "sha256=" + createHmac("sha256", appSecret).update(rawBody).digest("hex");
 
-  return signatureHeader === expectedSignature;
+  // Use constant-time comparison to prevent timing attacks
+  const expected = Buffer.from(expectedSignature);
+  const received = Buffer.from(signatureHeader);
+  if (expected.length !== received.length) return false;
+  return timingSafeEqual(expected, received);
 }

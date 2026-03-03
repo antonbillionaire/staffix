@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
 
-// Helper: get user ID (NextAuth + cookie fallback)
+// Helper: get user ID (NextAuth session)
 async function getUserId(): Promise<string | undefined> {
   const session = await auth();
 
@@ -14,8 +13,7 @@ async function getUserId(): Promise<string | undefined> {
     if (user?.id) return user.id;
   }
 
-  const cookieStore = await cookies();
-  return cookieStore.get("userId")?.value;
+  return undefined;
 }
 
 // GET - Fetch all documents for user's business

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { getSalesSystemPrompt } from "@/lib/sales-bot/system-prompt";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 // Telegram types
 interface TelegramUpdate {
@@ -270,6 +271,13 @@ async function generateAIResponse(
 // Webhook handler
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting: 30 requests per minute per IP
+    const ip = getClientIp(request);
+    const rl = await rateLimit(`sales-tg:${ip}`, 30, 1);
+    if (!rl.allowed) {
+      return NextResponse.json({ ok: true }); // Telegram expects 200 even on rejection
+    }
+
     const update: TelegramUpdate = await request.json();
 
     // Handle callback queries

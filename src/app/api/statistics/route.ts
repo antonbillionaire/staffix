@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
+export const maxDuration = 30;
+
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
@@ -52,31 +54,175 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get total messages
-    const totalMessages = await prisma.message.count({
-      where: {
-        conversation: { businessId: business.id },
-        createdAt: { gte: startDate },
-      },
-    });
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    // Get total bookings
-    const totalBookings = await prisma.booking.count({
-      where: {
-        businessId: business.id,
-        createdAt: { gte: startDate },
-      },
-    });
+    // ========= PARALLEL BATCH: All independent queries =========
+    const [
+      // Core stats
+      totalMessages,
+      totalBookings,
+      conversations,
+      messages,
+      userMessages,
+      clients,
+      bookingStatusCounts,
+      completedBookings,
+      broadcastsSent,
+      reviews,
+      // Previous period (for trends)
+      prevMessages,
+      prevBookings,
+      prevConversations,
+      prevOrders,
+      // Order stats
+      totalOrders,
+      orderStatusCounts,
+      orderRevenueAgg,
+      ordersList,
+      orderItems,
+      // Channel & response time
+      channelMessageCounts,
+      recentConversations,
+    ] = await Promise.all([
+      // --- Core stats ---
+      prisma.message.count({
+        where: {
+          conversation: { businessId: business.id },
+          createdAt: { gte: startDate },
+        },
+      }),
+      prisma.booking.count({
+        where: {
+          businessId: business.id,
+          createdAt: { gte: startDate },
+        },
+      }),
+      prisma.conversation.findMany({
+        where: {
+          businessId: business.id,
+          createdAt: { gte: startDate },
+        },
+        select: { clientTelegramId: true },
+        distinct: ["clientTelegramId"],
+      }),
+      prisma.message.findMany({
+        where: {
+          conversation: { businessId: business.id },
+          createdAt: { gte: startDate },
+        },
+        select: { createdAt: true },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.message.findMany({
+        where: {
+          conversation: { businessId: business.id },
+          role: "user",
+          createdAt: { gte: startDate },
+        },
+        select: { content: true },
+      }),
+      prisma.client.findMany({
+        where: { businessId: business.id },
+        select: { totalVisits: true, lastVisitDate: true },
+      }),
+      prisma.booking.groupBy({
+        by: ["status"],
+        where: { businessId: business.id, createdAt: { gte: startDate } },
+        _count: true,
+      }),
+      prisma.booking.findMany({
+        where: {
+          businessId: business.id,
+          status: "completed",
+          createdAt: { gte: startDate },
+        },
+        include: { service: { select: { price: true } } },
+      }),
+      prisma.clientBroadcast.count({
+        where: {
+          businessId: business.id,
+          status: "sent",
+          createdAt: { gte: startDate },
+        },
+      }),
+      prisma.review.findMany({
+        where: { businessId: business.id, createdAt: { gte: startDate } },
+        select: { rating: true },
+      }),
+      // --- Previous period (for trends) ---
+      period !== "all" ? prisma.message.count({
+        where: {
+          conversation: { businessId: business.id },
+          createdAt: { gte: prevStartDate, lt: startDate },
+        },
+      }) : Promise.resolve(0),
+      period !== "all" ? prisma.booking.count({
+        where: {
+          businessId: business.id,
+          createdAt: { gte: prevStartDate, lt: startDate },
+        },
+      }) : Promise.resolve(0),
+      period !== "all" ? prisma.conversation.findMany({
+        where: {
+          businessId: business.id,
+          createdAt: { gte: prevStartDate, lt: startDate },
+        },
+        select: { clientTelegramId: true },
+        distinct: ["clientTelegramId"],
+      }) : Promise.resolve([]),
+      period !== "all" ? prisma.order.count({
+        where: {
+          businessId: business.id,
+          createdAt: { gte: prevStartDate, lt: startDate },
+        },
+      }) : Promise.resolve(0),
+      // --- Order stats ---
+      prisma.order.count({
+        where: { businessId: business.id, createdAt: { gte: startDate } },
+      }),
+      prisma.order.groupBy({
+        by: ["status"],
+        where: { businessId: business.id, createdAt: { gte: startDate } },
+        _count: true,
+      }),
+      prisma.order.aggregate({
+        where: { businessId: business.id, createdAt: { gte: startDate } },
+        _sum: { totalPrice: true },
+        _avg: { totalPrice: true },
+      }),
+      prisma.order.findMany({
+        where: { businessId: business.id, createdAt: { gte: startDate } },
+        select: { createdAt: true },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.orderItem.findMany({
+        where: {
+          order: { businessId: business.id, createdAt: { gte: startDate } },
+        },
+        select: { name: true, quantity: true, price: true },
+      }),
+      // --- Channel & response time ---
+      prisma.channelMessage.groupBy({
+        by: ["channel"],
+        where: { businessId: business.id, createdAt: { gte: startDate } },
+        _count: true,
+      }),
+      prisma.conversation.findMany({
+        where: { businessId: business.id },
+        include: {
+          messages: {
+            orderBy: { createdAt: "asc" },
+            take: 100,
+            where: { createdAt: { gte: startDate } },
+          },
+        },
+        take: 20,
+      }),
+    ]);
 
-    // Get unique clients
-    const conversations = await prisma.conversation.findMany({
-      where: {
-        businessId: business.id,
-        createdAt: { gte: startDate },
-      },
-      select: { clientTelegramId: true },
-      distinct: ["clientTelegramId"],
-    });
+    // ========= Process results (pure computation, no DB) =========
+
+    // Unique clients
     const totalClients = conversations.length;
 
     // Calculate conversion rate
@@ -84,17 +230,7 @@ export async function GET(request: NextRequest) {
       ? Math.round((totalBookings / totalClients) * 100)
       : 0;
 
-    // Get messages by day
-    const messages = await prisma.message.findMany({
-      where: {
-        conversation: { businessId: business.id },
-        createdAt: { gte: startDate },
-      },
-      select: { createdAt: true },
-      orderBy: { createdAt: "asc" },
-    });
-
-    // Group by day
+    // Group messages by day
     const messagesByDayMap = new Map<string, number>();
     messages.forEach((msg) => {
       const dateStr = msg.createdAt.toISOString().split("T")[0];
@@ -119,16 +255,6 @@ export async function GET(request: NextRequest) {
         .slice(-maxDays);
       messagesByDay.push(...entries);
     }
-
-    // Get popular questions (messages from users)
-    const userMessages = await prisma.message.findMany({
-      where: {
-        conversation: { businessId: business.id },
-        role: "user",
-        createdAt: { gte: startDate },
-      },
-      select: { content: true },
-    });
 
     // Keyword-based grouping: normalize messages and group similar ones
     const questionCounts = new Map<string, { display: string; count: number }>();
@@ -170,15 +296,7 @@ export async function GET(request: NextRequest) {
       popularQuestions.push(...topSingle);
     }
 
-    // Enhanced CRM stats
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
     // Customer segments
-    const clients = await prisma.client.findMany({
-      where: { businessId: business.id },
-      select: { totalVisits: true, lastVisitDate: true },
-    });
-
     const customerSegments = {
       vip: clients.filter((c) => c.totalVisits >= 5).length,
       active: clients.filter(
@@ -190,12 +308,6 @@ export async function GET(request: NextRequest) {
     };
 
     // Bookings by status
-    const bookingStatusCounts = await prisma.booking.groupBy({
-      by: ["status"],
-      where: { businessId: business.id, createdAt: { gte: startDate } },
-      _count: true,
-    });
-
     const bookingsByStatus = {
       pending: 0,
       confirmed: 0,
@@ -209,94 +321,29 @@ export async function GET(request: NextRequest) {
     });
 
     // Total revenue from completed bookings
-    const completedBookings = await prisma.booking.findMany({
-      where: {
-        businessId: business.id,
-        status: "completed",
-        createdAt: { gte: startDate },
-      },
-      include: { service: { select: { price: true } } },
-    });
     const totalRevenue = completedBookings.reduce((sum, b) => sum + (b.service?.price || 0), 0);
 
-    // Broadcasts sent
-    const broadcastsSent = await prisma.clientBroadcast.count({
-      where: {
-        businessId: business.id,
-        status: "sent",
-        createdAt: { gte: startDate },
-      },
-    });
-
     // Average rating
-    const reviews = await prisma.review.findMany({
-      where: { businessId: business.id, createdAt: { gte: startDate } },
-      select: { rating: true },
-    });
     const avgRating = reviews.length > 0
       ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
       : null;
 
-    // Calculate trends by comparing to previous period
-    const prevMessages = period !== "all" ? await prisma.message.count({
-      where: {
-        conversation: { businessId: business.id },
-        createdAt: { gte: prevStartDate, lt: startDate },
-      },
-    }) : 0;
-
-    const prevBookings = period !== "all" ? await prisma.booking.count({
-      where: {
-        businessId: business.id,
-        createdAt: { gte: prevStartDate, lt: startDate },
-      },
-    }) : 0;
-
-    const prevConversations = period !== "all" ? await prisma.conversation.findMany({
-      where: {
-        businessId: business.id,
-        createdAt: { gte: prevStartDate, lt: startDate },
-      },
-      select: { clientTelegramId: true },
-      distinct: ["clientTelegramId"],
-    }) : [];
-
+    // Trends
     const calcTrend = (current: number, previous: number) => {
       if (previous === 0) return current > 0 ? 100 : 0;
       return Math.round(((current - previous) / previous) * 100);
     };
 
-    // ========= ORDER STATISTICS (for sales/shop businesses) =========
-    const totalOrders = await prisma.order.count({
-      where: { businessId: business.id, createdAt: { gte: startDate } },
-    });
-
-    const orderStatusCounts = await prisma.order.groupBy({
-      by: ["status"],
-      where: { businessId: business.id, createdAt: { gte: startDate } },
-      _count: true,
-    });
-
+    // Order stats processing
     const ordersByStatus: Record<string, number> = {};
     orderStatusCounts.forEach((item) => {
       ordersByStatus[item.status] = item._count;
     });
 
-    // Order revenue
-    const orderRevenueAgg = await prisma.order.aggregate({
-      where: { businessId: business.id, createdAt: { gte: startDate } },
-      _sum: { totalPrice: true },
-      _avg: { totalPrice: true },
-    });
     const orderRevenue = orderRevenueAgg._sum?.totalPrice || 0;
     const avgOrderValue = Math.round(orderRevenueAgg._avg?.totalPrice || 0);
 
     // Orders by day
-    const ordersList = await prisma.order.findMany({
-      where: { businessId: business.id, createdAt: { gte: startDate } },
-      select: { createdAt: true },
-      orderBy: { createdAt: "asc" },
-    });
     const ordersByDayMap = new Map<string, number>();
     ordersList.forEach((o) => {
       const dateStr = o.createdAt.toISOString().split("T")[0];
@@ -307,12 +354,6 @@ export async function GET(request: NextRequest) {
       .slice(-maxDays);
 
     // Popular products (top items in orders)
-    const orderItems = await prisma.orderItem.findMany({
-      where: {
-        order: { businessId: business.id, createdAt: { gte: startDate } },
-      },
-      select: { name: true, quantity: true, price: true },
-    });
     const productPopularity = new Map<string, { count: number; revenue: number }>();
     orderItems.forEach((item) => {
       const existing = productPopularity.get(item.name) || { count: 0, revenue: 0 };
@@ -325,38 +366,13 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    // Previous period orders for trend
-    const prevOrders = period !== "all" ? await prisma.order.count({
-      where: {
-        businessId: business.id,
-        createdAt: { gte: prevStartDate, lt: startDate },
-      },
-    }) : 0;
-
     // Channel-specific message counts
-    const channelMessageCounts = await prisma.channelMessage.groupBy({
-      by: ["channel"],
-      where: { businessId: business.id, createdAt: { gte: startDate } },
-      _count: true,
-    });
     const messagesByChannel: Record<string, number> = {};
     channelMessageCounts.forEach((item) => {
       messagesByChannel[item.channel] = item._count;
     });
 
     // Calculate average response time from message pairs
-    const recentConversations = await prisma.conversation.findMany({
-      where: { businessId: business.id },
-      include: {
-        messages: {
-          orderBy: { createdAt: "asc" },
-          take: 100,
-          where: { createdAt: { gte: startDate } },
-        },
-      },
-      take: 20,
-    });
-
     let totalResponseMs = 0;
     let responseCount = 0;
     for (const conv of recentConversations) {

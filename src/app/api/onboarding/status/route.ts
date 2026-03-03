@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -10,11 +9,6 @@ async function getUserBusiness() {
   if (session?.user?.email) {
     const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     userId = user?.id || null;
-  }
-
-  if (!userId) {
-    const cookieStore = await cookies();
-    userId = cookieStore.get("userId")?.value || null;
   }
 
   if (!userId) return null;

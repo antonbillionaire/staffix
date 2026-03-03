@@ -185,10 +185,10 @@ export async function PUT(request: Request) {
     if (businessTypes !== undefined) updateData.businessTypes = businessTypes;
     if (language !== undefined) updateData.language = language;
     if (deliveryEnabled !== undefined) updateData.deliveryEnabled = Boolean(deliveryEnabled);
-    if (deliveryTimeFrom !== undefined) updateData.deliveryTimeFrom = deliveryTimeFrom ? parseInt(deliveryTimeFrom) : null;
-    if (deliveryTimeTo !== undefined) updateData.deliveryTimeTo = deliveryTimeTo ? parseInt(deliveryTimeTo) : null;
-    if (deliveryFee !== undefined) updateData.deliveryFee = deliveryFee ? parseInt(deliveryFee) : null;
-    if (deliveryFreeFrom !== undefined) updateData.deliveryFreeFrom = deliveryFreeFrom ? parseInt(deliveryFreeFrom) : null;
+    if (deliveryTimeFrom !== undefined) updateData.deliveryTimeFrom = deliveryTimeFrom ? (parseInt(deliveryTimeFrom, 10) || null) : null;
+    if (deliveryTimeTo !== undefined) updateData.deliveryTimeTo = deliveryTimeTo ? (parseInt(deliveryTimeTo, 10) || null) : null;
+    if (deliveryFee !== undefined) updateData.deliveryFee = deliveryFee ? (parseInt(deliveryFee, 10) || null) : null;
+    if (deliveryFreeFrom !== undefined) updateData.deliveryFreeFrom = deliveryFreeFrom ? (parseInt(deliveryFreeFrom, 10) || null) : null;
     if (deliveryZones !== undefined) updateData.deliveryZones = deliveryZones || null;
 
     // WhatsApp
@@ -238,9 +238,11 @@ export async function PUT(request: Request) {
       data: updateData,
     });
 
+    // Mask sensitive tokens before returning
+    const { botToken: _bt, webhookSecret: _ws, waAccessToken: _wa, fbPageAccessToken: _fb, metaUserAccessToken: _mu, ...safeBusiness } = updatedBusiness as Record<string, unknown>;
     return NextResponse.json({
       message: "Данные сохранены",
-      business: updatedBusiness,
+      business: safeBusiness,
     });
   } catch (error) {
     console.error("Update business error:", error);

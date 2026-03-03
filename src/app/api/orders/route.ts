@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -10,11 +9,6 @@ async function getUserBusiness(): Promise<string | null> {
   if (session?.user?.email) {
     const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     userId = user?.id || null;
-  }
-
-  if (!userId) {
-    const cookieStore = await cookies();
-    userId = cookieStore.get("userId")?.value || null;
   }
 
   if (!userId) return null;
@@ -34,8 +28,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const page = parseInt(searchParams.get("page") || "1", 10) || 1;
+    const limit = parseInt(searchParams.get("limit") || "20", 10) || 20;
     const skip = (page - 1) * limit;
 
     const where = {

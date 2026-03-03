@@ -145,6 +145,7 @@ model Business {
   igActive             Boolean   @default(false)
 
   // Meta OAuth (shared for FB + IG, managed by Facebook Login flow)
+  metaUserId           String?   // Facebook/Meta User ID (for data deletion scoping)
   metaUserAccessToken  String?   // Long-lived User Access Token (60 дней)
   metaTokenExpiresAt   DateTime? // Когда истекает
 
@@ -191,6 +192,10 @@ model Business {
 
   // WhatsApp/Facebook разговоры
   channelConversations ChannelConversation[]
+
+  // Channel messages and leads
+  channelMessages      ChannelMessage[]
+  leads                Lead[]
 
   // Программы лояльности (может быть несколько типов)
   loyaltyPrograms    LoyaltyProgram[]
@@ -240,6 +245,8 @@ model Service {
   business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   bookings      Booking[]
+
+  @@index([businessId])
 }
 
 // Мастера/сотрудники
@@ -260,6 +267,8 @@ model Staff {
   bookings      Booking[]
   schedule      StaffSchedule[]
   timeOffs      StaffTimeOff[]
+
+  @@index([businessId])
 }
 
 // FAQ / База знаний
@@ -270,6 +279,8 @@ model FAQ {
 
   businessId    String
   business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
 }
 
 // Записи клиентов
@@ -301,6 +312,9 @@ model Booking {
   reviews       Review[]
 
   createdAt     DateTime  @default(now())
+
+  @@index([businessId])
+  @@index([businessId, date])
 }
 
 // Диалоги с клиентами
@@ -358,6 +372,8 @@ model Message {
   conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   createdAt       DateTime  @default(now())
+
+  @@index([conversationId])
 }
 
 // Подписки
@@ -860,6 +876,7 @@ model ChannelMessage {
   client                ChannelClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
   businessId            String
+  business              Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   createdAt             DateTime  @default(now())
 
@@ -897,6 +914,7 @@ model Lead {
   client                ChannelClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
   businessId            String
+  business              Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt

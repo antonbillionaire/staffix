@@ -35,6 +35,11 @@ export async function GET(request: NextRequest) {
 
     // Detail view: return messages for a specific conversation
     if (clientId && channel) {
+      // Validate clientId for Telegram (must be numeric for BigInt)
+      if (channel === "telegram" && !/^\d+$/.test(clientId)) {
+        return NextResponse.json({ error: "Invalid clientId" }, { status: 400 });
+      }
+
       // Channel conversation (WA/IG/FB)
       if (channel !== "telegram") {
         const conv = await prisma.channelConversation.findFirst({
@@ -95,6 +100,9 @@ export async function GET(request: NextRequest) {
 
     // Backwards compatibility: clientId without channel = Telegram
     if (clientId && !channel) {
+      if (!/^\d+$/.test(clientId)) {
+        return NextResponse.json({ error: "Invalid clientId" }, { status: 400 });
+      }
       const conversation = await prisma.conversation.findFirst({
         where: {
           businessId: business.id,

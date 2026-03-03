@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
 import { auth } from "@/auth";
 
 async function getBusinessId(): Promise<string | null> {
@@ -12,11 +11,6 @@ async function getBusinessId(): Promise<string | null> {
       where: { email: session.user.email },
     });
     userId = user?.id;
-  }
-
-  if (!userId) {
-    const cookieStore = await cookies();
-    userId = cookieStore.get("userId")?.value;
   }
 
   if (!userId) return null;
@@ -66,8 +60,8 @@ export async function PUT(request: NextRequest) {
         data: { isRead: true },
       });
     } else if (id) {
-      await prisma.notification.update({
-        where: { id },
+      await prisma.notification.updateMany({
+        where: { id, businessId },
         data: { isRead: true },
       });
     }

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
 import { auth } from "@/auth";
 
 async function getUserId(): Promise<string | null> {
@@ -13,8 +12,7 @@ async function getUserId(): Promise<string | null> {
     if (user?.id) return user.id;
   }
 
-  const cookieStore = await cookies();
-  return cookieStore.get("userId")?.value || null;
+  return null;
 }
 
 // PUT - обновить услугу
@@ -42,13 +40,24 @@ export async function PUT(
       return NextResponse.json({ error: "Услуга не найдена" }, { status: 404 });
     }
 
+    const parsedPrice = price ? parseInt(price, 10) : undefined;
+    const parsedDuration = duration ? parseInt(duration, 10) : undefined;
+
+    if (parsedPrice !== undefined && (isNaN(parsedPrice) || parsedPrice < 0)) {
+      return NextResponse.json({ error: "Некорректная цена" }, { status: 400 });
+    }
+
+    if (parsedDuration !== undefined && (isNaN(parsedDuration) || parsedDuration <= 0)) {
+      return NextResponse.json({ error: "Некорректная длительность" }, { status: 400 });
+    }
+
     const updated = await prisma.service.update({
       where: { id },
       data: {
         name: name || undefined,
         description: description !== undefined ? (description || null) : undefined,
-        price: price ? parseInt(price) : undefined,
-        duration: duration ? parseInt(duration) : undefined,
+        price: parsedPrice,
+        duration: parsedDuration,
       },
     });
 

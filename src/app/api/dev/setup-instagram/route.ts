@@ -5,9 +5,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { subscribePageToWebhooks } from "@/lib/sales-bot/meta-api";
 
-const SECRET = process.env.DEMO_SECRET || "paypro-demo-2025";
+const SECRET = process.env.DEMO_SECRET;
 
 export async function POST(request: NextRequest) {
+  if (!SECRET) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   const { secret } = await request.json();
   if (secret !== SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

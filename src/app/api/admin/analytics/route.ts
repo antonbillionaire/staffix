@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const period = searchParams.get("period") || "30"; // days
-    const periodDays = parseInt(period);
+    const periodDays = parseInt(period, 10) || 30;
 
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - periodDays);

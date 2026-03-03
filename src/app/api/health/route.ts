@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
+import { auth } from "@/auth";
+import { isAdmin } from "@/lib/admin";
 
-// Public health check — no auth required
-// Shows system status without exposing secrets
+// Health check — detailed info for admins only
 export async function GET() {
+  const session = await auth();
+  if (!session?.user?.email || !isAdmin(session.user.email)) {
+    return NextResponse.json({ status: "ok" }); // minimal response for non-admins
+  }
+
   const checks: Record<string, unknown> = {};
 
   // 1. Database connection

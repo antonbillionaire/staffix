@@ -27,12 +27,14 @@ import {
   getStaffList,
   getClientBookings,
   cancelBooking,
+  updateLeadStatus,
 } from "@/lib/booking-tools";
 import { sendBookingNotification } from "@/lib/notifications";
 import { formatDateRu } from "@/lib/automation";
 import { dispatchCrmEvent } from "@/lib/crm-integrations";
 import { salesToolDefinitions, executeSalesTool, notifyManagerByTelegram } from "@/lib/sales-tools";
 import { buildSalesSystemPrompt, isSalesMode } from "@/lib/sales-prompt";
+import { markWebhookProcessed } from "@/lib/webhook-dedup";
 
 // ========================================
 // HELPERS
@@ -299,6 +301,12 @@ async function getOrCreateConversation(
       include: { messages: true },
     });
 
+    // Increment totalConversations only when a NEW conversation is created
+    prisma.business.update({
+      where: { id: businessId },
+      data: { totalConversations: { increment: 1 } },
+    }).catch(e => console.error("[Webhook] totalConversations increment error:", e));
+
     return { id: conversation.id, messages: [] };
   } catch (error) {
     console.error("Error getting conversation:", error);
@@ -435,6 +443,17 @@ async function handleToolCall(
           toolInput.reason,
           toolInput.client_name,
           toolInput.urgency
+        );
+        return JSON.stringify(result);
+      }
+
+      case "update_lead_status": {
+        const result = await updateLeadStatus(
+          businessId,
+          telegramId.toString(),
+          "telegram",
+          toolInput.status,
+          toolInput.reason
         );
         return JSON.stringify(result);
       }
@@ -1029,6 +1048,12 @@ export async function POST(request: NextRequest) {
 
     const update: TelegramUpdate = JSON.parse(rawBody);
 
+    // Skip duplicate webhook deliveries
+    const dedupId = `tg-${update.update_id}`;
+    if (!(await markWebhookProcessed(dedupId))) {
+      return NextResponse.json({ ok: true });
+    }
+
     // Обработка нажатий на inline-кнопки
     if (update.callback_query) {
       await handleCallbackQuery(botToken, business.id, update.callback_query);
@@ -1289,12 +1314,9 @@ export async function POST(request: NextRequest) {
     // Отправляем ответ
     await sendTelegramMessage(botToken, chatId, aiResponse);
 
-    // Увеличиваем счётчик использованных сообщений и статистику (не блокируем ответ)
+    // Увеличиваем счётчик использованных сообщений (не блокируем ответ)
+    // Note: totalConversations is now incremented in getOrCreateConversation only for NEW conversations
     incrementMessageUsage(business.id).catch(e => console.error("[Webhook] incrementMessageUsage error:", e));
-    prisma.business.update({
-      where: { id: business.id },
-      data: { totalConversations: { increment: 1 } },
-    }).catch(e => console.error("[Webhook] stats update error:", e));
 
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {

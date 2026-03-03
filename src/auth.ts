@@ -125,8 +125,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return true;
         } catch (error) {
           console.error("Error in signIn callback:", error);
-          // Still allow sign in even if user creation fails
-          return true;
+          return false;
         }
       }
       return true;

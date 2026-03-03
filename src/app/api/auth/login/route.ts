@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { cookies } from "next/headers";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
@@ -54,16 +53,6 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
-
-    // Set session cookie (simple implementation)
-    // In production, use proper JWT or session management
-    const cookieStore = await cookies();
-    cookieStore.set("userId", user.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-    });
 
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user;

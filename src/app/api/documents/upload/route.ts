@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
 
 // No top-level imports for parsing libraries!
 // They are loaded dynamically to avoid crashes on Vercel
@@ -29,7 +28,7 @@ const ALLOWED_TYPES = [
 
 export async function POST(request: NextRequest) {
   try {
-    // Auth: same pattern as business API (NextAuth + cookie fallback)
+    // Auth: NextAuth session
     const session = await auth();
     let userId: string | undefined;
 
@@ -38,12 +37,6 @@ export async function POST(request: NextRequest) {
         where: { email: session.user.email },
       });
       userId = user?.id;
-    }
-
-    // Fallback to cookie-based auth
-    if (!userId) {
-      const cookieStore = await cookies();
-      userId = cookieStore.get("userId")?.value;
     }
 
     if (!userId) {

@@ -74,6 +74,19 @@ export async function exchangeCodeForLongLivedToken(code: string): Promise<{
   };
 }
 
+/**
+ * Fetch the authenticated Meta user's ID from a user access token.
+ * Used to store metaUserId for data deletion scoping.
+ */
+export async function getMetaUserId(userAccessToken: string): Promise<string> {
+  const res = await fetch(
+    `${META_GRAPH_BASE}/me?fields=id&access_token=${userAccessToken}`
+  );
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message || "Failed to fetch Meta user ID");
+  return data.id;
+}
+
 export interface MetaPage {
   id: string;
   name: string;

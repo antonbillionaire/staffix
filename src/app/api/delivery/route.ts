@@ -108,15 +108,20 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Зона не найдена" }, { status: 404 });
       }
 
+      const parsedFee = parseInt(fee, 10);
+      if (isNaN(parsedFee) || parsedFee < 0) {
+        return NextResponse.json({ error: "Некорректная стоимость доставки" }, { status: 400 });
+      }
+
       const updated = await prisma.deliveryZone.update({
         where: { id },
         data: {
           name,
-          fee: parseInt(fee, 10),
+          fee: parsedFee,
           currency: currency || "UZS",
-          timeFrom: timeFrom ? parseInt(timeFrom, 10) : null,
-          timeTo: timeTo ? parseInt(timeTo, 10) : null,
-          freeFrom: freeFrom ? parseInt(freeFrom, 10) : null,
+          timeFrom: timeFrom ? (parseInt(timeFrom, 10) || null) : null,
+          timeTo: timeTo ? (parseInt(timeTo, 10) || null) : null,
+          freeFrom: freeFrom ? (parseInt(freeFrom, 10) || null) : null,
           isActive: isActive !== undefined ? isActive : true,
         },
       });
@@ -126,14 +131,19 @@ export async function POST(request: NextRequest) {
       // Create new zone
       const count = await prisma.deliveryZone.count({ where: { businessId } });
 
+      const parsedFeeNew = parseInt(fee, 10);
+      if (isNaN(parsedFeeNew) || parsedFeeNew < 0) {
+        return NextResponse.json({ error: "Некорректная стоимость доставки" }, { status: 400 });
+      }
+
       const zone = await prisma.deliveryZone.create({
         data: {
           name,
-          fee: parseInt(fee, 10),
+          fee: parsedFeeNew,
           currency: currency || "UZS",
-          timeFrom: timeFrom ? parseInt(timeFrom, 10) : null,
-          timeTo: timeTo ? parseInt(timeTo, 10) : null,
-          freeFrom: freeFrom ? parseInt(freeFrom, 10) : null,
+          timeFrom: timeFrom ? (parseInt(timeFrom, 10) || null) : null,
+          timeTo: timeTo ? (parseInt(timeTo, 10) || null) : null,
+          freeFrom: freeFrom ? (parseInt(freeFrom, 10) || null) : null,
           sortOrder: count,
           businessId,
         },

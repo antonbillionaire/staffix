@@ -456,70 +456,82 @@ export async function createBooking(
       staffName = staff.name;
     }
 
-    // Verify the slot is still available
+    // Verify the slot and create booking atomically to prevent double-booking
     const slotEnd = new Date(bookingDate);
     slotEnd.setMinutes(slotEnd.getMinutes() + serviceDuration);
 
-    const dayBookings = await prisma.booking.findMany({
-      where: {
-        businessId,
-        status: { in: ["pending", "confirmed"] },
-        date: {
-          gte: localToUTC(dateStr, "00:00", tz),
-          lte: localToUTC(dateStr, "23:59", tz),
+    const txResult = await prisma.$transaction(async (tx) => {
+      const dayBookings = await tx.booking.findMany({
+        where: {
+          businessId,
+          status: { in: ["pending", "confirmed"] },
+          date: {
+            gte: localToUTC(dateStr, "00:00", tz),
+            lte: localToUTC(dateStr, "23:59", tz),
+          },
+          ...(actualStaffId ? { staffId: actualStaffId } : {}),
         },
-        ...(actualStaffId ? { staffId: actualStaffId } : {}),
-      },
-      include: {
-        service: { select: { name: true, duration: true, price: true } },
-        staff: { select: { name: true } },
-      },
+        include: {
+          service: { select: { name: true, duration: true, price: true } },
+          staff: { select: { name: true } },
+        },
+      });
+
+      for (const existing of dayBookings) {
+        const existingStart = new Date(existing.date);
+        const existingDuration = existing.service?.duration || 60;
+        const existingEnd = new Date(existingStart);
+        existingEnd.setMinutes(existingEnd.getMinutes() + existingDuration);
+
+        if (bookingDate < existingEnd && slotEnd > existingStart) {
+          // If same client already booked this slot — return existing booking (idempotent)
+          if (clientTelegramId && existing.clientTelegramId === clientTelegramId) {
+            return {
+              success: true as const,
+              bookingId: existing.id,
+              details: {
+                date: dateStr,
+                time,
+                staffName: existing.staff?.name || staffName,
+                serviceName: existing.service?.name || serviceName,
+                clientName,
+              },
+            };
+          }
+          return { success: false as const, error: "Этот слот уже занят. Пожалуйста, выберите другое время." };
+        }
+      }
+
+      // Create booking inside transaction
+      const booking = await tx.booking.create({
+        data: {
+          clientName,
+          clientPhone: clientPhone || null,
+          clientTelegramId: clientTelegramId || undefined,
+          date: bookingDate,
+          status: "confirmed",
+          businessId,
+          serviceId: serviceId || null,
+          staffId: actualStaffId || null,
+        },
+      });
+
+      await tx.business.update({
+        where: { id: businessId },
+        data: { totalBookings: { increment: 1 } },
+      });
+
+      return { success: true as const, bookingId: booking.id, details: null };
     });
 
-    for (const existing of dayBookings) {
-      const existingStart = new Date(existing.date);
-      const existingDuration = existing.service?.duration || 60;
-      const existingEnd = new Date(existingStart);
-      existingEnd.setMinutes(existingEnd.getMinutes() + existingDuration);
-
-      if (bookingDate < existingEnd && slotEnd > existingStart) {
-        // If same client already booked this slot — return existing booking (idempotent)
-        if (clientTelegramId && existing.clientTelegramId === clientTelegramId) {
-          return {
-            success: true,
-            bookingId: existing.id,
-            details: {
-              date: dateStr,
-              time,
-              staffName: existing.staff?.name || staffName,
-              serviceName: existing.service?.name || serviceName,
-              clientName,
-            },
-          };
-        }
-        return { success: false, error: "Этот слот уже занят. Пожалуйста, выберите другое время." };
-      }
+    if (!txResult.success) {
+      return txResult;
+    }
+    if (txResult.details) {
+      return txResult; // idempotent existing booking
     }
 
-    // Create booking
-    const booking = await prisma.booking.create({
-      data: {
-        clientName,
-        clientPhone: clientPhone || null,
-        clientTelegramId: clientTelegramId || undefined,
-        date: bookingDate,
-        status: "confirmed",
-        businessId,
-        serviceId: serviceId || null,
-        staffId: actualStaffId || null,
-      },
-    });
-
-    // Update business stats
-    await prisma.business.update({
-      where: { id: businessId },
-      data: { totalBookings: { increment: 1 } },
-    });
+    const booking = { id: txResult.bookingId };
 
     // Update client record (only if we have a telegramId-compatible identifier)
     if (clientTelegramId) {
@@ -633,6 +645,7 @@ export async function cancelBooking(
       include: {
         service: { select: { name: true } },
         staff: { select: { id: true, name: true } },
+        business: { select: { timezone: true } },
       },
     });
 
@@ -649,10 +662,11 @@ export async function cancelBooking(
       data: { status: "cancelled" },
     });
 
-    // Send cancellation notification
+    // Send cancellation notification using business timezone
     const bookingDate = new Date(booking.date);
-    const dateStr = bookingDate.toISOString().split("T")[0];
-    const timeStr = bookingDate.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+    const tz = booking.business?.timezone || "Asia/Tashkent";
+    const dateStr = bookingDate.toLocaleDateString("sv-SE", { timeZone: tz }); // YYYY-MM-DD
+    const timeStr = bookingDate.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: tz });
     notifyBooking(
       booking.businessId, "cancellation",
       booking.clientName, booking.service?.name || "Услуга",

@@ -12,6 +12,8 @@
  *   https://staffix.io/api/facebook/webhook
  */
 
+export const maxDuration = 60;
+
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";

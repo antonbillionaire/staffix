@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendVerificationEmail, sendWelcomeEmail } from "@/lib/email";
 import { notifyEmailVerified } from "@/lib/admin-notify";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 // Generate 6-digit verification code
 function generateVerificationCode(): string {
@@ -11,6 +12,13 @@ function generateVerificationCode(): string {
 // Verify code
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 5 attempts per 15 minutes per IP
+    const ip = getClientIp(request);
+    const { allowed } = await rateLimit(`verify:${ip}`, 5, 15);
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
+    }
+
     const { email, code } = await request.json();
 
     if (!email || !code) {

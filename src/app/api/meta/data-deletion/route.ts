@@ -72,31 +72,20 @@ export async function POST(request: Request) {
     // Generate a unique confirmation code
     const confirmationCode = crypto.randomUUID();
 
-    // Find businesses connected via this Meta user and clear their Meta data
-    // The metaUserAccessToken is obtained via Facebook Login for a specific Meta user,
-    // so we look for businesses that have this token (linked to this Meta user).
-    // Since we don't store metaUserId directly, we clear all businesses
-    // that have active Meta connections and log the deletion.
-    // In practice, one Meta user typically connects one business.
-
+    // Find businesses connected via this specific Meta user ID
     const businesses = await prisma.business.findMany({
       where: {
-        OR: [
-          { fbActive: true },
-          { igActive: true },
-        ],
-        metaUserAccessToken: { not: null },
+        metaUserId: metaUserId,
       },
       select: { id: true, name: true, fbPageId: true, igBusinessAccountId: true },
     });
 
+    if (businesses.length === 0) {
+      console.log(`[Meta Data Deletion] No businesses found for Meta user_id: ${metaUserId}`);
+    }
+
     let deletedCount = 0;
     for (const biz of businesses) {
-      // We can't verify which metaUserId owns which token without calling Meta API,
-      // so we delete channel conversations/messages for businesses with active Meta connections.
-      // This is conservative — in production with many businesses,
-      // you'd store metaUserId in the Business model for precise matching.
-
       // Delete channel conversations from Meta channels
       await prisma.channelConversation.deleteMany({
         where: {
@@ -113,6 +102,14 @@ export async function POST(request: Request) {
         },
       });
 
+      // Delete channel connections for Meta channels
+      await prisma.channelConnection.deleteMany({
+        where: {
+          businessId: biz.id,
+          channel: { in: ["facebook", "instagram"] },
+        },
+      });
+
       // Clear Meta connection fields
       await prisma.business.update({
         where: { id: biz.id },
@@ -123,6 +120,7 @@ export async function POST(request: Request) {
           igBusinessAccountId: null,
           igUsername: null,
           igActive: false,
+          metaUserId: null,
           metaUserAccessToken: null,
           metaTokenExpiresAt: null,
         },

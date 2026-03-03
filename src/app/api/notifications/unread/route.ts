@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
 import { auth } from "@/auth";
 
 // GET - количество непрочитанных уведомлений
@@ -14,11 +13,6 @@ export async function GET() {
         where: { email: session.user.email },
       });
       userId = user?.id;
-    }
-
-    if (!userId) {
-      const cookieStore = await cookies();
-      userId = cookieStore.get("userId")?.value;
     }
 
     if (!userId) {
