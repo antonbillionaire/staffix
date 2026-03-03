@@ -35,6 +35,10 @@ model User {
   notifyLowMessages    Boolean @default(true)
   notifyTrialEnding    Boolean @default(true)
 
+  // Drip campaign tracking
+  lastLoginAt          DateTime?
+  onboardingEmailsSent Json      @default("[]") // ["day2_services", "day5_channel", "day14_inactive"]
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -93,9 +97,10 @@ model Business {
   crmSystem     String?   // none, bitrix24, amocrm, smartup, billz, 1c, other
 
   // AI настройки
-  aiTone        String?   // friendly, professional, casual
-  aiRules       String?   // что можно/нельзя говорить
-  systemPrompt  String?   // сгенерированный промпт для AI
+  aiTone         String?   // friendly, professional, casual
+  aiRules        String?   // что можно/нельзя говорить
+  systemPrompt   String?   // сгенерированный промпт для AI
+  botDisplayName String?   // Имя бота для клиентов (напр. "Алия", "Виктор")
 
   // Telegram bot
   botToken      String?   @unique

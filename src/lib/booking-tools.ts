@@ -51,7 +51,7 @@ interface BookingResult {
  * - "с 9 до 18"
  * Falls back to 09:00-18:00 if can't parse
  */
-function parseWorkingHours(
+export function parseWorkingHours(
   workingHoursStr: string | null,
   date: Date
 ): { startHour: number; startMinute: number; endHour: number; endMinute: number } {

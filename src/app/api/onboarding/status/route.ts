@@ -53,13 +53,25 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const botConnected = !!business.botToken;
+    const waConnected = !!(business.waPhoneNumberId && business.waActive);
+    const metaConnected = !!(business.igBusinessAccountId || (business.fbPageId && business.fbActive));
+    const hasCatalog = business._count.services + business._count.products > 0;
+    const hasStaff = business._count.staff > 0;
+    const hasKnowledge = business._count.faqs + business._count.documents > 0;
+
+    // Минимальная настройка: хотя бы 1 канал + хотя бы 1 услуга/товар
+    const hasAnyChannel = botConnected || waConnected || metaConnected;
+    const minSetupComplete = hasAnyChannel && hasCatalog;
+
     return NextResponse.json({
-      botConnected: !!business.botToken,
-      waConnected: !!(business.waPhoneNumberId && business.waActive),
-      metaConnected: !!(business.igBusinessAccountId || (business.fbPageId && business.fbActive)),
-      hasCatalog: business._count.services + business._count.products > 0,
-      hasStaff: business._count.staff > 0,
-      hasKnowledge: business._count.faqs + business._count.documents > 0,
+      botConnected,
+      waConnected,
+      metaConnected,
+      hasCatalog,
+      hasStaff,
+      hasKnowledge,
+      minSetupComplete,
       businessType: business.businessType || null,
       dashboardMode: business.dashboardMode || "service",
     });

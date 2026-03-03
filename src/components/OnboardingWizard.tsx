@@ -26,6 +26,7 @@ interface OnboardingStatus {
   hasCatalog: boolean;
   hasStaff: boolean;
   hasKnowledge: boolean;
+  minSetupComplete: boolean;
   businessType: string | null;
   dashboardMode: string;
 }
@@ -99,22 +100,21 @@ export default function OnboardingWizard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const isDismissed = localStorage.getItem("onboarding_dismissed") === "true";
     const isCollapsed = localStorage.getItem("onboarding_collapsed") === "true";
-
-    if (isDismissed) {
-      setDismissed(true);
-      setLoading(false);
-      return;
-    }
-
     setCollapsed(isCollapsed);
 
     fetch("/api/onboarding/status")
       .then((r) => r.json())
       .then((data: OnboardingStatus) => {
         setStatus(data);
-        setDismissed(false);
+        const wasDismissed = localStorage.getItem("onboarding_dismissed") === "true";
+        // If dismissed BUT minimum setup not done — show wizard again
+        if (wasDismissed && !data.minSetupComplete) {
+          localStorage.removeItem("onboarding_dismissed");
+          setDismissed(false);
+        } else {
+          setDismissed(wasDismissed);
+        }
       })
       .catch(() => setDismissed(true))
       .finally(() => setLoading(false));
@@ -218,17 +218,20 @@ export default function OnboardingWizard() {
               <ChevronUp className="h-4 w-4" />
             )}
           </button>
-          <button
-            onClick={handleDismiss}
-            className={`p-1.5 rounded-lg transition-colors ${
-              isDark
-                ? "text-gray-500 hover:text-gray-300 hover:bg-white/5"
-                : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-            }`}
-            title="Скрыть"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          {/* Dismiss only available after minimum setup (1 channel + catalog) */}
+          {status.minSetupComplete && (
+            <button
+              onClick={handleDismiss}
+              className={`p-1.5 rounded-lg transition-colors ${
+                isDark
+                  ? "text-gray-500 hover:text-gray-300 hover:bg-white/5"
+                  : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              }`}
+              title="Скрыть"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 

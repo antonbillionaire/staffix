@@ -40,6 +40,8 @@ interface Stats {
   totalRevenue?: number;
   broadcastsSent?: number;
   avgRating?: number;
+  // Messages by channel
+  messagesByChannel?: Record<string, number>;
   // Order statistics (for sales/shop businesses)
   totalOrders?: number;
   ordersByStatus?: Record<string, number>;
@@ -234,11 +236,11 @@ export default function StatisticsPage() {
       </div>
 
       {/* Charts row */}
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Messages chart */}
         <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
           <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Сообщения по дням</h3>
-          <div className="h-64 flex items-end gap-2">
+          <div className="h-48 sm:h-64 flex items-end gap-1 sm:gap-2">
             {stats.messagesByDay.length > 0 ? (
               stats.messagesByDay.map((day, idx) => {
                 const maxCount = Math.max(...stats.messagesByDay.map(d => d.count));
@@ -261,6 +263,45 @@ export default function StatisticsPage() {
             )}
           </div>
         </div>
+
+        {/* Messages by channel */}
+        {stats.messagesByChannel && Object.keys(stats.messagesByChannel).length > 0 && (
+          <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
+            <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Сообщения по каналам</h3>
+            <div className="space-y-3">
+              {(() => {
+                const channels = stats.messagesByChannel!;
+                const maxVal = Math.max(...Object.values(channels), 1);
+                const channelMeta: Record<string, { label: string; color: string; bg: string }> = {
+                  telegram: { label: "Telegram", color: "bg-blue-500", bg: "bg-blue-500/10" },
+                  whatsapp: { label: "WhatsApp", color: "bg-green-500", bg: "bg-green-500/10" },
+                  instagram: { label: "Instagram", color: "bg-pink-500", bg: "bg-pink-500/10" },
+                  facebook: { label: "Facebook", color: "bg-blue-600", bg: "bg-blue-600/10" },
+                };
+                return Object.entries(channels)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([channel, count]) => {
+                    const meta = channelMeta[channel] || { label: channel, color: "bg-gray-500", bg: "bg-gray-500/10" };
+                    const pct = Math.round((count / maxVal) * 100);
+                    return (
+                      <div key={channel} className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className={`text-sm font-medium ${textPrimary}`}>{meta.label}</span>
+                          <span className={`text-sm ${textSecondary}`}>{count}</span>
+                        </div>
+                        <div className={`h-2 rounded-full ${isDark ? "bg-white/10" : "bg-gray-100"}`}>
+                          <div
+                            className={`h-full rounded-full ${meta.color} transition-all`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  });
+              })()}
+            </div>
+          </div>
+        )}
 
         {/* Popular questions */}
         <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
@@ -304,7 +345,7 @@ export default function StatisticsPage() {
 
       {/* Order Analytics (for shops) */}
       {(stats.totalOrders ?? 0) > 0 && (
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Orders by Status */}
           <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
             <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Заказы по статусам</h3>
@@ -377,7 +418,7 @@ export default function StatisticsPage() {
       )}
 
       {/* CRM Analytics */}
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Customer Segments */}
         <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
           <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Сегменты клиентов</h3>

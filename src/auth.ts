@@ -62,6 +62,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           throw new Error("Пожалуйста, подтвердите email");
         }
 
+        // Track last login
+        prisma.user.update({
+          where: { id: user.id },
+          data: { lastLoginAt: new Date() },
+        }).catch(() => {});
+
         return {
           id: user.id,
           email: user.email,
@@ -79,6 +85,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             where: { email: user.email! },
             include: { businesses: true },
           });
+
+          if (existingUser) {
+            // Track last login
+            prisma.user.update({
+              where: { id: existingUser.id },
+              data: { lastLoginAt: new Date() },
+            }).catch(() => {});
+          }
 
           if (!existingUser) {
             // Create new user with empty business (onboarding not completed)

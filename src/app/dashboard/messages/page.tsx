@@ -10,15 +10,22 @@ import {
   Bot,
   Clock,
   ChevronLeft,
+  Phone,
+  Instagram,
+  Facebook,
+  Send,
 } from "lucide-react";
 
 interface ConversationItem {
-  clientTelegramId: string;
+  clientId: string;
   clientName: string | null;
+  channel: "telegram" | "whatsapp" | "instagram" | "facebook";
   lastMessage: string;
   lastMessageRole: string;
   lastMessageAt: string;
   totalMessages: number;
+  // Backwards compatibility
+  clientTelegramId?: string;
 }
 
 interface ChatMessage {
@@ -28,15 +35,39 @@ interface ChatMessage {
   createdAt: string;
 }
 
+const CHANNEL_META: Record<string, { label: string; color: string; bg: string; iconColor: string }> = {
+  telegram: { label: "TG", color: "text-blue-400", bg: "bg-blue-500/20", iconColor: "text-blue-400" },
+  whatsapp: { label: "WA", color: "text-green-400", bg: "bg-green-500/20", iconColor: "text-green-400" },
+  instagram: { label: "IG", color: "text-pink-400", bg: "bg-pink-500/20", iconColor: "text-pink-400" },
+  facebook: { label: "FB", color: "text-blue-500", bg: "bg-blue-600/20", iconColor: "text-blue-500" },
+};
+
+function ChannelIcon({ channel, className = "h-4 w-4" }: { channel: string; className?: string }) {
+  const meta = CHANNEL_META[channel];
+  const iconClass = `${className} ${meta?.iconColor || "text-gray-400"}`;
+  switch (channel) {
+    case "whatsapp":
+      return <Phone className={iconClass} />;
+    case "instagram":
+      return <Instagram className={iconClass} />;
+    case "facebook":
+      return <Facebook className={iconClass} />;
+    default:
+      return <Send className={iconClass} />;
+  }
+}
+
 export default function MessagesPage() {
   const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
+  const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [search, setSearch] = useState("");
   const [clientName, setClientName] = useState<string | null>(null);
+  const [filterChannel, setFilterChannel] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const isDark = theme === "dark";
@@ -52,6 +83,7 @@ export default function MessagesPage() {
     try {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
+      if (filterChannel) params.set("channel", filterChannel);
       const res = await fetch(`/api/conversations?${params}`);
       if (res.ok) {
         const data = await res.json();
@@ -62,17 +94,18 @@ export default function MessagesPage() {
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [search, filterChannel]);
 
   useEffect(() => {
     fetchConversations();
   }, [fetchConversations]);
 
-  const fetchMessages = async (clientTelegramId: string) => {
+  const fetchMessages = async (clientId: string, channel: string) => {
     setLoadingMessages(true);
-    setSelectedClient(clientTelegramId);
+    setSelectedClient(clientId);
+    setSelectedChannel(channel);
     try {
-      const res = await fetch(`/api/conversations?clientId=${clientTelegramId}`);
+      const res = await fetch(`/api/conversations?clientId=${encodeURIComponent(clientId)}&channel=${channel}`);
       if (res.ok) {
         const data = await res.json();
         setMessages(data.messages || []);
@@ -100,21 +133,33 @@ export default function MessagesPage() {
     if (hours < 24) {
       return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
     }
-    if (hours < 168) { // 7 days
+    if (hours < 168) {
       return d.toLocaleDateString("ru-RU", { weekday: "short", hour: "2-digit", minute: "2-digit" });
     }
     return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
   };
 
   const getDisplayName = (item: ConversationItem) => {
-    return item.clientName || `Клиент #${item.clientTelegramId.slice(-4)}`;
+    if (item.clientName) return item.clientName;
+    const id = item.clientId || item.clientTelegramId || "";
+    return `Клиент #${id.slice(-4)}`;
   };
 
+  const getUniqueKey = (item: ConversationItem) => {
+    return `${item.channel}:${item.clientId || item.clientTelegramId}`;
+  };
+
+  // Channel filter tabs
+  const channelCounts: Record<string, number> = {};
+  for (const c of conversations) {
+    channelCounts[c.channel] = (channelCounts[c.channel] || 0) + 1;
+  }
+
   return (
-    <div className="h-[calc(100vh-100px)] flex flex-col">
+    <div className="h-[calc(100vh-80px)] sm:h-[calc(100vh-100px)] flex flex-col">
       <div className="mb-4">
         <h1 className={`text-2xl font-bold ${textPrimary}`}>Сообщения</h1>
-        <p className={textSecondary}>Переписки бота с клиентами</p>
+        <p className={textSecondary}>Переписки AI-сотрудника с клиентами</p>
       </div>
 
       <div className={`flex-1 flex ${cardBg} border ${borderColor} rounded-xl overflow-hidden min-h-0`}>
@@ -132,6 +177,36 @@ export default function MessagesPage() {
                 className={`w-full pl-9 pr-3 py-2 ${isDark ? "bg-white/5" : "bg-gray-50"} border ${isDark ? "border-white/10" : "border-gray-300"} rounded-lg ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm`}
               />
             </div>
+            {/* Channel filter */}
+            <div className="flex gap-1 mt-2 flex-wrap">
+              <button
+                onClick={() => setFilterChannel("")}
+                className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                  !filterChannel
+                    ? "bg-blue-500 text-white"
+                    : isDark
+                    ? "bg-white/5 text-gray-400 hover:bg-white/10"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                Все
+              </button>
+              {Object.entries(CHANNEL_META).map(([key, meta]) => (
+                <button
+                  key={key}
+                  onClick={() => setFilterChannel(key === filterChannel ? "" : key)}
+                  className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                    filterChannel === key
+                      ? "bg-blue-500 text-white"
+                      : isDark
+                      ? "bg-white/5 text-gray-400 hover:bg-white/10"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {meta.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Client list */}
@@ -147,38 +222,51 @@ export default function MessagesPage() {
                 <p className="text-xs mt-1">Переписки появятся когда клиенты напишут боту</p>
               </div>
             ) : (
-              conversations.map((item) => (
-                <button
-                  key={item.clientTelegramId}
-                  onClick={() => fetchMessages(item.clientTelegramId)}
-                  className={`w-full text-left p-3 border-b ${borderColor} transition-colors ${
-                    selectedClient === item.clientTelegramId ? activeBg : hoverBg
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isDark ? "bg-blue-500/20" : "bg-blue-100"}`}>
-                      <User className="h-5 w-5 text-blue-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className={`font-medium text-sm ${textPrimary} truncate`}>
-                          {getDisplayName(item)}
-                        </p>
-                        <span className={`text-xs ${textTertiary} flex-shrink-0`}>
-                          {formatTime(item.lastMessageAt)}
-                        </span>
+              conversations.map((item) => {
+                const itemKey = getUniqueKey(item);
+                const isSelected = selectedClient === (item.clientId || item.clientTelegramId) && selectedChannel === item.channel;
+                const meta = CHANNEL_META[item.channel] || CHANNEL_META.telegram;
+
+                return (
+                  <button
+                    key={itemKey}
+                    onClick={() => fetchMessages(item.clientId || item.clientTelegramId || "", item.channel)}
+                    className={`w-full text-left p-3 border-b ${borderColor} transition-colors ${
+                      isSelected ? activeBg : hoverBg
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${meta.bg}`}>
+                        <ChannelIcon channel={item.channel} className="h-5 w-5" />
                       </div>
-                      <p className={`text-xs ${textSecondary} truncate mt-0.5`}>
-                        {item.lastMessageRole === "assistant" ? "Бот: " : ""}
-                        {item.lastMessage}
-                      </p>
-                      <p className={`text-xs ${textTertiary} mt-0.5`}>
-                        {item.totalMessages} сообщ.
-                      </p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <p className={`font-medium text-sm ${textPrimary} truncate`}>
+                              {getDisplayName(item)}
+                            </p>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${
+                              isDark ? "bg-white/10 text-gray-400" : "bg-gray-100 text-gray-500"
+                            }`}>
+                              {meta.label}
+                            </span>
+                          </div>
+                          <span className={`text-xs ${textTertiary} flex-shrink-0`}>
+                            {formatTime(item.lastMessageAt)}
+                          </span>
+                        </div>
+                        <p className={`text-xs ${textSecondary} truncate mt-0.5`}>
+                          {item.lastMessageRole === "assistant" ? "Бот: " : ""}
+                          {item.lastMessage}
+                        </p>
+                        <p className={`text-xs ${textTertiary} mt-0.5`}>
+                          {item.totalMessages} сообщ.
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))
+                  </button>
+                );
+              })
             )}
           </div>
         </div>
@@ -190,19 +278,23 @@ export default function MessagesPage() {
               {/* Chat header */}
               <div className={`p-4 border-b ${borderColor} flex items-center gap-3`}>
                 <button
-                  onClick={() => setSelectedClient(null)}
+                  onClick={() => { setSelectedClient(null); setSelectedChannel(null); }}
                   className={`sm:hidden p-2 ${hoverBg} rounded-lg`}
                 >
                   <ChevronLeft className={`h-5 w-5 ${textSecondary}`} />
                 </button>
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDark ? "bg-blue-500/20" : "bg-blue-100"}`}>
-                  <User className="h-5 w-5 text-blue-500" />
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  CHANNEL_META[selectedChannel || "telegram"]?.bg || "bg-blue-500/20"
+                }`}>
+                  <ChannelIcon channel={selectedChannel || "telegram"} className="h-5 w-5" />
                 </div>
                 <div>
                   <p className={`font-medium ${textPrimary}`}>
                     {clientName || `Клиент #${selectedClient.slice(-4)}`}
                   </p>
-                  <p className={`text-xs ${textSecondary}`}>Telegram ID: {selectedClient}</p>
+                  <p className={`text-xs ${textSecondary}`}>
+                    {CHANNEL_META[selectedChannel || "telegram"]?.label || "Telegram"} &middot; {selectedClient}
+                  </p>
                 </div>
               </div>
 
@@ -222,7 +314,7 @@ export default function MessagesPage() {
                       key={msg.id}
                       className={`flex ${msg.role === "user" ? "justify-start" : "justify-end"}`}
                     >
-                      <div className={`max-w-[75%] flex gap-2 ${msg.role === "user" ? "" : "flex-row-reverse"}`}>
+                      <div className={`max-w-[85%] sm:max-w-[75%] flex gap-2 ${msg.role === "user" ? "" : "flex-row-reverse"}`}>
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-1 ${
                           msg.role === "user"
                             ? isDark ? "bg-gray-700" : "bg-gray-200"

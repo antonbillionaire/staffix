@@ -169,7 +169,7 @@ export default function LeadsPage() {
       <div className={`${bgCard} rounded-xl border ${border} p-4 mb-4`}>
         <div className="flex flex-wrap items-center gap-3">
           {/* Search */}
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative flex-1 min-w-0 sm:min-w-[200px]">
             <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${textSecondary}`} />
             <input
               type="text"

@@ -56,10 +56,16 @@ export default function KnowledgeBasePage() {
     welcomeMessage: "",
     rules: "",
     language: "ru",
+    botDisplayName: "",
   });
   const [businessName, setBusinessName] = useState("");
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
+
+  // Bot test state
+  const [testMessage, setTestMessage] = useState("");
+  const [testReply, setTestReply] = useState("");
+  const [testLoading, setTestLoading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
 
   // FAQ state
@@ -110,6 +116,7 @@ export default function KnowledgeBasePage() {
             welcomeMessage: data.business.welcomeMessage || "",
             rules: data.business.aiRules || "",
             language: data.business.language || "ru",
+            botDisplayName: data.business.botDisplayName || "",
           });
           setBusinessName(data.business.name || "");
         }
@@ -143,6 +150,7 @@ export default function KnowledgeBasePage() {
           welcomeMessage: aiSettings.welcomeMessage,
           aiRules: aiSettings.rules,
           language: aiSettings.language,
+          botDisplayName: aiSettings.botDisplayName || null,
         }),
       });
       if (!res.ok) throw new Error(t("botPage.saveError"));
@@ -152,6 +160,29 @@ export default function KnowledgeBasePage() {
       console.error(err);
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  const handleTestBot = async () => {
+    if (!testMessage.trim()) return;
+    setTestLoading(true);
+    setTestReply("");
+    try {
+      const res = await fetch("/api/bot/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: testMessage }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTestReply(data.reply || "Нет ответа");
+      } else {
+        setTestReply("Ошибка: сначала сохраните настройки и добавьте хотя бы одну услугу.");
+      }
+    } catch {
+      setTestReply("Ошибка подключения к серверу.");
+    } finally {
+      setTestLoading(false);
     }
   };
 
@@ -553,6 +584,24 @@ export default function KnowledgeBasePage() {
                 <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"} mt-2`}>{t("botPage.rulesHelp")}</p>
               </div>
 
+              {/* Bot display name */}
+              <div>
+                <label className={`block text-sm font-medium ${textPrimary} mb-2`}>
+                  Имя бота
+                </label>
+                <input
+                  type="text"
+                  value={aiSettings.botDisplayName}
+                  onChange={(e) => setAiSettings({ ...aiSettings, botDisplayName: e.target.value })}
+                  placeholder="Например: Алия, Виктор, Ассистент"
+                  maxLength={50}
+                  className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                />
+                <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"} mt-2`}>
+                  Бот будет представляться этим именем клиентам. Оставьте пустым для "AI-помощник".
+                </p>
+              </div>
+
               <button
                 onClick={handleSaveSettings}
                 disabled={savingSettings}
@@ -566,6 +615,47 @@ export default function KnowledgeBasePage() {
                   <><Save className="h-4 w-4" /> {t("botPage.saveSettings")}</>
                 )}
               </button>
+
+              {/* Test your bot */}
+              <div className={`mt-6 p-5 rounded-xl border ${isDark ? "border-blue-500/30 bg-blue-500/5" : "border-blue-200 bg-blue-50/50"}`}>
+                <h3 className={`text-sm font-semibold ${textPrimary} mb-3 flex items-center gap-2`}>
+                  <Brain className="h-4 w-4 text-blue-500" />
+                  Протестируйте бота
+                </h3>
+                <p className={`text-xs ${textSecondary} mb-3`}>
+                  Напишите сообщение как клиент — и посмотрите как бот ответит с текущими настройками.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={testMessage}
+                    onChange={(e) => setTestMessage(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && testMessage.trim() && !testLoading) {
+                        handleTestBot();
+                      }
+                    }}
+                    placeholder="Напишите тестовое сообщение..."
+                    className={`flex-1 px-4 py-2.5 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                  />
+                  <button
+                    onClick={handleTestBot}
+                    disabled={testLoading || !testMessage.trim()}
+                    className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium disabled:opacity-50 hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
+                    {testLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    Тест
+                  </button>
+                </div>
+                {testReply && (
+                  <div className={`mt-3 p-3 rounded-lg text-sm ${isDark ? "bg-white/5 text-gray-300" : "bg-white text-gray-700"} border ${isDark ? "border-white/10" : "border-gray-200"}`}>
+                    <p className={`text-xs font-medium ${isDark ? "text-blue-400" : "text-blue-600"} mb-1`}>
+                      {aiSettings.botDisplayName || "AI-помощник"}:
+                    </p>
+                    <p className="whitespace-pre-wrap">{testReply}</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

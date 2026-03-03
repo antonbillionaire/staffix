@@ -625,3 +625,169 @@ export async function sendTelegramNotification(
   console.error("Telegram notification failed after all retries");
   return { success: false, error: lastError };
 }
+
+// ========================================
+// ONBOARDING DRIP EMAILS
+// ========================================
+
+const DRIP_FOOTER = `
+  <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+    <p style="color: #6b7280; font-size: 12px; margin: 0;">
+      © Staffix — AI-сотрудник для вашего бизнеса<br/>
+      <a href="https://www.staffix.io" style="color: #3b82f6;">www.staffix.io</a>
+    </p>
+  </div>
+`;
+
+// Day 2: Remind to add services
+export async function sendDripServicesReminder(
+  email: string,
+  name: string
+): Promise<{ success: boolean; error?: string }> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Drip services reminder for ${email}`);
+    return { success: true };
+  }
+
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: "Добавьте услуги — и AI начнёт работать",
+      html: `
+        <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, system-ui, sans-serif; background: #0a0a1a; color: #e5e7eb; padding: 40px 30px; border-radius: 16px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="background: linear-gradient(135deg, #3b82f6, #9333ea); border-radius: 16px; width: 60px; height: 60px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+              <span style="color: white; font-size: 28px; font-weight: bold;">S</span>
+            </div>
+          </div>
+          <h1 style="color: white; font-size: 22px; text-align: center; margin-bottom: 20px;">
+            ${name}, осталось добавить услуги!
+          </h1>
+          <p style="color: #9ca3af; font-size: 15px; line-height: 1.6; text-align: center;">
+            Ваш AI-сотрудник почти готов к работе. Чтобы он мог рассказывать клиентам о ваших услугах и записывать их — добавьте хотя бы одну услугу.
+          </p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://www.staffix.io/dashboard/services" style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 15px; display: inline-block;">
+              Добавить услуги
+            </a>
+          </div>
+          <p style="color: #6b7280; font-size: 13px; text-align: center;">
+            Это займёт 2-3 минуты. Укажите название, цену и длительность.
+          </p>
+          ${DRIP_FOOTER}
+        </div>
+      `,
+    });
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Send error" };
+  }
+}
+
+// Day 5: Remind to connect a channel
+export async function sendDripChannelReminder(
+  email: string,
+  name: string
+): Promise<{ success: boolean; error?: string }> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Drip channel reminder for ${email}`);
+    return { success: true };
+  }
+
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: "Подключите канал — клиенты ждут",
+      html: `
+        <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, system-ui, sans-serif; background: #0a0a1a; color: #e5e7eb; padding: 40px 30px; border-radius: 16px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="background: linear-gradient(135deg, #3b82f6, #9333ea); border-radius: 16px; width: 60px; height: 60px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+              <span style="color: white; font-size: 28px; font-weight: bold;">S</span>
+            </div>
+          </div>
+          <h1 style="color: white; font-size: 22px; text-align: center; margin-bottom: 20px;">
+            ${name}, подключите канал связи
+          </h1>
+          <p style="color: #9ca3af; font-size: 15px; line-height: 1.6; text-align: center;">
+            AI-сотрудник готов отвечать клиентам, но ему нужен канал: Telegram, WhatsApp или Instagram. Подключите один из них — и бот начнёт работать.
+          </p>
+          <div style="text-align: center; margin: 30px 0; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <a href="https://www.staffix.io/dashboard/channels/telegram" style="background: #2563eb; color: white; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px;">
+              Telegram
+            </a>
+            <a href="https://www.staffix.io/dashboard/channels/whatsapp" style="background: #16a34a; color: white; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px;">
+              WhatsApp
+            </a>
+            <a href="https://www.staffix.io/dashboard/channels/meta" style="background: #e11d48; color: white; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px;">
+              Instagram
+            </a>
+          </div>
+          <p style="color: #6b7280; font-size: 13px; text-align: center;">
+            Самый быстрый — Telegram (5 минут). WhatsApp и Instagram требуют бизнес-аккаунт.
+          </p>
+          ${DRIP_FOOTER}
+        </div>
+      `,
+    });
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Send error" };
+  }
+}
+
+// Day 14: Re-engagement for inactive users
+export async function sendDripReengageReminder(
+  email: string,
+  name: string
+): Promise<{ success: boolean; error?: string }> {
+  const resend = getResend();
+  if (!resend) {
+    console.log(`[DEV] Drip reengage reminder for ${email}`);
+    return { success: true };
+  }
+
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: `${name}, нужна помощь с настройкой?`,
+      html: `
+        <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, system-ui, sans-serif; background: #0a0a1a; color: #e5e7eb; padding: 40px 30px; border-radius: 16px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <div style="background: linear-gradient(135deg, #3b82f6, #9333ea); border-radius: 16px; width: 60px; height: 60px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center;">
+              <span style="color: white; font-size: 28px; font-weight: bold;">S</span>
+            </div>
+          </div>
+          <h1 style="color: white; font-size: 22px; text-align: center; margin-bottom: 20px;">
+            ${name}, мы можем помочь!
+          </h1>
+          <p style="color: #9ca3af; font-size: 15px; line-height: 1.6; text-align: center;">
+            Заметили что вы ещё не завершили настройку AI-сотрудника. Может быть возникли вопросы? Мы готовы помочь — напишите нам и мы настроим всё вместе.
+          </p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="https://www.staffix.io/dashboard" style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 15px; display: inline-block;">
+              Вернуться в Staffix
+            </a>
+          </div>
+          <p style="color: #6b7280; font-size: 13px; text-align: center;">
+            Ответьте на это письмо или напишите нам в поддержку — поможем с настройкой бесплатно.
+          </p>
+          ${DRIP_FOOTER}
+        </div>
+      `,
+    });
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Send error" };
+  }
+}

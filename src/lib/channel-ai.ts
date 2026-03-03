@@ -62,6 +62,7 @@ async function loadBusinessProfile(businessId: string) {
       welcomeMessage: true,
       aiTone: true,
       aiRules: true,
+      botDisplayName: true,
       language: true,
       city: true,
       country: true,
@@ -76,7 +77,7 @@ async function loadBusinessProfile(businessId: string) {
 /**
  * Build system prompt for channel AI
  */
-function buildChannelSystemPrompt(
+export function buildChannelSystemPrompt(
   biz: NonNullable<Awaited<ReturnType<typeof loadBusinessProfile>>>,
   channel: string
 ): string {
@@ -104,7 +105,8 @@ function buildChannelSystemPrompt(
     ? biz.faqs.map((f) => `Q: ${f.question}\nA: ${f.answer}`).join("\n\n")
     : "";
 
-  let prompt = `Ты — AI-помощник бизнеса «${biz.name}» в ${channelName}. Твоя задача — вежливо и точно отвечать на вопросы клиентов, помогать с записью и информацией об услугах. Общайся ${tone} тоном.`;
+  const botName = biz.botDisplayName || "AI-помощник";
+  let prompt = `Ты — ${botName} бизнеса «${biz.name}» в ${channelName}. Твоя задача — вежливо и точно отвечать на вопросы клиентов, помогать с записью и информацией об услугах. Общайся ${tone} тоном.${biz.botDisplayName ? ` Тебя зовут ${biz.botDisplayName}, представляйся этим именем.` : ""}`;
 
   if (biz.address) prompt += `\n\nАдрес: ${biz.address}`;
   if (biz.phone) prompt += `\nТелефон: ${biz.phone}`;

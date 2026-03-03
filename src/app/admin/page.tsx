@@ -15,6 +15,12 @@ import {
   UserPlus,
   CreditCard,
   Zap,
+  Activity,
+  Database,
+  Webhook,
+  Radio,
+  Bot,
+  RefreshCw,
 } from "lucide-react";
 
 interface Stats {
@@ -49,9 +55,34 @@ interface Stats {
   }>;
 }
 
+interface HealthCheck {
+  status: "ok" | "warn" | "error";
+  detail: string;
+}
+
+interface HealthData {
+  status: "ok" | "warn" | "error";
+  checks: Record<string, HealthCheck>;
+  timestamp: string;
+}
+
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [health, setHealth] = useState<HealthData | null>(null);
+  const [healthLoading, setHealthLoading] = useState(false);
+
+  const fetchHealth = async () => {
+    setHealthLoading(true);
+    try {
+      const res = await fetch("/api/admin/health");
+      if (res.ok) setHealth(await res.json());
+    } catch (error) {
+      console.error("Error fetching health:", error);
+    } finally {
+      setHealthLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -69,6 +100,7 @@ export default function AdminDashboard() {
     };
 
     fetchStats();
+    fetchHealth();
   }, []);
 
   if (loading) {
@@ -121,6 +153,69 @@ export default function AdminDashboard() {
         <h1 className="text-2xl font-bold text-white">Дашборд</h1>
         <p className="text-gray-400">Обзор ключевых метрик Staffix</p>
       </div>
+
+      {/* Health Check */}
+      {health && (
+        <div className="bg-[#12122a] border border-white/5 rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Activity className={`h-5 w-5 ${
+                health.status === "ok" ? "text-green-400" :
+                health.status === "warn" ? "text-yellow-400" : "text-red-400"
+              }`} />
+              <h3 className="text-base font-semibold text-white">System Health</h3>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                health.status === "ok" ? "bg-green-500/10 text-green-400" :
+                health.status === "warn" ? "bg-yellow-500/10 text-yellow-400" :
+                "bg-red-500/10 text-red-400"
+              }`}>
+                {health.status.toUpperCase()}
+              </span>
+            </div>
+            <button
+              onClick={fetchHealth}
+              disabled={healthLoading}
+              className="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+            >
+              <RefreshCw className={`h-4 w-4 ${healthLoading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {Object.entries(health.checks).map(([key, check]) => {
+              const icons: Record<string, React.ReactNode> = {
+                database: <Database className="h-4 w-4" />,
+                webhooks: <Webhook className="h-4 w-4" />,
+                channels: <Radio className="h-4 w-4" />,
+                aiActivity: <Bot className="h-4 w-4" />,
+              };
+              const labels: Record<string, string> = {
+                database: "База данных",
+                webhooks: "Вебхуки",
+                channels: "Каналы",
+                aiActivity: "AI активность",
+              };
+              return (
+                <div key={key} className={`p-3 rounded-lg border ${
+                  check.status === "ok" ? "border-green-500/20 bg-green-500/5" :
+                  check.status === "warn" ? "border-yellow-500/20 bg-yellow-500/5" :
+                  "border-red-500/20 bg-red-500/5"
+                }`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={
+                      check.status === "ok" ? "text-green-400" :
+                      check.status === "warn" ? "text-yellow-400" : "text-red-400"
+                    }>
+                      {icons[key] || <Activity className="h-4 w-4" />}
+                    </span>
+                    <span className="text-xs font-medium text-gray-300">{labels[key] || key}</span>
+                  </div>
+                  <p className="text-xs text-gray-500">{check.detail}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Main metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
