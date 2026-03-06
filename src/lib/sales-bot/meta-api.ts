@@ -8,6 +8,20 @@
  * Send a text message via Instagram Messaging API
  * Docs: https://developers.facebook.com/docs/instagram-messaging
  */
+function splitIGMessage(text: string, maxLen = 1000): string[] {
+  if (text.length <= maxLen) return [text];
+  const parts: string[] = [];
+  let remaining = text;
+  while (remaining.length > maxLen) {
+    const splitAt = remaining.lastIndexOf("\n", maxLen);
+    const cutAt = splitAt > maxLen / 2 ? splitAt : maxLen;
+    parts.push(remaining.slice(0, cutAt));
+    remaining = remaining.slice(cutAt).trimStart();
+  }
+  if (remaining) parts.push(remaining);
+  return parts;
+}
+
 export async function sendInstagramMessage(
   recipientId: string,
   text: string
@@ -19,27 +33,30 @@ export async function sendInstagramMessage(
     return false;
   }
 
+  const chunks = splitIGMessage(text, 1000);
   try {
-    const response = await fetch(
-      `https://graph.facebook.com/v21.0/${pageId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          recipient: { id: recipientId },
-          messaging_type: "RESPONSE",
-          message: { text },
-        }),
-      }
-    );
+    for (const chunk of chunks) {
+      const response = await fetch(
+        `https://graph.facebook.com/v21.0/${pageId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            recipient: { id: recipientId },
+            messaging_type: "RESPONSE",
+            message: { text: chunk },
+          }),
+        }
+      );
 
-    if (!response.ok) {
-      const error = await response.json();
-      console.error("Meta API: Instagram send error:", error);
-      return false;
+      if (!response.ok) {
+        const error = await response.json();
+        console.error("Meta API: Instagram send error:", error);
+        return false;
+      }
     }
     return true;
   } catch (error) {

@@ -213,29 +213,46 @@ async function processIGMessage(
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+function splitIGMessage(text: string, maxLen = 1000): string[] {
+  if (text.length <= maxLen) return [text];
+  const parts: string[] = [];
+  let remaining = text;
+  while (remaining.length > maxLen) {
+    const splitAt = remaining.lastIndexOf("\n", maxLen);
+    const cutAt = splitAt > maxLen / 2 ? splitAt : maxLen;
+    parts.push(remaining.slice(0, cutAt));
+    remaining = remaining.slice(cutAt).trimStart();
+  }
+  if (remaining) parts.push(remaining);
+  return parts;
+}
+
 async function sendIGMessage(
   igAccountId: string,
   accessToken: string,
   recipientId: string,
   text: string
 ): Promise<boolean> {
+  const chunks = splitIGMessage(text, 1000);
   try {
-    const res = await fetch(`${META_API_BASE}/${igAccountId}/messages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        recipient: { id: recipientId },
-        messaging_type: "RESPONSE",
-        message: { text },
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.error("IG sendMessage error:", err);
-      return false;
+    for (const chunk of chunks) {
+      const res = await fetch(`${META_API_BASE}/${igAccountId}/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          recipient: { id: recipientId },
+          messaging_type: "RESPONSE",
+          message: { text: chunk },
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error("IG sendMessage error:", err);
+        return false;
+      }
     }
     return true;
   } catch (e) {
