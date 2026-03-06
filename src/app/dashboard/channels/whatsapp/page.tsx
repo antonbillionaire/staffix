@@ -20,6 +20,7 @@ import {
   Unplug,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import ChannelGuideModal from "@/components/ChannelGuideModal";
 
 // Extend Window for Facebook SDK
@@ -45,6 +46,7 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
 
 export default function WhatsAppChannelPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isDark = theme === "dark";
   const router = useRouter();
 
@@ -147,7 +149,7 @@ export default function WhatsAppChannelPage() {
   // Handle Embedded Signup
   const handleConnectWhatsApp = useCallback(() => {
     if (!window.FB || !configId) {
-      setError("Facebook SDK не загружен. Попробуйте обновить страницу или используйте ручную настройку.");
+      setError(t("channels.wa.sdkError"));
       return;
     }
 
@@ -204,15 +206,15 @@ export default function WhatsAppChannelPage() {
               } else if (data.success) {
                 setConnected(true);
                 setPhoneNumber(data.phoneNumber || "");
-                setSuccess(`WhatsApp подключён! Номер: ${data.phoneNumber}`);
+                setSuccess(t("channels.wa.connectedSuccess").replace("{number}", data.phoneNumber));
                 setConnecting(false);
               } else {
-                setError(data.error || "Ошибка подключения");
+                setError(data.error || t("channels.wa.connectionError"));
                 setConnecting(false);
               }
             })
             .catch((err) => {
-              setError(err.message || "Ошибка подключения");
+              setError(err.message || t("channels.wa.connectionError"));
               setConnecting(false);
             });
         } else {
@@ -245,12 +247,12 @@ export default function WhatsAppChannelPage() {
         setConnected(true);
         setPhoneNumber(data.phoneNumber || "");
         setPhones([]);
-        setSuccess(`WhatsApp подключён! Номер: ${data.phoneNumber}`);
+        setSuccess(t("channels.wa.connectedSuccess").replace("{number}", data.phoneNumber));
       } else {
-        setError(data.error || "Ошибка подключения");
+        setError(data.error || t("channels.wa.connectionError"));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка подключения");
+      setError(err instanceof Error ? err.message : t("channels.wa.connectionError"));
     }
     setSelectingPhone(null);
   };
@@ -263,10 +265,10 @@ export default function WhatsAppChannelPage() {
       if (res.ok) {
         setConnected(false);
         setPhoneNumber("");
-        setSuccess("WhatsApp отключён");
+        setSuccess(t("channels.wa.disconnected"));
       }
     } catch (err) {
-      setError("Ошибка отключения");
+      setError(t("channels.wa.disconnectError"));
     }
     setDisconnecting(false);
   };
@@ -290,13 +292,13 @@ export default function WhatsAppChannelPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Ошибка сохранения");
+        throw new Error(data.error || t("channels.wa.saveError"));
       }
       setManualSaved(true);
       setConnected(manualSettings.active && !!manualSettings.phoneNumberId);
       setTimeout(() => setManualSaved(false), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка сохранения");
+      setError(err instanceof Error ? err.message : t("channels.wa.saveError"));
     }
     setSavingManual(false);
   };
@@ -321,12 +323,12 @@ export default function WhatsAppChannelPage() {
           {connected && (
             <span className="ml-2 flex items-center gap-1.5 text-sm text-green-400">
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              Подключён
+              {t("channels.wa.connected")}
             </span>
           )}
         </div>
         <p className={textSecondary}>
-          Подключите WhatsApp Business для автоматических ответов клиентам
+          {t("channels.wa.subtitle")}
         </p>
       </div>
 
@@ -353,7 +355,7 @@ export default function WhatsAppChannelPage() {
                 <WhatsAppIcon className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h3 className={`font-semibold ${textPrimary}`}>WhatsApp подключён</h3>
+                <h3 className={`font-semibold ${textPrimary}`}>{t("channels.wa.connectedTitle")}</h3>
                 <p className={`text-sm ${textSecondary}`}>
                   Phone Number ID: {phoneNumber}
                 </p>
@@ -369,7 +371,7 @@ export default function WhatsAppChannelPage() {
               ) : (
                 <Unplug className="h-4 w-4" />
               )}
-              Отключить
+              {t("channels.disconnect")}
             </button>
           </div>
         </div>
@@ -379,10 +381,10 @@ export default function WhatsAppChannelPage() {
       {phones.length > 0 && (
         <div className={`${cardBg} border ${borderColor} rounded-xl p-6 space-y-4`}>
           <h3 className={`text-lg font-semibold ${textPrimary}`}>
-            Выберите номер WhatsApp
+            {t("channels.wa.selectPhone")}
           </h3>
           <p className={textSecondary}>
-            У вас несколько номеров. Выберите, к какому подключить AI-сотрудника.
+            {t("channels.wa.multiplePhones")}
           </p>
           <div className="space-y-3">
             {phones.map((phone) => (
@@ -416,7 +418,7 @@ export default function WhatsAppChannelPage() {
                     <Loader2 className="h-5 w-5 animate-spin text-green-500 flex-shrink-0" />
                   ) : (
                     <div className="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-green-600 to-emerald-600 text-white flex-shrink-0">
-                      Выбрать
+                      {t("channels.wa.select")}
                     </div>
                   )}
                 </div>
@@ -432,14 +434,14 @@ export default function WhatsAppChannelPage() {
           {/* Benefits */}
           <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
             <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>
-              Преимущества WhatsApp для бизнеса
+              {t("channels.wa.benefitsTitle")}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
-                { icon: Phone, color: "text-green-400", bg: "bg-green-500/20", title: "Личный контакт", desc: "WhatsApp — самый личный канал. Клиенты отвечают охотнее" },
-                { icon: Clock, color: "text-blue-400", bg: "bg-blue-500/20", title: "Мгновенные ответы", desc: "AI отвечает за секунды — клиент не уходит к конкуренту" },
-                { icon: TrendingUp, color: "text-purple-400", bg: "bg-purple-500/20", title: "98% открываемость", desc: "Сообщения в WhatsApp читают в 5 раз чаще чем email" },
-                { icon: Shield, color: "text-yellow-400", bg: "bg-yellow-500/20", title: "Верифицированный бизнес", desc: "Официальный бизнес-аккаунт вызывает доверие у клиентов" },
+                { icon: Phone, color: "text-green-400", bg: "bg-green-500/20", title: t("channels.wa.personalContact"), desc: t("channels.wa.personalContactDesc") },
+                { icon: Clock, color: "text-blue-400", bg: "bg-blue-500/20", title: t("channels.wa.instantReplies"), desc: t("channels.wa.instantRepliesDesc") },
+                { icon: TrendingUp, color: "text-purple-400", bg: "bg-purple-500/20", title: t("channels.wa.openRate"), desc: t("channels.wa.openRateDesc") },
+                { icon: Shield, color: "text-yellow-400", bg: "bg-yellow-500/20", title: t("channels.wa.verifiedBusiness"), desc: t("channels.wa.verifiedBusinessDesc") },
               ].map((item) => (
                 <div key={item.title} className="flex items-start gap-3">
                   <div className={`w-10 h-10 ${item.bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
@@ -461,10 +463,10 @@ export default function WhatsAppChannelPage() {
           {configId && (
             <div className={`${cardBg} border ${borderColor} rounded-xl p-6 text-center space-y-4`}>
               <h3 className={`text-lg font-semibold ${textPrimary}`}>
-                Подключить WhatsApp в один клик
+                {t("channels.wa.connectOneClick")}
               </h3>
               <p className={textSecondary}>
-                Авторизуйтесь через Facebook — мы автоматически подключим ваш WhatsApp Business
+                {t("channels.wa.connectDesc")}
               </p>
               <button
                 onClick={handleConnectWhatsApp}
@@ -472,13 +474,13 @@ export default function WhatsAppChannelPage() {
                 className="inline-flex items-center gap-3 px-8 py-4 rounded-xl text-lg font-semibold bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-500 hover:to-emerald-500 disabled:opacity-50 transition-all shadow-lg shadow-green-500/20"
               >
                 {connecting ? (
-                  <><Loader2 className="h-6 w-6 animate-spin" /> Подключаем...</>
+                  <><Loader2 className="h-6 w-6 animate-spin" /> {t("channels.wa.connecting")}</>
                 ) : (
-                  <><WhatsAppIcon className="h-6 w-6" /> Подключить WhatsApp</>
+                  <><WhatsAppIcon className="h-6 w-6" /> {t("channels.wa.connectButton")}</>
                 )}
               </button>
               {!sdkLoaded && metaAppId && (
-                <p className={`text-xs ${textSecondary}`}>Загрузка Facebook SDK...</p>
+                <p className={`text-xs ${textSecondary}`}>{t("channels.wa.loadingSDK")}</p>
               )}
             </div>
           )}
@@ -490,7 +492,7 @@ export default function WhatsAppChannelPage() {
               className={`w-full flex items-center justify-between p-4 ${textSecondary} hover:${isDark ? "bg-white/5" : "bg-gray-50"} transition-colors`}
             >
               <span className="text-sm font-medium">
-                {configId ? "Расширенная настройка (вручную)" : "Настройка WhatsApp Business API"}
+                {configId ? t("channels.wa.manualSetup") : t("channels.wa.manualSetupTitle")}
               </span>
               {showManualSetup ? (
                 <ChevronUp className="h-4 w-4" />
@@ -503,22 +505,22 @@ export default function WhatsAppChannelPage() {
               <div className="p-6 pt-0 space-y-4">
                 {/* Instructions */}
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-gray-700 space-y-2">
-                  <p className="font-semibold text-gray-900">Пошаговая инструкция:</p>
+                  <p className="font-semibold text-gray-900">{t("channels.wa.instructions")}</p>
                   <div className="space-y-1.5">
-                    <p><span className="font-semibold text-gray-900">Шаг 1.</span> Купите отдельную симкарту — номер не должен быть зарегистрирован в WhatsApp</p>
-                    <p><span className="font-semibold text-gray-900">Шаг 2.</span> Установите WhatsApp Business, зарегистрируйте эту симку (получите SMS-код)</p>
-                    <p><span className="font-semibold text-gray-900">Шаг 3.</span> Откройте <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="underline text-blue-600 hover:text-blue-700">developers.facebook.com</a> → ваше приложение → WhatsApp → API Setup → скопируйте <strong className="text-gray-900">Phone Number ID</strong> и <strong className="text-gray-900">Access Token</strong></p>
-                    <p><span className="font-semibold text-gray-900">Шаг 4.</span> Вставьте данные в поля ниже → придумайте Verify Token → нажмите Сохранить → скопируйте Webhook URL</p>
-                    <p><span className="font-semibold text-gray-900">Шаг 5.</span> Вернитесь в Meta Developers → WhatsApp → Configuration → вставьте Webhook URL и Verify Token → выберите событие <strong className="text-gray-900">messages</strong> → Verify and Save</p>
-                    <p><span className="font-semibold text-gray-900">Шаг 6.</span> Включите тоггл «Активировать WhatsApp» → Сохранить</p>
+                    <p><span className="font-semibold text-gray-900">1.</span> {t("channels.wa.step1")}</p>
+                    <p><span className="font-semibold text-gray-900">2.</span> {t("channels.wa.step2")}</p>
+                    <p><span className="font-semibold text-gray-900">3.</span> {t("channels.wa.step3")}</p>
+                    <p><span className="font-semibold text-gray-900">4.</span> {t("channels.wa.step4")}</p>
+                    <p><span className="font-semibold text-gray-900">5.</span> {t("channels.wa.step5")}</p>
+                    <p><span className="font-semibold text-gray-900">6.</span> {t("channels.wa.step6")}</p>
                   </div>
-                  <p className="text-xs text-gray-500 pt-1">Не получается? Напишите в <a href="/dashboard/support" className="underline text-blue-600 hover:text-blue-700">поддержку</a> — поможем за 15 минут</p>
+                  <p className="text-xs text-gray-500 pt-1">{t("channels.wa.needHelp")}</p>
                 </div>
 
                 {/* Webhook URL */}
                 {businessId && (
                   <div>
-                    <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1.5`}>Webhook URL (скопируйте в Meta)</label>
+                    <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1.5`}>{t("channels.wa.webhookUrl")}</label>
                     <div className="flex gap-2">
                       <input
                         readOnly
@@ -554,10 +556,10 @@ export default function WhatsAppChannelPage() {
                     placeholder="EAAxxxxxxxx..."
                     className={`w-full ${isDark ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200 text-gray-900"} border rounded-xl px-4 py-3 placeholder-gray-500 text-sm focus:outline-none focus:border-green-500/50`}
                   />
-                  <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"} mt-1`}>Введите новый только если хотите обновить.</p>
+                  <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"} mt-1`}>{t("channels.wa.accessTokenNote")}</p>
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1.5`}>Verify Token (придумайте сами)</label>
+                  <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1.5`}>{t("channels.wa.verifyTokenLabel")}</label>
                   <input
                     type="text"
                     value={manualSettings.verifyToken}
@@ -577,7 +579,7 @@ export default function WhatsAppChannelPage() {
                     />
                     <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-green-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all" />
                   </label>
-                  <span className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>Активировать WhatsApp канал</span>
+                  <span className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>{t("channels.wa.activateChannel")}</span>
                 </div>
 
                 <button
@@ -586,11 +588,11 @@ export default function WhatsAppChannelPage() {
                   className="w-full bg-green-600/20 border border-green-500/30 text-green-300 py-3 px-4 rounded-xl font-medium hover:bg-green-600/30 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
                 >
                   {savingManual ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> Сохраняем...</>
+                    <><Loader2 className="h-4 w-4 animate-spin" /> {t("channels.wa.saving")}</>
                   ) : manualSaved ? (
-                    <><Check className="h-4 w-4" /> Сохранено!</>
+                    <><Check className="h-4 w-4" /> {t("channels.wa.saved")}</>
                   ) : (
-                    <><Save className="h-4 w-4" /> Сохранить</>
+                    <><Save className="h-4 w-4" /> {t("channels.wa.save")}</>
                   )}
                 </button>
               </div>

@@ -132,7 +132,7 @@ export default function TelegramChannelPage() {
           <h1 className={`text-2xl font-bold ${textPrimary}`}>Telegram</h1>
         </div>
         <p className={textSecondary}>
-          Подключите Telegram бота для автоматического общения с клиентами
+          {t("channels.tg.subtitle")}
         </p>
       </div>
 
@@ -172,14 +172,14 @@ export default function TelegramChannelPage() {
       {/* Benefits */}
       <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
         <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>
-          Что даёт Telegram бот вашему бизнесу
+          {t("channels.tg.benefitsTitle")}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
-            { icon: Clock, color: "text-blue-400", bg: "bg-blue-500/20", title: "Ответы 24/7", desc: "Бот отвечает клиентам мгновенно в любое время суток" },
-            { icon: Users, color: "text-green-400", bg: "bg-green-500/20", title: "Запись клиентов", desc: "Автоматическая запись на услуги прямо в чате" },
-            { icon: TrendingUp, color: "text-purple-400", bg: "bg-purple-500/20", title: "Рост конверсии", desc: "Мгновенные ответы увеличивают конверсию до 3x" },
-            { icon: Zap, color: "text-yellow-400", bg: "bg-yellow-500/20", title: "Экономия времени", desc: "Бот берёт на себя 80% рутинных вопросов" },
+            { icon: Clock, color: "text-blue-400", bg: "bg-blue-500/20", title: t("channels.tg.replies247"), desc: t("channels.tg.replies247Desc") },
+            { icon: Users, color: "text-green-400", bg: "bg-green-500/20", title: t("channels.tg.clientBooking"), desc: t("channels.tg.clientBookingDesc") },
+            { icon: TrendingUp, color: "text-purple-400", bg: "bg-purple-500/20", title: t("channels.tg.conversionGrowth"), desc: t("channels.tg.conversionGrowthDesc") },
+            { icon: Zap, color: "text-yellow-400", bg: "bg-yellow-500/20", title: t("channels.tg.timeSaving"), desc: t("channels.tg.timeSavingDesc") },
           ].map((item) => (
             <div key={item.title} className="flex items-start gap-3">
               <div className={`w-10 h-10 ${item.bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
@@ -297,17 +297,17 @@ export default function TelegramChannelPage() {
         <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
           <h3 className={`text-lg font-semibold ${textPrimary} mb-3 flex items-center gap-2`}>
             <Image className="h-5 w-5 text-pink-400" />
-            Аватарка бота
+            {t("channels.tg.botAvatar")}
           </h3>
           <p className={`${textSecondary} text-sm mb-4`}>
-            Чтобы установить аватарку бота в Telegram, используйте @BotFather:
+            {t("channels.tg.avatarInstructions")}
           </p>
           <div className={`${isDark ? "bg-white/5" : "bg-gray-50"} rounded-lg p-4 space-y-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-            <p>1. Откройте <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">@BotFather</a> в Telegram</p>
-            <p>2. Отправьте <code className={`${isDark ? "bg-white/10" : "bg-gray-200"} px-1.5 py-0.5 rounded text-blue-400`}>/mybots</code></p>
-            <p>3. Выберите вашего бота</p>
-            <p>4. Edit Bot → Edit Botpic</p>
-            <p>5. Отправьте картинку</p>
+            <p>1. {t("channels.tg.avatarStep1")}</p>
+            <p>2. {t("channels.tg.avatarStep2")}</p>
+            <p>3. {t("channels.tg.avatarStep3")}</p>
+            <p>4. {t("channels.tg.avatarStep4")}</p>
+            <p>5. {t("channels.tg.avatarStep5")}</p>
           </div>
         </div>
       )}

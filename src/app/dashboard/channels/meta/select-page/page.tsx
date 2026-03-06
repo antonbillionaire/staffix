@@ -10,6 +10,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface PageInfo {
   id: string;
@@ -22,6 +23,7 @@ interface PageInfo {
 
 export default function SelectPagePage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isDark = theme === "dark";
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -39,7 +41,7 @@ export default function SelectPagePage() {
 
   useEffect(() => {
     if (!businessId) {
-      setError("Некорректная ссылка. Вернитесь и попробуйте снова.");
+      setError(t("channels.selectPage.invalidLink"));
       setLoading(false);
       return;
     }
@@ -50,13 +52,13 @@ export default function SelectPagePage() {
         );
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || "Ошибка загрузки страниц");
+          throw new Error(data.error || t("channels.selectPage.loadError"));
         }
         const data = await res.json();
         setPages(data.pages || []);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Ошибка загрузки страниц"
+          err instanceof Error ? err.message : t("channels.selectPage.loadError")
         );
       } finally {
         setLoading(false);
@@ -76,7 +78,7 @@ export default function SelectPagePage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Ошибка подключения страницы");
+        throw new Error(data.error || t("channels.selectPage.connectError"));
       }
       const igParam = data.igUsername
         ? `&ig_username=${data.igUsername}`
@@ -85,7 +87,7 @@ export default function SelectPagePage() {
         `/dashboard/channels?meta_connected=${data.connected}${igParam}`
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка подключения");
+      setError(err instanceof Error ? err.message : t("channels.selectPage.connectionError"));
       setSelecting(null);
     }
   };
@@ -107,13 +109,13 @@ export default function SelectPagePage() {
           className={`flex items-center gap-2 text-sm ${textSecondary} hover:text-blue-400 mb-4 transition-colors`}
         >
           <ArrowLeft className="h-4 w-4" />
-          Назад к каналам
+          {t("channels.selectPage.backToChannels")}
         </button>
         <h1 className={`text-2xl font-bold ${textPrimary} mb-2`}>
-          Выберите страницу Facebook
+          {t("channels.selectPage.title")}
         </h1>
         <p className={textSecondary}>
-          У вас несколько страниц. Выберите, к какой подключить AI-сотрудника.
+          {t("channels.selectPage.subtitle")}
         </p>
       </div>
 
@@ -169,7 +171,7 @@ export default function SelectPagePage() {
                 <Loader2 className="h-5 w-5 animate-spin text-blue-500 flex-shrink-0" />
               ) : (
                 <div className="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-blue-600 to-purple-600 text-white flex-shrink-0">
-                  Выбрать
+                  {t("channels.selectPage.select")}
                 </div>
               )}
             </div>
@@ -182,7 +184,7 @@ export default function SelectPagePage() {
           className={`${cardBg} border ${borderColor} rounded-xl p-8 text-center`}
         >
           <p className={textSecondary}>
-            Страницы не найдены. Попробуйте переподключиться.
+            {t("channels.selectPage.noPagesFound")}
           </p>
         </div>
       )}

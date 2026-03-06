@@ -17,6 +17,7 @@ import {
   Target,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import ChannelGuideModal from "@/components/ChannelGuideModal";
 
 interface ChannelStatus {
@@ -34,6 +35,7 @@ interface ChannelStatus {
 
 export default function MetaChannelsPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isDark = theme === "dark";
 
   const [loading, setLoading] = useState(true);
@@ -53,8 +55,8 @@ export default function MetaChannelsPage() {
 
   useEffect(() => {
     if (successMessage) {
-      const t = setTimeout(() => setSuccessMessage(null), 8000);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => setSuccessMessage(null), 8000);
+      return () => clearTimeout(timer);
     }
   }, [successMessage]);
 
@@ -73,18 +75,18 @@ export default function MetaChannelsPage() {
   };
 
   const handleDisconnect = async (channel: string) => {
-    if (!confirm(`Отключить ${channel === "instagram" ? "Instagram" : "Facebook Messenger"}? AI-сотрудник перестанет отвечать в этом канале.`)) return;
+    if (!confirm(t("channels.meta.disconnectConfirm").replace("{channel}", channel === "instagram" ? "Instagram" : "Facebook Messenger"))) return;
     setDisconnecting(channel);
     try {
       const res = await fetch(`/api/channels?channel=${channel}`, { method: "DELETE" });
       if (res.ok) {
-        setSuccessMessage("Канал отключён");
+        setSuccessMessage(t("channels.meta.disconnected"));
         await fetchChannels();
       } else {
-        setErrorMessage("Ошибка при отключении канала");
+        setErrorMessage(t("channels.meta.disconnectError"));
       }
     } catch {
-      setErrorMessage("Ошибка при отключении канала");
+      setErrorMessage(t("channels.meta.disconnectError"));
     } finally {
       setDisconnecting(null);
     }
@@ -117,7 +119,7 @@ export default function MetaChannelsPage() {
           <h1 className={`text-2xl font-bold ${textPrimary}`}>Instagram & Facebook</h1>
         </div>
         <p className={textSecondary}>
-          Подключите Instagram Direct и Facebook Messenger одной кнопкой через Meta
+          {t("channels.meta.subtitle")}
         </p>
       </div>
 
@@ -138,14 +140,14 @@ export default function MetaChannelsPage() {
       {/* Benefits */}
       <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
         <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>
-          Преимущества Instagram & Facebook для бизнеса
+          {t("channels.meta.benefitsTitle")}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
-            { icon: Target, color: "text-pink-400", bg: "bg-pink-500/20", title: "Захват лидов из рекламы", desc: "AI мгновенно отвечает на сообщения из Instagram и Facebook рекламы" },
-            { icon: Clock, color: "text-blue-400", bg: "bg-blue-500/20", title: "Ответ за секунды", desc: "Пока конкуренты спят — ваш AI уже общается с клиентом" },
-            { icon: MessageSquare, color: "text-purple-400", bg: "bg-purple-500/20", title: "Instagram Direct + Messenger", desc: "Один AI-сотрудник отвечает в обоих каналах одновременно" },
-            { icon: TrendingUp, color: "text-green-400", bg: "bg-green-500/20", title: "Меньше потерь лидов", desc: "Клиенты не уходят — бот отвечает мгновенно на каждое сообщение" },
+            { icon: Target, color: "text-pink-400", bg: "bg-pink-500/20", title: t("channels.meta.adCapture"), desc: t("channels.meta.adCaptureDesc") },
+            { icon: Clock, color: "text-blue-400", bg: "bg-blue-500/20", title: t("channels.meta.fastReply"), desc: t("channels.meta.fastReplyDesc") },
+            { icon: MessageSquare, color: "text-purple-400", bg: "bg-purple-500/20", title: t("channels.meta.dualChannel"), desc: t("channels.meta.dualChannelDesc") },
+            { icon: TrendingUp, color: "text-green-400", bg: "bg-green-500/20", title: t("channels.meta.fewerLostLeads"), desc: t("channels.meta.fewerLostLeadsDesc") },
           ].map((item) => (
             <div key={item.title} className="flex items-start gap-3">
               <div className={`w-10 h-10 ${item.bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
@@ -187,11 +189,11 @@ export default function MetaChannelsPage() {
                   className={`w-full py-2 px-3 rounded-lg text-sm flex items-center justify-center gap-2 ${isDark ? "bg-red-500/20 hover:bg-red-500/30 text-red-400" : "bg-red-50 hover:bg-red-100 text-red-600"} transition-all`}
                 >
                   {disconnecting === "instagram" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlink className="h-4 w-4" />}
-                  Отключить
+                  {t("channels.disconnect")}
                 </button>
               </>
             ) : (
-              <p className={`text-sm ${textSecondary}`}>Не подключен</p>
+              <p className={`text-sm ${textSecondary}`}>{t("channels.meta.notConnected")}</p>
             )}
           </div>
         </div>
@@ -221,11 +223,11 @@ export default function MetaChannelsPage() {
                   className={`w-full py-2 px-3 rounded-lg text-sm flex items-center justify-center gap-2 ${isDark ? "bg-red-500/20 hover:bg-red-500/30 text-red-400" : "bg-red-50 hover:bg-red-100 text-red-600"} transition-all`}
                 >
                   {disconnecting === "facebook" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlink className="h-4 w-4" />}
-                  Отключить
+                  {t("channels.disconnect")}
                 </button>
               </>
             ) : (
-              <p className={`text-sm ${textSecondary}`}>Не подключен</p>
+              <p className={`text-sm ${textSecondary}`}>{t("channels.meta.notConnected")}</p>
             )}
           </div>
         </div>
@@ -243,18 +245,17 @@ export default function MetaChannelsPage() {
             </div>
             <div className="flex-1">
               <h3 className={`text-lg font-semibold ${textPrimary} mb-2`}>
-                Подключите за 1 клик
+                {t("channels.meta.connectOneClick")}
               </h3>
               <p className={`${textSecondary} mb-4`}>
-                Нажмите кнопку — войдите через Facebook — выберите страницу.
-                AI-сотрудник сразу начнёт отвечать клиентам в Instagram Direct и Facebook Messenger.
+                {t("channels.meta.connectDesc")}
               </p>
               <button
                 onClick={handleConnectMeta}
                 className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-all flex items-center gap-2"
               >
                 <Facebook className="h-4 w-4" />
-                Подключить через Facebook
+                {t("channels.meta.connectViaFacebook")}
               </button>
             </div>
           </div>
@@ -265,14 +266,14 @@ export default function MetaChannelsPage() {
       {isAnyConnected && (!igChannel?.isConnected || !fbChannel?.isConnected) && (
         <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
           <p className={`${textSecondary} text-sm mb-3`}>
-            Хотите подключить {!igChannel?.isConnected ? "Instagram" : "Facebook Messenger"}?
+            {t("channels.meta.wantConnect").replace("{channel}", !igChannel?.isConnected ? "Instagram" : "Facebook Messenger")}
           </p>
           <button
             onClick={handleConnectMeta}
             className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-all flex items-center gap-2"
           >
             <Facebook className="h-4 w-4" />
-            Переподключить через Facebook
+            {t("channels.meta.reconnect")}
           </button>
         </div>
       )}

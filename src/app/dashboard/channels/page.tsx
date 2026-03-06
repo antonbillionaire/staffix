@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useSearchParams } from "next/navigation";
 import {
   MessageSquare,
@@ -47,6 +48,7 @@ interface ChannelStatus {
 
 export default function ChannelsPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [channels, setChannels] = useState<ChannelStatus[]>([]);
@@ -73,20 +75,20 @@ export default function ChannelsPage() {
         .map((c) =>
           c === "instagram" ? "Instagram" : c === "facebook" ? "Facebook Messenger" : c
         )
-        .join(" и ");
-      setSuccessMessage(`${channelNames} успешно подключены!`);
+        .join(" & ");
+      setSuccessMessage(t("channels.connectedSuccess").replace("{channels}", channelNames));
       // Clean URL params
       window.history.replaceState({}, "", "/dashboard/channels");
     }
     if (metaError) {
       const errors: Record<string, string> = {
-        no_code: "Facebook не вернул код авторизации",
-        no_business: "Бизнес не найден",
-        no_pages: "У вашего Facebook аккаунта нет привязанных страниц",
-        exchange_failed: "Ошибка обмена токена",
-        forbidden: "Нет доступа к этому бизнесу",
+        no_code: t("channels.error.noCode"),
+        no_business: t("channels.error.noBusiness"),
+        no_pages: t("channels.error.noPages"),
+        exchange_failed: t("channels.error.exchangeFailed"),
+        forbidden: t("channels.error.forbidden"),
       };
-      setErrorMessage(errors[metaError] || `Ошибка подключения: ${metaError}`);
+      setErrorMessage(errors[metaError] || `${t("channels.error.connectionError")}: ${metaError}`);
       window.history.replaceState({}, "", "/dashboard/channels");
     }
 
@@ -96,15 +98,15 @@ export default function ChannelsPage() {
   // Auto-hide messages
   useEffect(() => {
     if (successMessage) {
-      const t = setTimeout(() => setSuccessMessage(null), 8000);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => setSuccessMessage(null), 8000);
+      return () => clearTimeout(timer);
     }
   }, [successMessage]);
 
   useEffect(() => {
     if (errorMessage) {
-      const t = setTimeout(() => setErrorMessage(null), 10000);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => setErrorMessage(null), 10000);
+      return () => clearTimeout(timer);
     }
   }, [errorMessage]);
 
@@ -123,18 +125,18 @@ export default function ChannelsPage() {
   };
 
   const handleDisconnect = async (channel: string) => {
-    if (!confirm("Отключить канал? AI-сотрудник перестанет отвечать в этом канале.")) return;
+    if (!confirm(t("channels.disconnectConfirm"))) return;
     setDisconnecting(channel);
     try {
       const res = await fetch(`/api/channels?channel=${channel}`, { method: "DELETE" });
       if (res.ok) {
-        setSuccessMessage(`Канал отключён`);
+        setSuccessMessage(t("channels.disconnected"));
         await fetchChannels();
       } else {
-        setErrorMessage("Ошибка при отключении канала");
+        setErrorMessage(t("channels.disconnectError"));
       }
     } catch {
-      setErrorMessage("Ошибка при отключении канала");
+      setErrorMessage(t("channels.disconnectError"));
     } finally {
       setDisconnecting(null);
     }
@@ -151,7 +153,7 @@ export default function ChannelsPage() {
       name: "Telegram",
       icon: TelegramIcon,
       color: "from-blue-500 to-cyan-500",
-      description: "Telegram бот для общения с клиентами",
+      description: t("channels.telegramDesc"),
       setupLink: "/dashboard/channels/telegram",
     },
     {
@@ -159,7 +161,7 @@ export default function ChannelsPage() {
       name: "WhatsApp",
       icon: WhatsAppIcon,
       color: "from-green-500 to-emerald-500",
-      description: "WhatsApp Business API для автоматических ответов",
+      description: t("channels.whatsappDesc"),
       setupLink: "/dashboard/channels/whatsapp",
     },
     {
@@ -167,7 +169,7 @@ export default function ChannelsPage() {
       name: "Instagram",
       icon: Instagram,
       color: "from-pink-500 to-purple-500",
-      description: "AI-ассистент отвечает в Instagram Direct",
+      description: t("channels.instagramDesc"),
       setupLink: "/dashboard/channels/meta",
       connectAction: "meta",
     },
@@ -176,7 +178,7 @@ export default function ChannelsPage() {
       name: "Messenger",
       icon: Facebook,
       color: "from-blue-600 to-indigo-500",
-      description: "AI-ассистент отвечает в Facebook Messenger",
+      description: t("channels.facebookDesc"),
       setupLink: "/dashboard/channels/meta",
       connectAction: "meta",
     },
@@ -195,10 +197,10 @@ export default function ChannelsPage() {
       {/* Header */}
       <div>
         <h1 className={`text-2xl font-bold ${textPrimary} mb-2`}>
-          Каналы связи
+          {t("channels.title")}
         </h1>
         <p className={textSecondary}>
-          Подключите мессенджеры для общения с клиентами через AI-сотрудника
+          {t("channels.subtitle")}
         </p>
       </div>
 
@@ -228,18 +230,17 @@ export default function ChannelsPage() {
               </div>
               <div className="flex-1">
                 <h3 className={`text-lg font-semibold ${textPrimary} mb-2`}>
-                  Подключите Instagram и Messenger за 1 клик
+                  {t("channels.connectMetaBanner")}
                 </h3>
                 <p className={`${textSecondary} mb-4`}>
-                  Нажмите кнопку — войдите через Facebook — выберите страницу.
-                  AI-сотрудник сразу начнёт отвечать клиентам в Instagram Direct и Facebook Messenger.
+                  {t("channels.connectMetaDesc")}
                 </p>
                 <button
                   onClick={handleConnectMeta}
                   className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-all flex items-center gap-2"
                 >
                   <Facebook className="h-4 w-4" />
-                  Подключить через Facebook
+                  {t("channels.connectViaFacebook")}
                 </button>
               </div>
             </div>
@@ -308,7 +309,7 @@ export default function ChannelsPage() {
                   <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3 mb-4 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-yellow-500 flex-shrink-0" />
                     <p className="text-xs text-yellow-300">
-                      Токен скоро истечёт. Переподключите канал.
+                      {t("channels.tokenWarning")}
                     </p>
                   </div>
                 )}
@@ -324,7 +325,7 @@ export default function ChannelsPage() {
                         } ${textPrimary} transition-all`}
                       >
                         <Settings className="h-4 w-4" />
-                        Настройки
+                        {t("channels.settings")}
                       </a>
                     )}
                     <button
@@ -339,7 +340,7 @@ export default function ChannelsPage() {
                       ) : (
                         <Unlink className="h-4 w-4" />
                       )}
-                      Отключить
+                      {t("channels.disconnect")}
                     </button>
                   </div>
                 ) : config.connectAction === "meta" ? (
@@ -348,7 +349,7 @@ export default function ChannelsPage() {
                     className="w-full py-2.5 px-4 rounded-lg text-sm font-medium bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90 transition-all flex items-center justify-center gap-2"
                   >
                     <Zap className="h-4 w-4" />
-                    Подключить
+                    {t("channels.connect")}
                   </button>
                 ) : config.setupLink ? (
                   <a
@@ -356,7 +357,7 @@ export default function ChannelsPage() {
                     className="w-full py-2.5 px-4 rounded-lg text-sm font-medium bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:opacity-90 transition-all flex items-center justify-center gap-2"
                   >
                     <Zap className="h-4 w-4" />
-                    Подключить
+                    {t("channels.connect")}
                   </a>
                 ) : null}
               </div>
@@ -368,7 +369,7 @@ export default function ChannelsPage() {
       {/* Benefits Section */}
       <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
         <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>
-          Преимущества мультиканальности
+          {t("channels.benefits.title")}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="flex items-start gap-3">
@@ -376,9 +377,9 @@ export default function ChannelsPage() {
               <Users className="h-5 w-5 text-green-500" />
             </div>
             <div>
-              <h4 className={`font-medium ${textPrimary} mb-1`}>Единая база клиентов</h4>
+              <h4 className={`font-medium ${textPrimary} mb-1`}>{t("channels.benefits.unifiedClients")}</h4>
               <p className={`text-sm ${textSecondary}`}>
-                Все контакты из всех каналов в одном месте
+                {t("channels.benefits.unifiedClientsDesc")}
               </p>
             </div>
           </div>
@@ -388,9 +389,9 @@ export default function ChannelsPage() {
               <TrendingUp className="h-5 w-5 text-purple-500" />
             </div>
             <div>
-              <h4 className={`font-medium ${textPrimary} mb-1`}>Лиды из рекламы</h4>
+              <h4 className={`font-medium ${textPrimary} mb-1`}>{t("channels.benefits.adLeads")}</h4>
               <p className={`text-sm ${textSecondary}`}>
-                Автоматический захват лидов из Instagram и Facebook рекламы
+                {t("channels.benefits.adLeadsDesc")}
               </p>
             </div>
           </div>
@@ -400,9 +401,9 @@ export default function ChannelsPage() {
               <MessageSquare className="h-5 w-5 text-blue-500" />
             </div>
             <div>
-              <h4 className={`font-medium ${textPrimary} mb-1`}>Единый AI</h4>
+              <h4 className={`font-medium ${textPrimary} mb-1`}>{t("channels.benefits.unifiedAI")}</h4>
               <p className={`text-sm ${textSecondary}`}>
-                Один AI-сотрудник отвечает во всех каналах одновременно
+                {t("channels.benefits.unifiedAIDesc")}
               </p>
             </div>
           </div>
