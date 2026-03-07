@@ -119,6 +119,44 @@ export async function POST(request: Request) {
         console.error("[IG Webhook] processing error:", e);
       }
     }
+
+    // ─── Process Comments (Comment-to-DM) ─────────────────────────────────────
+    // Requires: instagram_manage_comments + pages_messaging (Advanced Access)
+    // Webhook field: "feed" (subscribed_fields includes "feed")
+    const changes = (entry.changes as Array<Record<string, unknown>>) || [];
+    for (const change of changes) {
+      if (change.field !== "comments" && change.field !== "live_comments") continue;
+
+      const value = change.value as Record<string, unknown> | undefined;
+      if (!value) continue;
+
+      const commentId = value.id as string | undefined;
+      const commentText = value.text as string | undefined;
+      const from = value.from as Record<string, string> | undefined;
+      const commenterId = from?.id;
+      const isAdComment = !!value.ad_id;
+
+      if (!commentId || !commentText || !commenterId) continue;
+
+      // Skip replies to existing comments (prevent loops)
+      if (value.parent_id) continue;
+
+      if (!(await markWebhookProcessed(commentId))) continue;
+
+      const contextLabel = isAdComment
+        ? "Instagram Ad Comment"
+        : change.field === "live_comments"
+        ? "Instagram Live Comment"
+        : "Instagram Post Comment";
+
+      console.log(`[IG Webhook] ${contextLabel} from ${commenterId} on account ${accountId}: "${commentText.slice(0, 50)}"`);
+
+      try {
+        await processIGComment(accountId, commentId, commentText, commenterId, contextLabel);
+      } catch (e) {
+        console.error("[IG Webhook] comment processing error:", e);
+      }
+    }
   }
 
   return respond200();
@@ -211,7 +249,111 @@ async function processIGMessage(
   }
 }
 
+// ─── Comment-to-DM processing ────────────────────────────────────────────────
+
+async function processIGComment(
+  accountId: string,
+  commentId: string,
+  commentText: string,
+  commenterId: string,
+  contextLabel: string
+) {
+  // Look up business by IG account
+  const business = await prisma.business.findFirst({
+    where: {
+      OR: [
+        { igBusinessAccountId: accountId, igActive: true },
+        { fbPageId: accountId, igActive: true },
+      ],
+    },
+    select: {
+      id: true,
+      fbPageId: true,
+      fbPageAccessToken: true,
+      subscription: {
+        select: { messagesUsed: true, messagesLimit: true, expiresAt: true },
+      },
+    },
+  });
+
+  if (!business || !business.fbPageAccessToken) {
+    // Fall back to Staffix sales bot for comments on @staffixio
+    console.log(`[IG Webhook] No business for comment on ${accountId}, falling back to sales bot`);
+    const staffixToken =
+      process.env.FACEBOOK_PAGE_ACCESS_TOKEN ||
+      process.env.STAFFIX_FB_PAGE_ACCESS_TOKEN;
+    const pageId =
+      process.env.FACEBOOK_PAGE_ID ||
+      process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
+    if (!staffixToken || !pageId) return;
+
+    const reply = await generateStaffixSalesResponse("instagram_comment", commenterId, commentText);
+    await sendIGPrivateReply(pageId, staffixToken, commentId, reply);
+    return;
+  }
+
+  // Check subscription limits
+  const sub = business.subscription;
+  if (sub) {
+    const isExpired = new Date(sub.expiresAt) < new Date();
+    const limitReached = sub.messagesLimit !== -1 && sub.messagesUsed >= sub.messagesLimit;
+    if (isExpired || limitReached) return; // Silently skip — don't reply to comments if over limit
+  }
+
+  const pageId = business.fbPageId || accountId;
+
+  // Generate AI response based on comment context
+  const reply = await generateChannelAIResponse(
+    business.id,
+    "instagram_comment",
+    commenterId,
+    `[${contextLabel}] ${commentText}`
+  );
+
+  // Send private DM reply to the commenter (1 per comment, 7-day window)
+  const sent = await sendIGPrivateReply(pageId, business.fbPageAccessToken, commentId, reply);
+
+  if (sent && sub) {
+    await prisma.subscription.update({
+      where: { businessId: business.id },
+      data: { messagesUsed: { increment: 1 } },
+    });
+  }
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+async function sendIGPrivateReply(
+  pageId: string,
+  accessToken: string,
+  commentId: string,
+  text: string
+): Promise<boolean> {
+  try {
+    const pgToken = await getPageAccessToken(pageId, accessToken).catch(() => accessToken);
+    const res = await fetch(`${META_API_BASE}/${pageId}/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${pgToken}`,
+      },
+      body: JSON.stringify({
+        recipient: { comment_id: commentId },
+        message: { text: text.slice(0, 1000) }, // IG DM limit
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("IG privateReply error:", err);
+      return false;
+    }
+    console.log(`[IG Webhook] Private reply sent for comment ${commentId}`);
+    return true;
+  } catch (e) {
+    console.error("IG privateReply exception:", e);
+    return false;
+  }
+}
 
 function splitIGMessage(text: string, maxLen = 1000): string[] {
   if (text.length <= maxLen) return [text];
