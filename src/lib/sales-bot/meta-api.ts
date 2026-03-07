@@ -169,7 +169,7 @@ export async function sendPrivateReply(
 export async function subscribePageToWebhooks(
   pageId: string,
   pageAccessToken: string,
-  fields = "messages,feed"
+  fields = "messages,feed,leadgen"
 ): Promise<boolean> {
   try {
     const response = await fetch(

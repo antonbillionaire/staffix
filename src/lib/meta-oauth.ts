@@ -114,7 +114,7 @@ export async function getUserPages(userAccessToken: string): Promise<MetaPage[]>
 export async function subscribePageWebhooks(
   pageId: string,
   pageAccessToken: string,
-  fields: string = "messages,messaging_postbacks"
+  fields: string = "messages,messaging_postbacks,leadgen"
 ): Promise<boolean> {
   const res = await fetch(
     `${META_GRAPH_BASE}/${pageId}/subscribed_apps?` +

@@ -17,7 +17,7 @@ export const maxDuration = 60;
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { parseFBWebhookAll, sendFBMessage, sendFBTyping } from "@/lib/facebook-utils";
+import { parseFBWebhookAll, sendFBMessage, sendFBTyping, parseLeadgenEvents, fetchLeadAdData, getPageAccessToken } from "@/lib/facebook-utils";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
 import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
@@ -88,8 +88,19 @@ export async function POST(request: Request) {
     return respond200();
   }
 
+  // ─── Process Lead Ads (leadgen events) ──────────────────────────────────────
+  const leadgenEvents = parseLeadgenEvents(body);
+  for (const evt of leadgenEvents) {
+    if (!(await markWebhookProcessed(`leadgen:${evt.leadId}`))) continue;
+    try {
+      await processLeadAdEvent(evt);
+    } catch (e) {
+      console.error("[FB Webhook] Lead Ad processing error:", e);
+    }
+  }
+
   const messages = parseFBWebhookAll(body);
-  if (messages.length === 0) return respond200();
+  if (messages.length === 0 && leadgenEvents.length === 0) return respond200();
 
   // Process messages BEFORE returning 200 — Vercel kills serverless functions
   // after response is sent, so fire-and-forget doesn't work reliably.
@@ -217,5 +228,178 @@ async function processBusinessFBMessage(
     }
   } catch (e) {
     console.error("processBusinessFBMessage error:", e);
+  }
+}
+
+// ─── Lead Ads Processing ──────────────────────────────────────────────────────
+
+async function processLeadAdEvent(evt: {
+  leadId: string;
+  pageId: string;
+  formId: string;
+  adId?: string;
+  createdTime: number;
+}) {
+  console.log(`[LeadAds] New lead: ${evt.leadId} from page ${evt.pageId} form ${evt.formId}`);
+
+  // Find business by Page ID
+  const business = await prisma.business.findFirst({
+    where: { fbPageId: evt.pageId, fbActive: true },
+    select: {
+      id: true,
+      name: true,
+      fbPageId: true,
+      fbPageAccessToken: true,
+      igBusinessAccountId: true,
+      igActive: true,
+      waPhoneNumberId: true,
+      waActive: true,
+      subscription: {
+        select: { messagesUsed: true, messagesLimit: true, expiresAt: true },
+      },
+      user: { select: { email: true, name: true } },
+    },
+  });
+
+  if (!business || !business.fbPageAccessToken) {
+    console.log(`[LeadAds] No business found for page ${evt.pageId}`);
+    return;
+  }
+
+  // Check subscription limits
+  const sub = business.subscription;
+  if (sub) {
+    const isExpired = new Date(sub.expiresAt) < new Date();
+    const limitReached = sub.messagesLimit !== -1 && sub.messagesUsed >= sub.messagesLimit;
+    if (isExpired || limitReached) {
+      console.log(`[LeadAds] Business ${business.id} subscription expired or limit reached`);
+      return;
+    }
+  }
+
+  // Fetch full lead data from Graph API
+  const pageToken = await getPageAccessToken(evt.pageId, business.fbPageAccessToken);
+  const leadData = await fetchLeadAdData(evt.leadId, pageToken);
+  if (!leadData) {
+    console.error(`[LeadAds] Failed to fetch lead data for ${evt.leadId}`);
+    return;
+  }
+  leadData.pageId = evt.pageId;
+
+  const clientName = leadData.fields.full_name
+    || [leadData.fields.first_name, leadData.fields.last_name].filter(Boolean).join(" ")
+    || undefined;
+  const phone = leadData.fields.phone_number;
+  const email = leadData.fields.email;
+
+  console.log(`[LeadAds] Lead data: name=${clientName}, phone=${phone}, email=${email}`);
+
+  // Create Lead in DB
+  const leadSource = evt.adId ? "instagram_ad" : "lead_form";
+  const channel = phone && business.waActive ? "whatsapp" : "messenger";
+  const clientId = phone || email || evt.leadId;
+
+  await prisma.lead.upsert({
+    where: {
+      businessId_channel_clientId: {
+        businessId: business.id,
+        channel,
+        clientId,
+      },
+    },
+    create: {
+      businessId: business.id,
+      source: leadSource,
+      adId: evt.adId,
+      channel,
+      clientId,
+      clientName,
+      status: "warm", // Lead Ads leads are already warm — they filled out a form
+      firstMessage: `[Lead Ad Form] ${Object.entries(leadData.fields).map(([k, v]) => `${k}: ${v}`).join(", ")}`,
+      metadata: {
+        formId: evt.formId,
+        leadgenId: evt.leadId,
+        fields: leadData.fields,
+      },
+      lastInteractionAt: new Date(),
+    },
+    update: {
+      lastInteractionAt: new Date(),
+      clientName: clientName || undefined,
+    },
+  });
+
+  // Send greeting message via the best available channel
+  const greeting = clientName
+    ? `Здравствуйте, ${clientName}! Спасибо за ваш интерес. Чем могу помочь?`
+    : "Здравствуйте! Спасибо за ваш интерес. Чем могу помочь?";
+
+  if (phone && business.waActive && business.waPhoneNumberId) {
+    // Prefer WhatsApp if we have phone number and WA is active
+    await sendWhatsAppGreeting(business.waPhoneNumberId, phone, greeting);
+    console.log(`[LeadAds] Greeting sent via WhatsApp to ${phone}`);
+  } else {
+    // Fallback to Facebook Messenger (if lead came from FB, they have PSID context)
+    // Note: We can only message them on Messenger if they initiated conversation
+    // For Lead Ads, the recommended approach is WhatsApp or email
+    console.log(`[LeadAds] No WhatsApp available, lead saved for manual follow-up`);
+  }
+
+  // Increment message usage if we sent a message
+  if (phone && business.waActive && sub) {
+    await prisma.subscription.update({
+      where: { businessId: business.id },
+      data: { messagesUsed: { increment: 1 } },
+    });
+  }
+
+  console.log(`[LeadAds] Lead ${evt.leadId} processed for business ${business.id}`);
+}
+
+/**
+ * Send a WhatsApp template/greeting to a lead from Lead Ads.
+ * Uses WhatsApp Cloud API with the business's phone number.
+ */
+async function sendWhatsAppGreeting(
+  phoneNumberId: string,
+  recipientPhone: string,
+  text: string
+): Promise<boolean> {
+  const waToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  if (!waToken) {
+    console.error("[LeadAds] WHATSAPP_ACCESS_TOKEN not set");
+    return false;
+  }
+
+  try {
+    // Clean phone number (remove spaces, dashes, plus sign for API)
+    const cleanPhone = recipientPhone.replace(/[\s\-\(\)]/g, "");
+
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${waToken}`,
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to: cleanPhone,
+          type: "text",
+          text: { body: text },
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("[LeadAds] WhatsApp send error:", err);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("[LeadAds] WhatsApp send exception:", e);
+    return false;
   }
 }

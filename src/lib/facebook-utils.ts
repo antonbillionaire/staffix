@@ -152,6 +152,99 @@ export function parseFBWebhook(body: Record<string, unknown>): FBIncomingMessage
   return all.length > 0 ? all[0] : null;
 }
 
+// ─── Lead Ads ────────────────────────────────────────────────────────────────
+
+export interface LeadAdData {
+  leadId: string;
+  formId: string;
+  pageId: string;
+  adId?: string;
+  createdTime: string;
+  fields: Record<string, string>; // field_name → value (e.g. full_name, email, phone_number)
+}
+
+/**
+ * Parse leadgen events from a Facebook webhook payload.
+ * Lead Ads events arrive as entry.changes with field="leadgen".
+ */
+export function parseLeadgenEvents(body: Record<string, unknown>): Array<{
+  leadId: string;
+  pageId: string;
+  formId: string;
+  adId?: string;
+  createdTime: number;
+}> {
+  const results: Array<{
+    leadId: string;
+    pageId: string;
+    formId: string;
+    adId?: string;
+    createdTime: number;
+  }> = [];
+
+  if (body.object !== "page") return results;
+
+  for (const entry of (body.entry as Array<Record<string, unknown>>) || []) {
+    const changes = (entry.changes as Array<Record<string, unknown>>) || [];
+    for (const change of changes) {
+      if (change.field !== "leadgen") continue;
+      const value = change.value as Record<string, unknown> | undefined;
+      if (!value) continue;
+
+      results.push({
+        leadId: String(value.leadgen_id || ""),
+        pageId: String(value.page_id || entry.id || ""),
+        formId: String(value.form_id || ""),
+        adId: value.ad_id ? String(value.ad_id) : undefined,
+        createdTime: Number(value.created_time || 0),
+      });
+    }
+  }
+  return results;
+}
+
+/**
+ * Fetch lead data from Meta Graph API.
+ * Requires: leads_retrieval permission + Page Access Token.
+ * Docs: https://developers.facebook.com/docs/marketing-api/guides/lead-ads/retrieving
+ */
+export async function fetchLeadAdData(
+  leadId: string,
+  pageAccessToken: string
+): Promise<LeadAdData | null> {
+  try {
+    const res = await fetch(
+      `${FB_API_BASE}/${leadId}?fields=id,created_time,field_data,ad_id,form_id&access_token=${pageAccessToken}`
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("[LeadAds] fetchLeadAdData error:", err);
+      return null;
+    }
+    const data = await res.json();
+
+    // Parse field_data array into flat object
+    const fields: Record<string, string> = {};
+    for (const fd of (data.field_data as Array<{ name: string; values: string[] }>) || []) {
+      if (fd.name && fd.values?.length) {
+        fields[fd.name] = fd.values[0];
+      }
+    }
+
+    return {
+      leadId: data.id || leadId,
+      formId: data.form_id || "",
+      pageId: "", // filled by caller
+      adId: data.ad_id || undefined,
+      createdTime: data.created_time || "",
+      fields,
+    };
+  } catch (e) {
+    console.error("[LeadAds] fetchLeadAdData exception:", e);
+    return null;
+  }
+}
+
 function splitMessage(text: string, maxLen: number): string[] {
   if (text.length <= maxLen) return [text];
   const parts: string[] = [];

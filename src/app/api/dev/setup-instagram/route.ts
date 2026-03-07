@@ -30,13 +30,13 @@ export async function POST(request: NextRequest) {
   const ok = await subscribePageToWebhooks(
     pageId,
     pageAccessToken,
-    "messages,feed"
+    "messages,feed,leadgen"
   );
 
   if (ok) {
     return NextResponse.json({
       success: true,
-      message: `Page ${pageId} subscribed to: messages, feed`,
+      message: `Page ${pageId} subscribed to: messages, feed, leadgen`,
     });
   }
 
