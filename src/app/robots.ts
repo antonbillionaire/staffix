@@ -1,12 +1,14 @@
-import type { MetadataRoute } from "next";
+import { MetadataRoute } from "next";
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: {
-      userAgent: "*",
-      allow: "/",
-      disallow: ["/dashboard/", "/admin/", "/api/", "/onboarding/"],
-    },
+    rules: [
+      {
+        userAgent: "*",
+        allow: "/",
+        disallow: ["/dashboard/", "/admin/", "/api/", "/auth/"],
+      },
+    ],
     sitemap: "https://www.staffix.io/sitemap.xml",
   };
 }
