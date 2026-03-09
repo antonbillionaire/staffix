@@ -7,6 +7,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
+import { dispatchCrmEvent } from "@/lib/crm-integrations";
 import {
   bookingToolDefinitions,
   checkAvailability,
@@ -16,6 +17,7 @@ import {
   updateLeadStatus,
   getClientBookings,
   cancelBooking,
+  searchProducts,
 } from "@/lib/booking-tools";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -26,7 +28,7 @@ type HistoryMessage = { role: "user" | "assistant"; content: string };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const channelBookingTools: any[] = bookingToolDefinitions.filter(
   (t: { name: string }) =>
-    ["check_availability", "create_booking", "get_services", "get_staff", "update_lead_status", "get_my_bookings", "cancel_booking", "notify_manager"].includes(t.name)
+    ["check_availability", "create_booking", "get_services", "get_staff", "update_lead_status", "get_my_bookings", "cancel_booking", "notify_manager", "search_products"].includes(t.name)
 );
 
 /**
@@ -69,10 +71,10 @@ async function loadBusinessProfile(businessId: string) {
       city: true,
       country: true,
       services: { select: { name: true, description: true, price: true, duration: true }, take: 50 },
-      products: { select: { name: true, description: true, price: true, category: true, stock: true }, take: 50 },
+      products: { select: { name: true, description: true, price: true, category: true, stock: true }, take: 300 },
       faqs: { select: { question: true, answer: true }, take: 20 },
       staff: { select: { name: true, role: true }, take: 10 },
-      documents: { where: { parsed: true }, select: { name: true, extractedText: true }, take: 5 },
+      documents: { where: { parsed: true }, select: { name: true, extractedText: true }, take: 10 },
     },
   });
 }
@@ -143,15 +145,21 @@ export function buildChannelSystemPrompt(
 
   if (faqList) prompt += `\n\nЧасто задаваемые вопросы:\n${faqList}`;
 
-  // Add knowledge base documents
-  const docs = biz.documents
-    .filter((d) => d.extractedText)
-    .map((d) => {
-      const text = d.extractedText!.length > 8000 ? d.extractedText!.substring(0, 8000) + "..." : d.extractedText!;
-      return `### ${d.name}:\n${text}`;
-    });
-  if (docs.length > 0) {
-    prompt += `\n\nДокументы базы знаний:\n${docs.join("\n\n")}`;
+  // Add knowledge base documents with chunking (total limit 50000 chars)
+  const MAX_DOCS_TOTAL_CHARS = 50000;
+  const docsWithText = biz.documents.filter((d) => d.extractedText && d.extractedText.length > 0);
+  if (docsWithText.length > 0) {
+    const docParts: string[] = [];
+    let totalChars = 0;
+    for (const d of docsWithText) {
+      const fullText = d.extractedText!;
+      const remaining = MAX_DOCS_TOTAL_CHARS - totalChars;
+      if (remaining <= 0) break;
+      const text = fullText.length > remaining ? fullText.substring(0, remaining) + "..." : fullText;
+      docParts.push(`### ${d.name}:\n${text}`);
+      totalChars += text.length;
+    }
+    prompt += `\n\nДокументы базы знаний:\n${docParts.join("\n\n")}`;
   }
 
   if (biz.welcomeMessage) {
@@ -177,6 +185,8 @@ export function buildChannelSystemPrompt(
 Статус можно только повышать, никогда не понижай. Вызывай update_lead_status тихо, не сообщай клиенту о квалификации.
 
 Если в каталоге есть несколько позиций с одинаковым или похожим названием (разные размеры, характеристики, варианты) — ВСЕГДА показывай ВСЕ варианты клиенту и уточняй, какой именно нужен. Используй описания из каталога и базы знаний, чтобы объяснить разницу между вариантами.
+
+Если клиент спрашивает о товаре, которого нет в списке выше, или если нужно найти товар по ключевому слову или категории — используй инструмент search_products. Он ищет по всей базе товаров (не только по тем, что в списке выше).
 
 Отвечай на языке клиента (русский, узбекский, казахский, английский).`;
 
@@ -255,6 +265,11 @@ async function handleChannelToolCall(
         return JSON.stringify(result);
       }
 
+      case "search_products": {
+        const results = await searchProducts(businessId, toolInput.query, toolInput.category);
+        return JSON.stringify(results);
+      }
+
       case "notify_manager": {
         // Send notification to business owner about client needing human help
         const business = await prisma.business.findUnique({
@@ -303,6 +318,21 @@ export async function generateChannelAIResponse(
     ]);
 
     if (!biz) return "Извините, произошла ошибка. Пожалуйста, свяжитесь с нами напрямую.";
+
+    // Dispatch message_received CRM event (non-blocking)
+    dispatchCrmEvent(businessId, "message_received", {
+      client: {
+        name: clientName || null,
+        phone: null,
+        telegramId: channel === "telegram" ? clientId : null,
+        totalVisits: 0,
+        tags: [],
+      },
+      message: {
+        text: userMessage.substring(0, 500),
+        direction: "incoming",
+      },
+    }).catch((e) => console.error("[CRM] message_received dispatch error:", e));
 
     const systemPrompt = buildChannelSystemPrompt(biz, channel);
 

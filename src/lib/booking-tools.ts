@@ -6,6 +6,7 @@
 import { prisma } from "./prisma";
 import { localToUTC } from "./automation";
 import { sendBookingNotification } from "./notifications";
+import { dispatchCrmEvent } from "./crm-integrations";
 
 // ========================================
 // TYPES
@@ -562,6 +563,27 @@ export async function createBooking(
     // Send notification to business owner and staff via Telegram + Dashboard (non-blocking)
     notifyBooking(businessId, "new_booking", clientName, serviceName, staffName, dateStr, time, booking.id, actualStaffId, clientPhone);
 
+    // Dispatch booking_confirmed CRM event (bookings are auto-confirmed on creation)
+    dispatchCrmEvent(businessId, "booking_confirmed", {
+      client: {
+        name: clientName,
+        phone: clientPhone || null,
+        telegramId: clientTelegramId ? clientTelegramId.toString() : null,
+        totalVisits: 0,
+        tags: [],
+      },
+      booking: {
+        id: booking.id,
+        service: serviceName,
+        master: staffName,
+        date: `${dateStr} ${time}`,
+        price: null,
+        status: "confirmed",
+        clientName,
+        clientPhone: clientPhone || null,
+      },
+    }).catch((e) => console.error("[CRM] booking_confirmed dispatch error:", e));
+
     return {
       success: true,
       bookingId: booking.id,
@@ -662,6 +684,27 @@ export async function cancelBooking(
       data: { status: "cancelled" },
     });
 
+    // Dispatch booking_cancelled CRM event (non-blocking)
+    dispatchCrmEvent(booking.businessId, "booking_cancelled", {
+      client: {
+        name: booking.clientName,
+        phone: booking.clientPhone || null,
+        telegramId: clientTelegramId ? clientTelegramId.toString() : null,
+        totalVisits: 0,
+        tags: [],
+      },
+      booking: {
+        id: bookingId,
+        service: booking.service?.name || null,
+        master: booking.staff?.name || null,
+        date: booking.date.toISOString(),
+        price: null,
+        status: "cancelled",
+        clientName: booking.clientName,
+        clientPhone: booking.clientPhone || null,
+      },
+    }).catch((e) => console.error("[CRM] booking_cancelled dispatch error:", e));
+
     // Send cancellation notification using business timezone
     const bookingDate = new Date(booking.date);
     const tz = booking.business?.timezone || "Asia/Tashkent";
@@ -679,6 +722,44 @@ export async function cancelBooking(
     console.error("Error cancelling booking:", error);
     return { success: false, error: "Ошибка при отмене записи" };
   }
+}
+
+// ========================================
+// SEARCH PRODUCTS
+// ========================================
+
+/**
+ * Search products by query (name, description, category, SKU).
+ * Used by the AI bot when the client asks about a product not in the prompt.
+ */
+export async function searchProducts(
+  businessId: string,
+  query?: string,
+  category?: string
+): Promise<Array<{ name: string; description: string | null; price: number; category: string | null; stock: number | null; sku: string | null }>> {
+  const where: Record<string, unknown> = { businessId, isActive: true };
+
+  if (category) {
+    where.category = { contains: category, mode: "insensitive" };
+  }
+
+  if (query) {
+    where.OR = [
+      { name: { contains: query, mode: "insensitive" } },
+      { description: { contains: query, mode: "insensitive" } },
+      { sku: { contains: query, mode: "insensitive" } },
+      { category: { contains: query, mode: "insensitive" } },
+    ];
+  }
+
+  const products = await prisma.product.findMany({
+    where,
+    select: { name: true, description: true, price: true, category: true, stock: true, sku: true },
+    orderBy: { name: "asc" },
+    take: 50,
+  });
+
+  return products;
 }
 
 // ========================================
@@ -818,6 +899,25 @@ export const bookingToolDefinitions: any[] = [
     },
   },
   {
+    name: "search_products",
+    description:
+      "Поиск товаров по названию, описанию, категории или артикулу. Используй когда клиент спрашивает о конкретном товаре, ищет по категории, или когда нужно найти товар которого нет в списке выше. Возвращает до 50 результатов с ценами, описаниями и наличием.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          description: "Поисковый запрос — название товара, ключевое слово, артикул. Например: 'iPhone', 'кофе', 'SKU-001'",
+        },
+        category: {
+          type: "string",
+          description: "Фильтр по категории. Например: 'Смартфоны', 'Косметика'",
+        },
+      },
+      required: [],
+    },
+  },
+  {
     name: "update_lead_status",
     description:
       "Обновить статус квалификации лида. Вызывай после каждого сообщения клиента, если его статус изменился. Не понижай статус — только повышай (cold → warm → hot → client).",
@@ -900,6 +1000,17 @@ export async function updateLeadStatus(
           ...(finalStatus === "client" ? { convertedAt: now } : {}),
         },
       });
+
+      // Dispatch new_client CRM event (non-blocking)
+      dispatchCrmEvent(businessId, "new_client", {
+        client: {
+          name: clientName || null,
+          phone: null,
+          telegramId: channel === "telegram" ? clientId : null,
+          totalVisits: 0,
+          tags: [],
+        },
+      }).catch((e) => console.error("[CRM] new_client dispatch error:", e));
     }
 
     return { success: true, previousStatus: prevStatus, newStatus: finalStatus };

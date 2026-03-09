@@ -126,16 +126,32 @@ describe("buildChannelSystemPrompt", () => {
     expect(prompt).toContain("Ташкент");
   });
 
-  it("truncates long documents to 8000 chars", () => {
-    const longText = "A".repeat(10000);
+  it("truncates documents when total exceeds 50000 chars", () => {
+    const longText = "A".repeat(60000);
     const biz = makeBiz({
       documents: [{ name: "long.pdf", extractedText: longText }],
     });
     const prompt = buildChannelSystemPrompt(biz, "whatsapp");
     expect(prompt).toContain("long.pdf");
     expect(prompt).toContain("...");
-    // Should not contain the full 10000 chars
-    expect(prompt.length).toBeLessThan(longText.length + 2000);
+    // Should not contain the full 60000 chars — capped at 50000
+    expect(prompt.length).toBeLessThan(55000);
+  });
+
+  it("includes multiple documents within total limit", () => {
+    const biz = makeBiz({
+      documents: [
+        { name: "doc1.pdf", extractedText: "Первый документ с текстом" },
+        { name: "doc2.pdf", extractedText: "Второй документ с текстом" },
+        { name: "doc3.pdf", extractedText: "Третий документ с текстом" },
+      ],
+    });
+    const prompt = buildChannelSystemPrompt(biz, "whatsapp");
+    expect(prompt).toContain("doc1.pdf");
+    expect(prompt).toContain("doc2.pdf");
+    expect(prompt).toContain("doc3.pdf");
+    expect(prompt).toContain("Первый документ");
+    expect(prompt).toContain("Третий документ");
   });
 
   it("includes products in prompt", () => {

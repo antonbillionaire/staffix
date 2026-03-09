@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const csvText: string = body.csv;
+    const isPreview: boolean = body.preview === true;
 
     if (!csvText || typeof csvText !== "string") {
       return NextResponse.json({ error: "Нет данных CSV" }, { status: 400 });
@@ -87,6 +88,16 @@ export async function POST(request: NextRequest) {
       stock: ["остаток", "stock", "количество", "qty", "quantity", "кол-во"],
       sku: ["артикул", "sku", "код", "code"],
       oldPrice: ["старая цена", "old price", "старая_цена", "скидка от", "old_price", "oldprice"],
+    };
+
+    const FIELD_LABELS: Record<string, string> = {
+      name: "Название",
+      price: "Цена",
+      category: "Категория",
+      description: "Описание",
+      stock: "Остаток",
+      sku: "Артикул",
+      oldPrice: "Старая цена",
     };
 
     const firstRow = rows[0].map((c) => c.toLowerCase().trim());
@@ -118,6 +129,33 @@ export async function POST(request: NextRequest) {
 
     if (dataRows.length === 0) {
       return NextResponse.json({ error: "Нет строк с данными" }, { status: 400 });
+    }
+
+    // Preview mode: return column mapping + sample rows without importing
+    if (isPreview) {
+      const mapping = Object.entries(colMap).map(([field, colIndex]) => ({
+        field,
+        label: FIELD_LABELS[field] || field,
+        columnIndex: colIndex,
+        headerName: hasHeader ? rows[0][colIndex] || `Колонка ${colIndex + 1}` : `Колонка ${colIndex + 1}`,
+      }));
+
+      const sampleRows = dataRows.slice(0, 5).map((row) => {
+        const mapped: Record<string, string> = {};
+        for (const [field, colIndex] of Object.entries(colMap)) {
+          mapped[field] = row[colIndex] || "";
+        }
+        return mapped;
+      });
+
+      return NextResponse.json({
+        preview: true,
+        hasHeader,
+        usePositional,
+        totalRows: dataRows.length,
+        mapping,
+        sampleRows,
+      });
     }
 
     const productsToCreate: {

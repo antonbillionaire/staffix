@@ -49,6 +49,16 @@ export default function ProductsPage() {
   const [importResult, setImportResult] = useState<{ message: string; errors?: string[] } | null>(null);
   const [parsingFile, setParsingFile] = useState(false);
 
+  // Preview state
+  const [previewData, setPreviewData] = useState<{
+    hasHeader: boolean;
+    usePositional: boolean;
+    totalRows: number;
+    mapping: Array<{ field: string; label: string; columnIndex: number; headerName: string }>;
+    sampleRows: Array<Record<string, string>>;
+  } | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
@@ -158,6 +168,8 @@ export default function ProductsPage() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPreviewData(null);
+    setImportResult(null);
     const ext = file.name.split(".").pop()?.toLowerCase();
 
     if (ext === "xlsx" || ext === "xls") {
@@ -168,9 +180,14 @@ export default function ProductsPage() {
         const buf = await file.arrayBuffer();
         const data = new Uint8Array(buf);
         const wb = XLSX.read(data, { type: "array" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const csv = XLSX.utils.sheet_to_csv(ws, { FS: ";", rawNumbers: true });
-        setImportCsv(csv);
+        // Parse ALL sheets, not just the first one
+        const csvParts: string[] = [];
+        for (const sheetName of wb.SheetNames) {
+          const ws = wb.Sheets[sheetName];
+          const csv = XLSX.utils.sheet_to_csv(ws, { FS: ";", rawNumbers: true });
+          if (csv.trim()) csvParts.push(csv);
+        }
+        setImportCsv(csvParts.join("\n"));
       } catch {
         setImportResult({ message: "Ошибка чтения Excel файла" });
       } finally {
@@ -181,6 +198,30 @@ export default function ProductsPage() {
       const reader = new FileReader();
       reader.onload = (ev) => setImportCsv((ev.target?.result as string) || "");
       reader.readAsText(file, "utf-8");
+    }
+  };
+
+  const handlePreview = async () => {
+    if (!importCsv.trim()) return;
+    setLoadingPreview(true);
+    setImportResult(null);
+    setPreviewData(null);
+    try {
+      const res = await fetch("/api/import/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csv: importCsv, preview: true }),
+      });
+      const data = await res.json();
+      if (data.preview) {
+        setPreviewData(data);
+      } else {
+        setImportResult({ message: data.error || "Ошибка превью" });
+      }
+    } catch {
+      setImportResult({ message: "Ошибка при анализе файла" });
+    } finally {
+      setLoadingPreview(false);
     }
   };
 
@@ -196,6 +237,7 @@ export default function ProductsPage() {
       });
       const data = await res.json();
       setImportResult({ message: data.message || data.error, errors: data.errors });
+      setPreviewData(null);
       if (data.created > 0) await fetchProducts();
     } catch {
       setImportResult({ message: "Ошибка при импорте" });
@@ -254,7 +296,7 @@ export default function ProductsPage() {
               </button>
             )}
             <button
-              onClick={() => { setIsImportOpen(true); setImportResult(null); setImportCsv(""); }}
+              onClick={() => { setIsImportOpen(true); setImportResult(null); setImportCsv(""); setPreviewData(null); }}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border ${isDark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
             >
               <Upload className="w-4 h-4" />
@@ -609,17 +651,68 @@ export default function ProductsPage() {
                 <label className={`block text-sm font-medium mb-1 ${text}`}>Или вставьте текст CSV</label>
                 <textarea
                   value={importCsv}
-                  onChange={(e) => setImportCsv(e.target.value)}
+                  onChange={(e) => { setImportCsv(e.target.value); setPreviewData(null); }}
                   rows={5}
                   placeholder={"iPhone 15;150000;Смартфоны\nSamsung S24;130000;Смартфоны\nAirPods Pro;45000;Аксессуары"}
                   className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none resize-none ${input}`}
                 />
               </div>
 
-              {(parsingFile || importing) && (
+              {(parsingFile || importing || loadingPreview) && (
                 <div className={`flex items-center gap-3 p-4 rounded-lg text-sm font-medium ${isDark ? "bg-blue-500/10 text-blue-300 border border-blue-500/20" : "bg-blue-50 text-blue-700 border border-blue-200"}`}>
                   <Loader2 className="w-5 h-5 animate-spin flex-shrink-0" />
-                  {parsingFile ? "Чтение файла... Пожалуйста, подождите" : "Импорт данных... Пожалуйста, подождите, не закрывайте окно"}
+                  {parsingFile ? "Чтение файла..." : loadingPreview ? "Анализ данных..." : "Импорт данных... Не закрывайте окно"}
+                </div>
+              )}
+
+              {/* Preview: column mapping + sample rows */}
+              {previewData && (
+                <div className={`p-3 rounded-lg text-sm space-y-3 ${isDark ? "bg-blue-500/10 border border-blue-500/20" : "bg-blue-50 border border-blue-200"}`}>
+                  <div className="flex items-center justify-between">
+                    <p className={`font-medium ${isDark ? "text-blue-300" : "text-blue-800"}`}>
+                      Найдено строк: {previewData.totalRows}
+                      {previewData.usePositional && " (заголовки не обнаружены, колонки по порядку)"}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className={`text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>Маппинг колонок:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {previewData.mapping.map((m) => (
+                        <span key={m.field} className={`text-xs px-2 py-1 rounded ${isDark ? "bg-gray-700 text-gray-300" : "bg-white text-gray-700 border border-gray-200"}`}>
+                          <span className="font-medium">{m.label}</span>
+                          <span className={`mx-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>&larr;</span>
+                          <span className={isDark ? "text-gray-400" : "text-gray-500"}>{m.headerName}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <p className={`text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Примеры (первые {previewData.sampleRows.length} строк):</p>
+                    <table className={`w-full text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                      <thead>
+                        <tr>
+                          {previewData.mapping.map((m) => (
+                            <th key={m.field} className={`text-left p-1.5 font-medium ${isDark ? "border-b border-gray-700" : "border-b border-gray-200"}`}>
+                              {m.label}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {previewData.sampleRows.map((row, i) => (
+                          <tr key={i}>
+                            {previewData.mapping.map((m) => (
+                              <td key={m.field} className={`p-1.5 max-w-[150px] truncate ${isDark ? "border-b border-gray-700/50" : "border-b border-gray-100"}`}>
+                                {row[m.field] || "—"}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
@@ -640,14 +733,25 @@ export default function ProductsPage() {
               >
                 Закрыть
               </button>
-              <button
-                onClick={handleImport}
-                disabled={importing || !importCsv.trim()}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium"
-              >
-                {importing && <Loader2 className="w-4 h-4 animate-spin" />}
-                Импортировать
-              </button>
+              {!previewData ? (
+                <button
+                  onClick={handlePreview}
+                  disabled={loadingPreview || !importCsv.trim()}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium"
+                >
+                  {loadingPreview && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Проверить данные
+                </button>
+              ) : (
+                <button
+                  onClick={handleImport}
+                  disabled={importing}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium"
+                >
+                  {importing && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Импортировать {previewData.totalRows} товаров
+                </button>
+              )}
             </div>
           </div>
         </div>
