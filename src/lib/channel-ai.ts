@@ -68,7 +68,8 @@ async function loadBusinessProfile(businessId: string) {
       language: true,
       city: true,
       country: true,
-      services: { select: { name: true, price: true, duration: true }, take: 20 },
+      services: { select: { name: true, description: true, price: true, duration: true }, take: 50 },
+      products: { select: { name: true, description: true, price: true, category: true, stock: true }, take: 50 },
       faqs: { select: { question: true, answer: true }, take: 20 },
       staff: { select: { name: true, role: true }, take: 10 },
       documents: { where: { parsed: true }, select: { name: true, extractedText: true }, take: 5 },
@@ -95,9 +96,28 @@ export function buildChannelSystemPrompt(
 
   const servicesList = biz.services.length > 0
     ? biz.services
-        .map((s) => `- ${s.name}${s.price ? ` — ${s.price.toLocaleString("ru-RU")}` : ""}${s.duration ? ` (${s.duration} мин)` : ""}`)
+        .map((s) => {
+          let line = `- ${s.name}`;
+          if (s.description) line += ` — ${s.description}`;
+          if (s.price) line += ` | ${s.price.toLocaleString("ru-RU")}`;
+          if (s.duration) line += ` (${s.duration} мин)`;
+          return line;
+        })
         .join("\n")
     : "Услуги не указаны";
+
+  const productsList = biz.products.length > 0
+    ? biz.products
+        .map((p) => {
+          let line = `- ${p.name}`;
+          if (p.description) line += ` — ${p.description}`;
+          if (p.price) line += ` | ${p.price.toLocaleString("ru-RU")}`;
+          if (p.category) line += ` [${p.category}]`;
+          if (p.stock !== null && p.stock !== undefined) line += p.stock > 0 ? ` (в наличии: ${p.stock})` : ` (нет в наличии)`;
+          return line;
+        })
+        .join("\n")
+    : "";
 
   const staffList = biz.staff.length > 0
     ? biz.staff.map((s) => `- ${s.name}${s.role ? ` (${s.role})` : ""}`).join("\n")
@@ -117,6 +137,8 @@ export function buildChannelSystemPrompt(
 
   prompt += `\n\nУслуги:\n${servicesList}`;
 
+  if (productsList) prompt += `\n\nТовары:\n${productsList}`;
+
   if (staffList) prompt += `\n\nСпециалисты:\n${staffList}`;
 
   if (faqList) prompt += `\n\nЧасто задаваемые вопросы:\n${faqList}`;
@@ -125,7 +147,7 @@ export function buildChannelSystemPrompt(
   const docs = biz.documents
     .filter((d) => d.extractedText)
     .map((d) => {
-      const text = d.extractedText!.length > 4000 ? d.extractedText!.substring(0, 4000) + "..." : d.extractedText!;
+      const text = d.extractedText!.length > 8000 ? d.extractedText!.substring(0, 8000) + "..." : d.extractedText!;
       return `### ${d.name}:\n${text}`;
     });
   if (docs.length > 0) {
@@ -153,6 +175,8 @@ export function buildChannelSystemPrompt(
 - hot: хочет записаться, обсуждает конкретное время, готов к покупке
 - client: записался или купил услугу
 Статус можно только повышать, никогда не понижай. Вызывай update_lead_status тихо, не сообщай клиенту о квалификации.
+
+Если в каталоге есть несколько позиций с одинаковым или похожим названием (разные размеры, характеристики, варианты) — ВСЕГДА показывай ВСЕ варианты клиенту и уточняй, какой именно нужен. Используй описания из каталога и базы знаний, чтобы объяснить разницу между вариантами.
 
 Отвечай на языке клиента (русский, узбекский, казахский, английский).`;
 

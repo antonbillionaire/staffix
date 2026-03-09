@@ -344,7 +344,7 @@ export async function checkAvailability(
 export async function getServicesList(businessId: string) {
   const services = await prisma.service.findMany({
     where: { businessId },
-    select: { id: true, name: true, price: true, duration: true },
+    select: { id: true, name: true, description: true, price: true, duration: true },
     orderBy: { name: "asc" },
   });
   return services;

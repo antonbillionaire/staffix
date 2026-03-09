@@ -258,7 +258,7 @@ export default function ProductsPage() {
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border ${isDark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
             >
               <Upload className="w-4 h-4" />
-              Импорт CSV
+              Импорт каталога
             </button>
             <button
               onClick={openCreate}
@@ -596,7 +596,7 @@ export default function ProductsPage() {
               </div>
 
               <div>
-                <label className={`block text-sm font-medium mb-1 ${text}`}>Загрузить файл (.xlsx, .xls, .csv)</label>
+                <label className={`block text-sm font-medium mb-1 ${text}`}>Загрузить файл</label>
                 <input
                   type="file"
                   accept=".csv,.txt,.xlsx,.xls"

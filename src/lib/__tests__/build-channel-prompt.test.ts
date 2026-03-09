@@ -17,9 +17,10 @@ function makeBiz(overrides: Record<string, unknown> = {}) {
     city: "Ташкент",
     country: "UZ",
     services: [
-      { name: "Стрижка", price: 50000, duration: 30 },
-      { name: "Маникюр", price: 80000, duration: 60 },
+      { name: "Стрижка", description: null, price: 50000, duration: 30 },
+      { name: "Маникюр", description: null, price: 80000, duration: 60 },
     ],
+    products: [] as Array<{ name: string; description: string | null; price: number; category: string | null; stock: number | null }>,
     faqs: [
       { question: "Где вы находитесь?", answer: "На улице Тестовой, 1" },
     ],
@@ -125,15 +126,39 @@ describe("buildChannelSystemPrompt", () => {
     expect(prompt).toContain("Ташкент");
   });
 
-  it("truncates long documents to 4000 chars", () => {
-    const longText = "A".repeat(5000);
+  it("truncates long documents to 8000 chars", () => {
+    const longText = "A".repeat(10000);
     const biz = makeBiz({
       documents: [{ name: "long.pdf", extractedText: longText }],
     });
     const prompt = buildChannelSystemPrompt(biz, "whatsapp");
     expect(prompt).toContain("long.pdf");
     expect(prompt).toContain("...");
-    // Should not contain the full 5000 chars
+    // Should not contain the full 10000 chars
     expect(prompt.length).toBeLessThan(longText.length + 2000);
+  });
+
+  it("includes products in prompt", () => {
+    const biz = makeBiz({
+      products: [
+        { name: "Пинцет 6 см", description: "Для тонких волос", price: 5000, category: "Инструменты", stock: 10 },
+        { name: "Пинцет 10 см", description: "Универсальный", price: 7000, category: "Инструменты", stock: 0 },
+      ],
+    });
+    const prompt = buildChannelSystemPrompt(biz, "whatsapp");
+    expect(prompt).toContain("Пинцет 6 см");
+    expect(prompt).toContain("Для тонких волос");
+    expect(prompt).toContain("Пинцет 10 см");
+    expect(prompt).toContain("нет в наличии");
+  });
+
+  it("includes service description in prompt", () => {
+    const biz = makeBiz({
+      services: [
+        { name: "Стрижка", description: "Мужская классическая", price: 50000, duration: 30 },
+      ],
+    });
+    const prompt = buildChannelSystemPrompt(biz, "whatsapp");
+    expect(prompt).toContain("Мужская классическая");
   });
 });
