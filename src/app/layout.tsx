@@ -34,10 +34,8 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      {
-        url: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%233b82f6'/><stop offset='100%25' stop-color='%239333ea'/></linearGradient></defs><rect width='100' height='100' rx='22' fill='url(%23g)'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='white' font-family='system-ui' font-weight='bold'>S</text></svg>",
-        type: "image/svg+xml",
-      },
+      { url: "/new-logo/4_sfx_favicon.ico", type: "image/x-icon" },
+      { url: "/new-logo/4_sfx_favicon.png", type: "image/png" },
     ],
   },
 };

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -364,11 +365,14 @@ export default function DashboardLayout({
       >
         {/* Logo */}
         <div className={`flex items-center justify-between h-16 px-5 border-b ${borderColor} flex-shrink-0`}>
-          <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-              <Brain className="h-5 w-5 text-white" />
-            </div>
-            <span className={`text-xl font-bold ${textPrimary}`}>Staffix</span>
+          <Link href="/dashboard" className="flex items-center">
+            <Image
+              src={isDark ? "/new-logo/A2_right_white_text.png" : "/new-logo/5_sfx_wordmark_right.png"}
+              alt="Staffix"
+              width={160}
+              height={40}
+              className="h-9 w-auto"
+            />
           </Link>
           <button
             onClick={() => setSidebarOpen(false)}

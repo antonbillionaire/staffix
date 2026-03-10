@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
+import Image from "next/image";
 import {
-  Brain,
   MessageSquare,
   Calendar,
   Clock,
   Shield,
+  Brain,
   Zap,
   ChevronRight,
   Star,
@@ -134,11 +135,8 @@ export default function Home() {
       {/* Header */}
       <header className="relative z-50 container mx-auto px-4 py-6">
         <nav className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-              <Brain className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold tracking-tight">Staffix</span>
+          <div className="flex items-center">
+            <Image src="/new-logo/A2_right_white_text.png" alt="Staffix" width={180} height={45} className="h-10 w-auto" />
           </div>
           <div className="hidden md:flex items-center gap-8">
             <Link href="#features" className="text-gray-300 hover:text-white transition-colors">
@@ -258,9 +256,7 @@ export default function Home() {
             {/* Chat mockup */}
             <div className="relative bg-[#12122a] border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
               <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/10">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <Brain className="h-5 w-5 text-white" />
-                </div>
+                <Image src="/new-logo/2_sfx_icon.png" alt="Staffix AI" width={40} height={40} className="w-10 h-10 rounded-full object-cover" />
                 <div>
                   <p className="font-medium">{t("home.demoAiEmployee")}</p>
                   <p className="text-xs text-green-400 flex items-center gap-1">
@@ -363,9 +359,7 @@ export default function Home() {
             {/* AI Employee column */}
             <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-2xl p-8">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                  <Brain className="h-5 w-5 text-white" />
-                </div>
+                <Image src="/new-logo/2_sfx_icon.png" alt="Staffix AI" width={40} height={40} className="w-10 h-10 rounded-xl object-cover" />
                 <h3 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
                   {t("home.aiEmployee")}
                 </h3>
@@ -679,13 +673,8 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <Brain className="h-4 w-4 text-white" />
-              </div>
-              <div>
-                <span className="text-lg font-bold">Staffix</span>
-                <p className="text-xs text-gray-500">by K-Bridge Co. LTD</p>
-              </div>
+              <Image src="/new-logo/A2_right_white_text.png" alt="Staffix" width={140} height={35} className="h-8 w-auto" />
+              <p className="text-xs text-gray-500">by K-Bridge Co. LTD</p>
             </div>
             <div className="flex items-center gap-6 text-gray-500 text-sm flex-wrap">
               <Link href="/docs" className="hover:text-white transition-colors">{t("home.footer.docs")}</Link>

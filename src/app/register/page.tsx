@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { Brain, Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
+import Image from "next/image";
+import { Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -77,11 +78,8 @@ export default function RegisterPage() {
       </div>
 
       <div className="relative z-10 sm:mx-auto sm:w-full sm:max-w-md">
-        <Link href="/" className="flex items-center justify-center gap-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-            <Brain className="h-7 w-7 text-white" />
-          </div>
-          <span className="text-2xl font-bold text-white">Staffix</span>
+        <Link href="/" className="flex items-center justify-center">
+          <Image src="/new-logo/A2_right_white_text.png" alt="Staffix" width={200} height={50} className="h-12 w-auto" />
         </Link>
         <h2 className="mt-8 text-center text-3xl font-bold text-white">
           Создать аккаунт
