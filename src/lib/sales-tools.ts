@@ -9,6 +9,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "./prisma";
 import { dispatchCrmEvent } from "./crm-integrations";
 import { getPaymentButtons } from "./payment-links";
+import { sendOwnerNotification } from "./notifications";
+
+const LOW_STOCK_THRESHOLD = 5;
 
 // ========================================
 // HELPERS
@@ -274,6 +277,11 @@ export async function searchProducts(
         category: p.category,
         stock: p.stock,
         inStock: p.stock === null || p.stock > 0,
+        stockMessage:
+          p.stock === null ? "В наличии"
+          : p.stock === 0 ? "Нет в наличии"
+          : p.stock < LOW_STOCK_THRESHOLD ? `Осталось ${p.stock} шт.`
+          : `В наличии (${p.stock}+ шт.)`,
         shortDescription: p.description ? p.description.slice(0, 150) : null,
       })),
     };
@@ -495,15 +503,34 @@ export async function createOrder(
       include: { items: true },
     });
 
-    // Уменьшаем stock для товаров с ограниченным наличием
+    // Уменьшаем stock для товаров с ограниченным наличием + уведомляем о низком остатке
     for (const item of order.items) {
       if (item.productId) {
         const product = products.find((p) => p.id === item.productId);
         if (product && product.stock !== null) {
-          await prisma.product.update({
+          const previousStock = product.stock;
+          const updated = await prisma.product.update({
             where: { id: item.productId },
             data: { stock: { decrement: item.quantity } },
           });
+          // Log stock change
+          prisma.stockLog.create({
+            data: {
+              productId: item.productId,
+              previousStock,
+              newStock: updated.stock,
+              change: -item.quantity,
+              reason: "order",
+              orderId: order.id,
+            },
+          }).catch(() => {});
+          // Low stock notification
+          if (updated.stock !== null && updated.stock <= LOW_STOCK_THRESHOLD && updated.stock >= 0) {
+            const stockMsg = updated.stock === 0
+              ? `<b>Товар закончился!</b>\n"${product.name}" — остаток: 0 шт.`
+              : `<b>Мало на складе!</b>\n"${product.name}" — осталось: ${updated.stock} шт.`;
+            sendOwnerNotification(businessId, stockMsg).catch(() => {});
+          }
         }
       }
     }

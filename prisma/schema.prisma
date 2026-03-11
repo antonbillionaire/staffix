@@ -1198,8 +1198,30 @@ model Product {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  stockLogs   StockLog[]
+
   @@index([businessId, isActive])
   @@index([businessId, category])
+}
+
+// История изменений остатков
+model StockLog {
+  id          String   @id @default(cuid())
+
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  previousStock Int?   // null = was unlimited
+  newStock      Int?   // null = set to unlimited
+  change        Int    // delta (positive = added, negative = sold/removed)
+
+  reason      String   // "order", "manual", "bulk_update", "import"
+  orderId     String?  // optional: link to order
+  note        String?  // optional: free-text note
+
+  createdAt   DateTime @default(now())
+
+  @@index([productId, createdAt])
 }
 
 // Заказы клиентов

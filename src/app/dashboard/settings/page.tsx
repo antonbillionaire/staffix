@@ -20,7 +20,6 @@ import {
   Calendar,
   Clock,
   Lock,
-  Truck,
   Eye,
   EyeOff,
 } from "lucide-react";
@@ -406,7 +405,6 @@ export default function SettingsPage() {
   const tabs = [
     { id: "profile", label: "Профиль", icon: User },
     { id: "security", label: "Безопасность", icon: Lock },
-    { id: "delivery", label: "Доставка", icon: Truck },
     { id: "theme", label: "Тема", icon: Palette },
     { id: "subscription", label: "Подписка", icon: CreditCard },
     { id: "notifications", label: "Уведомления", icon: Bell },
@@ -606,112 +604,6 @@ export default function SettingsPage() {
               className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:opacity-90 disabled:opacity-50 transition-all"
             >
               {passwordSaving ? <><Loader2 className="h-4 w-4 animate-spin" /> Сохранение...</> : "Сменить пароль"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Delivery Tab */}
-      {activeTab === "delivery" && (
-        <div className={`${bgCard} rounded-xl border ${borderColor} p-6`}>
-          <div className="flex items-center gap-2 mb-4">
-            <Truck className="h-5 w-5 text-blue-500" />
-            <h3 className={`text-lg font-medium ${textPrimary}`}>Настройки доставки</h3>
-            {deliverySaved && <span className="text-green-500 text-sm flex items-center gap-1"><Check className="h-3 w-3" /> Сохранено</span>}
-          </div>
-          <p className={`text-sm ${textSecondary} mb-6`}>
-            AI-бот будет сообщать клиентам информацию о доставке
-          </p>
-
-          <div className="space-y-4 max-w-lg">
-            {/* Enable toggle */}
-            <label className={`flex items-center justify-between p-4 ${isDark ? "bg-white/5" : "bg-gray-50"} rounded-xl cursor-pointer`}>
-              <div>
-                <p className={`font-medium ${textPrimary}`}>Доставка включена</p>
-                <p className={`text-sm ${textSecondary}`}>Показывать информацию о доставке клиентам</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDelivery({ ...delivery, enabled: !delivery.enabled })}
-                className={`relative w-11 h-6 rounded-full transition-colors ${delivery.enabled ? "bg-blue-600" : isDark ? "bg-white/10" : "bg-gray-300"}`}
-              >
-                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${delivery.enabled ? "translate-x-5" : ""}`} />
-              </button>
-            </label>
-
-            {delivery.enabled && (
-              <>
-                {/* Time range */}
-                <div>
-                  <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Время доставки (минуты)</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="number"
-                      min="0"
-                      value={delivery.timeFrom}
-                      onChange={(e) => setDelivery({ ...delivery, timeFrom: e.target.value })}
-                      placeholder="30"
-                      className={`w-24 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    />
-                    <span className={textSecondary}>—</span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={delivery.timeTo}
-                      onChange={(e) => setDelivery({ ...delivery, timeTo: e.target.value })}
-                      placeholder="60"
-                      className={`w-24 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    />
-                    <span className={`text-sm ${textSecondary}`}>мин</span>
-                  </div>
-                </div>
-
-                {/* Delivery fee */}
-                <div>
-                  <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Стоимость доставки</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={delivery.fee}
-                    onChange={(e) => setDelivery({ ...delivery, fee: e.target.value })}
-                    placeholder="0 — бесплатная"
-                    className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                  />
-                </div>
-
-                {/* Free from */}
-                <div>
-                  <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Бесплатная доставка от суммы</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={delivery.freeFrom}
-                    onChange={(e) => setDelivery({ ...delivery, freeFrom: e.target.value })}
-                    placeholder="Оставьте пустым если не применимо"
-                    className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                  />
-                </div>
-
-                {/* Zones */}
-                <div>
-                  <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Зоны доставки (необязательно)</label>
-                  <textarea
-                    rows={3}
-                    value={delivery.zones}
-                    onChange={(e) => setDelivery({ ...delivery, zones: e.target.value })}
-                    placeholder="Например: Центр — 30 мин, Окраины — 60 мин"
-                    className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                  />
-                </div>
-              </>
-            )}
-
-            <button
-              onClick={handleSaveDelivery}
-              disabled={deliverySaving}
-              className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:opacity-90 disabled:opacity-50 transition-all"
-            >
-              {deliverySaving ? <><Loader2 className="h-4 w-4 animate-spin" /> Сохранение...</> : "Сохранить"}
             </button>
           </div>
         </div>

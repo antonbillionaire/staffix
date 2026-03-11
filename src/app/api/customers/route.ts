@@ -141,6 +141,10 @@ export async function GET(request: NextRequest) {
         bookingsCount: clientBookings.length,
         avgRating,
         segment: isVip ? "vip" : isActive ? "active" : "inactive",
+        loyaltyPoints: client.loyaltyPoints,
+        loyaltyVisits: client.loyaltyVisits,
+        loyaltyTotalSpent: client.loyaltyTotalSpent,
+        loyaltyProgramIds: client.loyaltyProgramIds,
       };
     });
 

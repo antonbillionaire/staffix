@@ -61,6 +61,21 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" });
 }
 
+// Role options per business mode
+const SALES_ROLES = [
+  { value: "admin", label: "Администратор" },
+  { value: "manager", label: "Менеджер по продажам" },
+  { value: "operator", label: "Оператор" },
+  { value: "warehouse", label: "Складской работник" },
+  { value: "custom", label: "Другое..." },
+];
+const SERVICE_ROLES = [
+  { value: "admin", label: "Администратор" },
+  { value: "manager", label: "Менеджер" },
+  { value: "master", label: "Мастер" },
+  { value: "custom", label: "Другое..." },
+];
+
 export default function StaffPage() {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
@@ -69,6 +84,7 @@ export default function StaffPage() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [dashboardMode, setDashboardMode] = useState<string>("service");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
@@ -180,7 +196,18 @@ export default function StaffPage() {
 
   useEffect(() => {
     fetchStaff();
+    // Fetch dashboard mode for role options
+    fetch("/api/business")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.business?.dashboardMode) setDashboardMode(data.business.dashboardMode);
+      })
+      .catch(() => {});
   }, [fetchStaff]);
+
+  const isSales = dashboardMode === "sales";
+  const roleOptions = isSales ? SALES_ROLES : SERVICE_ROLES;
+  const knownRoleValues = roleOptions.filter(r => r.value !== "custom").map(r => r.value);
 
   const openModal = (person?: Staff) => {
     if (person) {
@@ -524,7 +551,7 @@ export default function StaffPage() {
                   {t("staffPage.role")}
                 </label>
                 <select
-                  value={["admin", "manager", "master"].includes(formData.role) ? formData.role : "custom"}
+                  value={knownRoleValues.includes(formData.role) ? formData.role : "custom"}
                   onChange={(e) => {
                     if (e.target.value === "custom") {
                       setFormData({ ...formData, role: "" });
@@ -534,12 +561,11 @@ export default function StaffPage() {
                   }}
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white" : "border-gray-300"}`}
                 >
-                  <option value="admin">Администратор</option>
-                  <option value="manager">Менеджер</option>
-                  <option value="master">Мастер</option>
-                  <option value="custom">Другое...</option>
+                  {roleOptions.map((r) => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
                 </select>
-                {!["admin", "manager", "master"].includes(formData.role) && (
+                {!knownRoleValues.includes(formData.role) && (
                   <input
                     type="text"
                     required
@@ -679,9 +705,9 @@ export default function StaffPage() {
             <div className={`text-sm mb-4 p-3 rounded-lg ${isDark ? "bg-white/5 text-gray-400" : "bg-gray-50 text-gray-600"}`}>
               <p className="font-medium mb-2">Импорт сотрудников</p>
               <p className="text-xs mb-1"><span className="font-medium">Обязательное поле:</span> Имя</p>
-              <p className="text-xs mb-2"><span className="font-medium">Необязательные:</span> Должность (Администратор / Менеджер / Мастер), Telegram</p>
+              <p className="text-xs mb-2"><span className="font-medium">Необязательные:</span> Должность ({isSales ? "Администратор / Менеджер по продажам / Оператор" : "Администратор / Менеджер / Мастер"}), Telegram</p>
               <code className={`text-xs block ${isDark ? "text-green-400" : "text-green-700"}`}>Имя;Должность;Telegram</code>
-              <code className={`text-xs block mt-1 ${isDark ? "text-blue-400" : "text-blue-700"}`}>Анна;Мастер;@anna_beauty</code>
+              <code className={`text-xs block mt-1 ${isDark ? "text-blue-400" : "text-blue-700"}`}>{isSales ? "Олег;Менеджер по продажам;@oleg_sales" : "Анна;Мастер;@anna_beauty"}</code>
               <p className="mt-2 text-xs">Форматы: .xlsx, .xls, .csv, .txt. Колонки определяются автоматически по заголовкам.</p>
             </div>
 

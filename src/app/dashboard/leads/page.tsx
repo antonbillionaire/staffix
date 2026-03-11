@@ -73,7 +73,8 @@ export default function LeadsPage() {
     fetch("/api/business")
       .then((r) => r.json())
       .then((data) => {
-        if (data.id) setBusinessId(data.id);
+        const id = data.business?.id || data.id;
+        if (id) setBusinessId(id);
       })
       .catch(console.error);
   }, []);

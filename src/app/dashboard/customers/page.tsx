@@ -25,6 +25,9 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  Award,
+  Plus,
+  Minus,
 } from "lucide-react";
 
 interface Customer {
@@ -42,6 +45,10 @@ interface Customer {
   bookingsCount: number;
   avgRating: number | null;
   segment: "vip" | "active" | "inactive";
+  loyaltyPoints: number;
+  loyaltyVisits: number;
+  loyaltyTotalSpent: number;
+  loyaltyProgramIds: string[];
 }
 
 interface Stats {
@@ -88,6 +95,11 @@ export default function CustomersPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importError, setImportError] = useState("");
+
+  // Loyalty modal state
+  const [loyaltyCustomer, setLoyaltyCustomer] = useState<Customer | null>(null);
+  const [loyaltyAmount, setLoyaltyAmount] = useState("");
+  const [loyaltySaving, setLoyaltySaving] = useState(false);
 
   // Theme-aware styles
   const isDark = theme === "dark";
@@ -184,6 +196,51 @@ export default function CustomersPage() {
     setImportCsv("");
     setImportResult(null);
     setImportError("");
+  };
+
+  const handleLoyaltyAction = async (action: string) => {
+    if (!loyaltyCustomer) return;
+    const amount = parseInt(loyaltyAmount) || 0;
+    if (amount <= 0) return;
+    setLoyaltySaving(true);
+    try {
+      const res = await fetch(`/api/customers/${loyaltyCustomer.id}/loyalty`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, amount }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Update customer in local state
+        setCustomers((prev) =>
+          prev.map((c) =>
+            c.id === loyaltyCustomer.id
+              ? {
+                  ...c,
+                  loyaltyPoints: data.client.loyaltyPoints,
+                  loyaltyVisits: data.client.loyaltyVisits,
+                  loyaltyTotalSpent: data.client.loyaltyTotalSpent,
+                }
+              : c
+          )
+        );
+        setLoyaltyCustomer((prev) =>
+          prev
+            ? {
+                ...prev,
+                loyaltyPoints: data.client.loyaltyPoints,
+                loyaltyVisits: data.client.loyaltyVisits,
+                loyaltyTotalSpent: data.client.loyaltyTotalSpent,
+              }
+            : null
+        );
+        setLoyaltyAmount("");
+      }
+    } catch (err) {
+      console.error("Loyalty action error:", err);
+    } finally {
+      setLoyaltySaving(false);
+    }
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -356,6 +413,7 @@ export default function CustomersPage() {
                   <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>Визиты</th>
                   <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>Активность</th>
                   <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>Рейтинг</th>
+                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>Баллы</th>
                   <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>Последний визит</th>
                   <th className={`text-right py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>Действия</th>
                 </tr>
@@ -414,6 +472,16 @@ export default function CustomersPage() {
                       ) : (
                         <span className={textTertiary}>—</span>
                       )}
+                    </td>
+                    <td className="py-3 px-4">
+                      <button
+                        onClick={() => { setLoyaltyCustomer(customer); setLoyaltyAmount(""); }}
+                        className={`flex items-center gap-1 text-sm ${customer.loyaltyPoints > 0 ? "text-purple-500" : textTertiary} hover:text-purple-400 transition-colors`}
+                        title="Управление баллами"
+                      >
+                        <Award className="h-3.5 w-3.5" />
+                        {customer.loyaltyPoints > 0 ? customer.loyaltyPoints : "—"}
+                      </button>
                     </td>
                     <td className="py-3 px-4">
                       <div className={`flex items-center gap-2 ${textSecondary}`}>
@@ -568,6 +636,98 @@ export default function CustomersPage() {
                     )}
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Loyalty Modal */}
+      {loyaltyCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className={`${cardBg} border ${borderColor} rounded-2xl w-full max-w-md`}>
+            <div className={`flex items-center justify-between p-6 border-b ${borderColor}`}>
+              <div className="flex items-center gap-3">
+                <Award className="h-5 w-5 text-purple-500" />
+                <div>
+                  <h2 className={`text-lg font-bold ${textPrimary}`}>Лояльность</h2>
+                  <p className={`text-sm ${textSecondary}`}>{loyaltyCustomer.name}</p>
+                </div>
+              </div>
+              <button onClick={() => setLoyaltyCustomer(null)} className={`p-2 ${hoverBg} rounded-lg transition-colors`}>
+                <X className={`h-5 w-5 ${textSecondary}`} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Current stats */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className={`p-3 rounded-xl ${isDark ? "bg-purple-500/10" : "bg-purple-50"} text-center`}>
+                  <p className={`text-xl font-bold text-purple-500`}>{loyaltyCustomer.loyaltyPoints}</p>
+                  <p className={`text-xs ${textSecondary}`}>Баллы</p>
+                </div>
+                <div className={`p-3 rounded-xl ${isDark ? "bg-blue-500/10" : "bg-blue-50"} text-center`}>
+                  <p className={`text-xl font-bold text-blue-500`}>{loyaltyCustomer.loyaltyVisits}</p>
+                  <p className={`text-xs ${textSecondary}`}>Визиты</p>
+                </div>
+                <div className={`p-3 rounded-xl ${isDark ? "bg-green-500/10" : "bg-green-50"} text-center`}>
+                  <p className={`text-xl font-bold text-green-500`}>{loyaltyCustomer.loyaltyTotalSpent.toLocaleString()}</p>
+                  <p className={`text-xs ${textSecondary}`}>Потрачено</p>
+                </div>
+              </div>
+
+              {/* Adjust points */}
+              <div>
+                <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Управление баллами</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    value={loyaltyAmount}
+                    onChange={(e) => setLoyaltyAmount(e.target.value)}
+                    placeholder="Количество"
+                    className={`flex-1 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                  />
+                  <button
+                    onClick={() => handleLoyaltyAction("addPoints")}
+                    disabled={loyaltySaving || !loyaltyAmount}
+                    className="flex items-center gap-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleLoyaltyAction("subtractPoints")}
+                    disabled={loyaltySaving || !loyaltyAmount || loyaltyCustomer.loyaltyPoints === 0}
+                    className="flex items-center gap-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Add visits */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setLoyaltyAmount("1"); setTimeout(() => handleLoyaltyAction("addVisits"), 0); }}
+                  disabled={loyaltySaving}
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} rounded-lg ${textSecondary} transition-colors text-sm`}
+                >
+                  <Plus className="h-3 w-3" />
+                  Визит
+                </button>
+                <button
+                  onClick={() => {
+                    const amount = prompt("Сумма покупки:");
+                    if (amount && parseInt(amount) > 0) {
+                      setLoyaltyAmount(amount);
+                      setTimeout(() => handleLoyaltyAction("addSpent"), 0);
+                    }
+                  }}
+                  disabled={loyaltySaving}
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} rounded-lg ${textSecondary} transition-colors text-sm`}
+                >
+                  <Plus className="h-3 w-3" />
+                  Покупка
+                </button>
               </div>
             </div>
           </div>

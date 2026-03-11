@@ -47,6 +47,7 @@ import {
   Briefcase,
   Gift,
   Truck,
+  Warehouse,
   Instagram,
   Facebook,
   Phone,
@@ -130,6 +131,7 @@ function buildNavConfig(isSales: boolean): NavEntry[] {
         ] : []),
         ...(isSales ? [
           { nameKey: "nav.myOrders", href: "/dashboard/orders", icon: ShoppingBag },
+          { nameKey: "nav.myInventory", href: "/dashboard/inventory", icon: Warehouse },
           { nameKey: "nav.myDelivery", href: "/dashboard/delivery", icon: Truck },
         ] : []),
         { nameKey: "nav.myLeads", href: "/dashboard/leads", icon: Target },
