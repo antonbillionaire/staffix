@@ -51,6 +51,19 @@ export async function PATCH(
       updateData.loyaltyTotalSpent = { increment: Math.max(0, amount) };
     } else if (action === "setPrograms" && Array.isArray(loyaltyProgramIds)) {
       updateData.loyaltyProgramIds = loyaltyProgramIds;
+    } else if (action === "setCashback") {
+      const cashback = body.cashbackPercent;
+      // null = use program default, 0-100 = custom %
+      updateData.loyaltyCashbackPercent = cashback === null || cashback === undefined
+        ? null
+        : Math.max(0, Math.min(100, parseFloat(cashback) || 0));
+    } else if (action === "setTier") {
+      const tier = body.tier;
+      const validTiers = ["bronze", "silver", "gold", "platinum", null];
+      if (!validTiers.includes(tier)) {
+        return NextResponse.json({ error: "Invalid tier" }, { status: 400 });
+      }
+      updateData.loyaltyTier = tier;
     } else {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
@@ -68,6 +81,8 @@ export async function PATCH(
         loyaltyVisits: updated.loyaltyVisits,
         loyaltyTotalSpent: updated.loyaltyTotalSpent,
         loyaltyProgramIds: updated.loyaltyProgramIds,
+        loyaltyCashbackPercent: updated.loyaltyCashbackPercent,
+        loyaltyTier: updated.loyaltyTier,
       },
     });
   } catch (error) {

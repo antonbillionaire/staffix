@@ -470,6 +470,72 @@ export async function createOrder(
       };
     }
 
+    // ======== LOYALTY: look up client discounts ========
+    let tierDiscount = 0;
+    let cashbackPercent = 0;
+    let clientTierLabel = "";
+    let cashbackEarned = 0;
+
+    const client = await prisma.client.findUnique({
+      where: { businessId_telegramId: { businessId, telegramId } },
+      select: {
+        loyaltyCashbackPercent: true,
+        loyaltyTier: true,
+        loyaltyPoints: true,
+        loyaltyTotalSpent: true,
+      },
+    });
+
+    if (client) {
+      // Get business loyalty programs
+      const programs = await prisma.loyaltyProgram.findMany({
+        where: { businessId, enabled: true },
+        select: { type: true, cashbackPercent: true, tiers: true },
+      });
+
+      // Determine cashback %: individual override > program default
+      const cashbackProgram = programs.find((p) => p.type === "cashback");
+      if (client.loyaltyCashbackPercent !== null && client.loyaltyCashbackPercent !== undefined) {
+        cashbackPercent = client.loyaltyCashbackPercent;
+      } else if (cashbackProgram?.cashbackPercent) {
+        cashbackPercent = cashbackProgram.cashbackPercent;
+      }
+
+      // Determine tier discount
+      const tieredProgram = programs.find((p) => p.type === "tiered");
+      if (tieredProgram && tieredProgram.tiers) {
+        const tiers = tieredProgram.tiers as Array<{ name: string; minSpent: number; discount: number }>;
+        // Use manually assigned tier or auto-detect from spending
+        const clientTier = client.loyaltyTier;
+        if (clientTier) {
+          const tierData = tiers.find((t) => t.name.toLowerCase() === clientTier);
+          if (tierData) {
+            tierDiscount = tierData.discount;
+            clientTierLabel = tierData.name;
+          }
+        } else {
+          // Auto-detect tier from totalSpent
+          const sorted = [...tiers].sort((a, b) => b.minSpent - a.minSpent);
+          for (const t of sorted) {
+            if (client.loyaltyTotalSpent >= t.minSpent) {
+              tierDiscount = t.discount;
+              clientTierLabel = t.name;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Apply tier discount to totalPrice
+    const discountAmount = tierDiscount > 0 ? Math.round(totalPrice * tierDiscount / 100) : 0;
+    const finalPrice = totalPrice - discountAmount;
+
+    // Calculate cashback earned on finalPrice
+    cashbackEarned = cashbackPercent > 0 ? Math.round(finalPrice * cashbackPercent / 100) : 0;
+
+    // ======== END LOYALTY ========
+
     // Получаем следующий номер заказа
     const lastOrder = await prisma.order.findFirst({
       where: { businessId },
@@ -488,7 +554,7 @@ export async function createOrder(
         clientAddress: clientAddress || null,
         clientTelegramId: telegramId,
         clientNotes: notes || null,
-        totalPrice,
+        totalPrice: finalPrice,
         paymentMethod: paymentMethod || null,
         status: "new",
         items: {
@@ -535,6 +601,22 @@ export async function createOrder(
       }
     }
 
+    // Award cashback points to client
+    if (cashbackEarned > 0 && client) {
+      prisma.client.update({
+        where: { businessId_telegramId: { businessId, telegramId } },
+        data: {
+          loyaltyPoints: { increment: cashbackEarned },
+          loyaltyTotalSpent: { increment: finalPrice },
+        },
+      }).catch(() => {});
+    } else if (client) {
+      prisma.client.update({
+        where: { businessId_telegramId: { businessId, telegramId } },
+        data: { loyaltyTotalSpent: { increment: finalPrice } },
+      }).catch(() => {});
+    }
+
     // Уведомляем владельца через Telegram + отправляем кнопки оплаты клиенту
     notifyNewOrder(businessId, order, orderItemsData, telegramId).catch(() => {});
 
@@ -567,11 +649,19 @@ export async function createOrder(
       success: true,
       orderId: order.id,
       orderNumber: `#${orderNumber}`,
-      totalPrice,
+      originalPrice: discountAmount > 0 ? totalPrice : undefined,
+      discountAmount: discountAmount > 0 ? discountAmount : undefined,
+      discountPercent: tierDiscount > 0 ? tierDiscount : undefined,
+      tierName: clientTierLabel || undefined,
+      totalPrice: finalPrice,
+      cashbackEarned: cashbackEarned > 0 ? cashbackEarned : undefined,
+      cashbackPercent: cashbackPercent > 0 ? cashbackPercent : undefined,
       summary,
       items: orderItemsData,
       warnings: issues.length > 0 ? issues : undefined,
-      message: `Заказ ${`#${orderNumber}`} успешно оформлен! Сумма: ${totalPrice.toLocaleString("ru-RU")}`,
+      message: discountAmount > 0
+        ? `Заказ #${orderNumber} оформлен! Скидка ${tierDiscount}% (${clientTierLabel}): -${discountAmount.toLocaleString("ru-RU")}. Итого: ${finalPrice.toLocaleString("ru-RU")}${cashbackEarned > 0 ? `. Начислено ${cashbackEarned} бонусных баллов (${cashbackPercent}%)` : ""}`
+        : `Заказ #${orderNumber} оформлен! Сумма: ${finalPrice.toLocaleString("ru-RU")}${cashbackEarned > 0 ? `. Начислено ${cashbackEarned} бонусных баллов (${cashbackPercent}%)` : ""}`,
     };
   } catch (error) {
     console.error("createOrder error:", error);

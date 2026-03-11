@@ -36,6 +36,13 @@ interface BookingResult {
     staffName: string;
     serviceName: string;
     clientName: string;
+    servicePrice?: number;
+    discountPercent?: number;
+    discountAmount?: number;
+    finalPrice?: number;
+    tierName?: string;
+    cashbackEarned?: number;
+    cashbackPercent?: number;
   };
 }
 
@@ -431,16 +438,18 @@ export async function createBooking(
     // Get service info
     let serviceName = "Услуга";
     let serviceDuration = 60;
+    let servicePrice = 0;
     if (serviceId) {
       const service = await prisma.service.findUnique({
         where: { id: serviceId },
-        select: { name: true, duration: true },
+        select: { name: true, duration: true, price: true },
       });
       if (!service) {
         return { success: false, error: "Услуга не найдена" };
       }
       serviceName = service.name;
       serviceDuration = service.duration;
+      servicePrice = service.price;
     }
 
     // Get staff info
@@ -584,6 +593,69 @@ export async function createBooking(
       },
     }).catch((e) => console.error("[CRM] booking_confirmed dispatch error:", e));
 
+    // ======== LOYALTY: calculate discounts for booking ========
+    let tierDiscount = 0;
+    let cashbackPercent = 0;
+    let clientTierLabel = "";
+    let discountAmount = 0;
+    let finalPrice = servicePrice;
+    let cashbackEarned = 0;
+
+    if (clientTelegramId && servicePrice > 0) {
+      const loyaltyClient = await prisma.client.findUnique({
+        where: { businessId_telegramId: { businessId, telegramId: clientTelegramId } },
+        select: { loyaltyCashbackPercent: true, loyaltyTier: true, loyaltyTotalSpent: true },
+      });
+
+      if (loyaltyClient) {
+        const programs = await prisma.loyaltyProgram.findMany({
+          where: { businessId, enabled: true },
+          select: { type: true, cashbackPercent: true, tiers: true },
+        });
+
+        // Cashback %
+        const cashbackProgram = programs.find((p) => p.type === "cashback");
+        if (loyaltyClient.loyaltyCashbackPercent !== null && loyaltyClient.loyaltyCashbackPercent !== undefined) {
+          cashbackPercent = loyaltyClient.loyaltyCashbackPercent;
+        } else if (cashbackProgram?.cashbackPercent) {
+          cashbackPercent = cashbackProgram.cashbackPercent;
+        }
+
+        // Tier discount
+        const tieredProgram = programs.find((p) => p.type === "tiered");
+        if (tieredProgram && tieredProgram.tiers) {
+          const tiers = tieredProgram.tiers as Array<{ name: string; minSpent: number; discount: number }>;
+          const clientTier = loyaltyClient.loyaltyTier;
+          if (clientTier) {
+            const tierData = tiers.find((t) => t.name.toLowerCase() === clientTier);
+            if (tierData) { tierDiscount = tierData.discount; clientTierLabel = tierData.name; }
+          } else {
+            const sorted = [...tiers].sort((a, b) => b.minSpent - a.minSpent);
+            for (const t of sorted) {
+              if (loyaltyClient.loyaltyTotalSpent >= t.minSpent) {
+                tierDiscount = t.discount; clientTierLabel = t.name; break;
+              }
+            }
+          }
+        }
+
+        discountAmount = tierDiscount > 0 ? Math.round(servicePrice * tierDiscount / 100) : 0;
+        finalPrice = servicePrice - discountAmount;
+        cashbackEarned = cashbackPercent > 0 ? Math.round(finalPrice * cashbackPercent / 100) : 0;
+
+        // Award cashback
+        if (cashbackEarned > 0) {
+          prisma.client.update({
+            where: { businessId_telegramId: { businessId, telegramId: clientTelegramId } },
+            data: {
+              loyaltyPoints: { increment: cashbackEarned },
+              loyaltyTotalSpent: { increment: finalPrice },
+            },
+          }).catch(() => {});
+        }
+      }
+    }
+
     return {
       success: true,
       bookingId: booking.id,
@@ -593,6 +665,12 @@ export async function createBooking(
         staffName,
         serviceName,
         clientName,
+        ...(servicePrice > 0 ? {
+          servicePrice,
+          ...(discountAmount > 0 ? { discountPercent: tierDiscount, discountAmount, tierName: clientTierLabel } : {}),
+          finalPrice,
+          ...(cashbackEarned > 0 ? { cashbackEarned, cashbackPercent } : {}),
+        } : {}),
       },
     };
   } catch (error) {

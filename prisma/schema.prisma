@@ -572,6 +572,8 @@ model Client {
   loyaltyPoints     Int      @default(0)   // бонусные баллы
   loyaltyVisits     Int      @default(0)   // кол-во визитов для программы
   loyaltyTotalSpent Int      @default(0)   // общая сумма покупок
+  loyaltyCashbackPercent Float?            // индивидуальный % кэшбека (null = по программе)
+  loyaltyTier       String?               // уровень: bronze, silver, gold, platinum (null = авто по программе)
 
   // ========================================
   // AI MEMORY - Фаза 1

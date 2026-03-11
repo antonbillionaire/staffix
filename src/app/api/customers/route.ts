@@ -145,6 +145,8 @@ export async function GET(request: NextRequest) {
         loyaltyVisits: client.loyaltyVisits,
         loyaltyTotalSpent: client.loyaltyTotalSpent,
         loyaltyProgramIds: client.loyaltyProgramIds,
+        loyaltyCashbackPercent: client.loyaltyCashbackPercent,
+        loyaltyTier: client.loyaltyTier,
       };
     });
 

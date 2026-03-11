@@ -49,6 +49,8 @@ interface Customer {
   loyaltyVisits: number;
   loyaltyTotalSpent: number;
   loyaltyProgramIds: string[];
+  loyaltyCashbackPercent: number | null;
+  loyaltyTier: string | null;
 }
 
 interface Stats {
@@ -198,43 +200,37 @@ export default function CustomersPage() {
     setImportError("");
   };
 
-  const handleLoyaltyAction = async (action: string) => {
+  const handleLoyaltyAction = async (action: string, extraBody?: Record<string, unknown>) => {
     if (!loyaltyCustomer) return;
-    const amount = parseInt(loyaltyAmount) || 0;
-    if (amount <= 0) return;
     setLoyaltySaving(true);
     try {
+      // For point/visit actions require amount
+      const body: Record<string, unknown> = { action, ...extraBody };
+      if (!extraBody) {
+        const amount = parseInt(loyaltyAmount) || 0;
+        if (amount <= 0) { setLoyaltySaving(false); return; }
+        body.amount = amount;
+      }
+
       const res = await fetch(`/api/customers/${loyaltyCustomer.id}/loyalty`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, amount }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         const data = await res.json();
-        // Update customer in local state
+        const updatedFields = {
+          loyaltyPoints: data.client.loyaltyPoints,
+          loyaltyVisits: data.client.loyaltyVisits,
+          loyaltyTotalSpent: data.client.loyaltyTotalSpent,
+          loyaltyCashbackPercent: data.client.loyaltyCashbackPercent ?? null,
+          loyaltyTier: data.client.loyaltyTier ?? null,
+        };
         setCustomers((prev) =>
-          prev.map((c) =>
-            c.id === loyaltyCustomer.id
-              ? {
-                  ...c,
-                  loyaltyPoints: data.client.loyaltyPoints,
-                  loyaltyVisits: data.client.loyaltyVisits,
-                  loyaltyTotalSpent: data.client.loyaltyTotalSpent,
-                }
-              : c
-          )
+          prev.map((c) => c.id === loyaltyCustomer.id ? { ...c, ...updatedFields } : c)
         );
-        setLoyaltyCustomer((prev) =>
-          prev
-            ? {
-                ...prev,
-                loyaltyPoints: data.client.loyaltyPoints,
-                loyaltyVisits: data.client.loyaltyVisits,
-                loyaltyTotalSpent: data.client.loyaltyTotalSpent,
-              }
-            : null
-        );
-        setLoyaltyAmount("");
+        setLoyaltyCustomer((prev) => prev ? { ...prev, ...updatedFields } : null);
+        if (!extraBody) setLoyaltyAmount("");
       }
     } catch (err) {
       console.error("Loyalty action error:", err);
@@ -728,6 +724,68 @@ export default function CustomersPage() {
                   <Plus className="h-3 w-3" />
                   Покупка
                 </button>
+              </div>
+
+              {/* Cashback % */}
+              <div>
+                <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Кэшбек (%)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.5"
+                    value={loyaltyCustomer.loyaltyCashbackPercent ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const newPercent = val === "" ? null : parseFloat(val);
+                      setLoyaltyCustomer((prev) => prev ? { ...prev, loyaltyCashbackPercent: newPercent } : null);
+                    }}
+                    placeholder="По программе"
+                    className={`flex-1 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                  />
+                  <button
+                    onClick={() => handleLoyaltyAction("setCashback", { cashbackPercent: loyaltyCustomer.loyaltyCashbackPercent })}
+                    disabled={loyaltySaving}
+                    className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors text-sm"
+                  >
+                    Сохранить
+                  </button>
+                </div>
+                <p className={`text-xs ${textTertiary} mt-1`}>Пусто = по программе лояльности</p>
+              </div>
+
+              {/* Tier */}
+              <div>
+                <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Уровень клиента</label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {[
+                    { value: null, label: "Авто", color: "gray" },
+                    { value: "bronze", label: "Бронза", color: "orange" },
+                    { value: "silver", label: "Серебро", color: "slate" },
+                    { value: "gold", label: "Золото", color: "yellow" },
+                    { value: "platinum", label: "Платина", color: "blue" },
+                  ].map((tier) => {
+                    const isSelected = loyaltyCustomer.loyaltyTier === tier.value;
+                    const colorClasses: Record<string, string> = {
+                      gray: isSelected ? "bg-gray-500/20 border-gray-500 text-gray-300" : `${isDark ? "bg-white/5" : "bg-gray-50"} border-transparent`,
+                      orange: isSelected ? "bg-orange-500/20 border-orange-500 text-orange-400" : `${isDark ? "bg-white/5" : "bg-gray-50"} border-transparent`,
+                      slate: isSelected ? "bg-slate-400/20 border-slate-400 text-slate-300" : `${isDark ? "bg-white/5" : "bg-gray-50"} border-transparent`,
+                      yellow: isSelected ? "bg-yellow-500/20 border-yellow-500 text-yellow-400" : `${isDark ? "bg-white/5" : "bg-gray-50"} border-transparent`,
+                      blue: isSelected ? "bg-blue-500/20 border-blue-500 text-blue-400" : `${isDark ? "bg-white/5" : "bg-gray-50"} border-transparent`,
+                    };
+                    return (
+                      <button
+                        key={tier.value ?? "auto"}
+                        onClick={() => handleLoyaltyAction("setTier", { tier: tier.value })}
+                        disabled={loyaltySaving}
+                        className={`px-2 py-1.5 rounded-lg border text-xs font-medium transition-colors ${colorClasses[tier.color]} ${!isSelected ? `${textSecondary} hover:border-${tier.color}-500/50` : ""} disabled:opacity-50`}
+                      >
+                        {tier.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
