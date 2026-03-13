@@ -175,12 +175,12 @@ export default function KnowledgeBasePage() {
       });
       if (res.ok) {
         const data = await res.json();
-        setTestReply(data.reply || "Нет ответа");
+        setTestReply(data.reply || t("knowledge.testNoReply"));
       } else {
-        setTestReply("Ошибка: сначала сохраните настройки и добавьте хотя бы одну услугу.");
+        setTestReply(t("knowledge.testErrorSave"));
       }
     } catch {
-      setTestReply("Ошибка подключения к серверу.");
+      setTestReply(t("knowledge.testErrorConnection"));
     } finally {
       setTestLoading(false);
     }
@@ -268,15 +268,15 @@ export default function KnowledgeBasePage() {
         });
 
         if (!res.ok) {
-          let errorMsg = "Ошибка загрузки";
-          try { const data = await res.json(); errorMsg = data.error || errorMsg; } catch { errorMsg = `Ошибка сервера (${res.status})`; }
+          let errorMsg = t("knowledge.uploadError");
+          try { const data = await res.json(); errorMsg = data.error || errorMsg; } catch { errorMsg = t("knowledge.serverError").replace("{code}", String(res.status)); }
           throw new Error(errorMsg);
         }
 
         const data = await res.json();
         setDocuments((prev) => [data.document, ...prev]);
       } catch (error) {
-        setUploadError(error instanceof Error ? error.message : "Ошибка загрузки");
+        setUploadError(error instanceof Error ? error.message : t("knowledge.uploadError"));
       }
     }
 
@@ -313,7 +313,7 @@ export default function KnowledgeBasePage() {
   // AI FAQ generation
   const handleAiGenerate = async () => {
     if (!aiDescription.trim() || aiDescription.length < 10) {
-      setAiError("Опишите ваш бизнес подробнее");
+      setAiError(t("knowledge.describeBusinessError"));
       return;
     }
     setAiError("");
@@ -328,7 +328,7 @@ export default function KnowledgeBasePage() {
         body: JSON.stringify({ description: aiDescription }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Ошибка");
+      if (!res.ok) throw new Error(data.error || t("knowledge.generationError"));
       const withIds = data.faqs.map((f: { question: string; answer: string }, i: number) => ({
         id: `ai_${i}`,
         question: f.question,
@@ -337,7 +337,7 @@ export default function KnowledgeBasePage() {
       setAiGenerated(withIds);
       setAiSelected(new Set(withIds.map((_: FAQ, i: number) => i)));
     } catch (err) {
-      setAiError(err instanceof Error ? err.message : "Ошибка генерации");
+      setAiError(err instanceof Error ? err.message : t("knowledge.generationError"));
     } finally {
       setAiGenerating(false);
     }
@@ -386,18 +386,18 @@ export default function KnowledgeBasePage() {
   }
 
   const tabs: { id: Tab; label: string; icon: typeof Brain; count?: number }[] = [
-    { id: "personality", label: "AI Личность", icon: Brain },
+    { id: "personality", label: t("knowledge.tabPersonality"), icon: Brain },
     { id: "faq", label: "FAQ", icon: HelpCircle, count: faqs.length },
-    { id: "documents", label: "Документы", icon: FileText, count: documents.length },
+    { id: "documents", label: t("knowledge.tabDocuments"), icon: FileText, count: documents.length },
   ];
 
   return (
     <div className="max-w-5xl space-y-6">
       {/* Header */}
       <div>
-        <h1 className={`text-2xl font-bold ${textPrimary} mb-2`}>База знаний</h1>
+        <h1 className={`text-2xl font-bold ${textPrimary} mb-2`}>{t("knowledge.pageTitle")}</h1>
         <p className={textSecondary}>
-          Настройте личность AI-сотрудника, добавьте FAQ и загрузите документы
+          {t("knowledge.pageSubtitle")}
         </p>
       </div>
 
@@ -460,7 +460,7 @@ export default function KnowledgeBasePage() {
                     {template.name}
                   </span>
                   {selectedTemplate === template.id && (
-                    <span className="block text-xs text-blue-400 mt-1">{t("botPage.selected") || "Выбрано"}</span>
+                    <span className="block text-xs text-blue-400 mt-1">{t("botPage.selected")}</span>
                   )}
                 </button>
               ))}
@@ -503,23 +503,23 @@ export default function KnowledgeBasePage() {
 
               {/* Language */}
               <div>
-                <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-2`}>Язык бота</label>
+                <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-2`}>{t("knowledge.botLanguage")}</label>
                 <select
                   value={aiSettings.language}
                   onChange={(e) => setAiSettings({ ...aiSettings, language: e.target.value })}
                   className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 >
-                  <option value="ru">Русский</option>
-                  <option value="en">English</option>
-                  <option value="uz">O&apos;zbek (Узбекский)</option>
-                  <option value="kz">Қазақ (Казахский)</option>
-                  <option value="kg">Кыргыз (Кыргызский)</option>
-                  <option value="tj">Тоҷикӣ (Таджикский)</option>
-                  <option value="am">Հայերեն (Армянский)</option>
-                  <option value="ge">ქართული (Грузинский)</option>
+                  <option value="ru">{t("knowledge.langRussian")}</option>
+                  <option value="en">{t("knowledge.langEnglish")}</option>
+                  <option value="uz">{t("knowledge.langUzbek")}</option>
+                  <option value="kz">{t("knowledge.langKazakh")}</option>
+                  <option value="kg">{t("knowledge.langKyrgyz")}</option>
+                  <option value="tj">{t("knowledge.langTajik")}</option>
+                  <option value="am">{t("knowledge.langArmenian")}</option>
+                  <option value="ge">{t("knowledge.langGeorgian")}</option>
                 </select>
                 <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"} mt-1`}>
-                  Бот будет отвечать на выбранном языке. Если клиент пишет на другом — бот автоматически переключится.
+                  {t("knowledge.botLanguageHelp")}
                 </p>
               </div>
 
@@ -547,14 +547,14 @@ export default function KnowledgeBasePage() {
                 </div>
                 <div className="flex flex-wrap gap-2 mb-3">
                   {[
-                    { label: "🚫 Не обсуждать конкурентов", text: "Никогда не упоминай и не обсуждай конкурентов." },
-                    { label: "💰 Без скидок", text: "Не давай скидки самостоятельно, направляй к менеджеру." },
-                    { label: "📋 Уточнять имя", text: "В начале разговора всегда уточняй имя клиента." },
-                    { label: "🌐 Только русский", text: "Отвечай только на русском языке." },
-                    { label: "📦 Проверять наличие", text: "Перед оформлением заказа уточняй актуальное наличие товара." },
-                    { label: "🎯 Только по теме", text: "Отвечай только на вопросы, связанные с нашим бизнесом. На посторонние темы вежливо отказывай." },
-                    { label: "⏰ Время ответа", text: "Если клиент ждёт — сообщай, что ответишь в течение нескольких минут." },
-                    { label: "📞 Предлагать звонок", text: "При сложных вопросах предлагай связаться по телефону." },
+                    { label: t("knowledge.chipNoCompetitors"), text: t("knowledge.chipNoCompetitorsText") },
+                    { label: t("knowledge.chipNoDiscounts"), text: t("knowledge.chipNoDiscountsText") },
+                    { label: t("knowledge.chipAskName"), text: t("knowledge.chipAskNameText") },
+                    { label: t("knowledge.chipRussianOnly"), text: t("knowledge.chipRussianOnlyText") },
+                    { label: t("knowledge.chipCheckStock"), text: t("knowledge.chipCheckStockText") },
+                    { label: t("knowledge.chipOnTopicOnly"), text: t("knowledge.chipOnTopicOnlyText") },
+                    { label: t("knowledge.chipResponseTime"), text: t("knowledge.chipResponseTimeText") },
+                    { label: t("knowledge.chipOfferCall"), text: t("knowledge.chipOfferCallText") },
                   ].map((chip) => (
                     <button
                       key={chip.label}
@@ -587,18 +587,18 @@ export default function KnowledgeBasePage() {
               {/* Bot display name */}
               <div>
                 <label className={`block text-sm font-medium ${textPrimary} mb-2`}>
-                  Имя бота
+                  {t("knowledge.botName")}
                 </label>
                 <input
                   type="text"
                   value={aiSettings.botDisplayName}
                   onChange={(e) => setAiSettings({ ...aiSettings, botDisplayName: e.target.value })}
-                  placeholder="Например: Алия, Виктор, Ассистент"
+                  placeholder={t("knowledge.botNamePlaceholder")}
                   maxLength={50}
                   className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 />
                 <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"} mt-2`}>
-                  Бот будет представляться этим именем клиентам. Оставьте пустым для "AI-помощник".
+                  {t("knowledge.botNameHelp")}
                 </p>
               </div>
 
@@ -620,10 +620,10 @@ export default function KnowledgeBasePage() {
               <div className={`mt-6 p-5 rounded-xl border ${isDark ? "border-blue-500/30 bg-blue-500/5" : "border-blue-200 bg-blue-50/50"}`}>
                 <h3 className={`text-sm font-semibold ${textPrimary} mb-3 flex items-center gap-2`}>
                   <Brain className="h-4 w-4 text-blue-500" />
-                  Протестируйте бота
+                  {t("knowledge.testBot")}
                 </h3>
                 <p className={`text-xs ${textSecondary} mb-3`}>
-                  Напишите сообщение как клиент — и посмотрите как бот ответит с текущими настройками.
+                  {t("knowledge.testBotDesc")}
                 </p>
                 <div className="flex gap-2">
                   <input
@@ -635,7 +635,7 @@ export default function KnowledgeBasePage() {
                         handleTestBot();
                       }
                     }}
-                    placeholder="Напишите тестовое сообщение..."
+                    placeholder={t("knowledge.testPlaceholder")}
                     className={`flex-1 px-4 py-2.5 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
                   />
                   <button
@@ -644,13 +644,13 @@ export default function KnowledgeBasePage() {
                     className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium disabled:opacity-50 hover:bg-blue-700 transition-colors flex items-center gap-2"
                   >
                     {testLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                    Тест
+                    {t("knowledge.testButton")}
                   </button>
                 </div>
                 {testReply && (
                   <div className={`mt-3 p-3 rounded-lg text-sm ${isDark ? "bg-white/5 text-gray-300" : "bg-white text-gray-700"} border ${isDark ? "border-white/10" : "border-gray-200"}`}>
                     <p className={`text-xs font-medium ${isDark ? "text-blue-400" : "text-blue-600"} mb-1`}>
-                      {aiSettings.botDisplayName || "AI-помощник"}:
+                      {aiSettings.botDisplayName || t("knowledge.defaultBotName")}:
                     </p>
                     <p className="whitespace-pre-wrap">{testReply}</p>
                   </div>
@@ -679,7 +679,7 @@ export default function KnowledgeBasePage() {
                 }`}
               >
                 <Sparkles className="h-4 w-4" />
-                AI генерация
+                {t("knowledge.aiGeneration")}
               </button>
               <button
                 onClick={() => openModal()}
@@ -790,7 +790,7 @@ export default function KnowledgeBasePage() {
             <div className={`flex items-center justify-between px-6 py-4 border-b ${borderColor}`}>
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-purple-400" />
-                <h3 className={`text-lg font-semibold ${textPrimary}`}>AI-генерация FAQ</h3>
+                <h3 className={`text-lg font-semibold ${textPrimary}`}>{t("knowledge.aiGenerationTitle")}</h3>
               </div>
               <button onClick={() => { setAiModalOpen(false); setAiGenerated([]); setAiError(""); }} className={`${textSecondary} hover:${textPrimary}`}>
                 <X className="h-5 w-5" />
@@ -798,12 +798,12 @@ export default function KnowledgeBasePage() {
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
               <div>
-                <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Опишите ваш бизнес</label>
+                <label className={`block text-sm font-medium ${textSecondary} mb-2`}>{t("knowledge.describeBusinessLabel")}</label>
                 <textarea
                   rows={4}
                   value={aiDescription}
                   onChange={(e) => { setAiDescription(e.target.value); setAiError(""); }}
-                  placeholder="Например: Салон красоты в Алматы, услуги маникюра, педикюра, наращивания ресниц..."
+                  placeholder={t("knowledge.describeBusinessPlaceholder")}
                   className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} resize-none text-sm focus:outline-none focus:ring-2 focus:ring-purple-500`}
                 />
                 {aiError && <p className="mt-2 text-sm text-red-400 flex items-center gap-1.5"><AlertCircle className="h-4 w-4" />{aiError}</p>}
@@ -814,15 +814,15 @@ export default function KnowledgeBasePage() {
                   disabled={aiGenerating || aiDescription.length < 10}
                   className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-xl font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {aiGenerating ? <><Loader2 className="h-4 w-4 animate-spin" />AI генерирует...</> : <><Sparkles className="h-4 w-4" />Сгенерировать FAQ</>}
+                  {aiGenerating ? <><Loader2 className="h-4 w-4 animate-spin" />{t("knowledge.aiGenerating")}</> : <><Sparkles className="h-4 w-4" />{t("knowledge.generateFaq")}</>}
                 </button>
               )}
               {aiGenerated.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <p className={`text-sm font-medium ${textPrimary}`}>Сгенерировано {aiGenerated.length} вопросов:</p>
+                    <p className={`text-sm font-medium ${textPrimary}`}>{t("knowledge.generatedCount").replace("{count}", String(aiGenerated.length))}</p>
                     <button onClick={() => aiSelected.size === aiGenerated.length ? setAiSelected(new Set()) : setAiSelected(new Set(aiGenerated.map((_, i) => i)))} className="text-sm text-purple-400 hover:text-purple-300">
-                      {aiSelected.size === aiGenerated.length ? "Снять все" : "Выбрать все"}
+                      {aiSelected.size === aiGenerated.length ? t("knowledge.deselectAll") : t("knowledge.selectAll")}
                     </button>
                   </div>
                   {aiGenerated.map((faq, i) => (
@@ -845,18 +845,18 @@ export default function KnowledgeBasePage() {
                     </div>
                   ))}
                   <button onClick={handleAiGenerate} disabled={aiGenerating} className={`w-full py-2 rounded-xl text-sm border ${isDark ? "border-white/10 text-gray-400 hover:bg-white/5" : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}>
-                    {aiGenerating ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-3 w-3 animate-spin" />Генерирую...</span> : "↻ Сгенерировать заново"}
+                    {aiGenerating ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-3 w-3 animate-spin" />{t("knowledge.generating")}</span> : t("knowledge.regenerate")}
                   </button>
                 </div>
               )}
             </div>
             {aiGenerated.length > 0 && (
               <div className={`px-6 py-4 border-t ${borderColor} flex items-center justify-between gap-3`}>
-                <p className={`text-sm ${textSecondary}`}>Выбрано: <strong className={textPrimary}>{aiSelected.size}</strong> из {aiGenerated.length}</p>
+                <p className={`text-sm ${textSecondary}`}>{t("knowledge.selectedCount")} <strong className={textPrimary}>{aiSelected.size}</strong> {t("knowledge.ofCount")} {aiGenerated.length}</p>
                 <div className="flex gap-3">
-                  <button onClick={() => { setAiModalOpen(false); setAiGenerated([]); }} className={`px-4 py-2 rounded-lg border text-sm font-medium ${textSecondary} ${isDark ? "border-white/10 hover:bg-white/5" : "border-gray-200 hover:bg-gray-50"}`}>Отмена</button>
+                  <button onClick={() => { setAiModalOpen(false); setAiGenerated([]); }} className={`px-4 py-2 rounded-lg border text-sm font-medium ${textSecondary} ${isDark ? "border-white/10 hover:bg-white/5" : "border-gray-200 hover:bg-gray-50"}`}>{t("knowledge.cancelButton")}</button>
                   <button onClick={handleAiSave} disabled={aiSaving || aiSelected.size === 0} className="px-5 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
-                    {aiSaving ? <><Loader2 className="h-4 w-4 animate-spin" />Сохраняю...</> : <><Check className="h-4 w-4" />Сохранить {aiSelected.size} вопросов</>}
+                    {aiSaving ? <><Loader2 className="h-4 w-4 animate-spin" />{t("knowledge.saving")}</> : <><Check className="h-4 w-4" />{t("knowledge.saveQuestions").replace("{count}", String(aiSelected.size))}</>}
                   </button>
                 </div>
               </div>
