@@ -12,11 +12,31 @@ import {
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
 import { markWebhookProcessed } from "@/lib/webhook-dedup";
 
-// In-memory conversation history (keyed by Instagram-scoped user ID)
-const conversationHistory: Map<
-  string,
-  Array<{ role: "user" | "assistant"; content: string }>
-> = new Map();
+// Conversation history helpers — persisted in SalesLead.history (DB-backed)
+type HistoryMessage = { role: "user" | "assistant"; content: string };
+
+async function getLeadHistory(instagramId: string): Promise<HistoryMessage[]> {
+  try {
+    const lead = await prisma.salesLead.findUnique({
+      where: { instagramId },
+      select: { history: true },
+    });
+    return (lead?.history as HistoryMessage[]) || [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveLeadHistory(instagramId: string, history: HistoryMessage[]): Promise<void> {
+  try {
+    await prisma.salesLead.update({
+      where: { instagramId },
+      data: { history: history.slice(-40) as unknown as [] },
+    });
+  } catch {
+    // Lead may not exist yet
+  }
+}
 
 // Generate AI response for any Instagram interaction
 async function generateAIResponse(
@@ -31,7 +51,7 @@ async function generateAIResponse(
 
   try {
     const anthropic = new Anthropic({ apiKey });
-    let history = conversationHistory.get(senderId) || [];
+    let history = await getLeadHistory(senderId);
 
     if (history.length > 20) {
       history = history.slice(-20);
@@ -55,7 +75,7 @@ async function generateAIResponse(
         : "Извините, не могу обработать ваш запрос.";
 
     history.push({ role: "assistant", content: assistantMessage });
-    conversationHistory.set(senderId, history);
+    await saveLeadHistory(senderId, history);
 
     return assistantMessage;
   } catch (error) {

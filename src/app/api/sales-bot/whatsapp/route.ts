@@ -9,11 +9,31 @@ import {
 } from "@/lib/sales-bot/meta-api";
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
 
-// In-memory conversation history
-const conversationHistory: Map<
-  string,
-  Array<{ role: "user" | "assistant"; content: string }>
-> = new Map();
+// Conversation history helpers — persisted in SalesLead.history (DB-backed)
+type HistoryMessage = { role: "user" | "assistant"; content: string };
+
+async function getLeadHistory(whatsappPhone: string): Promise<HistoryMessage[]> {
+  try {
+    const lead = await prisma.salesLead.findUnique({
+      where: { whatsappPhone },
+      select: { history: true },
+    });
+    return (lead?.history as HistoryMessage[]) || [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveLeadHistory(whatsappPhone: string, history: HistoryMessage[]): Promise<void> {
+  try {
+    await prisma.salesLead.update({
+      where: { whatsappPhone },
+      data: { history: history.slice(-40) as unknown as [] },
+    });
+  } catch {
+    // Lead may not exist yet
+  }
+}
 
 // Generate AI response
 async function generateAIResponse(
@@ -28,7 +48,7 @@ async function generateAIResponse(
 
   try {
     const anthropic = new Anthropic({ apiKey });
-    let history = conversationHistory.get(senderPhone) || [];
+    let history = await getLeadHistory(senderPhone);
 
     if (history.length > 20) {
       history = history.slice(-20);
@@ -53,7 +73,7 @@ async function generateAIResponse(
         : "Извините, не могу обработать ваш запрос.";
 
     history.push({ role: "assistant", content: assistantMessage });
-    conversationHistory.set(senderPhone, history);
+    await saveLeadHistory(senderPhone, history);
 
     return assistantMessage;
   } catch (error) {
