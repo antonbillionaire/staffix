@@ -324,11 +324,12 @@ async function processIGComment(
   const commenterName = await fetchIGUserName(commenterId, business.fbPageAccessToken);
 
   // Generate AI response based on comment context
+  // Use "instagram" channel (not "instagram_comment") so conversations appear in Messages page
   const reply = await generateChannelAIResponse(
     business.id,
-    "instagram_comment",
+    "instagram",
     commenterId,
-    `[${contextLabel}] ${commentText}`,
+    `[Комментарий к посту] ${commentText}`,
     commenterName
   );
 
