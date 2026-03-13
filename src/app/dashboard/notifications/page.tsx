@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Bell, CheckCheck, Calendar, X, RefreshCw } from "lucide-react";
 
 interface Notification {
@@ -15,6 +16,7 @@ interface Notification {
 
 export default function NotificationsPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isDark = theme === "dark";
 
   const bgMain = isDark ? "bg-[#0a0a1a]" : "bg-gray-50";
@@ -86,9 +88,9 @@ export default function NotificationsPage() {
               <Bell className="w-5 h-5 text-blue-400" />
             </div>
             <div>
-              <h1 className={`text-xl font-bold ${textPrimary}`}>Уведомления</h1>
+              <h1 className={`text-xl font-bold ${textPrimary}`}>{t("notifications.title")}</h1>
               <p className={`text-sm ${textMuted}`}>
-                {unreadCount > 0 ? `${unreadCount} непрочитанных` : "Все прочитаны"}
+                {unreadCount > 0 ? `${unreadCount} ${t("notifications.unread")}` : t("notifications.allRead")}
               </p>
             </div>
           </div>
@@ -96,7 +98,7 @@ export default function NotificationsPage() {
             <button
               onClick={fetchNotifications}
               className={`p-2 rounded-lg ${hoverBg} transition-colors ${textMuted}`}
-              title="Обновить"
+              title={t("notifications.refresh")}
             >
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -106,7 +108,7 @@ export default function NotificationsPage() {
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-500/10 text-blue-400 rounded-lg hover:bg-blue-500/20 transition-colors"
               >
                 <CheckCheck className="w-4 h-4" />
-                Прочитать все
+                {t("notifications.readAll")}
               </button>
             )}
           </div>
@@ -117,14 +119,14 @@ export default function NotificationsPage() {
           {loading ? (
             <div className="py-16 flex flex-col items-center gap-3">
               <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              <p className={`text-sm ${textMuted}`}>Загрузка...</p>
+              <p className={`text-sm ${textMuted}`}>{t("notifications.loading")}</p>
             </div>
           ) : notifications.length === 0 ? (
             <div className="py-16 flex flex-col items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-gray-500/10 flex items-center justify-center">
                 <Bell className={`w-6 h-6 ${textMuted}`} />
               </div>
-              <p className={`text-sm ${textMuted}`}>Нет уведомлений</p>
+              <p className={`text-sm ${textMuted}`}>{t("notifications.noNotifications")}</p>
             </div>
           ) : (
             notifications.map((notif, i) => (

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   MessageCircle,
   Send,
@@ -21,40 +22,10 @@ import {
   RotateCcw,
 } from "lucide-react";
 
-const faqItems = [
-  {
-    question: "Как настроить AI-сотрудника?",
-    answer: "Перейдите в раздел 'AI-сотрудник' в меню, выберите характер и стиль общения, добавьте информацию о ваших услугах и FAQ. AI автоматически начнёт отвечать клиентам в соответствии с настройками.",
-  },
-  {
-    question: "Как подключить Telegram бота?",
-    answer: "1. Откройте @BotFather в Telegram → отправьте /newbot\n2. Придумайте имя и username бота\n3. Скопируйте токен (выглядит как 123456789:ABCxxx)\n4. Dashboard → Бот → вставьте токен → нажмите «Активировать AI»\nГотово! Бот начнёт отвечать клиентам автоматически.",
-  },
-  {
-    question: "Что входит в пробный период?",
-    answer: "В пробный период (14 дней) входят все функции платформы: 100 сообщений AI, CRM, записи, рассылки, аналитика. Кредитная карта не нужна.",
-  },
-  {
-    question: "Как увеличить лимит сообщений?",
-    answer: "Перейдите в Настройки → Подписка и выберите подходящий тарифный план. После оплаты лимит будет увеличен автоматически.",
-  },
-  {
-    question: "💬 Как подключить WhatsApp к боту? (пошагово)",
-    answer: "Шаг 1. Купите отдельную симкарту — номер не должен быть в WhatsApp.\n\nШаг 2. Установите WhatsApp Business, зарегистрируйте эту симку.\n\nШаг 3. Зайдите на developers.facebook.com → ваше приложение → WhatsApp → API Setup → скопируйте Phone Number ID и Access Token.\n\nШаг 4. Dashboard → Бот → WhatsApp → вставьте Phone Number ID + Access Token → придумайте Verify Token (например: myjuntos2025) → Сохранить → скопируйте Webhook URL.\n\nШаг 5. Вернитесь в Meta Developers → WhatsApp → Configuration → вставьте Webhook URL и Verify Token → выберите событие messages → Verify and Save.\n\nШаг 6. В Staffix включите тоггл «Активировать WhatsApp» → Сохранить.\n\nВсё! Клиенты пишут в WhatsApp — AI отвечает. Если не получается — напишите нам, поможем за 15 минут.",
-  },
-  {
-    question: "💬 WhatsApp подключён, но бот не отвечает",
-    answer: "Проверьте:\n✅ Тоггл «Активировать WhatsApp» включён\n✅ Phone Number ID — только цифры, 16-17 знаков\n✅ Access Token начинается с EAAA... и не истёк (временный токен живёт 24 часа — создайте постоянный через System Users в Meta Business)\n✅ Verify Token в Staffix совпадает с тем что вы вводили в Meta\n✅ В Meta Developers → WhatsApp → Configuration — Webhook зелёный (активен)\n✅ В подписках Webhook выбрано событие messages\n\nЕсли всё верно, но не работает — напишите нам с скриншотом страницы Configuration.",
-  },
-  {
-    question: "💬 Где взять постоянный Access Token для WhatsApp?",
-    answer: "Временный токен истекает через 24 часа. Постоянный:\n1. business.facebook.com → Настройки → Системные пользователи\n2. Добавить системного пользователя → роль Admin\n3. Создать токен → выберите приложение Staffix AI\n4. Разрешения: whatsapp_business_messaging + whatsapp_business_management\n5. Создать токен → скопируйте\n6. Вставьте в Staffix → Бот → WhatsApp → Access Token → Сохранить\n\nЭтот токен бессрочный.",
-  },
-];
-
 export default function SupportPage() {
   const router = useRouter();
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const [formData, setFormData] = useState({
     subject: "",
     message: "",
@@ -85,6 +56,37 @@ export default function SupportPage() {
   const [expandedTicket, setExpandedTicket] = useState<string | null>(null);
   const [ratingTicketId, setRatingTicketId] = useState<string | null>(null);
   const [hoveredStar, setHoveredStar] = useState(0);
+
+  const faqItems = [
+    {
+      question: t("support.faqSetupAi"),
+      answer: t("support.faqSetupAiAnswer"),
+    },
+    {
+      question: t("support.faqTelegram"),
+      answer: t("support.faqTelegramAnswer"),
+    },
+    {
+      question: t("support.faqTrial"),
+      answer: t("support.faqTrialAnswer"),
+    },
+    {
+      question: t("support.faqMessageLimit"),
+      answer: t("support.faqMessageLimitAnswer"),
+    },
+    {
+      question: t("support.faqWhatsapp"),
+      answer: t("support.faqWhatsappAnswer"),
+    },
+    {
+      question: t("support.faqWhatsappNotWorking"),
+      answer: t("support.faqWhatsappNotWorkingAnswer"),
+    },
+    {
+      question: t("support.faqWhatsappToken"),
+      answer: t("support.faqWhatsappTokenAnswer"),
+    },
+  ];
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -126,13 +128,13 @@ export default function SupportPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Ошибка отправки");
+        throw new Error(data.error || t("support.sendError"));
       }
 
       setSent(true);
       setFormData({ subject: "", message: "", priority: "normal" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка отправки. Попробуйте позже.");
+      setError(err instanceof Error ? err.message : t("support.sendErrorRetry"));
     } finally {
       setSending(false);
     }
@@ -171,10 +173,10 @@ export default function SupportPage() {
 
   const statusLabel = (status: string) => {
     switch (status) {
-      case "open": return "Открыт";
-      case "in_progress": return "В работе";
-      case "resolved": return "Решён";
-      case "closed": return "Закрыт";
+      case "open": return t("support.statusOpen");
+      case "in_progress": return t("support.statusInProgress");
+      case "resolved": return t("support.statusResolved");
+      case "closed": return t("support.statusClosed");
       default: return status;
     }
   };
@@ -200,9 +202,9 @@ export default function SupportPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
-        <h2 className={`text-2xl font-bold ${textPrimary} mb-2`}>Центр поддержки</h2>
+        <h2 className={`text-2xl font-bold ${textPrimary} mb-2`}>{t("support.pageTitle")}</h2>
         <p className={textSecondary}>
-          Мы всегда готовы помочь вам с любыми вопросами
+          {t("support.subtitle")}
         </p>
       </div>
 
@@ -212,9 +214,9 @@ export default function SupportPage() {
           <div className={`w-10 h-10 ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'} rounded-lg flex items-center justify-center mb-3`}>
             <Book className="h-5 w-5 text-blue-500" />
           </div>
-          <h3 className={`font-medium ${textPrimary} mb-1`}>База знаний</h3>
+          <h3 className={`font-medium ${textPrimary} mb-1`}>{t("support.knowledgeBase")}</h3>
           <p className={`text-sm ${textSecondary}`}>
-            Статьи и руководства по использованию
+            {t("support.knowledgeBaseDesc")}
           </p>
         </div>
         <a
@@ -235,9 +237,9 @@ export default function SupportPage() {
           <div className={`w-10 h-10 ${isDark ? 'bg-green-500/10' : 'bg-green-50'} rounded-lg flex items-center justify-center mb-3`}>
             <Clock className="h-5 w-5 text-green-500" />
           </div>
-          <h3 className={`font-medium ${textPrimary} mb-1`}>Время ответа</h3>
+          <h3 className={`font-medium ${textPrimary} mb-1`}>{t("support.responseTime")}</h3>
           <p className={`text-sm ${textSecondary}`}>
-            Обычно отвечаем в течение часа
+            {t("support.responseTimeDesc")}
           </p>
         </div>
       </div>
@@ -250,8 +252,8 @@ export default function SupportPage() {
               <MessageCircle className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h3 className={`text-lg font-medium ${textPrimary}`}>Написать нам</h3>
-              <p className={`text-sm ${textSecondary}`}>Опишите вашу проблему</p>
+              <h3 className={`text-lg font-medium ${textPrimary}`}>{t("support.writeToUs")}</h3>
+              <p className={`text-sm ${textSecondary}`}>{t("support.describeIssue")}</p>
             </div>
           </div>
 
@@ -261,23 +263,23 @@ export default function SupportPage() {
                 <Check className="h-8 w-8 text-green-500" />
               </div>
               <h4 className={`text-lg font-medium ${textPrimary} mb-2`}>
-                Сообщение отправлено!
+                {t("support.messageSent")}
               </h4>
               <p className={`${textSecondary} mb-4`}>
-                Мы ответим вам в ближайшее время. Ответ придёт в раздел "Сообщения".
+                {t("support.willReply")}
               </p>
               <div className="flex flex-col gap-2">
                 <button
                   onClick={handleViewMessages}
                   className="text-blue-500 hover:text-blue-400 font-medium"
                 >
-                  Перейти в сообщения
+                  {t("support.goToMessages")}
                 </button>
                 <button
                   onClick={() => setSent(false)}
                   className={`text-sm ${textSecondary}`}
                 >
-                  Отправить ещё одно сообщение
+                  {t("support.sendAnother")}
                 </button>
               </div>
             </div>
@@ -291,7 +293,7 @@ export default function SupportPage() {
 
               <div>
                 <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
-                  Тема обращения
+                  {t("support.subjectLabel")}
                 </label>
                 <input
                   type="text"
@@ -301,13 +303,13 @@ export default function SupportPage() {
                     setFormData({ ...formData, subject: e.target.value })
                   }
                   className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                  placeholder="Например: Проблема с настройкой бота"
+                  placeholder={t("support.subjectPlaceholder")}
                 />
               </div>
 
               <div>
                 <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
-                  Приоритет
+                  {t("support.priority")}
                 </label>
                 <select
                   value={formData.priority}
@@ -316,15 +318,15 @@ export default function SupportPage() {
                   }
                   className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                 >
-                  <option value="low" className={bgCard}>Низкий</option>
-                  <option value="normal" className={bgCard}>Обычный</option>
-                  <option value="high" className={bgCard}>Высокий</option>
+                  <option value="low" className={bgCard}>{t("support.low")}</option>
+                  <option value="normal" className={bgCard}>{t("support.normal")}</option>
+                  <option value="high" className={bgCard}>{t("support.high")}</option>
                 </select>
               </div>
 
               <div>
                 <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
-                  Сообщение
+                  {t("support.messageLabel")}
                 </label>
                 <textarea
                   required
@@ -334,7 +336,7 @@ export default function SupportPage() {
                     setFormData({ ...formData, message: e.target.value })
                   }
                   className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none`}
-                  placeholder="Опишите вашу проблему подробно..."
+                  placeholder={t("support.messagePlaceholder")}
                 />
               </div>
 
@@ -346,12 +348,12 @@ export default function SupportPage() {
                 {sending ? (
                   <>
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    Отправка...
+                    {t("support.sending")}
                   </>
                 ) : (
                   <>
                     <Send className="h-5 w-5" />
-                    Отправить
+                    {t("support.send")}
                   </>
                 )}
               </button>
@@ -366,8 +368,8 @@ export default function SupportPage() {
               <HelpCircle className="h-5 w-5 text-yellow-500" />
             </div>
             <div>
-              <h3 className={`text-lg font-medium ${textPrimary}`}>Частые вопросы</h3>
-              <p className={`text-sm ${textSecondary}`}>Быстрые ответы</p>
+              <h3 className={`text-lg font-medium ${textPrimary}`}>{t("support.faq")}</h3>
+              <p className={`text-sm ${textSecondary}`}>{t("support.faqDesc")}</p>
             </div>
           </div>
 
@@ -409,8 +411,8 @@ export default function SupportPage() {
             <Inbox className="h-5 w-5 text-indigo-500" />
           </div>
           <div>
-            <h3 className={`text-lg font-medium ${textPrimary}`}>Мои обращения</h3>
-            <p className={`text-sm ${textSecondary}`}>История ваших запросов в поддержку</p>
+            <h3 className={`text-lg font-medium ${textPrimary}`}>{t("support.myTickets")}</h3>
+            <p className={`text-sm ${textSecondary}`}>{t("support.myTicketsDesc")}</p>
           </div>
         </div>
 
@@ -421,7 +423,7 @@ export default function SupportPage() {
         ) : tickets.length === 0 ? (
           <div className={`${bgCard} rounded-xl border ${borderColor} p-8 text-center`}>
             <Inbox className={`h-10 w-10 ${textSecondary} mx-auto mb-3 opacity-50`} />
-            <p className={textSecondary}>Обращений пока нет</p>
+            <p className={textSecondary}>{t("support.noTickets")}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -450,7 +452,7 @@ export default function SupportPage() {
                       )}
                     </div>
                     <div className={`text-xs ${textSecondary}`}>
-                      {formatDate(ticket.createdAt)} · {ticket.messages.length} сообщ.
+                      {formatDate(ticket.createdAt)} · {ticket.messages.length} {t("support.messages")}
                     </div>
                   </div>
                   {expandedTicket === ticket.id ? (
@@ -477,7 +479,7 @@ export default function SupportPage() {
                           }`}>
                             <div className="flex items-center gap-2 mb-1">
                               <span className={`text-xs font-medium ${msg.isFromSupport ? 'text-blue-400' : textSecondary}`}>
-                                {msg.isFromSupport ? 'Поддержка' : 'Вы'}
+                                {msg.isFromSupport ? t("support.supportLabel") : t("support.youLabel")}
                               </span>
                               <span className={`text-xs ${textSecondary}`}>
                                 {formatDate(msg.createdAt)}
@@ -497,7 +499,7 @@ export default function SupportPage() {
                           className="flex items-center gap-1.5 text-sm text-green-500 hover:text-green-400 font-medium"
                         >
                           <CheckCircle2 className="h-4 w-4" />
-                          Вопрос решён
+                          {t("support.resolved")}
                         </button>
                       ) : ticket.status === "resolved" ? (
                         <>
@@ -506,11 +508,11 @@ export default function SupportPage() {
                             className="flex items-center gap-1.5 text-sm text-blue-500 hover:text-blue-400 font-medium"
                           >
                             <RotateCcw className="h-4 w-4" />
-                            Открыть снова
+                            {t("support.reopen")}
                           </button>
                           {!ticket.rating && (
                             <div className="flex items-center gap-1 ml-auto">
-                              <span className={`text-xs ${textSecondary} mr-1`}>Оцените:</span>
+                              <span className={`text-xs ${textSecondary} mr-1`}>{t("support.rateUs")}</span>
                               {[1, 2, 3, 4, 5].map((star) => (
                                 <button
                                   key={star}
@@ -532,7 +534,7 @@ export default function SupportPage() {
                           )}
                           {ticket.rating && (
                             <div className="flex items-center gap-1 ml-auto">
-                              <span className={`text-xs ${textSecondary} mr-1`}>Оценка:</span>
+                              <span className={`text-xs ${textSecondary} mr-1`}>{t("support.rating")}</span>
                               {[1, 2, 3, 4, 5].map((star) => (
                                 <Star
                                   key={star}

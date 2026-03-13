@@ -225,7 +225,7 @@ export default function FAQPage() {
   // AI generation handlers
   const handleAiGenerate = async () => {
     if (!aiDescription.trim() || aiDescription.length < 10) {
-      setAiError("Опишите ваш бизнес подробнее");
+      setAiError(t("faqPage.aiDescribeMore"));
       return;
     }
     setAiError("");
@@ -240,7 +240,7 @@ export default function FAQPage() {
         body: JSON.stringify({ description: aiDescription }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Ошибка");
+      if (!res.ok) throw new Error(data.error || t("faqPage.aiGenerationError"));
       const withIds = data.faqs.map((f: { question: string; answer: string }, i: number) => ({
         id: `ai_${i}`,
         question: f.question,
@@ -250,7 +250,7 @@ export default function FAQPage() {
       // Select all by default
       setAiSelected(new Set(withIds.map((_: FAQ, i: number) => i)));
     } catch (err) {
-      setAiError(err instanceof Error ? err.message : "Ошибка генерации");
+      setAiError(err instanceof Error ? err.message : t("faqPage.aiGenerationError"));
     } finally {
       setAiGenerating(false);
     }
@@ -396,7 +396,7 @@ export default function FAQPage() {
               }`}
             >
               <Sparkles className="h-4 w-4" />
-              Сгенерировать с AI
+              {t("faqPage.aiGenerate")}
             </button>
             <button
               onClick={() => openModal()}
@@ -460,7 +460,7 @@ export default function FAQPage() {
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-purple-400" />
                 <h3 className={`text-lg font-semibold ${textPrimary}`}>
-                  AI-генерация вопросов и ответов
+                  {t("faqPage.aiModalTitle")}
                 </h3>
               </div>
               <button
@@ -475,13 +475,13 @@ export default function FAQPage() {
               {/* Description input */}
               <div>
                 <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
-                  Опишите ваш бизнес кратко
+                  {t("faqPage.aiDescribeLabel")}
                 </label>
                 <textarea
                   rows={4}
                   value={aiDescription}
                   onChange={(e) => { setAiDescription(e.target.value); setAiError(""); }}
-                  placeholder="Например: Салон красоты в Алматы, услуги маникюра, педикюра, наращивания ресниц. Работаем с 9:00 до 21:00 без выходных. Принимаем оплату картой и наличными. Запись по телефону или через бот."
+                  placeholder={t("faqPage.aiDescribePlaceholder")}
                   className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 ${textPrimary} resize-none text-sm`}
                 />
                 {aiError && (
@@ -502,12 +502,12 @@ export default function FAQPage() {
                   {aiGenerating ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      AI генерирует вопросы...
+                      {t("faqPage.aiGenerating")}
                     </>
                   ) : (
                     <>
                       <Sparkles className="h-4 w-4" />
-                      Сгенерировать FAQ
+                      {t("faqPage.aiGenerateFaq")}
                     </>
                   )}
                 </button>
@@ -518,7 +518,7 @@ export default function FAQPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <p className={`text-sm font-medium ${textPrimary}`}>
-                      Сгенерировано {aiGenerated.length} вопросов — выберите нужные:
+                      {t("faqPage.aiGeneratedCount").replace("{count}", String(aiGenerated.length))}
                     </p>
                     <button
                       onClick={() => {
@@ -530,7 +530,7 @@ export default function FAQPage() {
                       }}
                       className="text-sm text-purple-400 hover:text-purple-300"
                     >
-                      {aiSelected.size === aiGenerated.length ? "Снять все" : "Выбрать все"}
+                      {aiSelected.size === aiGenerated.length ? t("faqPage.aiDeselectAll") : t("faqPage.aiSelectAll")}
                     </button>
                   </div>
 
@@ -580,10 +580,10 @@ export default function FAQPage() {
                   >
                     {aiGenerating ? (
                       <span className="flex items-center justify-center gap-2">
-                        <Loader2 className="h-3 w-3 animate-spin" /> Генерирую...
+                        <Loader2 className="h-3 w-3 animate-spin" /> {t("faqPage.aiRegenerating")}
                       </span>
                     ) : (
-                      "↻ Сгенерировать заново"
+                      t("faqPage.aiRegenerate")
                     )}
                   </button>
                 </div>
@@ -594,7 +594,7 @@ export default function FAQPage() {
             {aiGenerated.length > 0 && (
               <div className={`px-6 py-4 border-t ${borderColor} flex items-center justify-between gap-3`}>
                 <p className={`text-sm ${textSecondary}`}>
-                  Выбрано: <strong className={textPrimary}>{aiSelected.size}</strong> из {aiGenerated.length}
+                  {t("faqPage.aiSelected")}: <strong className={textPrimary}>{aiSelected.size}</strong> {t("faqPage.aiOf")} {aiGenerated.length}
                 </p>
                 <div className="flex gap-3">
                   <button
@@ -603,7 +603,7 @@ export default function FAQPage() {
                       isDark ? "border-white/10 hover:bg-white/5" : "border-gray-200 hover:bg-gray-50"
                     }`}
                   >
-                    Отмена
+                    {t("faqPage.cancel")}
                   </button>
                   <button
                     onClick={handleAiSave}
@@ -611,9 +611,9 @@ export default function FAQPage() {
                     className="px-5 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
                   >
                     {aiSaving ? (
-                      <><Loader2 className="h-4 w-4 animate-spin" /> Сохраняю...</>
+                      <><Loader2 className="h-4 w-4 animate-spin" /> {t("faqPage.aiSaving")}</>
                     ) : (
-                      <><Check className="h-4 w-4" /> Сохранить {aiSelected.size} вопросов</>
+                      <><Check className="h-4 w-4" /> {t("faqPage.aiSaveCount").replace("{count}", String(aiSelected.size))}</>
                     )}
                   </button>
                 </div>

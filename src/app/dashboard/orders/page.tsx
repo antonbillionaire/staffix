@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, ShoppingBag, Phone, MapPin, ChevronDown, ChevronUp, Check, Truck, X, Clock, AlertCircle } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface OrderItem {
   id: string;
@@ -26,18 +27,33 @@ interface Order {
   createdAt: string;
 }
 
-const STATUSES: { id: string; label: string; color: string; icon: React.ReactNode }[] = [
-  { id: "new", label: "Новый", color: "bg-blue-500/20 text-blue-400", icon: <AlertCircle className="w-3 h-3" /> },
-  { id: "confirmed", label: "Подтверждён", color: "bg-green-500/20 text-green-400", icon: <Check className="w-3 h-3" /> },
-  { id: "processing", label: "В обработке", color: "bg-yellow-500/20 text-yellow-500", icon: <Clock className="w-3 h-3" /> },
-  { id: "shipped", label: "Отправлен", color: "bg-purple-500/20 text-purple-400", icon: <Truck className="w-3 h-3" /> },
-  { id: "delivered", label: "Доставлен", color: "bg-emerald-500/20 text-emerald-400", icon: <Check className="w-3 h-3" /> },
-  { id: "cancelled", label: "Отменён", color: "bg-red-500/20 text-red-400", icon: <X className="w-3 h-3" /> },
+const STATUS_CONFIGS: { id: string; color: string; icon: React.ReactNode }[] = [
+  { id: "new", color: "bg-blue-500/20 text-blue-400", icon: <AlertCircle className="w-3 h-3" /> },
+  { id: "confirmed", color: "bg-green-500/20 text-green-400", icon: <Check className="w-3 h-3" /> },
+  { id: "processing", color: "bg-yellow-500/20 text-yellow-500", icon: <Clock className="w-3 h-3" /> },
+  { id: "shipped", color: "bg-purple-500/20 text-purple-400", icon: <Truck className="w-3 h-3" /> },
+  { id: "delivered", color: "bg-emerald-500/20 text-emerald-400", icon: <Check className="w-3 h-3" /> },
+  { id: "cancelled", color: "bg-red-500/20 text-red-400", icon: <X className="w-3 h-3" /> },
 ];
+
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  new: "orders.statusNew",
+  confirmed: "orders.statusConfirmed",
+  processing: "orders.statusProcessing",
+  shipped: "orders.statusShipped",
+  delivered: "orders.statusDelivered",
+  cancelled: "orders.statusCancelled",
+};
 
 export default function OrdersPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isDark = theme === "dark";
+
+  const STATUSES = STATUS_CONFIGS.map((s) => ({
+    ...s,
+    label: t(STATUS_LABEL_KEYS[s.id]),
+  }));
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -123,9 +139,9 @@ export default function OrdersPage() {
       <div className="max-w-5xl mx-auto">
         {/* Заголовок */}
         <div className="mb-6">
-          <h1 className={`text-2xl font-bold ${text}`}>Заказы</h1>
+          <h1 className={`text-2xl font-bold ${text}`}>{t("orders.title")}</h1>
           <p className={`mt-1 text-sm ${sub}`}>
-            Все заказы от AI-продавца. Управляй статусами — клиент получает уведомление в Telegram.
+            {t("orders.subtitle")}
           </p>
         </div>
 
@@ -133,17 +149,17 @@ export default function OrdersPage() {
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className={`${card} border rounded-xl p-4`}>
             <p className={`text-2xl font-bold ${text}`}>{totalOrders}</p>
-            <p className={`text-sm ${sub}`}>Всего заказов</p>
+            <p className={`text-sm ${sub}`}>{t("orders.totalOrders")}</p>
           </div>
           <div className={`${card} border rounded-xl p-4`}>
             <p className="text-2xl font-bold text-blue-400">{newCount}</p>
-            <p className={`text-sm ${sub}`}>Новых (требуют внимания)</p>
+            <p className={`text-sm ${sub}`}>{t("orders.newNeedAttention")}</p>
           </div>
           <div className={`${card} border rounded-xl p-4`}>
             <p className="text-2xl font-bold text-green-400">
               {totalRevenue.toLocaleString("ru-RU")}
             </p>
-            <p className={`text-sm ${sub}`}>Выручка</p>
+            <p className={`text-sm ${sub}`}>{t("orders.revenue")}</p>
           </div>
         </div>
 
@@ -159,7 +175,7 @@ export default function OrdersPage() {
                 : "bg-white border border-gray-200 text-gray-700 hover:border-gray-300"
             }`}
           >
-            Все
+            {t("orders.all")}
           </button>
           {STATUSES.map((s) => {
             const count = stats.find((st) => st.status === s.id)?._count || 0;
@@ -192,9 +208,9 @@ export default function OrdersPage() {
         {orders.length === 0 ? (
           <div className={`${card} border rounded-xl p-12 text-center`}>
             <ShoppingBag className={`w-12 h-12 mx-auto mb-4 ${sub}`} />
-            <p className={`text-lg font-medium ${text}`}>Заказов нет</p>
+            <p className={`text-lg font-medium ${text}`}>{t("orders.noOrders")}</p>
             <p className={`mt-2 text-sm ${sub}`}>
-              Заказы появятся когда клиенты начнут покупать через AI-бота
+              {t("orders.noOrdersHint")}
             </p>
           </div>
         ) : (
@@ -219,7 +235,7 @@ export default function OrdersPage() {
                         </span>
                         {order.isPaid && (
                           <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 font-medium">
-                            Оплачен
+                            {t("orders.paid")}
                           </span>
                         )}
                       </div>
@@ -268,14 +284,14 @@ export default function OrdersPage() {
                       {/* Примечания */}
                       {order.clientNotes && (
                         <div className={`text-sm p-3 rounded-lg ${isDark ? "bg-gray-700" : "bg-gray-100"}`}>
-                          <span className={`font-medium ${sub}`}>Пожелание: </span>
+                          <span className={`font-medium ${sub}`}>{t("orders.clientNotes")}: </span>
                           <span className={text}>{order.clientNotes}</span>
                         </div>
                       )}
 
                       {/* Состав заказа */}
                       <div>
-                        <p className={`text-sm font-medium mb-2 ${sub}`}>Состав:</p>
+                        <p className={`text-sm font-medium mb-2 ${sub}`}>{t("orders.orderItems")}:</p>
                         <div className="space-y-1">
                           {order.items.map((item) => (
                             <div key={item.id} className="flex items-center justify-between">
@@ -288,7 +304,7 @@ export default function OrdersPage() {
                             </div>
                           ))}
                           <div className={`flex justify-between pt-2 border-t ${isDark ? "border-gray-600" : "border-gray-200"} font-bold`}>
-                            <span className={text}>Итого</span>
+                            <span className={text}>{t("orders.total")}</span>
                             <span className={text}>{order.totalPrice.toLocaleString("ru-RU")}</span>
                           </div>
                         </div>
@@ -323,9 +339,9 @@ export default function OrdersPage() {
                           {updatingId === order.id ? (
                             <Loader2 className="w-3 h-3 animate-spin" />
                           ) : order.isPaid ? (
-                            "✓ Оплачен"
+                            `✓ ${t("orders.paid")}`
                           ) : (
-                            "Отметить оплаченным"
+                            t("orders.markPaid")
                           )}
                         </button>
                       </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   MessageSquare,
   Search,
@@ -59,6 +60,7 @@ function ChannelIcon({ channel, className = "h-4 w-4" }: { channel: string; clas
 
 export default function MessagesPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
@@ -142,7 +144,7 @@ export default function MessagesPage() {
   const getDisplayName = (item: ConversationItem) => {
     if (item.clientName) return item.clientName;
     const id = item.clientId || item.clientTelegramId || "";
-    return `Клиент #${id.slice(-4)}`;
+    return `${t("messages.clientNumber")}${id.slice(-4)}`;
   };
 
   const getUniqueKey = (item: ConversationItem) => {
@@ -158,8 +160,8 @@ export default function MessagesPage() {
   return (
     <div className="h-[calc(100vh-80px)] sm:h-[calc(100vh-100px)] flex flex-col">
       <div className="mb-4">
-        <h1 className={`text-2xl font-bold ${textPrimary}`}>Сообщения</h1>
-        <p className={textSecondary}>Переписки AI-сотрудника с клиентами</p>
+        <h1 className={`text-2xl font-bold ${textPrimary}`}>{t("messages.title")}</h1>
+        <p className={textSecondary}>{t("messages.subtitle")}</p>
       </div>
 
       <div className={`flex-1 flex ${cardBg} border ${borderColor} rounded-xl overflow-hidden min-h-0`}>
@@ -173,7 +175,7 @@ export default function MessagesPage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Поиск клиента..."
+                placeholder={t("messages.searchPlaceholder")}
                 className={`w-full pl-9 pr-3 py-2 ${isDark ? "bg-white/5" : "bg-gray-50"} border ${isDark ? "border-white/10" : "border-gray-300"} rounded-lg ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm`}
               />
             </div>
@@ -189,7 +191,7 @@ export default function MessagesPage() {
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
-                Все
+                {t("messages.all")}
               </button>
               {Object.entries(CHANNEL_META).map(([key, meta]) => (
                 <button
@@ -218,8 +220,8 @@ export default function MessagesPage() {
             ) : conversations.length === 0 ? (
               <div className={`text-center py-12 px-4 ${textSecondary}`}>
                 <MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                <p className="text-sm">Нет переписок</p>
-                <p className="text-xs mt-1">Переписки появятся когда клиенты напишут боту</p>
+                <p className="text-sm">{t("messages.noConversations")}</p>
+                <p className="text-xs mt-1">{t("messages.noConversationsHint")}</p>
               </div>
             ) : (
               conversations.map((item) => {
@@ -256,11 +258,11 @@ export default function MessagesPage() {
                           </span>
                         </div>
                         <p className={`text-xs ${textSecondary} truncate mt-0.5`}>
-                          {item.lastMessageRole === "assistant" ? "Бот: " : ""}
+                          {item.lastMessageRole === "assistant" ? t("messages.botPrefix") : ""}
                           {item.lastMessage}
                         </p>
                         <p className={`text-xs ${textTertiary} mt-0.5`}>
-                          {item.totalMessages} сообщ.
+                          {item.totalMessages} {t("messages.messagesCount")}
                         </p>
                       </div>
                     </div>
@@ -290,7 +292,7 @@ export default function MessagesPage() {
                 </div>
                 <div>
                   <p className={`font-medium ${textPrimary}`}>
-                    {clientName || `Клиент #${selectedClient.slice(-4)}`}
+                    {clientName || `${t("messages.clientNumber")}${selectedClient.slice(-4)}`}
                   </p>
                   <p className={`text-xs ${textSecondary}`}>
                     {CHANNEL_META[selectedChannel || "telegram"]?.label || "Telegram"} &middot; {selectedClient}
@@ -306,7 +308,7 @@ export default function MessagesPage() {
                   </div>
                 ) : messages.length === 0 ? (
                   <div className={`text-center py-12 ${textSecondary}`}>
-                    <p>Нет сообщений</p>
+                    <p>{t("messages.noMessages")}</p>
                   </div>
                 ) : (
                   messages.map((msg) => (
@@ -354,8 +356,8 @@ export default function MessagesPage() {
             <div className={`flex-1 flex items-center justify-center ${textSecondary}`}>
               <div className="text-center">
                 <MessageSquare className="h-16 w-16 mx-auto mb-4 opacity-30" />
-                <p className="text-lg font-medium">Выберите клиента</p>
-                <p className="text-sm mt-1">Нажмите на клиента слева чтобы увидеть переписку</p>
+                <p className="text-lg font-medium">{t("messages.selectClient")}</p>
+                <p className="text-sm mt-1">{t("messages.selectClientHint")}</p>
               </div>
             </div>
           )}

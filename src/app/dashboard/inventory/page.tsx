@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Package,
   Loader2,
@@ -28,6 +29,7 @@ type SortDir = "asc" | "desc";
 
 export default function InventoryPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isDark = theme === "dark";
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -169,10 +171,10 @@ export default function InventoryPage() {
         <div>
           <h1 className={`text-2xl font-bold ${textPrimary} flex items-center gap-2`}>
             <Package className="h-6 w-6 text-blue-500" />
-            Контроль остатков
+            {t("inventory.title")}
           </h1>
           <p className={`text-sm ${textSecondary} mt-1`}>
-            Быстрое обновление остатков по всем товарам
+            {t("inventory.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -198,7 +200,7 @@ export default function InventoryPage() {
             ) : (
               <Save className="h-4 w-4" />
             )}
-            {saved ? "Сохранено!" : `Сохранить${hasChanges ? ` (${Object.keys(editedStock).length})` : ""}`}
+            {saved ? t("inventory.saved") : `${t("inventory.save")}${hasChanges ? ` (${Object.keys(editedStock).length})` : ""}`}
           </button>
         </div>
       </div>
@@ -207,19 +209,19 @@ export default function InventoryPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className={`${bgCard} border ${borderColor} rounded-xl p-4`}>
           <p className={`text-2xl font-bold ${textPrimary}`}>{products.length}</p>
-          <p className={`text-xs ${textSecondary}`}>Всего товаров</p>
+          <p className={`text-xs ${textSecondary}`}>{t("inventory.totalProducts")}</p>
         </div>
         <div className={`${bgCard} border ${outOfStock > 0 ? "border-red-500/50" : borderColor} rounded-xl p-4`}>
           <p className={`text-2xl font-bold ${outOfStock > 0 ? "text-red-500" : textPrimary}`}>{outOfStock}</p>
-          <p className={`text-xs ${textSecondary}`}>Нет в наличии</p>
+          <p className={`text-xs ${textSecondary}`}>{t("inventory.outOfStock")}</p>
         </div>
         <div className={`${bgCard} border ${lowStock > 0 ? "border-yellow-500/50" : borderColor} rounded-xl p-4`}>
           <p className={`text-2xl font-bold ${lowStock > 0 ? "text-yellow-500" : textPrimary}`}>{lowStock}</p>
-          <p className={`text-xs ${textSecondary}`}>Мало на складе</p>
+          <p className={`text-xs ${textSecondary}`}>{t("inventory.lowStock")}</p>
         </div>
         <div className={`${bgCard} border ${borderColor} rounded-xl p-4`}>
           <p className={`text-2xl font-bold text-blue-500`}>{unlimited}</p>
-          <p className={`text-xs ${textSecondary}`}>Без ограничений</p>
+          <p className={`text-xs ${textSecondary}`}>{t("inventory.unlimited")}</p>
         </div>
       </div>
 
@@ -230,7 +232,7 @@ export default function InventoryPage() {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Поиск по названию, SKU, категории..."
+          placeholder={t("inventory.searchPlaceholder")}
           className={`w-full pl-10 pr-4 py-2.5 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
         />
       </div>
@@ -253,7 +255,7 @@ export default function InventoryPage() {
                   onClick={() => toggleSort("name")}
                 >
                   <span className="flex items-center gap-1">
-                    Товар
+                    {t("inventory.product")}
                     {sortField === "name" && <ArrowUpDown className="h-3 w-3" />}
                   </span>
                 </th>
@@ -262,21 +264,21 @@ export default function InventoryPage() {
                   onClick={() => toggleSort("category")}
                 >
                   <span className="flex items-center gap-1">
-                    Категория
+                    {t("inventory.category")}
                     {sortField === "category" && <ArrowUpDown className="h-3 w-3" />}
                   </span>
                 </th>
-                <th className={`text-right py-3 px-4 text-xs font-medium ${textSecondary} uppercase`}>Цена</th>
+                <th className={`text-right py-3 px-4 text-xs font-medium ${textSecondary} uppercase`}>{t("inventory.price")}</th>
                 <th
                   className={`text-center py-3 px-4 text-xs font-medium ${textSecondary} uppercase cursor-pointer select-none`}
                   onClick={() => toggleSort("stock")}
                 >
                   <span className="flex items-center justify-center gap-1">
-                    Остаток
+                    {t("inventory.stock")}
                     {sortField === "stock" && <ArrowUpDown className="h-3 w-3" />}
                   </span>
                 </th>
-                <th className={`text-center py-3 px-4 text-xs font-medium ${textSecondary} uppercase`}>Статус</th>
+                <th className={`text-center py-3 px-4 text-xs font-medium ${textSecondary} uppercase`}>{t("inventory.status")}</th>
               </tr>
             </thead>
             <tbody>
@@ -309,7 +311,7 @@ export default function InventoryPage() {
                         min="0"
                         value={currentStock}
                         onChange={(e) => handleStockChange(product.id, e.target.value)}
-                        placeholder="Без лимита"
+                        placeholder={t("inventory.noLimit")}
                         className={`w-24 mx-auto block px-2 py-1.5 text-center text-sm rounded-lg border ${
                           isEdited
                             ? "border-blue-500 ring-1 ring-blue-500/30"
@@ -320,19 +322,19 @@ export default function InventoryPage() {
                     <td className="py-3 px-4 text-center">
                       {stockNum === null ? (
                         <span className={`text-xs px-2 py-1 rounded-full ${isDark ? "bg-blue-500/10 text-blue-400" : "bg-blue-50 text-blue-600"}`}>
-                          Без лимита
+                          {t("inventory.noLimit")}
                         </span>
                       ) : stockNum === 0 ? (
                         <span className="text-xs px-2 py-1 rounded-full bg-red-500/10 text-red-400">
-                          Нет в наличии
+                          {t("inventory.outOfStock")}
                         </span>
                       ) : stockNum <= 5 ? (
                         <span className="text-xs px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-500">
-                          Мало
+                          {t("inventory.low")}
                         </span>
                       ) : (
                         <span className={`text-xs px-2 py-1 rounded-full ${isDark ? "bg-green-500/10 text-green-400" : "bg-green-50 text-green-600"}`}>
-                          В наличии
+                          {t("inventory.inStock")}
                         </span>
                       )}
                     </td>
@@ -346,7 +348,7 @@ export default function InventoryPage() {
         {filtered.length === 0 && (
           <div className={`text-center py-12 ${textSecondary}`}>
             <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p>Товары не найдены</p>
+            <p>{t("inventory.noProducts")}</p>
           </div>
         )}
       </div>

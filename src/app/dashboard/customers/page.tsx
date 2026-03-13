@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Search,
   Loader2,
@@ -79,6 +80,7 @@ interface ImportResult {
 
 export default function CustomersPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [stats, setStats] = useState<Stats>({ total: 0, active: 0, inactive: 0, vip: 0, blocked: 0 });
@@ -165,7 +167,7 @@ export default function CustomersPage() {
 
   const handleImport = async () => {
     if (!importCsv.trim()) {
-      setImportError("Вставьте данные или загрузите файл");
+      setImportError(t("customers.importEmptyError"));
       return;
     }
     setImporting(true);
@@ -181,13 +183,13 @@ export default function CustomersPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setImportError(data.error || "Ошибка импорта");
+        setImportError(data.error || t("customers.importError"));
       } else {
         setImportResult(data);
         fetchCustomers();
       }
     } catch {
-      setImportError("Ошибка сети");
+      setImportError(t("customers.networkError"));
     } finally {
       setImporting(false);
     }
@@ -252,7 +254,7 @@ export default function CustomersPage() {
     if (customer.isBlocked) {
       return (
         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-400">
-          Заблокирован
+          {t("customers.blocked")}
         </span>
       );
     }
@@ -267,13 +269,13 @@ export default function CustomersPage() {
     if (customer.isActive) {
       return (
         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400">
-          Активный
+          {t("customers.active")}
         </span>
       );
     }
     return (
       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-500/10 text-gray-400">
-        Неактивный
+        {t("customers.inactive")}
       </span>
     );
   };
@@ -283,9 +285,9 @@ export default function CustomersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className={`text-2xl font-bold ${textPrimary}`}>База клиентов</h1>
+          <h1 className={`text-2xl font-bold ${textPrimary}`}>{t("customers.database")}</h1>
           <p className={textSecondary}>
-            {stats.total} клиентов в базе
+            {stats.total} {t("customers.customersInDatabase")}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -294,14 +296,14 @@ export default function CustomersPage() {
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-xl hover:opacity-90 transition-opacity"
           >
             <Upload className="h-4 w-4" />
-            Импорт клиентов
+            {t("customers.importCustomers")}
           </button>
           <button
             onClick={fetchCustomers}
             className={`flex items-center gap-2 px-4 py-2 ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} rounded-xl ${textSecondary} transition-colors`}
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Обновить
+            {t("customers.refresh")}
           </button>
         </div>
       </div>
@@ -316,7 +318,7 @@ export default function CustomersPage() {
         >
           <div className="flex items-center gap-2 mb-2">
             <Users className="h-4 w-4 text-blue-500" />
-            <span className={`text-xs ${textSecondary}`}>Все</span>
+            <span className={`text-xs ${textSecondary}`}>{t("customers.all")}</span>
           </div>
           <p className={`text-xl font-bold ${textPrimary}`}>{stats.total}</p>
         </button>
@@ -328,7 +330,7 @@ export default function CustomersPage() {
         >
           <div className="flex items-center gap-2 mb-2">
             <UserCheck className="h-4 w-4 text-green-500" />
-            <span className={`text-xs ${textSecondary}`}>Активные</span>
+            <span className={`text-xs ${textSecondary}`}>{t("customers.activePlural")}</span>
           </div>
           <p className={`text-xl font-bold ${textPrimary}`}>{stats.active}</p>
         </button>
@@ -340,7 +342,7 @@ export default function CustomersPage() {
         >
           <div className="flex items-center gap-2 mb-2">
             <UserX className={`h-4 w-4 ${textSecondary}`} />
-            <span className={`text-xs ${textSecondary}`}>Неактивные</span>
+            <span className={`text-xs ${textSecondary}`}>{t("customers.inactivePlural")}</span>
           </div>
           <p className={`text-xl font-bold ${textPrimary}`}>{stats.inactive}</p>
         </button>
@@ -359,7 +361,7 @@ export default function CustomersPage() {
         <div className={`${cardBg} border ${borderColor} rounded-xl p-4`}>
           <div className="flex items-center gap-2 mb-2">
             <Ban className="h-4 w-4 text-red-500" />
-            <span className={`text-xs ${textSecondary}`}>Заблокировано</span>
+            <span className={`text-xs ${textSecondary}`}>{t("customers.blockedPlural")}</span>
           </div>
           <p className={`text-xl font-bold ${textPrimary}`}>{stats.blocked}</p>
         </div>
@@ -374,7 +376,7 @@ export default function CustomersPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Поиск по имени или телефону..."
+              placeholder={t("customers.searchPlaceholder")}
               className={`w-full pl-10 pr-4 py-2.5 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
             />
           </div>
@@ -382,7 +384,7 @@ export default function CustomersPage() {
             type="submit"
             className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-xl hover:opacity-90"
           >
-            Найти
+            {t("customers.find")}
           </button>
         </form>
       </div>
@@ -396,22 +398,22 @@ export default function CustomersPage() {
         ) : customers.length === 0 ? (
           <div className={`text-center py-12 ${textSecondary}`}>
             <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p>Клиенты не найдены</p>
-            <p className="text-sm mt-1">Клиенты появятся после общения с ботом</p>
+            <p>{t("customers.notFound")}</p>
+            <p className="text-sm mt-1">{t("customers.willAppearAfterBot")}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className={`border-b ${borderColor} ${tableBg}`}>
-                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>Клиент</th>
-                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>Статус</th>
-                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>Визиты</th>
-                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>Активность</th>
-                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>Рейтинг</th>
-                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>Баллы</th>
-                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>Последний визит</th>
-                  <th className={`text-right py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>Действия</th>
+                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thClient")}</th>
+                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thStatus")}</th>
+                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thVisits")}</th>
+                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thActivity")}</th>
+                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thRating")}</th>
+                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thPoints")}</th>
+                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thLastVisit")}</th>
+                  <th className={`text-right py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thActions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -436,7 +438,7 @@ export default function CustomersPage() {
                         <Link
                           href={`/dashboard/customers/${customer.id}?tab=bookings`}
                           className={`flex items-center gap-1 ${textSecondary} hover:text-blue-500 transition-colors`}
-                          title="Записи клиента"
+                          title={t("customers.clientBookings")}
                         >
                           <Calendar className="h-3 w-3" />
                           {customer.bookingsCount}
@@ -444,7 +446,7 @@ export default function CustomersPage() {
                         <Link
                           href={`/dashboard/customers/${customer.id}?tab=messages`}
                           className={`flex items-center gap-1 ${textSecondary} hover:text-blue-500 transition-colors`}
-                          title="Сообщения клиента"
+                          title={t("customers.clientMessages")}
                         >
                           <MessageSquare className="h-3 w-3" />
                           {customer.messagesCount}
@@ -456,7 +458,7 @@ export default function CustomersPage() {
                         href={`/dashboard/customers/${customer.id}?tab=bookings`}
                         className={`${textSecondary} hover:text-blue-500 transition-colors`}
                       >
-                        {customer.totalVisits} визитов
+                        {customer.totalVisits} {t("customers.visitsCount")}
                       </Link>
                     </td>
                     <td className="py-3 px-4">
@@ -473,7 +475,7 @@ export default function CustomersPage() {
                       <button
                         onClick={() => { setLoyaltyCustomer(customer); setLoyaltyAmount(""); }}
                         className={`flex items-center gap-1 text-sm ${customer.loyaltyPoints > 0 ? "text-purple-500" : textTertiary} hover:text-purple-400 transition-colors`}
-                        title="Управление баллами"
+                        title={t("customers.managePoints")}
                       >
                         <Award className="h-3.5 w-3.5" />
                         {customer.loyaltyPoints > 0 ? customer.loyaltyPoints : "—"}
@@ -504,7 +506,7 @@ export default function CustomersPage() {
         {pagination.totalPages > 1 && (
           <div className={`flex items-center justify-between px-4 py-3 border-t ${borderColor}`}>
             <p className={`text-sm ${textSecondary}`}>
-              Страница {pagination.page} из {pagination.totalPages}
+              {t("customers.page")} {pagination.page} {t("customers.of")} {pagination.totalPages}
             </p>
             <div className="flex items-center gap-2">
               <button
@@ -533,7 +535,7 @@ export default function CustomersPage() {
             <div className={`flex items-center justify-between p-6 border-b ${borderColor}`}>
               <div className="flex items-center gap-3">
                 <FileSpreadsheet className="h-5 w-5 text-blue-500" />
-                <h2 className={`text-lg font-bold ${textPrimary}`}>Импорт клиентов</h2>
+                <h2 className={`text-lg font-bold ${textPrimary}`}>{t("customers.importCustomers")}</h2>
               </div>
               <button onClick={closeImportModal} className={`p-2 ${hoverBg} rounded-lg transition-colors`}>
                 <X className={`h-5 w-5 ${textSecondary}`} />
@@ -543,15 +545,15 @@ export default function CustomersPage() {
             <div className="p-6 space-y-4">
               {/* Instructions */}
               <div className={`text-sm ${textSecondary} space-y-1`}>
-                <p>Загрузите CSV/TXT файл или вставьте данные.</p>
-                <p>Поддерживаемые колонки: <span className={textPrimary}>Имя, Фамилия, Телефон, Email, Компания, Заметки</span></p>
-                <p>Разделитель: запятая или точка с запятой</p>
+                <p>{t("customers.importInstruction1")}</p>
+                <p>{t("customers.importInstruction2")} <span className={textPrimary}>{t("customers.importColumns")}</span></p>
+                <p>{t("customers.importInstruction3")}</p>
               </div>
 
               {/* File upload */}
               <label className={`flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed ${inputBorder} rounded-xl cursor-pointer ${hoverBg} transition-colors`}>
                 <Upload className={`h-5 w-5 ${textSecondary}`} />
-                <span className={textSecondary}>Выбрать файл (.csv, .txt)</span>
+                <span className={textSecondary}>{t("customers.chooseFile")}</span>
                 <input
                   type="file"
                   accept=".csv,.txt,.tsv"
@@ -563,13 +565,13 @@ export default function CustomersPage() {
               {/* Or paste */}
               <div>
                 <label className={`block text-sm font-medium ${textSecondary} mb-1`}>
-                  Или вставьте данные:
+                  {t("customers.orPasteData")}
                 </label>
                 <textarea
                   value={importCsv}
                   onChange={(e) => { setImportCsv(e.target.value); setImportError(""); setImportResult(null); }}
                   rows={8}
-                  placeholder={"Имя;Фамилия;Телефон;Email;Компания\nИван;Петров;+77001234567;ivan@mail.ru;ТОО Рога"}
+                  placeholder={t("customers.importPlaceholder")}
                   className={`w-full px-3 py-2 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono`}
                 />
               </div>
@@ -587,13 +589,13 @@ export default function CustomersPage() {
                 <div className="p-4 bg-green-500/10 rounded-xl space-y-2">
                   <div className="flex items-center gap-2 text-green-400 font-medium">
                     <CheckCircle2 className="h-5 w-5" />
-                    Импорт завершён
+                    {t("customers.importComplete")}
                   </div>
                   <div className={`text-sm ${textSecondary} grid grid-cols-2 gap-1`}>
-                    <span>Всего строк:</span><span className={textPrimary}>{importResult.total}</span>
-                    <span>Создано:</span><span className="text-green-400">{importResult.created}</span>
-                    <span>Обновлено:</span><span className="text-blue-400">{importResult.updated}</span>
-                    <span>Пропущено:</span><span className={textTertiary}>{importResult.skipped}</span>
+                    <span>{t("customers.totalRows")}:</span><span className={textPrimary}>{importResult.total}</span>
+                    <span>{t("customers.created")}:</span><span className="text-green-400">{importResult.created}</span>
+                    <span>{t("customers.updated")}:</span><span className="text-blue-400">{importResult.updated}</span>
+                    <span>{t("customers.skipped")}:</span><span className={textTertiary}>{importResult.skipped}</span>
                   </div>
                   {importResult.errors.length > 0 && (
                     <div className="mt-2 text-sm text-red-400">
@@ -611,7 +613,7 @@ export default function CustomersPage() {
                   onClick={closeImportModal}
                   className={`flex-1 px-4 py-2.5 ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} rounded-xl ${textSecondary} font-medium transition-colors`}
                 >
-                  {importResult ? "Закрыть" : "Отмена"}
+                  {importResult ? t("customers.close") : t("customers.cancel")}
                 </button>
                 {!importResult && (
                   <button
@@ -622,12 +624,12 @@ export default function CustomersPage() {
                     {importing ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Импорт...
+                        {t("customers.importing")}
                       </>
                     ) : (
                       <>
                         <Upload className="h-4 w-4" />
-                        Импортировать
+                        {t("customers.import")}
                       </>
                     )}
                   </button>
@@ -645,7 +647,7 @@ export default function CustomersPage() {
               <div className="flex items-center gap-3">
                 <Award className="h-5 w-5 text-purple-500" />
                 <div>
-                  <h2 className={`text-lg font-bold ${textPrimary}`}>Лояльность</h2>
+                  <h2 className={`text-lg font-bold ${textPrimary}`}>{t("customers.loyalty")}</h2>
                   <p className={`text-sm ${textSecondary}`}>{loyaltyCustomer.name}</p>
                 </div>
               </div>
@@ -659,28 +661,28 @@ export default function CustomersPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div className={`p-3 rounded-xl ${isDark ? "bg-purple-500/10" : "bg-purple-50"} text-center`}>
                   <p className={`text-xl font-bold text-purple-500`}>{loyaltyCustomer.loyaltyPoints}</p>
-                  <p className={`text-xs ${textSecondary}`}>Баллы</p>
+                  <p className={`text-xs ${textSecondary}`}>{t("customers.points")}</p>
                 </div>
                 <div className={`p-3 rounded-xl ${isDark ? "bg-blue-500/10" : "bg-blue-50"} text-center`}>
                   <p className={`text-xl font-bold text-blue-500`}>{loyaltyCustomer.loyaltyVisits}</p>
-                  <p className={`text-xs ${textSecondary}`}>Визиты</p>
+                  <p className={`text-xs ${textSecondary}`}>{t("customers.visits")}</p>
                 </div>
                 <div className={`p-3 rounded-xl ${isDark ? "bg-green-500/10" : "bg-green-50"} text-center`}>
                   <p className={`text-xl font-bold text-green-500`}>{loyaltyCustomer.loyaltyTotalSpent.toLocaleString()}</p>
-                  <p className={`text-xs ${textSecondary}`}>Потрачено</p>
+                  <p className={`text-xs ${textSecondary}`}>{t("customers.spent")}</p>
                 </div>
               </div>
 
               {/* Adjust points */}
               <div>
-                <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Управление баллами</label>
+                <label className={`block text-sm font-medium ${textSecondary} mb-2`}>{t("customers.managePoints")}</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
                     min="1"
                     value={loyaltyAmount}
                     onChange={(e) => setLoyaltyAmount(e.target.value)}
-                    placeholder="Количество"
+                    placeholder={t("customers.amount")}
                     className={`flex-1 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500`}
                   />
                   <button
@@ -708,11 +710,11 @@ export default function CustomersPage() {
                   className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} rounded-lg ${textSecondary} transition-colors text-sm`}
                 >
                   <Plus className="h-3 w-3" />
-                  Визит
+                  {t("customers.visit")}
                 </button>
                 <button
                   onClick={() => {
-                    const amount = prompt("Сумма покупки:");
+                    const amount = prompt(t("customers.purchaseAmount"));
                     if (amount && parseInt(amount) > 0) {
                       setLoyaltyAmount(amount);
                       setTimeout(() => handleLoyaltyAction("addSpent"), 0);
@@ -722,13 +724,13 @@ export default function CustomersPage() {
                   className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} rounded-lg ${textSecondary} transition-colors text-sm`}
                 >
                   <Plus className="h-3 w-3" />
-                  Покупка
+                  {t("customers.purchase")}
                 </button>
               </div>
 
               {/* Cashback % */}
               <div>
-                <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Кэшбек (%)</label>
+                <label className={`block text-sm font-medium ${textSecondary} mb-2`}>{t("customers.cashbackPercent")}</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -741,7 +743,7 @@ export default function CustomersPage() {
                       const newPercent = val === "" ? null : parseFloat(val);
                       setLoyaltyCustomer((prev) => prev ? { ...prev, loyaltyCashbackPercent: newPercent } : null);
                     }}
-                    placeholder="По программе"
+                    placeholder={t("customers.byProgram")}
                     className={`flex-1 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500`}
                   />
                   <button
@@ -749,22 +751,22 @@ export default function CustomersPage() {
                     disabled={loyaltySaving}
                     className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors text-sm"
                   >
-                    Сохранить
+                    {t("customers.save")}
                   </button>
                 </div>
-                <p className={`text-xs ${textTertiary} mt-1`}>Пусто = по программе лояльности</p>
+                <p className={`text-xs ${textTertiary} mt-1`}>{t("customers.emptyMeansProgram")}</p>
               </div>
 
               {/* Tier */}
               <div>
-                <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Уровень клиента</label>
+                <label className={`block text-sm font-medium ${textSecondary} mb-2`}>{t("customers.clientTier")}</label>
                 <div className="grid grid-cols-5 gap-1.5">
                   {[
-                    { value: null, label: "Авто", color: "gray" },
-                    { value: "bronze", label: "Бронза", color: "orange" },
-                    { value: "silver", label: "Серебро", color: "slate" },
-                    { value: "gold", label: "Золото", color: "yellow" },
-                    { value: "platinum", label: "Платина", color: "blue" },
+                    { value: null, label: t("customers.tierAuto"), color: "gray" },
+                    { value: "bronze", label: t("customers.tierBronze"), color: "orange" },
+                    { value: "silver", label: t("customers.tierSilver"), color: "slate" },
+                    { value: "gold", label: t("customers.tierGold"), color: "yellow" },
+                    { value: "platinum", label: t("customers.tierPlatinum"), color: "blue" },
                   ].map((tier) => {
                     const isSelected = loyaltyCustomer.loyaltyTier === tier.value;
                     const colorClasses: Record<string, string> = {

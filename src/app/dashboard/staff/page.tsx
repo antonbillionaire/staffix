@@ -42,12 +42,7 @@ const DEFAULT_SCHEDULE: ScheduleDay[] = DAY_ORDER.map((day) => ({
   isWorkday: day >= 1 && day <= 5, // Mon-Fri by default
 }));
 
-const REASON_LABELS: Record<string, string> = {
-  vacation: "Отпуск",
-  sick: "Больничный",
-  personal: "Личные обстоятельства",
-  other: "Другое",
-};
+// REASON_LABELS moved to t() calls inside component
 
 const REASON_COLORS: Record<string, string> = {
   vacation: "text-blue-400 bg-blue-400/10",
@@ -61,25 +56,33 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" });
 }
 
-// Role options per business mode
-const SALES_ROLES = [
-  { value: "admin", label: "Администратор" },
-  { value: "manager", label: "Менеджер по продажам" },
-  { value: "operator", label: "Оператор" },
-  { value: "warehouse", label: "Складской работник" },
-  { value: "custom", label: "Другое..." },
-];
-const SERVICE_ROLES = [
-  { value: "admin", label: "Администратор" },
-  { value: "manager", label: "Менеджер" },
-  { value: "master", label: "Мастер" },
-  { value: "custom", label: "Другое..." },
-];
+// Role options moved to component body for t() access
 
 export default function StaffPage() {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const isDark = theme === "dark";
+
+  const REASON_LABELS: Record<string, string> = {
+    vacation: t("staffPage.reasonVacation"),
+    sick: t("staffPage.reasonSick"),
+    personal: t("staffPage.reasonPersonal"),
+    other: t("staffPage.reasonOther"),
+  };
+
+  const SALES_ROLES = [
+    { value: "admin", label: t("staffPage.roleAdmin") },
+    { value: "manager", label: t("staffPage.roleSalesManager") },
+    { value: "operator", label: t("staffPage.roleOperator") },
+    { value: "warehouse", label: t("staffPage.roleWarehouse") },
+    { value: "custom", label: t("staffPage.roleCustom") },
+  ];
+  const SERVICE_ROLES = [
+    { value: "admin", label: t("staffPage.roleAdmin") },
+    { value: "manager", label: t("staffPage.roleManager") },
+    { value: "master", label: t("staffPage.roleMaster") },
+    { value: "custom", label: t("staffPage.roleCustom") },
+  ];
 
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,7 +130,7 @@ export default function StaffPage() {
         const csv = XLSX.utils.sheet_to_csv(ws, { FS: ";", rawNumbers: true });
         setImportCsv(csv);
       } catch {
-        setImportResult({ message: "Ошибка чтения Excel файла" });
+        setImportResult({ message: t("staffPage.importExcelError") });
       } finally {
         setParsingFile(false);
       }
@@ -159,7 +162,7 @@ export default function StaffPage() {
         fetchStaff();
       }
     } catch {
-      setImportResult({ message: "Ошибка при импорте" });
+      setImportResult({ message: t("staffPage.importError") });
     } finally {
       setImportLoading(false);
     }
@@ -415,7 +418,7 @@ export default function StaffPage() {
             className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 border ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
           >
             <Upload className="h-4 w-4" />
-            Импорт
+            {t("staffPage.import")}
           </button>
           <button
             onClick={() => openModal()}
@@ -432,7 +435,7 @@ export default function StaffPage() {
         {loading ? (
           <div className={`col-span-full ${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border p-8 text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}>
             <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-            <p>Загрузка...</p>
+            <p>{t("staffPage.loading")}</p>
           </div>
         ) : staff.length === 0 ? (
           <div className={`col-span-full ${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border p-8 text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}>
@@ -470,14 +473,14 @@ export default function StaffPage() {
                   <button
                     onClick={() => openSchedule(person)}
                     className={`${isDark ? "text-gray-500 hover:text-purple-400" : "text-gray-400 hover:text-purple-600"} p-1`}
-                    title="Расписание"
+                    title={t("staffPage.scheduleTip")}
                   >
                     <CalendarDays className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => openTimeOff(person)}
                     className={`${isDark ? "text-gray-500 hover:text-orange-400" : "text-gray-400 hover:text-orange-600"} p-1`}
-                    title="Отпуска и больничные"
+                    title={t("staffPage.timeOffTip")}
                   >
                     <BedDouble className="h-4 w-4" />
                   </button>
@@ -615,7 +618,7 @@ export default function StaffPage() {
               {/* Photo */}
               <div>
                 <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
-                  Фото
+                  {t("staffPage.photo")}
                 </label>
                 <div className="flex items-center gap-3">
                   {formData.photo ? (
@@ -631,7 +634,7 @@ export default function StaffPage() {
                     </div>
                   )}
                   <label className={`cursor-pointer text-sm px-3 py-1.5 border rounded-lg ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}>
-                    Загрузить
+                    {t("staffPage.upload")}
                     <input
                       type="file"
                       accept="image/*"
@@ -640,7 +643,7 @@ export default function StaffPage() {
                         const file = e.target.files?.[0];
                         if (file) {
                           if (file.size > 500 * 1024) {
-                            alert("Файл слишком большой (макс. 500 KB)");
+                            alert(t("staffPage.fileTooLarge"));
                             return;
                           }
                           const reader = new FileReader();
@@ -658,7 +661,7 @@ export default function StaffPage() {
                       onClick={() => setFormData({ ...formData, photo: "" })}
                       className="text-sm text-red-500 hover:text-red-400"
                     >
-                      Удалить
+                      {t("staffPage.removePhoto")}
                     </button>
                   )}
                 </div>
@@ -692,7 +695,7 @@ export default function StaffPage() {
           <div className={`${isDark ? "bg-[#12122a]" : "bg-white"} rounded-lg p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto`}>
             <div className="flex items-center justify-between mb-4">
               <h3 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
-                Импорт сотрудников
+                {t("staffPage.importTitle")}
               </h3>
               <button
                 onClick={() => setIsImportOpen(false)}
@@ -703,21 +706,21 @@ export default function StaffPage() {
             </div>
 
             <div className={`text-sm mb-4 p-3 rounded-lg ${isDark ? "bg-white/5 text-gray-400" : "bg-gray-50 text-gray-600"}`}>
-              <p className="font-medium mb-2">Импорт сотрудников</p>
-              <p className="text-xs mb-1"><span className="font-medium">Обязательное поле:</span> Имя</p>
-              <p className="text-xs mb-2"><span className="font-medium">Необязательные:</span> Должность ({isSales ? "Администратор / Менеджер по продажам / Оператор" : "Администратор / Менеджер / Мастер"}), Telegram</p>
-              <code className={`text-xs block ${isDark ? "text-green-400" : "text-green-700"}`}>Имя;Должность;Telegram</code>
-              <code className={`text-xs block mt-1 ${isDark ? "text-blue-400" : "text-blue-700"}`}>{isSales ? "Олег;Менеджер по продажам;@oleg_sales" : "Анна;Мастер;@anna_beauty"}</code>
-              <p className="mt-2 text-xs">Форматы: .xlsx, .xls, .csv, .txt. Колонки определяются автоматически по заголовкам.</p>
+              <p className="font-medium mb-2">{t("staffPage.importTitle")}</p>
+              <p className="text-xs mb-1"><span className="font-medium">{t("staffPage.importRequiredField")}</span> {t("staffPage.importFieldName")}</p>
+              <p className="text-xs mb-2"><span className="font-medium">{t("staffPage.importOptionalFields")}</span> {t("staffPage.importFieldRole")} ({isSales ? t("staffPage.importSalesRoles") : t("staffPage.importServiceRoles")}), Telegram</p>
+              <code className={`text-xs block ${isDark ? "text-green-400" : "text-green-700"}`}>{t("staffPage.importCsvHeader")}</code>
+              <code className={`text-xs block mt-1 ${isDark ? "text-blue-400" : "text-blue-700"}`}>{isSales ? t("staffPage.importSalesExample") : t("staffPage.importServiceExample")}</code>
+              <p className="mt-2 text-xs">{t("staffPage.importFormats")}</p>
             </div>
 
             <div className="mb-4">
               <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                Загрузить файл
+                {t("staffPage.uploadFile")}
               </label>
               <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer font-medium text-sm ${isDark ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}>
                 <Upload className="h-4 w-4" />
-                Выбрать файл
+                {t("staffPage.chooseFile")}
                 <input
                   type="file"
                   accept=".csv,.txt,.xlsx,.xls"
@@ -728,20 +731,20 @@ export default function StaffPage() {
               {parsingFile && (
                 <div className="flex items-center gap-2 mt-2">
                   <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
-                  <span className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>Чтение файла...</span>
+                  <span className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>{t("staffPage.readingFile")}</span>
                 </div>
               )}
             </div>
 
             <div className="mb-4">
               <label className={`block text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                Или вставьте данные вручную
+                {t("staffPage.pasteManually")}
               </label>
               <textarea
                 rows={6}
                 value={importCsv}
                 onChange={(e) => setImportCsv(e.target.value)}
-                placeholder={"Имя;Должность;Telegram\nАнна Иванова;Мастер маникюра;@anna_master\nОлег Петров;Барбер;@oleg_barber"}
+                placeholder={t("staffPage.importPlaceholder")}
                 className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-600" : "border-gray-300 placeholder-gray-400"}`}
               />
             </div>
@@ -760,7 +763,7 @@ export default function StaffPage() {
                 onClick={() => setIsImportOpen(false)}
                 className={`flex-1 px-4 py-2 border rounded-lg font-medium ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
               >
-                Закрыть
+                {t("staffPage.close")}
               </button>
               <button
                 onClick={handleImport}
@@ -768,7 +771,7 @@ export default function StaffPage() {
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {importLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                Импортировать
+                {t("staffPage.importBtn")}
               </button>
             </div>
           </div>
@@ -867,7 +870,7 @@ export default function StaffPage() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
-                  Отпуска и больничные
+                  {t("staffPage.timeOffTitle")}
                 </h3>
                 <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>{timeOffStaffName}</p>
               </div>
@@ -882,13 +885,13 @@ export default function StaffPage() {
             {/* Add new time-off form */}
             <div className={`rounded-lg p-4 mb-4 ${isDark ? "bg-white/5" : "bg-gray-50"}`}>
               <h4 className={`text-sm font-medium mb-3 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                Добавить период
+                {t("staffPage.addPeriod")}
               </h4>
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={`block text-xs mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                      Начало
+                      {t("staffPage.startDate")}
                     </label>
                     <input
                       type="date"
@@ -899,7 +902,7 @@ export default function StaffPage() {
                   </div>
                   <div>
                     <label className={`block text-xs mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                      Конец
+                      {t("staffPage.endDate")}
                     </label>
                     <input
                       type="date"
@@ -913,29 +916,29 @@ export default function StaffPage() {
 
                 <div>
                   <label className={`block text-xs mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                    Причина
+                    {t("staffPage.reason")}
                   </label>
                   <select
                     value={timeOffForm.reason}
                     onChange={(e) => setTimeOffForm({ ...timeOffForm, reason: e.target.value })}
                     className={`w-full px-2 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? "bg-[#12122a] border-white/10 text-white" : "border-gray-300 bg-white"}`}
                   >
-                    <option value="vacation">Отпуск</option>
-                    <option value="sick">Больничный</option>
-                    <option value="personal">Личные обстоятельства</option>
-                    <option value="other">Другое</option>
+                    <option value="vacation">{t("staffPage.reasonVacation")}</option>
+                    <option value="sick">{t("staffPage.reasonSick")}</option>
+                    <option value="personal">{t("staffPage.reasonPersonal")}</option>
+                    <option value="other">{t("staffPage.reasonOther")}</option>
                   </select>
                 </div>
 
                 <div>
                   <label className={`block text-xs mb-1 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                    Примечание (необязательно)
+                    {t("staffPage.notesLabel")}
                   </label>
                   <input
                     type="text"
                     value={timeOffForm.notes}
                     onChange={(e) => setTimeOffForm({ ...timeOffForm, notes: e.target.value })}
-                    placeholder="Например: поездка в другой город"
+                    placeholder={t("staffPage.notesPlaceholder")}
                     className={`w-full px-2 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
                   />
                 </div>
@@ -946,7 +949,7 @@ export default function StaffPage() {
                   className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {savingTimeOff && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  Добавить период
+                  {t("staffPage.addPeriod")}
                 </button>
               </div>
             </div>
@@ -954,7 +957,7 @@ export default function StaffPage() {
             {/* Existing time-offs */}
             <div>
               <h4 className={`text-sm font-medium mb-3 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                Запланированные периоды
+                {t("staffPage.scheduledPeriods")}
               </h4>
 
               {loadingTimeOffs ? (
@@ -963,15 +966,15 @@ export default function StaffPage() {
                 </div>
               ) : timeOffs.length === 0 ? (
                 <p className={`text-sm text-center py-4 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                  Нет запланированных периодов
+                  {t("staffPage.noScheduledPeriods")}
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {timeOffs.map((t) => {
-                    const isPast = new Date(t.endDate) < new Date();
+                  {timeOffs.map((to) => {
+                    const isPast = new Date(to.endDate) < new Date();
                     return (
                       <div
-                        key={t.id}
+                        key={to.id}
                         className={`flex items-center justify-between p-3 rounded-lg ${
                           isPast
                             ? isDark ? "bg-white/3 opacity-50" : "bg-gray-50 opacity-60"
@@ -980,28 +983,28 @@ export default function StaffPage() {
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${REASON_COLORS[t.reason] || REASON_COLORS.other}`}>
-                              {REASON_LABELS[t.reason] || t.reason}
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${REASON_COLORS[to.reason] || REASON_COLORS.other}`}>
+                              {REASON_LABELS[to.reason] || to.reason}
                             </span>
                             {isPast && (
                               <span className={`text-xs ${isDark ? "text-gray-600" : "text-gray-400"}`}>
-                                прошёл
+                                {t("staffPage.past")}
                               </span>
                             )}
                           </div>
                           <p className={`text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
-                            {formatDate(t.startDate)}
-                            {t.startDate !== t.endDate && ` — ${formatDate(t.endDate)}`}
+                            {formatDate(to.startDate)}
+                            {to.startDate !== to.endDate && ` — ${formatDate(to.endDate)}`}
                           </p>
-                          {t.notes && (
+                          {to.notes && (
                             <p className={`text-xs mt-0.5 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                              {t.notes}
+                              {to.notes}
                             </p>
                           )}
                         </div>
                         {!isPast && (
                           <button
-                            onClick={() => deleteTimeOff(t.id)}
+                            onClick={() => deleteTimeOff(to.id)}
                             className={`ml-3 p-1.5 rounded ${isDark ? "text-gray-600 hover:text-red-400 hover:bg-red-400/10" : "text-gray-400 hover:text-red-600 hover:bg-red-50"} flex-shrink-0`}
                           >
                             <X className="h-3.5 w-3.5" />
@@ -1019,7 +1022,7 @@ export default function StaffPage() {
                 onClick={() => setIsTimeOffOpen(false)}
                 className={`w-full px-4 py-2 border rounded-lg font-medium text-sm ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
               >
-                Закрыть
+                {t("staffPage.close")}
               </button>
             </div>
           </div>

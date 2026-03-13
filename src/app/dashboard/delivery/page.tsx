@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Truck,
   Plus,
@@ -15,13 +16,7 @@ import {
   Gift,
 } from "lucide-react";
 
-const CURRENCIES = [
-  { code: "UZS", label: "UZS (сум)" },
-  { code: "KZT", label: "KZT (тенге)" },
-  { code: "RUB", label: "RUB (рубль)" },
-  { code: "KGS", label: "KGS (сом)" },
-  { code: "USD", label: "USD (доллар)" },
-];
+const CURRENCY_CODES = ["UZS", "KZT", "RUB", "KGS", "USD"] as const;
 
 interface DeliveryZone {
   id: string;
@@ -37,6 +32,7 @@ interface DeliveryZone {
 
 export default function DeliveryPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isDark = theme === "dark";
 
   const [loading, setLoading] = useState(true);
@@ -153,12 +149,12 @@ export default function DeliveryPage() {
         const fM = (from || 0) % 60;
         const tH = Math.floor((to || 0) / 60);
         const tM = (to || 0) % 60;
-        return `${fH}ч${fM ? ` ${fM}мин` : ""} — ${tH}ч${tM ? ` ${tM}мин` : ""}`;
+        return `${fH}${t("delivery.hourShort")}${fM ? ` ${fM}${t("delivery.minShort")}` : ""} — ${tH}${t("delivery.hourShort")}${tM ? ` ${tM}${t("delivery.minShort")}` : ""}`;
       }
-      return `${from} — ${to} мин`;
+      return `${from} — ${to} ${t("delivery.minShort")}`;
     }
-    if (to) return `до ${to} мин`;
-    return `от ${from} мин`;
+    if (to) return `${t("delivery.upTo")} ${to} ${t("delivery.minShort")}`;
+    return `${t("delivery.from")} ${from} ${t("delivery.minShort")}`;
   };
 
   if (loading) {
@@ -172,9 +168,9 @@ export default function DeliveryPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
-        <h2 className={`text-2xl font-bold ${textPrimary} mb-2`}>Настройки доставки</h2>
+        <h2 className={`text-2xl font-bold ${textPrimary} mb-2`}>{t("delivery.title")}</h2>
         <p className={textSecondary}>
-          Настройте зоны доставки с разной стоимостью и временем
+          {t("delivery.subtitle")}
         </p>
       </div>
 
@@ -186,9 +182,9 @@ export default function DeliveryPage() {
               <Truck className="h-5 w-5 text-blue-500" />
             </div>
             <div>
-              <h3 className={`font-medium ${textPrimary}`}>Доставка</h3>
+              <h3 className={`font-medium ${textPrimary}`}>{t("delivery.delivery")}</h3>
               <p className={`text-sm ${textSecondary}`}>
-                {deliveryEnabled ? "Доставка включена для заказов" : "Доставка отключена"}
+                {deliveryEnabled ? t("delivery.enabledForOrders") : t("delivery.disabled")}
               </p>
             </div>
           </div>
@@ -209,22 +205,22 @@ export default function DeliveryPage() {
       {deliveryEnabled && (
         <>
           <div className="flex items-center justify-between mb-4">
-            <h3 className={`text-lg font-medium ${textPrimary}`}>Зоны доставки</h3>
+            <h3 className={`text-lg font-medium ${textPrimary}`}>{t("delivery.zones")}</h3>
             <button
               onClick={openAddModal}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
             >
               <Plus className="h-4 w-4" />
-              Добавить зону
+              {t("delivery.addZone")}
             </button>
           </div>
 
           {zones.length === 0 ? (
             <div className={`${bgCard} rounded-xl border ${borderColor} p-8 text-center`}>
               <MapPin className={`h-10 w-10 ${textSecondary} mx-auto mb-3 opacity-50`} />
-              <p className={textSecondary}>Зон доставки пока нет</p>
+              <p className={textSecondary}>{t("delivery.noZones")}</p>
               <p className={`text-sm mt-1 ${textSecondary} opacity-70`}>
-                Добавьте зоны с разной стоимостью и временем доставки
+                {t("delivery.noZonesHint")}
               </p>
             </div>
           ) : (
@@ -236,7 +232,7 @@ export default function DeliveryPage() {
                       <h4 className={`font-medium ${textPrimary}`}>{zone.name}</h4>
                       {!zone.isActive && (
                         <span className="text-xs text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full">
-                          Неактивна
+                          {t("delivery.inactive")}
                         </span>
                       )}
                     </div>
@@ -277,7 +273,7 @@ export default function DeliveryPage() {
                       <div className="flex items-center gap-2">
                         <Gift className={`h-4 w-4 text-green-400`} />
                         <span className={`text-sm text-green-400`}>
-                          Бесплатно от {zone.freeFrom.toLocaleString()} {zone.currency}
+                          {t("delivery.freeFromAmount")} {zone.freeFrom.toLocaleString()} {zone.currency}
                         </span>
                       </div>
                     )}
@@ -295,7 +291,7 @@ export default function DeliveryPage() {
           <div className={`${bgCard} rounded-xl border ${borderColor} w-full max-w-md`}>
             <div className={`flex items-center justify-between p-5 border-b ${borderColor}`}>
               <h3 className={`text-lg font-medium ${textPrimary}`}>
-                {editingZone ? "Редактировать зону" : "Новая зона доставки"}
+                {editingZone ? t("delivery.editZone") : t("delivery.newZone")}
               </h3>
               <button onClick={() => setShowModal(false)}>
                 <X className={`h-5 w-5 ${textSecondary}`} />
@@ -305,13 +301,13 @@ export default function DeliveryPage() {
             <div className="p-5 space-y-4">
               <div>
                 <label className={`block text-sm font-medium ${textSecondary} mb-1`}>
-                  Название зоны *
+                  {t("delivery.zoneName")} *
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Например: Центр города"
+                  placeholder={t("delivery.zoneNamePlaceholder")}
                   className={`w-full px-3 py-2 border rounded-lg ${inputBg} ${inputBorder} ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 />
               </div>
@@ -319,7 +315,7 @@ export default function DeliveryPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={`block text-sm font-medium ${textSecondary} mb-1`}>
-                    Стоимость *
+                    {t("delivery.fee")} *
                   </label>
                   <input
                     type="number"
@@ -331,15 +327,15 @@ export default function DeliveryPage() {
                 </div>
                 <div>
                   <label className={`block text-sm font-medium ${textSecondary} mb-1`}>
-                    Валюта
+                    {t("delivery.currency")}
                   </label>
                   <select
                     value={formData.currency}
                     onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
                     className={`w-full px-3 py-2 border rounded-lg ${inputBg} ${inputBorder} ${textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   >
-                    {CURRENCIES.map((c) => (
-                      <option key={c.code} value={c.code}>{c.label}</option>
+                    {CURRENCY_CODES.map((code) => (
+                      <option key={code} value={code}>{t(`delivery.currency.${code}`)}</option>
                     ))}
                   </select>
                 </div>
@@ -348,7 +344,7 @@ export default function DeliveryPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={`block text-sm font-medium ${textSecondary} mb-1`}>
-                    Время от (мин)
+                    {t("delivery.timeFrom")}
                   </label>
                   <input
                     type="number"
@@ -360,7 +356,7 @@ export default function DeliveryPage() {
                 </div>
                 <div>
                   <label className={`block text-sm font-medium ${textSecondary} mb-1`}>
-                    Время до (мин)
+                    {t("delivery.timeTo")}
                   </label>
                   <input
                     type="number"
@@ -374,17 +370,17 @@ export default function DeliveryPage() {
 
               <div>
                 <label className={`block text-sm font-medium ${textSecondary} mb-1`}>
-                  Бесплатно от суммы
+                  {t("delivery.freeFromLabel")}
                 </label>
                 <input
                   type="number"
                   value={formData.freeFrom}
                   onChange={(e) => setFormData({ ...formData, freeFrom: e.target.value })}
-                  placeholder="Например: 100000"
+                  placeholder={t("delivery.freeFromPlaceholder")}
                   className={`w-full px-3 py-2 border rounded-lg ${inputBg} ${inputBorder} ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 />
                 <p className={`text-xs mt-1 ${textSecondary}`}>
-                  Оставьте пустым если нет бесплатной доставки
+                  {t("delivery.freeFromHint")}
                 </p>
               </div>
 
@@ -396,7 +392,7 @@ export default function DeliveryPage() {
                 {saving ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
                 ) : (
-                  editingZone ? "Сохранить" : "Добавить зону"
+                  editingZone ? t("delivery.save") : t("delivery.addZone")
                 )}
               </button>
             </div>

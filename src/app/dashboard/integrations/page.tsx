@@ -19,6 +19,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 // ========================================
 // ТИПЫ
@@ -37,74 +38,76 @@ interface Integration {
   createdAt: string;
 }
 
-const INTEGRATION_TYPES: {
+interface FormField {
+  key: string;
+  labelKey: string;
+  type: "text" | "url" | "password" | "textarea";
+  required: boolean;
+  placeholderKey?: string;
+  placeholderFallback?: string;
+}
+
+const INTEGRATION_TYPES_CONFIG: {
   id: IntegrationType;
   label: string;
-  description: string;
+  descriptionKey: string;
   icon: string;
   fields: FormField[];
 }[] = [
   {
     id: "webhook",
     label: "Universal Webhook",
-    description:
-      "Отправка событий на любой HTTP endpoint. Работает с Zapier, Make, n8n и любым API.",
+    descriptionKey: "integrations.webhookDesc",
     icon: "🔗",
     fields: [
-      { key: "url", label: "URL endpoint", type: "url", required: true, placeholder: "https://hooks.zapier.com/hooks/..." },
-      { key: "secret", label: "Secret (HMAC подпись)", type: "text", required: false, placeholder: "необязательно" },
+      { key: "url", labelKey: "integrations.webhookUrlLabel", type: "url", required: true, placeholderFallback: "https://hooks.zapier.com/hooks/..." },
+      { key: "secret", labelKey: "integrations.webhookSecretLabel", type: "text", required: false, placeholderKey: "integrations.webhookSecretPlaceholder" },
     ],
   },
   {
     id: "bitrix24",
     label: "Bitrix24",
-    description: "Создаёт контакты и сделки в Bitrix24 CRM при новых записях.",
+    descriptionKey: "integrations.bitrix24Desc",
     icon: "🏢",
     fields: [
-      { key: "domain", label: "Домен Bitrix24", type: "text", required: true, placeholder: "mycompany.bitrix24.ru" },
-      { key: "token", label: "Incoming Webhook Token", type: "text", required: true, placeholder: "из раздела Приложения → Вебхуки" },
+      { key: "domain", labelKey: "integrations.bitrix24DomainLabel", type: "text", required: true, placeholderFallback: "mycompany.bitrix24.ru" },
+      { key: "token", labelKey: "integrations.bitrix24TokenLabel", type: "text", required: true, placeholderKey: "integrations.bitrix24TokenPlaceholder" },
     ],
   },
   {
     id: "amocrm",
     label: "AmoCRM",
-    description: "Создаёт контакты и сделки в AmoCRM при новых записях.",
+    descriptionKey: "integrations.amocrmDesc",
     icon: "💼",
     fields: [
-      { key: "domain", label: "Поддомен AmoCRM", type: "text", required: true, placeholder: "mycompany (без .amocrm.ru)" },
-      { key: "token", label: "Access Token", type: "password", required: true, placeholder: "из интеграции AmoCRM" },
-      { key: "pipelineId", label: "ID воронки (необязательно)", type: "text", required: false, placeholder: "123456" },
+      { key: "domain", labelKey: "integrations.amocrmDomainLabel", type: "text", required: true, placeholderKey: "integrations.amocrmDomainPlaceholder" },
+      { key: "token", labelKey: "integrations.amocrmTokenLabel", type: "password", required: true, placeholderKey: "integrations.amocrmTokenPlaceholder" },
+      { key: "pipelineId", labelKey: "integrations.amocrmPipelineLabel", type: "text", required: false, placeholderFallback: "123456" },
     ],
   },
   {
     id: "google_sheets",
     label: "Google Sheets",
-    description: "Записывает каждое событие новой строкой в Google Таблицу.",
+    descriptionKey: "integrations.googleSheetsDesc",
     icon: "📊",
     fields: [
-      { key: "spreadsheetId", label: "ID таблицы", type: "text", required: true, placeholder: "из URL таблицы: .../d/ID/edit" },
-      { key: "sheetName", label: "Название листа", type: "text", required: false, placeholder: "Sheet1" },
-      { key: "credentialsJson", label: "Credentials JSON (сервисный аккаунт)", type: "textarea", required: true, placeholder: '{"type":"service_account","project_id":"..."}' },
+      { key: "spreadsheetId", labelKey: "integrations.sheetsIdLabel", type: "text", required: true, placeholderKey: "integrations.sheetsIdPlaceholder" },
+      { key: "sheetName", labelKey: "integrations.sheetsNameLabel", type: "text", required: false, placeholderFallback: "Sheet1" },
+      { key: "credentialsJson", labelKey: "integrations.sheetsCredentialsLabel", type: "textarea", required: true, placeholderFallback: '{"type":"service_account","project_id":"..."}' },
     ],
   },
 ];
 
-const ALL_EVENTS: { id: string; label: string }[] = [
-  { id: "booking_created", label: "Новая запись" },
-  { id: "booking_confirmed", label: "Запись подтверждена" },
-  { id: "booking_cancelled", label: "Запись отменена" },
-  { id: "new_client", label: "Новый клиент" },
-  { id: "review_created", label: "Новый отзыв" },
-  { id: "message_received", label: "Входящее сообщение" },
-];
+const ALL_EVENT_IDS = ["booking_created", "booking_confirmed", "booking_cancelled", "new_client", "review_created", "message_received"];
 
-interface FormField {
-  key: string;
-  label: string;
-  type: "text" | "url" | "password" | "textarea";
-  required: boolean;
-  placeholder?: string;
-}
+const EVENT_LABEL_KEYS: Record<string, string> = {
+  booking_created: "integrations.eventBookingCreated",
+  booking_confirmed: "integrations.eventBookingConfirmed",
+  booking_cancelled: "integrations.eventBookingCancelled",
+  new_client: "integrations.eventNewClient",
+  review_created: "integrations.eventReviewCreated",
+  message_received: "integrations.eventMessageReceived",
+};
 
 // ========================================
 // КОМПОНЕНТ
@@ -112,6 +115,7 @@ interface FormField {
 
 export default function IntegrationsPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isDark = theme === "dark";
 
   const [businessId, setBusinessId] = useState<string | null>(null);
@@ -190,14 +194,14 @@ export default function IntegrationsPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || "Ошибка создания");
+        alert(data.error || t("integrations.createError"));
         return;
       }
       setIsModalOpen(false);
       fetchIntegrations();
     } catch (e) {
       console.error(e);
-      alert("Ошибка сети");
+      alert(t("integrations.networkError"));
     } finally {
       setSaving(false);
     }
@@ -213,7 +217,7 @@ export default function IntegrationsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Удалить интеграцию?")) return;
+    if (!confirm(t("integrations.deleteConfirm"))) return;
     await fetch(`/api/integrations/${id}`, { method: "DELETE" });
     fetchIntegrations();
   };
@@ -234,7 +238,7 @@ export default function IntegrationsPage() {
       }));
       fetchIntegrations();
     } catch {
-      setTestResult((prev) => ({ ...prev, [id]: { success: false, error: "Ошибка сети" } }));
+      setTestResult((prev) => ({ ...prev, [id]: { success: false, error: t("integrations.networkError") } }));
     } finally {
       setTestingId(null);
     }
@@ -246,7 +250,7 @@ export default function IntegrationsPage() {
     );
   };
 
-  const typeInfo = INTEGRATION_TYPES.find((t) => t.id === selectedType)!;
+  const typeInfo = INTEGRATION_TYPES_CONFIG.find((t) => t.id === selectedType)!;
 
   // ========================================
   // СТИЛИ
@@ -275,9 +279,9 @@ export default function IntegrationsPage() {
         {/* Заголовок */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className={`text-2xl font-bold ${text}`}>CRM Интеграции</h1>
+            <h1 className={`text-2xl font-bold ${text}`}>{t("integrations.title")}</h1>
             <p className={`mt-1 text-sm ${sub}`}>
-              Автоматически передавайте данные о записях и клиентах во внешние системы
+              {t("integrations.subtitle")}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -286,14 +290,14 @@ export default function IntegrationsPage() {
               className={`flex items-center gap-2 px-4 py-2 ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} rounded-lg text-sm font-medium ${sub} transition-colors`}
             >
               <BookOpen className="w-4 h-4" />
-              Как подключить?
+              {t("integrations.howToConnect")}
             </button>
             <button
               onClick={openCreateModal}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
             >
               <Plus className="w-4 h-4" />
-              Добавить интеграцию
+              {t("integrations.addIntegration")}
             </button>
           </div>
         </div>
@@ -302,21 +306,21 @@ export default function IntegrationsPage() {
         {integrations.length === 0 ? (
           <div className={`${card} border rounded-xl p-12 text-center`}>
             <Link2 className={`w-12 h-12 mx-auto mb-4 ${sub}`} />
-            <p className={`text-lg font-medium ${text}`}>Нет интеграций</p>
+            <p className={`text-lg font-medium ${text}`}>{t("integrations.noIntegrations")}</p>
             <p className={`mt-2 text-sm ${sub}`}>
-              Подключите Bitrix24, AmoCRM, Google Sheets или любой Webhook
+              {t("integrations.noIntegrationsDesc")}
             </p>
             <button
               onClick={openCreateModal}
               className="mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
             >
-              Добавить первую интеграцию
+              {t("integrations.addFirst")}
             </button>
           </div>
         ) : (
           <div className="space-y-4">
             {integrations.map((integration) => {
-              const typeInfo = INTEGRATION_TYPES.find((t) => t.id === integration.type);
+              const typeInfo = INTEGRATION_TYPES_CONFIG.find((t) => t.id === integration.type);
               const tr = testResult[integration.id];
               return (
                 <div key={integration.id} className={`${card} border rounded-xl p-5`}>
@@ -333,13 +337,13 @@ export default function IntegrationsPage() {
                           </span>
                           {integration.isActive ? (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 font-medium">
-                              Активна
+                              {t("integrations.active")}
                             </span>
                           ) : (
                             <span className={`text-xs px-2 py-0.5 rounded-full ${
                               isDark ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-500"
                             } font-medium`}>
-                              Отключена
+                              {t("integrations.disabled")}
                             </span>
                           )}
                         </div>
@@ -351,7 +355,7 @@ export default function IntegrationsPage() {
                                 isDark ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"
                               }`}
                             >
-                              {ALL_EVENTS.find((ev) => ev.id === e)?.label || e}
+                              {EVENT_LABEL_KEYS[e] ? t(EVENT_LABEL_KEYS[e]) : e}
                             </span>
                           ))}
                         </div>
@@ -366,10 +370,10 @@ export default function IntegrationsPage() {
                           ) : integration.lastSyncAt ? (
                             <span className="flex items-center gap-1 text-xs text-green-400">
                               <CheckCircle2 className="w-3 h-3" />
-                              Синхр. {new Date(integration.lastSyncAt).toLocaleString("ru-RU")}
+                              {t("integrations.syncAt")} {new Date(integration.lastSyncAt).toLocaleString("ru-RU")}
                             </span>
                           ) : (
-                            <span className={`text-xs ${sub}`}>Ещё не запускалась</span>
+                            <span className={`text-xs ${sub}`}>{t("integrations.notRunYet")}</span>
                           )}
                         </div>
 
@@ -377,8 +381,8 @@ export default function IntegrationsPage() {
                         {tr && (
                           <div className={`mt-2 text-xs ${tr.success ? "text-green-400" : "text-red-400"}`}>
                             {tr.success
-                              ? "✓ Тест прошёл успешно"
-                              : `✗ Ошибка: ${tr.error || "неизвестно"}`}
+                              ? `✓ ${t("integrations.testSuccess")}`
+                              : `✗ ${t("integrations.testError")}: ${tr.error || t("integrations.unknown")}`}
                           </div>
                         )}
                       </div>
@@ -389,7 +393,7 @@ export default function IntegrationsPage() {
                       <button
                         onClick={() => handleTest(integration.id)}
                         disabled={testingId === integration.id}
-                        title="Тест"
+                        title={t("integrations.test")}
                         className={`p-2 rounded-lg transition-colors ${
                           isDark
                             ? "hover:bg-gray-700 text-gray-400 hover:text-white"
@@ -404,7 +408,7 @@ export default function IntegrationsPage() {
                       </button>
                       <button
                         onClick={() => handleToggle(integration.id, integration.isActive)}
-                        title={integration.isActive ? "Отключить" : "Включить"}
+                        title={integration.isActive ? t("integrations.disable") : t("integrations.enable")}
                         className={`p-2 rounded-lg transition-colors ${
                           isDark
                             ? "hover:bg-gray-700 text-gray-400 hover:text-white"
@@ -419,7 +423,7 @@ export default function IntegrationsPage() {
                       </button>
                       <button
                         onClick={() => handleDelete(integration.id)}
-                        title="Удалить"
+                        title={t("integrations.delete")}
                         className={`p-2 rounded-lg transition-colors ${
                           isDark
                             ? "hover:bg-red-900/30 text-gray-400 hover:text-red-400"
@@ -439,16 +443,16 @@ export default function IntegrationsPage() {
         {/* Инфо блок */}
         <div className={`mt-8 p-5 rounded-xl border ${isDark ? "border-blue-500/20 bg-blue-500/5" : "border-blue-100 bg-blue-50"}`}>
           <h3 className={`font-semibold mb-3 ${isDark ? "text-blue-300" : "text-blue-700"}`}>
-            📋 Формат данных Webhook
+            {t("integrations.webhookDataFormat")}
           </h3>
           <pre className={`text-xs overflow-x-auto ${isDark ? "text-gray-300" : "text-gray-700"}`}>
 {`{
   "event": "booking_created",
   "timestamp": "2026-02-23T10:30:00Z",
   "business": { "id": "...", "name": "${businessName}" },
-  "client": { "name": "Алишер", "phone": "+998901234567", "totalVisits": 5 },
+  "client": { "name": "Alisher", "phone": "+998901234567", "totalVisits": 5 },
   "booking": {
-    "service": "Стрижка", "master": "Рустам",
+    "service": "Haircut", "master": "Rustam",
     "date": "2026-02-25T14:00:00Z", "price": 25000, "status": "confirmed"
   }
 }`}
@@ -463,7 +467,7 @@ export default function IntegrationsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className={`${modalBg} border rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto`}>
             <div className="flex items-center justify-between p-5 border-b border-gray-700">
-              <h2 className={`text-lg font-semibold ${text}`}>Новая интеграция</h2>
+              <h2 className={`text-lg font-semibold ${text}`}>{t("integrations.newIntegration")}</h2>
               <button
                 onClick={() => setIsModalOpen(false)}
                 className={`p-1.5 rounded-lg transition-colors ${isDark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-500"}`}
@@ -475,41 +479,41 @@ export default function IntegrationsPage() {
             <div className="p-5 space-y-5">
               {/* Выбор типа */}
               <div>
-                <label className={`block text-sm font-medium mb-2 ${text}`}>Тип интеграции</label>
+                <label className={`block text-sm font-medium mb-2 ${text}`}>{t("integrations.integrationType")}</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {INTEGRATION_TYPES.map((t) => (
+                  {INTEGRATION_TYPES_CONFIG.map((t2) => (
                     <button
-                      key={t.id}
+                      key={t2.id}
                       onClick={() => {
-                        setSelectedType(t.id);
+                        setSelectedType(t2.id);
                         setFormConfig({});
                       }}
                       className={`flex items-center gap-2 p-3 rounded-lg border text-left transition-colors ${
-                        selectedType === t.id
+                        selectedType === t2.id
                           ? "border-blue-500 bg-blue-500/10 text-blue-400"
                           : isDark
                           ? "border-gray-600 hover:border-gray-500 text-gray-300"
                           : "border-gray-200 hover:border-gray-300 text-gray-700"
                       }`}
                     >
-                      <span className="text-xl">{t.icon}</span>
-                      <span className="text-sm font-medium">{t.label}</span>
+                      <span className="text-xl">{t2.icon}</span>
+                      <span className="text-sm font-medium">{t2.label}</span>
                     </button>
                   ))}
                 </div>
-                <p className={`mt-2 text-xs ${sub}`}>{typeInfo.description}</p>
+                <p className={`mt-2 text-xs ${sub}`}>{t(typeInfo.descriptionKey)}</p>
               </div>
 
               {/* Название */}
               <div>
                 <label className={`block text-sm font-medium mb-1 ${text}`}>
-                  Название <span className="text-red-400">*</span>
+                  {t("integrations.name")} <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="text"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
-                  placeholder={`Например: ${typeInfo.label} (${businessName})`}
+                  placeholder={`${t("integrations.example")}: ${typeInfo.label} (${businessName})`}
                   className={`w-full px-3 py-2 rounded-lg border text-sm outline-none transition-colors ${input}`}
                 />
               </div>
@@ -518,7 +522,7 @@ export default function IntegrationsPage() {
               {typeInfo.fields.map((field) => (
                 <div key={field.key}>
                   <label className={`block text-sm font-medium mb-1 ${text}`}>
-                    {field.label}
+                    {t(field.labelKey)}
                     {field.required && <span className="text-red-400 ml-1">*</span>}
                   </label>
                   {field.type === "textarea" ? (
@@ -527,7 +531,7 @@ export default function IntegrationsPage() {
                       onChange={(e) =>
                         setFormConfig((prev) => ({ ...prev, [field.key]: e.target.value }))
                       }
-                      placeholder={field.placeholder}
+                      placeholder={field.placeholderKey ? t(field.placeholderKey) : field.placeholderFallback}
                       rows={5}
                       className={`w-full px-3 py-2 rounded-lg border text-sm outline-none transition-colors font-mono text-xs ${input}`}
                     />
@@ -538,7 +542,7 @@ export default function IntegrationsPage() {
                       onChange={(e) =>
                         setFormConfig((prev) => ({ ...prev, [field.key]: e.target.value }))
                       }
-                      placeholder={field.placeholder}
+                      placeholder={field.placeholderKey ? t(field.placeholderKey) : field.placeholderFallback}
                       className={`w-full px-3 py-2 rounded-lg border text-sm outline-none transition-colors ${input}`}
                     />
                   )}
@@ -548,14 +552,14 @@ export default function IntegrationsPage() {
               {/* События */}
               <div>
                 <label className={`block text-sm font-medium mb-2 ${text}`}>
-                  Какие события отправлять
+                  {t("integrations.eventsToSend")}
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {ALL_EVENTS.map((event) => (
+                  {ALL_EVENT_IDS.map((eventId) => (
                     <label
-                      key={event.id}
+                      key={eventId}
                       className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${
-                        formEvents.includes(event.id)
+                        formEvents.includes(eventId)
                           ? "border-blue-500 bg-blue-500/10"
                           : isDark
                           ? "border-gray-600 hover:border-gray-500"
@@ -564,27 +568,27 @@ export default function IntegrationsPage() {
                     >
                       <input
                         type="checkbox"
-                        checked={formEvents.includes(event.id)}
-                        onChange={() => toggleEvent(event.id)}
+                        checked={formEvents.includes(eventId)}
+                        onChange={() => toggleEvent(eventId)}
                         className="hidden"
                       />
                       <div
                         className={`w-4 h-4 rounded flex items-center justify-center border flex-shrink-0 ${
-                          formEvents.includes(event.id)
+                          formEvents.includes(eventId)
                             ? "bg-blue-500 border-blue-500"
                             : isDark
                             ? "border-gray-500"
                             : "border-gray-300"
                         }`}
                       >
-                        {formEvents.includes(event.id) && (
+                        {formEvents.includes(eventId) && (
                           <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                           </svg>
                         )}
                       </div>
-                      <span className={`text-xs ${formEvents.includes(event.id) ? "text-blue-400" : sub}`}>
-                        {event.label}
+                      <span className={`text-xs ${formEvents.includes(eventId) ? "text-blue-400" : sub}`}>
+                        {t(EVENT_LABEL_KEYS[eventId])}
                       </span>
                     </label>
                   ))}
@@ -602,7 +606,7 @@ export default function IntegrationsPage() {
                     : "bg-gray-100 hover:bg-gray-200 text-gray-700"
                 }`}
               >
-                Отмена
+                {t("integrations.cancel")}
               </button>
               <button
                 onClick={handleCreate}
@@ -610,7 +614,7 @@ export default function IntegrationsPage() {
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                Создать
+                {t("integrations.create")}
               </button>
             </div>
           </div>
@@ -623,7 +627,7 @@ export default function IntegrationsPage() {
             <div className={`flex items-center justify-between p-6 border-b ${isDark ? "border-white/10" : "border-gray-200"}`}>
               <div className="flex items-center gap-3">
                 <HelpCircle className="h-5 w-5 text-blue-500" />
-                <h2 className={`text-lg font-bold ${text}`}>Как подключить интеграцию</h2>
+                <h2 className={`text-lg font-bold ${text}`}>{t("integrations.howToConnectTitle")}</h2>
               </div>
               <button onClick={() => setShowGuide(null)} className={`p-2 rounded-lg ${isDark ? "hover:bg-white/10" : "hover:bg-gray-100"}`}>
                 <X className={`h-5 w-5 ${sub}`} />
@@ -632,15 +636,15 @@ export default function IntegrationsPage() {
             <div className="p-6 space-y-6">
               {/* Tab selector */}
               <div className="flex gap-2 flex-wrap">
-                {INTEGRATION_TYPES.map((t) => (
+                {INTEGRATION_TYPES_CONFIG.map((t2) => (
                   <button
-                    key={t.id}
-                    onClick={() => setShowGuide(t.id)}
+                    key={t2.id}
+                    onClick={() => setShowGuide(t2.id)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      showGuide === t.id ? "bg-blue-600 text-white" : `${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} ${sub}`
+                      showGuide === t2.id ? "bg-blue-600 text-white" : `${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} ${sub}`
                     }`}
                   >
-                    {t.icon} {t.label}
+                    {t2.icon} {t2.label}
                   </button>
                 ))}
               </div>
@@ -650,22 +654,22 @@ export default function IntegrationsPage() {
                 {showGuide === "webhook" && (
                   <>
                     <h3 className="font-bold text-lg">Universal Webhook</h3>
-                    <p className={sub}>Подходит для Zapier, Make (Integromat), n8n и любых HTTP API.</p>
+                    <p className={sub}>{t("integrations.webhookGuideDesc")}</p>
                     <ol className="list-decimal list-inside space-y-3">
-                      <li><strong>Создайте endpoint</strong> в вашем сервисе автоматизации (Zapier → "Catch Webhook", Make → "Custom Webhook", n8n → "Webhook")</li>
-                      <li><strong>Скопируйте URL</strong> вебхука, который вам выдал сервис</li>
-                      <li>В Staffix нажмите <strong>"Добавить интеграцию"</strong> → выберите <strong>Webhook</strong></li>
-                      <li>Вставьте URL и выберите <strong>события</strong> (новая запись, новый клиент и т.д.)</li>
-                      <li>Нажмите <strong>"Тест"</strong> чтобы проверить что данные доходят</li>
+                      <li><strong>{t("integrations.guideStep1Create")}</strong> {t("integrations.guideStep1Desc")}</li>
+                      <li><strong>{t("integrations.guideStep2Copy")}</strong> {t("integrations.guideStep2Desc")}</li>
+                      <li>{t("integrations.guideStep3")}</li>
+                      <li>{t("integrations.guideStep4")}</li>
+                      <li>{t("integrations.guideStep5")}</li>
                     </ol>
                     <div className={`p-4 rounded-lg ${isDark ? "bg-white/5" : "bg-gray-50"}`}>
-                      <p className="font-medium mb-2">Формат данных (JSON):</p>
+                      <p className="font-medium mb-2">{t("integrations.dataFormatJson")}</p>
                       <pre className={`text-xs ${sub} font-mono whitespace-pre-wrap`}>{`{
   "event": "booking_created",
   "timestamp": "2026-02-25T12:00:00Z",
   "data": {
-    "client": { "name": "Иван", "phone": "+7700..." },
-    "booking": { "service": "Массаж", "date": "2026-02-26", "price": 5000 }
+    "client": { "name": "Ivan", "phone": "+7700..." },
+    "booking": { "service": "Massage", "date": "2026-02-26", "price": 5000 }
   }
 }`}</pre>
                     </div>
@@ -676,12 +680,12 @@ export default function IntegrationsPage() {
                   <>
                     <h3 className="font-bold text-lg">Bitrix24</h3>
                     <ol className="list-decimal list-inside space-y-3">
-                      <li>Откройте <strong>Bitrix24</strong> → <strong>Приложения</strong> (левое меню)</li>
-                      <li>Перейдите в <strong>Разработчикам</strong> → <strong>Другое</strong> → <strong>Входящий вебхук</strong></li>
-                      <li>Нажмите <strong>"Добавить"</strong></li>
-                      <li>В разделе <strong>"Настройка прав"</strong> выберите: <code>crm</code> (CRM), <code>crm.contact</code>, <code>crm.deal</code></li>
-                      <li>Сохраните и <strong>скопируйте URL вебхука</strong> (выглядит как: <code>https://ваш-домен.bitrix24.ru/rest/1/abc123xyz/</code>)</li>
-                      <li>В Staffix: <strong>Домен</strong> = <code>ваш-домен.bitrix24.ru</code>, <strong>Token</strong> = последняя часть URL (<code>abc123xyz</code>)</li>
+                      <li>{t("integrations.bitrix24GuideStep1")}</li>
+                      <li>{t("integrations.bitrix24GuideStep2")}</li>
+                      <li>{t("integrations.bitrix24GuideStep3")}</li>
+                      <li>{t("integrations.bitrix24GuideStep4")}</li>
+                      <li>{t("integrations.bitrix24GuideStep5")} {t("integrations.bitrix24GuideStep5Desc")}</li>
+                      <li>{t("integrations.bitrix24GuideStep6")}</li>
                     </ol>
                   </>
                 )}
@@ -690,13 +694,13 @@ export default function IntegrationsPage() {
                   <>
                     <h3 className="font-bold text-lg">AmoCRM</h3>
                     <ol className="list-decimal list-inside space-y-3">
-                      <li>Откройте <strong>AmoCRM</strong> → <strong>Настройки</strong> (шестерёнка)</li>
-                      <li>Перейдите в <strong>API</strong> → <strong>Ваши интеграции</strong></li>
-                      <li>Нажмите <strong>"Создать интеграцию"</strong> → выберите <strong>"Внешняя интеграция"</strong></li>
-                      <li>Заполните: Название (например "Staffix"), Описание, URL перенаправления (любой, например https://staffix.io)</li>
-                      <li>После создания: скопируйте <strong>Access Token</strong> (долгоживущий токен)</li>
-                      <li>В Staffix: <strong>Поддомен</strong> = часть URL до .amocrm.ru (например <code>mycompany</code>)</li>
-                      <li><strong>ID воронки</strong> (опционально): Сделки → Воронка → ID в URL</li>
+                      <li>{t("integrations.amocrmGuideStep1")}</li>
+                      <li>{t("integrations.amocrmGuideStep2")}</li>
+                      <li>{t("integrations.amocrmGuideStep3")}</li>
+                      <li>{t("integrations.amocrmGuideStep4")}</li>
+                      <li>{t("integrations.amocrmGuideStep5")}</li>
+                      <li>{t("integrations.amocrmGuideStep6")}</li>
+                      <li>{t("integrations.amocrmGuideStep7")}</li>
                     </ol>
                   </>
                 )}
@@ -705,13 +709,13 @@ export default function IntegrationsPage() {
                   <>
                     <h3 className="font-bold text-lg">Google Sheets</h3>
                     <ol className="list-decimal list-inside space-y-3">
-                      <li>Откройте <strong>Google Cloud Console</strong> → <strong>API & Services</strong></li>
-                      <li>Включите <strong>Google Sheets API</strong></li>
-                      <li>Создайте <strong>Service Account</strong> (IAM & Admin → Service Accounts)</li>
-                      <li>Создайте ключ для сервисного аккаунта → скачайте <strong>JSON файл</strong></li>
-                      <li>Создайте <strong>Google Таблицу</strong> и поделитесь ей с email сервисного аккаунта (даёте доступ "Редактор")</li>
-                      <li>Скопируйте <strong>ID таблицы</strong> из URL: <code>https://docs.google.com/spreadsheets/d/<strong>ID_ЗДЕСЬ</strong>/edit</code></li>
-                      <li>В Staffix: вставьте <strong>ID таблицы</strong>, <strong>название листа</strong> и содержимое <strong>JSON файла</strong> с ключами</li>
+                      <li>{t("integrations.sheetsGuideStep1")}</li>
+                      <li>{t("integrations.sheetsGuideStep2")}</li>
+                      <li>{t("integrations.sheetsGuideStep3")}</li>
+                      <li>{t("integrations.sheetsGuideStep4")}</li>
+                      <li>{t("integrations.sheetsGuideStep5")}</li>
+                      <li>{t("integrations.sheetsGuideStep6")}</li>
+                      <li>{t("integrations.sheetsGuideStep7")}</li>
                     </ol>
                   </>
                 )}

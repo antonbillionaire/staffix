@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   User,
   CreditCard,
@@ -29,6 +30,7 @@ export default function SettingsPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("profile");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -203,13 +205,13 @@ export default function SettingsPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Ошибка сохранения");
+        throw new Error(data.error || t("settings.saveError"));
       }
 
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка сохранения");
+      setError(err instanceof Error ? err.message : t("settings.saveError"));
     } finally {
       setSaving(false);
     }
@@ -244,7 +246,7 @@ export default function SettingsPage() {
         body: JSON.stringify({ timezone: tz }),
       });
 
-      if (!res.ok) throw new Error("Ошибка сохранения");
+      if (!res.ok) throw new Error(t("settings.saveError"));
 
       setTimezoneSaved(true);
       setTimeout(() => setTimezoneSaved(false), 3000);
@@ -271,7 +273,7 @@ export default function SettingsPage() {
         }),
       });
 
-      if (!res.ok) throw new Error("Ошибка сохранения");
+      if (!res.ok) throw new Error(t("settings.saveError"));
 
       setNotificationsSaved(true);
       setTimeout(() => setNotificationsSaved(false), 3000);
@@ -287,11 +289,11 @@ export default function SettingsPage() {
     setPasswordError("");
     setPasswordMessage("");
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setPasswordError("Пароли не совпадают");
+      setPasswordError(t("settings.passwordsDoNotMatch"));
       return;
     }
     if (passwordData.newPassword.length < 8) {
-      setPasswordError("Минимум 8 символов");
+      setPasswordError(t("settings.minChars"));
       return;
     }
     setPasswordSaving(true);
@@ -303,10 +305,10 @@ export default function SettingsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setPasswordMessage("Пароль успешно изменён");
+      setPasswordMessage(t("settings.passwordChanged"));
       setPasswordData({ oldPassword: "", newPassword: "", confirmPassword: "" });
     } catch (err) {
-      setPasswordError(err instanceof Error ? err.message : "Ошибка");
+      setPasswordError(err instanceof Error ? err.message : t("settings.error"));
     } finally {
       setPasswordSaving(false);
     }
@@ -329,7 +331,7 @@ export default function SettingsPage() {
           deliveryZones: delivery.zones,
         }),
       });
-      if (!res.ok) throw new Error("Ошибка сохранения");
+      if (!res.ok) throw new Error(t("settings.saveError"));
       setDeliverySaved(true);
       setTimeout(() => setDeliverySaved(false), 3000);
     } catch (err) {
@@ -346,7 +348,7 @@ export default function SettingsPage() {
 
   // Cancel subscription
   const handleCancelSubscription = async () => {
-    if (!confirm("Вы уверены, что хотите отменить подписку? Вы сможете пользоваться услугами до конца оплаченного периода.")) {
+    if (!confirm(t("settings.cancelConfirm"))) {
       return;
     }
 
@@ -363,13 +365,13 @@ export default function SettingsPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Ошибка отмены подписки");
+        throw new Error(data.error || t("settings.cancelError"));
       }
 
       setSubscription({ ...subscription, status: "cancelled" });
       setSubscriptionMessage(data.message);
     } catch (err) {
-      setSubscriptionMessage(err instanceof Error ? err.message : "Ошибка отмены подписки");
+      setSubscriptionMessage(err instanceof Error ? err.message : t("settings.cancelError"));
     } finally {
       setSubscriptionLoading(false);
     }
@@ -390,24 +392,24 @@ export default function SettingsPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Ошибка возобновления подписки");
+        throw new Error(data.error || t("settings.resumeError"));
       }
 
       setSubscription({ ...subscription, status: "active" });
       setSubscriptionMessage(data.message);
     } catch (err) {
-      setSubscriptionMessage(err instanceof Error ? err.message : "Ошибка возобновления подписки");
+      setSubscriptionMessage(err instanceof Error ? err.message : t("settings.resumeError"));
     } finally {
       setSubscriptionLoading(false);
     }
   };
 
   const tabs = [
-    { id: "profile", label: "Профиль", icon: User },
-    { id: "security", label: "Безопасность", icon: Lock },
-    { id: "theme", label: "Тема", icon: Palette },
-    { id: "subscription", label: "Подписка", icon: CreditCard },
-    { id: "notifications", label: "Уведомления", icon: Bell },
+    { id: "profile", label: t("settings.tabProfile"), icon: User },
+    { id: "security", label: t("settings.tabSecurity"), icon: Lock },
+    { id: "theme", label: t("settings.tabTheme"), icon: Palette },
+    { id: "subscription", label: t("settings.tabSubscription"), icon: CreditCard },
+    { id: "notifications", label: t("settings.tabNotifications"), icon: Bell },
   ];
 
   const messagesRemaining = subscription.messagesLimit - subscription.messagesUsed;
@@ -415,9 +417,9 @@ export default function SettingsPage() {
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
-        <h2 className={`text-xl font-semibold ${textPrimary}`}>Настройки</h2>
+        <h2 className={`text-xl font-semibold ${textPrimary}`}>{t("settings.title")}</h2>
         <p className={`text-sm ${textSecondary}`}>
-          Управление аккаунтом и подпиской
+          {t("settings.subtitle")}
         </p>
       </div>
 
@@ -442,7 +444,7 @@ export default function SettingsPage() {
       {/* Profile Tab */}
       {activeTab === "profile" && (
         <div className={`${bgCard} rounded-xl border ${borderColor} p-6`}>
-          <h3 className={`text-lg font-medium ${textPrimary} mb-4`}>Данные профиля</h3>
+          <h3 className={`text-lg font-medium ${textPrimary} mb-4`}>{t("settings.profileData")}</h3>
 
           {error && (
             <div className="mb-4 bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg text-sm flex items-center gap-2">
@@ -454,21 +456,21 @@ export default function SettingsPage() {
           {saved && (
             <div className="mb-4 bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-lg text-sm flex items-center gap-2">
               <Check className="h-4 w-4" />
-              Профиль успешно сохранён
+              {t("settings.profileSaved")}
             </div>
           )}
 
           <div className="space-y-4">
             <div>
               <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
-                Имя
+                {t("settings.name")}
               </label>
               <input
                 type="text"
                 value={profileData.name}
                 onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
                 className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                placeholder="Ваше имя"
+                placeholder={t("settings.namePlaceholder")}
               />
             </div>
             <div>
@@ -491,15 +493,15 @@ export default function SettingsPage() {
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Сохранение...
+                  {t("settings.saving")}
                 </>
               ) : saved ? (
                 <>
                   <Check className="h-4 w-4" />
-                  Сохранено
+                  {t("settings.saved")}
                 </>
               ) : (
-                "Сохранить"
+                t("settings.save")
               )}
             </button>
           </div>
@@ -511,10 +513,10 @@ export default function SettingsPage() {
         <div className={`${bgCard} rounded-xl border ${borderColor} p-6 mt-4`}>
           <div className="flex items-center gap-2 mb-4">
             <Clock className="h-5 w-5 text-blue-500" />
-            <h3 className={`text-lg font-medium ${textPrimary}`}>Часовой пояс</h3>
+            <h3 className={`text-lg font-medium ${textPrimary}`}>{t("settings.timezone")}</h3>
             {timezoneSaved && (
               <span className="text-green-500 text-sm flex items-center gap-1">
-                <Check className="h-3 w-3" /> Сохранено
+                <Check className="h-3 w-3" /> {t("settings.saved")}
               </span>
             )}
             {timezoneSaving && (
@@ -522,7 +524,7 @@ export default function SettingsPage() {
             )}
           </div>
           <p className={`text-sm ${textSecondary} mb-4`}>
-            Используется для расчёта времени записей и отправки напоминаний
+            {t("settings.timezoneDescription")}
           </p>
           <select
             value={timezone}
@@ -543,7 +545,7 @@ export default function SettingsPage() {
         <div className={`${bgCard} rounded-xl border ${borderColor} p-6`}>
           <div className="flex items-center gap-2 mb-4">
             <Lock className="h-5 w-5 text-blue-500" />
-            <h3 className={`text-lg font-medium ${textPrimary}`}>Смена пароля</h3>
+            <h3 className={`text-lg font-medium ${textPrimary}`}>{t("settings.changePassword")}</h3>
           </div>
 
           {passwordError && (
@@ -559,14 +561,14 @@ export default function SettingsPage() {
 
           <div className="space-y-4 max-w-md">
             <div>
-              <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Текущий пароль</label>
+              <label className={`block text-sm font-medium ${textSecondary} mb-2`}>{t("settings.currentPassword")}</label>
               <div className="relative">
                 <input
                   type={showOldPw ? "text" : "password"}
                   value={passwordData.oldPassword}
                   onChange={(e) => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
                   className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12`}
-                  placeholder="Текущий пароль"
+                  placeholder={t("settings.currentPassword")}
                 />
                 <button type="button" onClick={() => setShowOldPw(!showOldPw)} className={`absolute inset-y-0 right-0 pr-4 flex items-center ${textSecondary}`}>
                   {showOldPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -574,14 +576,14 @@ export default function SettingsPage() {
               </div>
             </div>
             <div>
-              <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Новый пароль</label>
+              <label className={`block text-sm font-medium ${textSecondary} mb-2`}>{t("settings.newPassword")}</label>
               <div className="relative">
                 <input
                   type={showNewPw ? "text" : "password"}
                   value={passwordData.newPassword}
                   onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
                   className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12`}
-                  placeholder="Минимум 8 символов"
+                  placeholder={t("settings.minChars")}
                 />
                 <button type="button" onClick={() => setShowNewPw(!showNewPw)} className={`absolute inset-y-0 right-0 pr-4 flex items-center ${textSecondary}`}>
                   {showNewPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -589,13 +591,13 @@ export default function SettingsPage() {
               </div>
             </div>
             <div>
-              <label className={`block text-sm font-medium ${textSecondary} mb-2`}>Подтвердите пароль</label>
+              <label className={`block text-sm font-medium ${textSecondary} mb-2`}>{t("settings.confirmPassword")}</label>
               <input
                 type="password"
                 value={passwordData.confirmPassword}
                 onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
                 className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                placeholder="Повторите новый пароль"
+                placeholder={t("settings.confirmPasswordPlaceholder")}
               />
             </div>
             <button
@@ -603,7 +605,7 @@ export default function SettingsPage() {
               disabled={passwordSaving || !passwordData.newPassword}
               className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:opacity-90 disabled:opacity-50 transition-all"
             >
-              {passwordSaving ? <><Loader2 className="h-4 w-4 animate-spin" /> Сохранение...</> : "Сменить пароль"}
+              {passwordSaving ? <><Loader2 className="h-4 w-4 animate-spin" /> {t("settings.saving")}</> : t("settings.changePasswordBtn")}
             </button>
           </div>
         </div>
@@ -612,9 +614,9 @@ export default function SettingsPage() {
       {/* Theme Tab */}
       {activeTab === "theme" && (
         <div className={`${bgCard} rounded-xl border ${borderColor} p-6`}>
-          <h3 className={`text-lg font-medium ${textPrimary} mb-4`}>Выбор темы</h3>
+          <h3 className={`text-lg font-medium ${textPrimary} mb-4`}>{t("settings.chooseTheme")}</h3>
           <p className={`text-sm ${textSecondary} mb-6`}>
-            Выберите предпочитаемую тему оформления
+            {t("settings.chooseThemeDesc")}
           </p>
 
           <div className="grid grid-cols-2 gap-4">
@@ -631,8 +633,8 @@ export default function SettingsPage() {
                   <Moon className="h-5 w-5 text-blue-400" />
                 </div>
                 <div className="text-left">
-                  <p className={`font-medium ${textPrimary}`}>Тёмная тема</p>
-                  <p className={`text-xs ${textSecondary}`}>Рекомендуется</p>
+                  <p className={`font-medium ${textPrimary}`}>{t("settings.darkTheme")}</p>
+                  <p className={`text-xs ${textSecondary}`}>{t("settings.recommended")}</p>
                 </div>
               </div>
               <div className="bg-[#0a0a1a] rounded-lg p-3 h-24">
@@ -655,8 +657,8 @@ export default function SettingsPage() {
                   <Sun className="h-5 w-5 text-yellow-500" />
                 </div>
                 <div className="text-left">
-                  <p className={`font-medium ${textPrimary}`}>Светлая тема</p>
-                  <p className={`text-xs ${textSecondary}`}>Классический вид</p>
+                  <p className={`font-medium ${textPrimary}`}>{t("settings.lightTheme")}</p>
+                  <p className={`text-xs ${textSecondary}`}>{t("settings.classicLook")}</p>
                 </div>
               </div>
               <div className="bg-gray-100 rounded-lg p-3 h-24">
@@ -668,7 +670,7 @@ export default function SettingsPage() {
           </div>
 
           <p className={`text-xs ${textSecondary} mt-4`}>
-            Тема будет применена ко всему дашборду
+            {t("settings.themeApplied")}
           </p>
         </div>
       )}
@@ -679,11 +681,11 @@ export default function SettingsPage() {
           {/* Message feedback */}
           {subscriptionMessage && (
             <div className={`p-4 rounded-xl flex items-center gap-2 ${
-              subscriptionMessage.includes("Ошибка")
+              subscriptionMessage.includes("Ошибка") || subscriptionMessage.includes("Error") || subscriptionMessage.includes("error")
                 ? "bg-red-500/10 border border-red-500/30 text-red-400"
                 : "bg-green-500/10 border border-green-500/30 text-green-400"
             }`}>
-              {subscriptionMessage.includes("Ошибка") ? (
+              {subscriptionMessage.includes("Ошибка") || subscriptionMessage.includes("Error") || subscriptionMessage.includes("error") ? (
                 <AlertCircle className="h-4 w-4" />
               ) : (
                 <Check className="h-4 w-4" />
@@ -693,16 +695,16 @@ export default function SettingsPage() {
           )}
 
           <div className={`${bgCard} rounded-xl border ${borderColor} p-6`}>
-            <h3 className={`text-lg font-medium ${textPrimary} mb-2`}>Текущий план</h3>
+            <h3 className={`text-lg font-medium ${textPrimary} mb-2`}>{t("settings.currentPlan")}</h3>
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
                 <div className="flex items-center gap-2">
                   <p className={`text-2xl font-bold ${textPrimary}`}>
-                    {subscription.plan === 'trial' ? 'Пробный период' :
+                    {subscription.plan === 'trial' ? t("settings.trialPeriod") :
                      subscription.plan === 'starter' ? 'Starter' :
                      subscription.plan === 'pro' ? 'Pro' :
                      subscription.plan === 'business' ? 'Business' :
-                     subscription.plan === 'enterprise' ? 'Enterprise' : 'Корпоративный'}
+                     subscription.plan === 'enterprise' ? 'Enterprise' : t("settings.corporate")}
                   </p>
                   <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                     subscription.status === 'active' ? 'bg-green-500/20 text-green-500' :
@@ -711,22 +713,22 @@ export default function SettingsPage() {
                     subscription.status === 'expired' ? 'bg-gray-500/20 text-gray-500' :
                     'bg-yellow-500/20 text-yellow-500'
                   }`}>
-                    {subscription.status === 'active' ? 'Активна' :
-                     subscription.status === 'cancelled' ? 'Отменена' :
-                     subscription.status === 'past_due' ? 'Просрочена' :
-                     subscription.status === 'expired' ? 'Истекла' : 'Активна'}
+                    {subscription.status === 'active' ? t("settings.statusActive") :
+                     subscription.status === 'cancelled' ? t("settings.statusCancelled") :
+                     subscription.status === 'past_due' ? t("settings.statusPastDue") :
+                     subscription.status === 'expired' ? t("settings.statusExpired") : t("settings.statusActive")}
                   </span>
                 </div>
                 <p className={`text-sm ${textSecondary} mt-1`}>
                   {subscription.plan === 'trial'
-                    ? `Осталось ${subscription.daysLeft} дней`
+                    ? t("settings.daysLeft").replace("{days}", String(subscription.daysLeft))
                     : subscription.status === 'cancelled'
-                    ? `Действует до ${new Date(subscription.expiresAt).toLocaleDateString('ru-RU')}`
-                    : `Продлится ${new Date(subscription.expiresAt).toLocaleDateString('ru-RU')}`}
+                    ? `${t("settings.validUntil")} ${new Date(subscription.expiresAt).toLocaleDateString('ru-RU')}`
+                    : `${t("settings.renewsOn")} ${new Date(subscription.expiresAt).toLocaleDateString('ru-RU')}`}
                 </p>
               </div>
               <div className="text-right">
-                <p className={`text-sm ${textSecondary}`}>Использовано сообщений</p>
+                <p className={`text-sm ${textSecondary}`}>{t("settings.messagesUsed")}</p>
                 <div className="flex items-center gap-2">
                   <p className={`text-xl font-medium ${textPrimary}`}>
                     {subscription.messagesUsed} / {subscription.messagesLimit}
@@ -755,7 +757,7 @@ export default function SettingsPage() {
                     ) : (
                       <XCircle className="h-4 w-4" />
                     )}
-                    Отменить подписку
+                    {t("settings.cancelSubscription")}
                   </button>
                 )}
                 {subscription.status === 'cancelled' && (
@@ -769,7 +771,7 @@ export default function SettingsPage() {
                     ) : (
                       <RefreshCw className="h-4 w-4" />
                     )}
-                    Возобновить подписку
+                    {t("settings.resumeSubscription")}
                   </button>
                 )}
               </div>
@@ -781,9 +783,9 @@ export default function SettingsPage() {
             <div className="bg-yellow-500/10 rounded-xl border border-yellow-500/20 p-4 flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium text-yellow-500">Осталось {messagesRemaining} сообщений</p>
+                <p className="font-medium text-yellow-500">{t("settings.messagesRemaining").replace("{count}", String(messagesRemaining))}</p>
                 <p className="text-sm text-yellow-500/70">
-                  Обновите план, чтобы получить больше сообщений и дополнительные функции
+                  {t("settings.upgradeForMore")}
                 </p>
               </div>
             </div>
@@ -794,10 +796,9 @@ export default function SettingsPage() {
             <div className="bg-yellow-500/10 rounded-xl border border-yellow-500/20 p-4 flex items-start gap-3">
               <Calendar className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium text-yellow-500">Подписка отменена</p>
+                <p className="font-medium text-yellow-500">{t("settings.subscriptionCancelled")}</p>
                 <p className="text-sm text-yellow-500/70">
-                  Вы можете пользоваться услугами до {new Date(subscription.expiresAt).toLocaleDateString('ru-RU')}.
-                  После этого ваш аккаунт будет переведён на бесплатный тариф.
+                  {t("settings.cancelledNotice").replace("{date}", new Date(subscription.expiresAt).toLocaleDateString('ru-RU'))}
                 </p>
               </div>
             </div>
@@ -807,18 +808,18 @@ export default function SettingsPage() {
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="h-5 w-5 text-yellow-400" />
               <h3 className={`text-lg font-medium ${textPrimary}`}>
-                {subscription.plan === 'trial' ? 'Выбрать план' : 'Обновить план'}
+                {subscription.plan === 'trial' ? t("settings.choosePlan") : t("settings.upgradePlan")}
               </h3>
             </div>
             <p className={`text-sm ${textSecondary} mb-4`}>
-              Получите безлимитные сообщения, приоритетную поддержку и расширенную аналитику
+              {t("settings.upgradeBenefits")}
             </p>
             <div className="flex gap-3">
               <button
                 onClick={handleChoosePlan}
                 className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-medium hover:opacity-90 transition-all"
               >
-                {subscription.plan === 'trial' ? 'Выбрать план' : 'Изменить план'}
+                {subscription.plan === 'trial' ? t("settings.choosePlan") : t("settings.changePlan")}
               </button>
             </div>
           </div>
@@ -828,23 +829,23 @@ export default function SettingsPage() {
       {/* Notifications Tab */}
       {activeTab === "notifications" && (
         <div className={`${bgCard} rounded-xl border ${borderColor} p-6`}>
-          <h3 className={`text-lg font-medium ${textPrimary} mb-4`}>Настройки уведомлений</h3>
+          <h3 className={`text-lg font-medium ${textPrimary} mb-4`}>{t("settings.notificationSettings")}</h3>
           <p className={`text-sm ${textSecondary} mb-6`}>
-            Выберите какие уведомления вы хотите получать
+            {t("settings.chooseNotifications")}
           </p>
 
           {notificationsSaved && (
             <div className="mb-4 bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-lg text-sm flex items-center gap-2">
               <Check className="h-4 w-4" />
-              Настройки сохранены
+              {t("settings.settingsSaved")}
             </div>
           )}
 
           <div className="space-y-4">
             <label className={`flex items-center justify-between p-4 ${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-xl cursor-pointer hover:opacity-80 transition-colors`}>
               <div>
-                <p className={`font-medium ${textPrimary}`}>Новые записи</p>
-                <p className={`text-sm ${textSecondary}`}>Уведомления о новых записях клиентов</p>
+                <p className={`font-medium ${textPrimary}`}>{t("settings.newBookings")}</p>
+                <p className={`text-sm ${textSecondary}`}>{t("settings.newBookingsDesc")}</p>
               </div>
               <div className="relative">
                 <input
@@ -860,8 +861,8 @@ export default function SettingsPage() {
 
             <label className={`flex items-center justify-between p-4 ${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-xl cursor-pointer hover:opacity-80 transition-colors`}>
               <div>
-                <p className={`font-medium ${textPrimary}`}>Отмены записей</p>
-                <p className={`text-sm ${textSecondary}`}>Уведомления когда клиент отменяет запись</p>
+                <p className={`font-medium ${textPrimary}`}>{t("settings.cancellations")}</p>
+                <p className={`text-sm ${textSecondary}`}>{t("settings.cancellationsDesc")}</p>
               </div>
               <div className="relative">
                 <input
@@ -877,8 +878,8 @@ export default function SettingsPage() {
 
             <label className={`flex items-center justify-between p-4 ${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-xl cursor-pointer hover:opacity-80 transition-colors`}>
               <div>
-                <p className={`font-medium ${textPrimary}`}>Лимит сообщений</p>
-                <p className={`text-sm ${textSecondary}`}>Предупреждение когда осталось 50 сообщений</p>
+                <p className={`font-medium ${textPrimary}`}>{t("settings.messageLimit")}</p>
+                <p className={`text-sm ${textSecondary}`}>{t("settings.messageLimitDesc")}</p>
               </div>
               <div className="relative">
                 <input
@@ -894,8 +895,8 @@ export default function SettingsPage() {
 
             <label className={`flex items-center justify-between p-4 ${isDark ? 'bg-white/5' : 'bg-gray-50'} rounded-xl cursor-pointer hover:opacity-80 transition-colors`}>
               <div>
-                <p className={`font-medium ${textPrimary}`}>Окончание пробного периода</p>
-                <p className={`text-sm ${textSecondary}`}>Напоминание за 3 дня до окончания триала</p>
+                <p className={`font-medium ${textPrimary}`}>{t("settings.trialEnding")}</p>
+                <p className={`text-sm ${textSecondary}`}>{t("settings.trialEndingDesc")}</p>
               </div>
               <div className="relative">
                 <input
@@ -918,28 +919,28 @@ export default function SettingsPage() {
             {notificationsSaving ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Сохранение...
+                {t("settings.saving")}
               </>
             ) : (
-              "Сохранить настройки"
+              t("settings.saveSettings")
             )}
           </button>
 
           <p className={`text-xs ${textSecondary} mt-4`}>
-            Уведомления будут отправляться на ваш email ({profileData.email})
+            {t("settings.notificationsEmailNote").replace("{email}", profileData.email)}
           </p>
 
           {/* Telegram notifications section */}
           <div className={`mt-8 pt-6 border-t ${borderColor}`}>
-            <h4 className={`text-base font-medium ${textPrimary} mb-2`}>Telegram-уведомления</h4>
+            <h4 className={`text-base font-medium ${textPrimary} mb-2`}>{t("settings.telegramNotifications")}</h4>
             <p className={`text-sm ${textSecondary} mb-4`}>
-              Получайте уведомления о записях прямо в Telegram
+              {t("settings.telegramNotificationsDesc")}
             </p>
 
             <div className="space-y-3">
               <div>
                 <label className={`block text-sm font-medium ${textSecondary} mb-1`}>
-                  Ваш Telegram username
+                  {t("settings.telegramUsername")}
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -973,7 +974,7 @@ export default function SettingsPage() {
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
                   >
                     {ownerTelegramSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : ownerTelegramSaved ? <Check className="h-3 w-3" /> : null}
-                    {ownerTelegramSaved ? "Сохранено" : "Сохранить"}
+                    {ownerTelegramSaved ? t("settings.saved") : t("settings.save")}
                   </button>
                 </div>
               </div>
@@ -982,14 +983,13 @@ export default function SettingsPage() {
                 <span className={`w-2 h-2 rounded-full ${ownerTelegramConnected ? "bg-green-400" : isDark ? "bg-gray-600" : "bg-gray-400"}`} />
                 <span className={`text-sm ${ownerTelegramConnected ? "text-green-400" : textSecondary}`}>
                   {ownerTelegramConnected
-                    ? "Подключено — уведомления приходят в Telegram"
-                    : "Не подключено — напишите /start вашему боту Staffix"}
+                    ? t("settings.telegramConnected")
+                    : t("settings.telegramNotConnected")}
                 </span>
               </div>
 
               <p className={`text-xs ${textSecondary}`}>
-                После сохранения username напишите /start вашему бизнес-боту в Telegram.
-                Бот автоматически свяжет ваш аккаунт и начнёт отправлять уведомления.
+                {t("settings.telegramInstructions")}
               </p>
             </div>
           </div>

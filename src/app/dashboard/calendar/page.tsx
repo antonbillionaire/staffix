@@ -78,10 +78,8 @@ const STAFF_COLORS_LIGHT = [
 const NO_STAFF_COLOR = { bg: "bg-gray-500", border: "border-gray-400", light: "bg-gray-500/20 text-gray-300" };
 const NO_STAFF_COLOR_LIGHT = { bg: "bg-gray-500", border: "border-gray-300", light: "bg-gray-100 text-gray-600" };
 
-const DAY_NAMES_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-const DAY_NAMES_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const MONTH_NAMES_RU = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
-const MONTH_NAMES_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const DAY_KEYS = ["calendar.dayMon", "calendar.dayTue", "calendar.dayWed", "calendar.dayThu", "calendar.dayFri", "calendar.daySat", "calendar.daySun"];
+const MONTH_KEYS = ["calendar.monthJan", "calendar.monthFeb", "calendar.monthMar", "calendar.monthApr", "calendar.monthMay", "calendar.monthJun", "calendar.monthJul", "calendar.monthAug", "calendar.monthSep", "calendar.monthOct", "calendar.monthNov", "calendar.monthDec"];
 
 function getWeekDates(date: Date): Date[] {
   const d = new Date(date);
@@ -102,7 +100,7 @@ function formatDateKey(d: Date): string {
 }
 
 export default function CalendarPage() {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
@@ -115,8 +113,8 @@ export default function CalendarPage() {
   const [staffFilter, setStaffFilter] = useState<string | null>(null);
   const [businessTimezone, setBusinessTimezone] = useState("Asia/Tashkent");
 
-  const dayNames = language === "en" ? DAY_NAMES_EN : DAY_NAMES_RU;
-  const monthNames = language === "en" ? MONTH_NAMES_EN : MONTH_NAMES_RU;
+  const dayNames = DAY_KEYS.map((k) => t(k));
+  const monthNames = MONTH_KEYS.map((k) => t(k));
   const weekDates = getWeekDates(currentDate);
 
   const getStaffColor = (staffId: string | null) => {
@@ -463,7 +461,7 @@ export default function CalendarPage() {
                   <Scissors className={`h-4 w-4 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
                   <span className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
                     {selectedBooking.serviceName}
-                    {selectedBooking.serviceDuration && ` (${selectedBooking.serviceDuration} мин)`}
+                    {selectedBooking.serviceDuration && ` (${selectedBooking.serviceDuration} ${t("calendar.min")})`}
                   </span>
                 </div>
               )}

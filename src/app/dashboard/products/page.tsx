@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Pencil, Trash2, X, Loader2, Package, Tag, Search, Upload } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Product {
   id: string;
@@ -30,6 +31,7 @@ const EMPTY_FORM = {
 
 export default function ProductsPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isDark = theme === "dark";
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -140,7 +142,7 @@ export default function ProductsPage() {
         fetchProducts();
       } else {
         const data = await res.json();
-        alert(data.error || "Ошибка сохранения");
+        alert(data.error || t("products.saveError"));
       }
     } finally {
       setSaving(false);
@@ -148,14 +150,14 @@ export default function ProductsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Скрыть товар? Он останется в истории заказов.")) return;
+    if (!confirm(t("products.confirmHide"))) return;
     await fetch(`/api/products/${id}`, { method: "DELETE" });
     fetchProducts();
   };
 
   const [deletingAll, setDeletingAll] = useState(false);
   const handleDeleteAll = async () => {
-    if (!confirm(`Удалить все ${products.length} товаров? Это действие нельзя отменить.`)) return;
+    if (!confirm(t("products.confirmDeleteAll").replace("{count}", String(products.length)))) return;
     setDeletingAll(true);
     try {
       await fetch("/api/products/bulk-delete", { method: "DELETE" });
@@ -189,7 +191,7 @@ export default function ProductsPage() {
         }
         setImportCsv(csvParts.join("\n"));
       } catch {
-        setImportResult({ message: "Ошибка чтения Excel файла" });
+        setImportResult({ message: t("products.excelReadError") });
       } finally {
         setParsingFile(false);
       }
@@ -216,10 +218,10 @@ export default function ProductsPage() {
       if (data.preview) {
         setPreviewData(data);
       } else {
-        setImportResult({ message: data.error || "Ошибка превью" });
+        setImportResult({ message: data.error || t("products.previewError") });
       }
     } catch {
-      setImportResult({ message: "Ошибка при анализе файла" });
+      setImportResult({ message: t("products.analyzeError") });
     } finally {
       setLoadingPreview(false);
     }
@@ -240,7 +242,7 @@ export default function ProductsPage() {
       setPreviewData(null);
       if (data.created > 0) await fetchProducts();
     } catch {
-      setImportResult({ message: "Ошибка при импорте" });
+      setImportResult({ message: t("products.importError") });
     } finally {
       setImporting(false);
     }
@@ -279,9 +281,9 @@ export default function ProductsPage() {
         {/* Заголовок */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className={`text-2xl font-bold ${text}`}>Товары</h1>
+            <h1 className={`text-2xl font-bold ${text}`}>{t("products.title")}</h1>
             <p className={`mt-1 text-sm ${sub}`}>
-              Каталог товаров для AI-продавца. Добавьте товары — бот сможет их искать и предлагать клиентам.
+              {t("products.subtitle")}
             </p>
           </div>
           <div className="flex gap-2">
@@ -292,7 +294,7 @@ export default function ProductsPage() {
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border ${isDark ? "border-red-500/30 text-red-400 hover:bg-red-500/10" : "border-red-300 text-red-600 hover:bg-red-50"} disabled:opacity-50`}
               >
                 {deletingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                Удалить все
+                {t("products.deleteAll")}
               </button>
             )}
             <button
@@ -300,14 +302,14 @@ export default function ProductsPage() {
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border ${isDark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
             >
               <Upload className="w-4 h-4" />
-              Импорт каталога
+              {t("products.importCatalog")}
             </button>
             <button
               onClick={openCreate}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
             >
               <Plus className="w-4 h-4" />
-              Добавить товар
+              {t("products.addProduct")}
             </button>
           </div>
         </div>
@@ -315,9 +317,9 @@ export default function ProductsPage() {
         {/* Статистика */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           {[
-            { label: "Всего товаров", value: products.length },
-            { label: "Активных", value: products.filter((p) => p.isActive).length },
-            { label: "Категорий", value: categories.length },
+            { label: t("products.totalProducts"), value: products.length },
+            { label: t("products.activeProducts"), value: products.filter((p) => p.isActive).length },
+            { label: t("products.categoriesCount"), value: categories.length },
           ].map((stat) => (
             <div key={stat.label} className={`${card} border rounded-xl p-4`}>
               <p className={`text-2xl font-bold ${text}`}>{stat.value}</p>
@@ -332,7 +334,7 @@ export default function ProductsPage() {
             <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${sub}`} />
             <input
               type="text"
-              placeholder="Поиск по названию, артикулу..."
+              placeholder={t("products.searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className={`w-full pl-9 pr-3 py-2 rounded-lg border text-sm outline-none ${input}`}
@@ -344,7 +346,7 @@ export default function ProductsPage() {
               onChange={(e) => setFilterCategory(e.target.value)}
               className={`px-3 py-2 rounded-lg border text-sm outline-none ${input}`}
             >
-              <option value="">Все категории</option>
+              <option value="">{t("products.allCategories")}</option>
               {categories.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
@@ -357,16 +359,16 @@ export default function ProductsPage() {
           <div className={`${card} border rounded-xl p-12 text-center`}>
             <Package className={`w-12 h-12 mx-auto mb-4 ${sub}`} />
             <p className={`text-lg font-medium ${text}`}>
-              {products.length === 0 ? "Товары не добавлены" : "Ничего не найдено"}
+              {products.length === 0 ? t("products.noProducts") : t("products.nothingFound")}
             </p>
             <p className={`mt-2 text-sm ${sub}`}>
               {products.length === 0
-                ? "Добавьте товары и AI-продавец сможет предлагать их клиентам"
-                : "Попробуйте изменить фильтры"}
+                ? t("products.noProductsHint")
+                : t("products.tryChangeFilters")}
             </p>
             {products.length === 0 && (
               <button onClick={openCreate} className="mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">
-                Добавить первый товар
+                {t("products.addFirstProduct")}
               </button>
             )}
           </div>
@@ -390,7 +392,7 @@ export default function ProductsPage() {
                     <span className={`font-semibold ${text}`}>{product.name}</span>
                     {!product.isActive && (
                       <span className={`text-xs px-2 py-0.5 rounded-full ${isDark ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-500"}`}>
-                        Скрыт
+                        {t("products.hidden")}
                       </span>
                     )}
                     {product.category && (
@@ -404,7 +406,7 @@ export default function ProductsPage() {
                           ? "bg-red-500/20 text-red-400"
                           : "bg-yellow-500/20 text-yellow-500"
                       }`}>
-                        {product.stock === 0 ? "Нет в наличии" : `Осталось ${product.stock} шт.`}
+                        {product.stock === 0 ? t("products.outOfStock") : t("products.remainingStock").replace("{count}", String(product.stock))}
                       </span>
                     )}
                   </div>
@@ -441,7 +443,7 @@ export default function ProductsPage() {
                         : "border-green-500/50 text-green-400 hover:bg-green-500/10"
                     }`}
                   >
-                    {product.isActive ? "Скрыть" : "Показать"}
+                    {product.isActive ? t("products.hide") : t("products.show")}
                   </button>
                   <button
                     onClick={() => openEdit(product)}
@@ -468,7 +470,7 @@ export default function ProductsPage() {
           <div className={`${modalBg} border rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto`}>
             <div className={`flex items-center justify-between p-5 border-b ${isDark ? "border-gray-700" : "border-gray-200"}`}>
               <h2 className={`text-lg font-semibold ${text}`}>
-                {editingProduct ? "Редактировать товар" : "Новый товар"}
+                {editingProduct ? t("products.editProduct") : t("products.newProduct")}
               </h2>
               <button onClick={() => setIsModalOpen(false)} className={`p-1.5 rounded-lg ${isDark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-500"}`}>
                 <X className="w-5 h-5" />
@@ -479,24 +481,24 @@ export default function ProductsPage() {
               {/* Название */}
               <div>
                 <label className={`block text-sm font-medium mb-1 ${text}`}>
-                  Название <span className="text-red-400">*</span>
+                  {t("products.nameLabel")} <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="Например: iPhone 15 Pro, Кофе Arabica 250г"
+                  placeholder={t("products.namePlaceholder")}
                   className={`w-full px-3 py-2 rounded-lg border text-sm outline-none ${input}`}
                 />
               </div>
 
               {/* Описание */}
               <div>
-                <label className={`block text-sm font-medium mb-1 ${text}`}>Описание</label>
+                <label className={`block text-sm font-medium mb-1 ${text}`}>{t("products.descriptionLabel")}</label>
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  placeholder="Краткое описание товара для AI-продавца..."
+                  placeholder={t("products.descriptionPlaceholder")}
                   rows={3}
                   className={`w-full px-3 py-2 rounded-lg border text-sm outline-none ${input}`}
                 />
@@ -506,7 +508,7 @@ export default function ProductsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={`block text-sm font-medium mb-1 ${text}`}>
-                    Цена <span className="text-red-400">*</span>
+                    {t("products.priceLabel")} <span className="text-red-400">*</span>
                   </label>
                   <input
                     type="number"
@@ -519,7 +521,7 @@ export default function ProductsPage() {
                 </div>
                 <div>
                   <label className={`block text-sm font-medium mb-1 ${text}`}>
-                    Старая цена (скидка)
+                    {t("products.oldPriceLabel")}
                   </label>
                   <input
                     type="number"
@@ -536,19 +538,19 @@ export default function ProductsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={`block text-sm font-medium mb-1 ${text}`}>
-                    Кол-во на складе
+                    {t("products.stockLabel")}
                   </label>
                   <input
                     type="number"
                     value={form.stock}
                     onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
-                    placeholder="пусто = без ограничений"
+                    placeholder={t("products.stockPlaceholder")}
                     min="0"
                     className={`w-full px-3 py-2 rounded-lg border text-sm outline-none ${input}`}
                   />
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${text}`}>Артикул (SKU)</label>
+                  <label className={`block text-sm font-medium mb-1 ${text}`}>{t("products.skuLabel")}</label>
                   <input
                     type="text"
                     value={form.sku}
@@ -561,12 +563,12 @@ export default function ProductsPage() {
 
               {/* Категория */}
               <div>
-                <label className={`block text-sm font-medium mb-1 ${text}`}>Категория</label>
+                <label className={`block text-sm font-medium mb-1 ${text}`}>{t("products.categoryLabel")}</label>
                 <input
                   type="text"
                   value={form.category}
                   onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                  placeholder="Электроника, Одежда, Косметика..."
+                  placeholder={t("products.categoryPlaceholder")}
                   list="categories-list"
                   className={`w-full px-3 py-2 rounded-lg border text-sm outline-none ${input}`}
                 />
@@ -578,16 +580,16 @@ export default function ProductsPage() {
               {/* Теги */}
               <div>
                 <label className={`block text-sm font-medium mb-1 ${text}`}>
-                  Теги (через запятую)
+                  {t("products.tagsLabel")}
                 </label>
                 <input
                   type="text"
                   value={form.tags}
                   onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
-                  placeholder="хит, новинка, скидка"
+                  placeholder={t("products.tagsPlaceholder")}
                   className={`w-full px-3 py-2 rounded-lg border text-sm outline-none ${input}`}
                 />
-                <p className={`text-xs mt-1 ${sub}`}>AI использует теги при поиске товаров</p>
+                <p className={`text-xs mt-1 ${sub}`}>{t("products.tagsHint")}</p>
               </div>
             </div>
 
@@ -596,7 +598,7 @@ export default function ProductsPage() {
                 onClick={() => setIsModalOpen(false)}
                 className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium ${isDark ? "bg-gray-700 hover:bg-gray-600 text-gray-300" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
               >
-                Отмена
+                {t("products.cancel")}
               </button>
               <button
                 onClick={handleSave}
@@ -604,7 +606,7 @@ export default function ProductsPage() {
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                {editingProduct ? "Сохранить" : "Добавить"}
+                {editingProduct ? t("products.save") : t("products.add")}
               </button>
             </div>
           </div>
@@ -616,7 +618,7 @@ export default function ProductsPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className={`${modalBg} border rounded-xl w-full max-w-lg`}>
             <div className="flex items-center justify-between p-5 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}">
-              <h3 className={`text-lg font-semibold ${text}`}>Импорт товаров</h3>
+              <h3 className={`text-lg font-semibold ${text}`}>{t("products.importTitle")}</h3>
               <button onClick={() => setIsImportOpen(false)} className={sub}>
                 <X className="w-5 h-5" />
               </button>
@@ -624,21 +626,21 @@ export default function ProductsPage() {
 
             <div className="p-5 space-y-4">
               <div className={`text-sm p-3 rounded-lg ${isDark ? "bg-white/5 text-gray-400" : "bg-gray-50 text-gray-600"}`}>
-                <p className="font-medium mb-2">Импорт каталога товаров</p>
-                <p className="text-xs mb-1"><span className="font-medium">Обязательные поля:</span> Название, Цена</p>
-                <p className="text-xs mb-2"><span className="font-medium">Необязательные:</span> Категория, Описание, Остаток, Артикул, Старая цена</p>
+                <p className="font-medium mb-2">{t("products.importCatalogTitle")}</p>
+                <p className="text-xs mb-1"><span className="font-medium">{t("products.requiredFields")}</span> {t("products.requiredFieldsList")}</p>
+                <p className="text-xs mb-2"><span className="font-medium">{t("products.optionalFields")}</span> {t("products.optionalFieldsList")}</p>
                 <code className={`text-xs block ${isDark ? "text-green-400" : "text-green-700"}`}>
-                  Название;Цена;Категория;Описание;Остаток;Артикул;Старая цена
+                  {t("products.csvHeaderExample")}
                 </code>
                 <code className={`text-xs block mt-1 ${isDark ? "text-blue-400" : "text-blue-700"}`}>
-                  iPhone 15;150000;Смартфоны;Новинка 2024;10;IPH15;180000
+                  {t("products.csvRowExample")}
                 </code>
-                <p className="mt-2 text-xs">Форматы: .xlsx, .xls, .csv, .txt. Колонки определяются автоматически по заголовкам.</p>
-                <p className="mt-1 text-xs opacity-70">Для подробных описаний товаров загрузите документы в Базу знаний (раздел Бот).</p>
+                <p className="mt-2 text-xs">{t("products.importFormats")}</p>
+                <p className="mt-1 text-xs opacity-70">{t("products.importKnowledgeHint")}</p>
               </div>
 
               <div>
-                <label className={`block text-sm font-medium mb-1 ${text}`}>Загрузить файл</label>
+                <label className={`block text-sm font-medium mb-1 ${text}`}>{t("products.uploadFile")}</label>
                 <input
                   type="file"
                   accept=".csv,.txt,.xlsx,.xls"
@@ -648,12 +650,12 @@ export default function ProductsPage() {
               </div>
 
               <div>
-                <label className={`block text-sm font-medium mb-1 ${text}`}>Или вставьте текст CSV</label>
+                <label className={`block text-sm font-medium mb-1 ${text}`}>{t("products.orPasteCsv")}</label>
                 <textarea
                   value={importCsv}
                   onChange={(e) => { setImportCsv(e.target.value); setPreviewData(null); }}
                   rows={5}
-                  placeholder={"iPhone 15;150000;Смартфоны\nSamsung S24;130000;Смартфоны\nAirPods Pro;45000;Аксессуары"}
+                  placeholder={t("products.csvPlaceholder")}
                   className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none resize-none ${input}`}
                 />
               </div>
@@ -661,7 +663,7 @@ export default function ProductsPage() {
               {(parsingFile || importing || loadingPreview) && (
                 <div className={`flex items-center gap-3 p-4 rounded-lg text-sm font-medium ${isDark ? "bg-blue-500/10 text-blue-300 border border-blue-500/20" : "bg-blue-50 text-blue-700 border border-blue-200"}`}>
                   <Loader2 className="w-5 h-5 animate-spin flex-shrink-0" />
-                  {parsingFile ? "Чтение файла..." : loadingPreview ? "Анализ данных..." : "Импорт данных... Не закрывайте окно"}
+                  {parsingFile ? t("products.readingFile") : loadingPreview ? t("products.analyzingData") : t("products.importingData")}
                 </div>
               )}
 
@@ -670,13 +672,13 @@ export default function ProductsPage() {
                 <div className={`p-3 rounded-lg text-sm space-y-3 ${isDark ? "bg-blue-500/10 border border-blue-500/20" : "bg-blue-50 border border-blue-200"}`}>
                   <div className="flex items-center justify-between">
                     <p className={`font-medium ${isDark ? "text-blue-300" : "text-blue-800"}`}>
-                      Найдено строк: {previewData.totalRows}
-                      {previewData.usePositional && " (заголовки не обнаружены, колонки по порядку)"}
+                      {t("products.rowsFound").replace("{count}", String(previewData.totalRows))}
+                      {previewData.usePositional && ` (${t("products.noHeadersDetected")})`}
                     </p>
                   </div>
 
                   <div className="space-y-1">
-                    <p className={`text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>Маппинг колонок:</p>
+                    <p className={`text-xs font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>{t("products.columnMapping")}:</p>
                     <div className="flex flex-wrap gap-1.5">
                       {previewData.mapping.map((m) => (
                         <span key={m.field} className={`text-xs px-2 py-1 rounded ${isDark ? "bg-gray-700 text-gray-300" : "bg-white text-gray-700 border border-gray-200"}`}>
@@ -689,7 +691,7 @@ export default function ProductsPage() {
                   </div>
 
                   <div className="overflow-x-auto">
-                    <p className={`text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Примеры (первые {previewData.sampleRows.length} строк):</p>
+                    <p className={`text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>{t("products.sampleRows").replace("{count}", String(previewData.sampleRows.length))}:</p>
                     <table className={`w-full text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}>
                       <thead>
                         <tr>
@@ -731,7 +733,7 @@ export default function ProductsPage() {
                 onClick={() => setIsImportOpen(false)}
                 className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium ${isDark ? "bg-gray-700 hover:bg-gray-600 text-gray-300" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
               >
-                Закрыть
+                {t("products.close")}
               </button>
               {!previewData ? (
                 <button
@@ -740,7 +742,7 @@ export default function ProductsPage() {
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium"
                 >
                   {loadingPreview && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Проверить данные
+                  {t("products.checkData")}
                 </button>
               ) : (
                 <button
@@ -749,7 +751,7 @@ export default function ProductsPage() {
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium"
                 >
                   {importing && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Импортировать {previewData.totalRows} товаров
+                  {t("products.importCount").replace("{count}", String(previewData.totalRows))}
                 </button>
               )}
             </div>

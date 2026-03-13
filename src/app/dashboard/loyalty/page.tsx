@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Loader2,
   Save,
@@ -42,23 +43,23 @@ const DEFAULT_TIERS: Tier[] = [
 const PROGRAM_TYPES = [
   {
     type: "cashback",
-    label: "Кэшбэк",
+    labelKey: "loyalty.cashback",
     icon: Percent,
-    desc: "Процент от суммы возвращается бонусами",
+    descKey: "loyalty.cashbackDesc",
     color: "blue",
   },
   {
     type: "visits",
-    label: "Визиты",
+    labelKey: "loyalty.visits",
     icon: Award,
-    desc: "Каждый N-й визит бесплатно или со скидкой",
+    descKey: "loyalty.visitsDesc",
     color: "green",
   },
   {
     type: "tiered",
-    label: "Уровни",
+    labelKey: "loyalty.tiered",
     icon: Layers,
-    desc: "Скидки растут с суммой покупок",
+    descKey: "loyalty.tieredDesc",
     color: "purple",
   },
 ] as const;
@@ -78,6 +79,7 @@ function defaultProgram(type: string): ProgramData {
 
 export default function LoyaltyPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isDark = theme === "dark";
 
   const [loading, setLoading] = useState(true);
@@ -113,16 +115,16 @@ export default function LoyaltyPage() {
             tiered: defaultProgram("tiered"),
           };
           for (const p of data.programs) {
-            const t = p.type || "cashback";
-            map[t] = {
+            const pType = p.type || "cashback";
+            map[pType] = {
               enabled: p.enabled,
-              type: t,
+              type: pType,
               name: p.name || "",
               cashbackPercent: p.cashbackPercent ?? 5,
               visitsForReward: p.visitsForReward ?? 10,
               rewardType: p.rewardType || "discount",
               rewardDiscount: p.rewardDiscount ?? 50,
-              tiers: p.tiers || (t === "tiered" ? DEFAULT_TIERS : null),
+              tiers: p.tiers || (pType === "tiered" ? DEFAULT_TIERS : null),
             };
           }
           setPrograms(map);
@@ -226,9 +228,9 @@ export default function LoyaltyPage() {
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h1 className={`text-2xl font-bold ${textPrimary}`}>Программы лояльности</h1>
+        <h1 className={`text-2xl font-bold ${textPrimary}`}>{t("loyalty.title")}</h1>
         <p className={`text-sm ${textSecondary} mt-1`}>
-          Настройте бонусные программы — можно включить несколько одновременно
+          {t("loyalty.subtitle")}
         </p>
       </div>
 
@@ -241,7 +243,7 @@ export default function LoyaltyPage() {
             </div>
             <div>
               <p className={`text-2xl font-bold ${textPrimary}`}>{stats.activeMembers}</p>
-              <p className={`text-sm ${textSecondary}`}>Участников</p>
+              <p className={`text-sm ${textSecondary}`}>{t("loyalty.members")}</p>
             </div>
           </div>
         </div>
@@ -252,7 +254,7 @@ export default function LoyaltyPage() {
             </div>
             <div>
               <p className={`text-2xl font-bold ${textPrimary}`}>{stats.totalPointsIssued.toLocaleString()}</p>
-              <p className={`text-sm ${textSecondary}`}>Бонусов начислено</p>
+              <p className={`text-sm ${textSecondary}`}>{t("loyalty.pointsIssued")}</p>
             </div>
           </div>
         </div>
@@ -263,14 +265,16 @@ export default function LoyaltyPage() {
             </div>
             <div>
               <p className={`text-2xl font-bold ${textPrimary}`}>{enabledCount} / 3</p>
-              <p className={`text-sm ${textSecondary}`}>Активных программ</p>
+              <p className={`text-sm ${textSecondary}`}>{t("loyalty.activePrograms")}</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Program Cards */}
-      {PROGRAM_TYPES.map(({ type, label, icon: Icon, desc, color }) => {
+      {PROGRAM_TYPES.map(({ type, labelKey, icon: Icon, descKey, color }) => {
+        const label = t(labelKey);
+        const desc = t(descKey);
         const p = programs[type];
         const c = colorMap[color];
         const isSaving = savingType === type;
@@ -317,11 +321,11 @@ export default function LoyaltyPage() {
               <div className={`px-6 pb-6 space-y-4 border-t ${borderColor} pt-4`}>
                 {/* Custom name */}
                 <div>
-                  <label className={`block text-sm ${textSecondary} mb-1`}>Название (опционально)</label>
+                  <label className={`block text-sm ${textSecondary} mb-1`}>{t("loyalty.nameOptional")}</label>
                   <input
                     value={p.name}
                     onChange={(e) => updateProgram(type, { name: e.target.value })}
-                    placeholder={`${label} программа`}
+                    placeholder={`${label}`}
                     className={`w-full max-w-xs px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-sm`}
                   />
                 </div>
@@ -329,7 +333,7 @@ export default function LoyaltyPage() {
                 {/* Cashback settings */}
                 {type === "cashback" && (
                   <div>
-                    <label className={`block text-sm ${textSecondary} mb-2`}>Процент кэшбэка</label>
+                    <label className={`block text-sm ${textSecondary} mb-2`}>{t("loyalty.cashbackPercent")}</label>
                     <div className="flex items-center gap-3">
                       <input
                         type="number"
@@ -342,7 +346,7 @@ export default function LoyaltyPage() {
                       <span className={textSecondary}>%</span>
                     </div>
                     <p className={`text-xs ${textSecondary} mt-2`}>
-                      Клиент получает {p.cashbackPercent}% от суммы каждого заказа в виде бонусных баллов
+                      {t("loyalty.cashbackHint").replace("{percent}", String(p.cashbackPercent))}
                     </p>
                   </div>
                 )}
@@ -351,7 +355,7 @@ export default function LoyaltyPage() {
                 {type === "visits" && (
                   <div className="space-y-4">
                     <div>
-                      <label className={`block text-sm ${textSecondary} mb-2`}>Каждый N-й визит</label>
+                      <label className={`block text-sm ${textSecondary} mb-2`}>{t("loyalty.everyNthVisit")}</label>
                       <div className="flex items-center gap-3">
                         <input
                           type="number"
@@ -361,11 +365,11 @@ export default function LoyaltyPage() {
                           onChange={(e) => updateProgram(type, { visitsForReward: parseInt(e.target.value) || 10 })}
                           className={`w-24 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-center`}
                         />
-                        <span className={textSecondary}>визит</span>
+                        <span className={textSecondary}>{t("loyalty.visit")}</span>
                       </div>
                     </div>
                     <div>
-                      <label className={`block text-sm ${textSecondary} mb-2`}>Награда</label>
+                      <label className={`block text-sm ${textSecondary} mb-2`}>{t("loyalty.reward")}</label>
                       <div className="flex gap-3">
                         <button
                           onClick={() => updateProgram(type, { rewardType: "free" })}
@@ -375,7 +379,7 @@ export default function LoyaltyPage() {
                               : `${borderColor} ${textSecondary}`
                           }`}
                         >
-                          Бесплатно
+                          {t("loyalty.free")}
                         </button>
                         <button
                           onClick={() => updateProgram(type, { rewardType: "discount" })}
@@ -385,13 +389,13 @@ export default function LoyaltyPage() {
                               : `${borderColor} ${textSecondary}`
                           }`}
                         >
-                          Скидка
+                          {t("loyalty.discount")}
                         </button>
                       </div>
                     </div>
                     {p.rewardType === "discount" && (
                       <div>
-                        <label className={`block text-sm ${textSecondary} mb-2`}>Размер скидки</label>
+                        <label className={`block text-sm ${textSecondary} mb-2`}>{t("loyalty.discountAmount")}</label>
                         <div className="flex items-center gap-3">
                           <input
                             type="number"
@@ -416,13 +420,13 @@ export default function LoyaltyPage() {
                     {(p.tiers || []).map((tier, i) => (
                       <div key={i} className={`flex items-center gap-3 p-3 rounded-lg border ${borderColor}`}>
                         <input
-                          placeholder="Название"
+                          placeholder={t("loyalty.tierName")}
                           value={tier.name}
                           onChange={(e) => updateTier(i, "name", e.target.value)}
                           className={`flex-1 px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-sm`}
                         />
                         <div className="flex items-center gap-1">
-                          <span className={`text-xs ${textSecondary}`}>от</span>
+                          <span className={`text-xs ${textSecondary}`}>{t("loyalty.from")}</span>
                           <input
                             type="number"
                             value={tier.minSpent}
@@ -449,7 +453,7 @@ export default function LoyaltyPage() {
                       className={`flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed ${borderColor} ${textSecondary} hover:border-purple-500 hover:text-purple-500 transition-colors text-sm`}
                     >
                       <Plus className="h-4 w-4" />
-                      Добавить уровень
+                      {t("loyalty.addTier")}
                     </button>
                   </div>
                 )}
@@ -468,7 +472,7 @@ export default function LoyaltyPage() {
                     ) : (
                       <Save className="h-4 w-4" />
                     )}
-                    {isSaved ? "Сохранено!" : "Сохранить"}
+                    {isSaved ? t("loyalty.saved") : t("loyalty.save")}
                   </button>
                 </div>
               </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   BarChart3,
   MessageSquare,
@@ -53,6 +54,7 @@ interface Stats {
 
 export default function StatisticsPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<"week" | "month" | "all">("week");
   const [stats, setStats] = useState<Stats>({
@@ -91,7 +93,7 @@ export default function StatisticsPage() {
 
   const exportToExcel = () => {
     // Create CSV content
-    const headers = ["Дата", "Сообщений"];
+    const headers = [t("statistics.csvDate"), t("statistics.csvMessages")];
     const rows = stats.messagesByDay.map(d => [d.date, d.count.toString()]);
     const csvContent = [headers, ...rows].map(row => row.join(",")).join("\n");
 
@@ -116,17 +118,17 @@ export default function StatisticsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className={`text-2xl font-bold ${textPrimary}`}>Статистика</h1>
-          <p className={textSecondary}>Аналитика работы вашего AI-сотрудника</p>
+          <h1 className={`text-2xl font-bold ${textPrimary}`}>{t("statistics.title")}</h1>
+          <p className={textSecondary}>{t("statistics.subtitle")}</p>
         </div>
 
         <div className="flex items-center gap-3">
           {/* Period selector */}
           <div className={`flex ${cardBg} rounded-lg border ${borderColor} p-1`}>
             {[
-              { id: "week", label: "Неделя" },
-              { id: "month", label: "Месяц" },
-              { id: "all", label: "Всё время" },
+              { id: "week", label: t("statistics.periodWeek") },
+              { id: "month", label: t("statistics.periodMonth") },
+              { id: "all", label: t("statistics.periodAll") },
             ].map((p) => (
               <button
                 key={p.id}
@@ -148,7 +150,7 @@ export default function StatisticsPage() {
             className={`flex items-center gap-2 px-4 py-2 ${cardBg} border ${borderColor} rounded-lg text-sm font-medium ${textSecondary} hover:${textPrimary} transition-colors`}
           >
             <Download className="h-4 w-4" />
-            Экспорт
+            {t("statistics.export")}
           </button>
         </div>
       </div>
@@ -168,7 +170,7 @@ export default function StatisticsPage() {
             )}
           </div>
           <p className={`text-3xl font-bold ${textPrimary} mt-4`}>{stats.totalMessages}</p>
-          <p className={textSecondary}>Всего сообщений</p>
+          <p className={textSecondary}>{t("statistics.totalMessages")}</p>
         </div>
 
         {/* Show orders for shops, bookings for services */}
@@ -186,7 +188,7 @@ export default function StatisticsPage() {
               )}
             </div>
             <p className={`text-3xl font-bold ${textPrimary} mt-4`}>{stats.totalOrders || 0}</p>
-            <p className={textSecondary}>Заказов</p>
+            <p className={textSecondary}>{t("statistics.orders")}</p>
           </div>
         ) : (
           <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
@@ -202,7 +204,7 @@ export default function StatisticsPage() {
               )}
             </div>
             <p className={`text-3xl font-bold ${textPrimary} mt-4`}>{stats.totalBookings}</p>
-            <p className={textSecondary}>Записей</p>
+            <p className={textSecondary}>{t("statistics.bookings")}</p>
           </div>
         )}
 
@@ -219,7 +221,7 @@ export default function StatisticsPage() {
             )}
           </div>
           <p className={`text-3xl font-bold ${textPrimary} mt-4`}>{stats.totalClients}</p>
-          <p className={textSecondary}>Клиентов</p>
+          <p className={textSecondary}>{t("statistics.clients")}</p>
         </div>
 
         <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
@@ -229,9 +231,9 @@ export default function StatisticsPage() {
             </div>
           </div>
           <p className={`text-3xl font-bold ${textPrimary} mt-4`}>
-            {stats.avgResponseTime <= 1 ? "<1с" : `${stats.avgResponseTime}с`}
+            {stats.avgResponseTime <= 1 ? t("statistics.lessThan1s") : `${stats.avgResponseTime}${t("statistics.seconds")}`}
           </p>
-          <p className={textSecondary}>Среднее время ответа</p>
+          <p className={textSecondary}>{t("statistics.avgResponseTime")}</p>
         </div>
       </div>
 
@@ -239,7 +241,7 @@ export default function StatisticsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Messages chart */}
         <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
-          <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Сообщения по дням</h3>
+          <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>{t("statistics.messagesByDay")}</h3>
           <div className="h-48 sm:h-64 flex items-end gap-1 sm:gap-2">
             {stats.messagesByDay.length > 0 ? (
               stats.messagesByDay.map((day, idx) => {
@@ -258,7 +260,7 @@ export default function StatisticsPage() {
               })
             ) : (
               <div className="w-full flex items-center justify-center">
-                <p className={textSecondary}>Нет данных за этот период</p>
+                <p className={textSecondary}>{t("statistics.noDataForPeriod")}</p>
               </div>
             )}
           </div>
@@ -267,7 +269,7 @@ export default function StatisticsPage() {
         {/* Messages by channel */}
         {stats.messagesByChannel && Object.keys(stats.messagesByChannel).length > 0 && (
           <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
-            <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Сообщения по каналам</h3>
+            <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>{t("statistics.messagesByChannel")}</h3>
             <div className="space-y-3">
               {(() => {
                 const channels = stats.messagesByChannel!;
@@ -305,7 +307,7 @@ export default function StatisticsPage() {
 
         {/* Popular questions */}
         <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
-          <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Популярные вопросы</h3>
+          <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>{t("statistics.popularQuestions")}</h3>
           <div className="space-y-3">
             {stats.popularQuestions.length > 0 ? (
               stats.popularQuestions.map((q, idx) => (
@@ -315,12 +317,12 @@ export default function StatisticsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm ${textPrimary} truncate`}>{q.question}</p>
-                    <p className={`text-xs ${textSecondary}`}>{q.count} раз</p>
+                    <p className={`text-xs ${textSecondary}`}>{q.count} {t("statistics.times")}</p>
                   </div>
                 </div>
               ))
             ) : (
-              <p className={textSecondary}>Пока нет данных о вопросах</p>
+              <p className={textSecondary}>{t("statistics.noQuestionsData")}</p>
             )}
           </div>
         </div>
@@ -329,7 +331,7 @@ export default function StatisticsPage() {
       {/* Conversion */}
       <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className={`text-lg font-semibold ${textPrimary}`}>Конверсия в записи</h3>
+          <h3 className={`text-lg font-semibold ${textPrimary}`}>{t("statistics.conversionToBookings")}</h3>
           <span className={`text-2xl font-bold ${textPrimary}`}>{stats.conversionRate}%</span>
         </div>
         <div className={`h-3 ${isDark ? "bg-white/10" : "bg-gray-200"} rounded-full overflow-hidden`}>
@@ -339,7 +341,7 @@ export default function StatisticsPage() {
           />
         </div>
         <p className={`text-sm ${textSecondary} mt-2`}>
-          Процент пользователей, которые записались после общения с AI-сотрудником
+          {t("statistics.conversionDescription")}
         </p>
       </div>
 
@@ -348,16 +350,16 @@ export default function StatisticsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Orders by Status */}
           <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
-            <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Заказы по статусам</h3>
+            <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>{t("statistics.ordersByStatus")}</h3>
             {stats.ordersByStatus ? (
               <div className="space-y-3">
                 {[
-                  { key: "new", label: "Новые", color: "yellow" },
-                  { key: "confirmed", label: "Подтверждены", color: "blue" },
-                  { key: "processing", label: "В обработке", color: "purple" },
-                  { key: "shipped", label: "Отправлены", color: "cyan" },
-                  { key: "delivered", label: "Доставлены", color: "green" },
-                  { key: "cancelled", label: "Отменены", color: "red" },
+                  { key: "new", label: t("statistics.orderStatusNew"), color: "yellow" },
+                  { key: "confirmed", label: t("statistics.orderStatusConfirmed"), color: "blue" },
+                  { key: "processing", label: t("statistics.orderStatusProcessing"), color: "purple" },
+                  { key: "shipped", label: t("statistics.orderStatusShipped"), color: "cyan" },
+                  { key: "delivered", label: t("statistics.orderStatusDelivered"), color: "green" },
+                  { key: "cancelled", label: t("statistics.orderStatusCancelled"), color: "red" },
                 ].map(({ key, label, color }) => {
                   const count = stats.ordersByStatus![key] || 0;
                   if (count === 0 && key !== "new") return null;
@@ -370,22 +372,22 @@ export default function StatisticsPage() {
                 })}
               </div>
             ) : (
-              <p className={textSecondary}>Нет данных</p>
+              <p className={textSecondary}>{t("statistics.noData")}</p>
             )}
           </div>
 
           {/* Order Revenue & Avg */}
           <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
-            <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Выручка от заказов</h3>
+            <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>{t("statistics.orderRevenue")}</h3>
             <div className="space-y-4">
               <div className={`p-4 rounded-xl ${isDark ? "bg-green-500/10" : "bg-green-50"}`}>
-                <p className={`text-sm ${textSecondary}`}>Общая выручка</p>
+                <p className={`text-sm ${textSecondary}`}>{t("statistics.totalRevenue")}</p>
                 <p className={`text-2xl font-bold text-green-500`}>
                   {(stats.orderRevenue || 0).toLocaleString()}
                 </p>
               </div>
               <div className={`p-4 rounded-xl ${isDark ? "bg-blue-500/10" : "bg-blue-50"}`}>
-                <p className={`text-sm ${textSecondary}`}>Средний чек</p>
+                <p className={`text-sm ${textSecondary}`}>{t("statistics.avgCheck")}</p>
                 <p className={`text-2xl font-bold text-blue-500`}>
                   {(stats.avgOrderValue || 0).toLocaleString()}
                 </p>
@@ -395,7 +397,7 @@ export default function StatisticsPage() {
 
           {/* Popular Products */}
           <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
-            <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Популярные товары</h3>
+            <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>{t("statistics.popularProducts")}</h3>
             {stats.popularProducts && stats.popularProducts.length > 0 ? (
               <div className="space-y-3">
                 {stats.popularProducts.slice(0, 5).map((p, idx) => (
@@ -405,13 +407,13 @@ export default function StatisticsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm ${textPrimary} truncate`}>{p.name}</p>
-                      <p className={`text-xs ${textSecondary}`}>{p.count} шт. — {p.revenue.toLocaleString()}</p>
+                      <p className={`text-xs ${textSecondary}`}>{p.count} {t("statistics.pcs")} — {p.revenue.toLocaleString()}</p>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className={textSecondary}>Нет данных о товарах</p>
+              <p className={textSecondary}>{t("statistics.noProductsData")}</p>
             )}
           </div>
         </div>
@@ -421,13 +423,13 @@ export default function StatisticsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Customer Segments */}
         <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
-          <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Сегменты клиентов</h3>
+          <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>{t("statistics.customerSegments")}</h3>
           {stats.customerSegments ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Crown className="h-4 w-4 text-yellow-400" />
-                  <span className={textSecondary}>VIP клиенты</span>
+                  <span className={textSecondary}>{t("statistics.vipClients")}</span>
                 </div>
                 <span className={`font-bold ${textPrimary}`}>{stats.customerSegments.vip}</span>
               </div>
@@ -438,7 +440,7 @@ export default function StatisticsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-green-400" />
-                  <span className={textSecondary}>Активные</span>
+                  <span className={textSecondary}>{t("statistics.activeClients")}</span>
                 </div>
                 <span className={`font-bold ${textPrimary}`}>{stats.customerSegments.active}</span>
               </div>
@@ -449,7 +451,7 @@ export default function StatisticsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Moon className="h-4 w-4 text-gray-400" />
-                  <span className={textSecondary}>Неактивные</span>
+                  <span className={textSecondary}>{t("statistics.inactiveClients")}</span>
                 </div>
                 <span className={`font-bold ${textPrimary}`}>{stats.customerSegments.inactive}</span>
               </div>
@@ -458,45 +460,45 @@ export default function StatisticsPage() {
               </div>
             </div>
           ) : (
-            <p className={textSecondary}>Нет данных о сегментах</p>
+            <p className={textSecondary}>{t("statistics.noSegmentsData")}</p>
           )}
         </div>
 
         {/* Bookings by Status */}
         <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
-          <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Записи по статусам</h3>
+          <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>{t("statistics.bookingsByStatus")}</h3>
           {stats.bookingsByStatus ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-yellow-500/10 rounded-lg">
-                <span className="text-yellow-400">Ожидают</span>
+                <span className="text-yellow-400">{t("statistics.bookingsPending")}</span>
                 <span className={`font-bold ${textPrimary}`}>{stats.bookingsByStatus.pending}</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-blue-500/10 rounded-lg">
-                <span className="text-blue-400">Подтверждены</span>
+                <span className="text-blue-400">{t("statistics.bookingsConfirmed")}</span>
                 <span className={`font-bold ${textPrimary}`}>{stats.bookingsByStatus.confirmed}</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg">
-                <span className="text-green-400">Завершены</span>
+                <span className="text-green-400">{t("statistics.bookingsCompleted")}</span>
                 <span className={`font-bold ${textPrimary}`}>{stats.bookingsByStatus.completed}</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-lg">
-                <span className="text-red-400">Отменены</span>
+                <span className="text-red-400">{t("statistics.bookingsCancelled")}</span>
                 <span className={`font-bold ${textPrimary}`}>{stats.bookingsByStatus.cancelled}</span>
               </div>
             </div>
           ) : (
-            <p className={textSecondary}>Нет данных о записях</p>
+            <p className={textSecondary}>{t("statistics.noBookingsData")}</p>
           )}
         </div>
 
         {/* Quick Stats */}
         <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
-          <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>Дополнительно</h3>
+          <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>{t("statistics.additional")}</h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
               <div className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5 text-green-400" />
-                <span className={textSecondary}>Выручка</span>
+                <span className={textSecondary}>{t("statistics.revenue")}</span>
               </div>
               <span className={`font-bold ${textPrimary}`}>
                 {stats.totalRevenue?.toLocaleString() || 0}₸
@@ -505,7 +507,7 @@ export default function StatisticsPage() {
             <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
               <div className="flex items-center gap-2">
                 <Send className="h-5 w-5 text-blue-400" />
-                <span className={textSecondary}>Рассылок</span>
+                <span className={textSecondary}>{t("statistics.broadcasts")}</span>
               </div>
               <span className={`font-bold ${textPrimary}`}>
                 {stats.broadcastsSent || 0}
@@ -514,7 +516,7 @@ export default function StatisticsPage() {
             <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
               <div className="flex items-center gap-2">
                 <Star className="h-5 w-5 text-yellow-400" />
-                <span className={textSecondary}>Средний рейтинг</span>
+                <span className={textSecondary}>{t("statistics.avgRating")}</span>
               </div>
               <span className={`font-bold ${textPrimary}`}>
                 {stats.avgRating?.toFixed(1) || "—"}
@@ -527,7 +529,7 @@ export default function StatisticsPage() {
             className={`mt-4 flex items-center justify-center gap-2 w-full py-3 ${isDark ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'} rounded-lg text-sm ${textPrimary} font-medium transition-colors`}
           >
             <Users className="h-4 w-4" />
-            Управление клиентами
+            {t("statistics.manageCustomers")}
           </Link>
         </div>
       </div>

@@ -129,10 +129,10 @@ export default function AutomationPage() {
   if (!canUseAutomations || needsUpgrade) {
     return (
       <UpgradePrompt
-        feature="Автоматизация"
+        feature={t("automation.title")}
         description={needsUpgrade
-          ? "Ваш пробный период закончился. Оформите подписку Pro чтобы продолжить использовать автоматизации."
-          : "Автоматические напоминания о записях, сбор отзывов и реактивация клиентов доступны в платных тарифах."
+          ? t("automation.trialExpired")
+          : t("automation.paidFeature")
         }
         requiredPlan="pro"
       />
@@ -268,7 +268,7 @@ export default function AutomationPage() {
               <div className={`text-sm ${textSecondary}`}>
                 <p className="font-medium text-blue-400 mb-1">{t("automation.messageExample")}</p>
                 <p className="italic">
-                  "Здравствуйте, Анна! 👋 Напоминаем о вашей записи: 📅 Завтра, 15 февраля в 14:00 💇 Стрижка женская. Ждём вас!"
+                  {t("automation.reminderExample")}
                 </p>
               </div>
             </div>
@@ -354,7 +354,7 @@ export default function AutomationPage() {
                   )}
                 </div>
                 <p className={`text-xs ${textSecondary} mt-2`}>
-                  Найдите свой бизнес на Google Maps → скопируйте URL из адресной строки → вставьте сюда
+                  {t("automation.googleLinkHelp")}
                 </p>
               </div>
 
@@ -383,14 +383,14 @@ export default function AutomationPage() {
                   )}
                 </div>
                 <p className={`text-xs ${textSecondary} mt-2`}>
-                  Найдите свой бизнес в 2GIS → скопируйте URL страницы → вставьте сюда
+                  {t("automation.2gisLinkHelp")}
                 </p>
               </div>
 
               {/* Yandex Maps link */}
               <div className="p-4 rounded-xl border border-white/5 bg-white/5">
                 <label className={`block text-sm font-medium ${textPrimary} mb-2`}>
-                  Яндекс.Карты (ссылка на отзывы)
+                  {t("automation.yandexLink")}
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -412,7 +412,7 @@ export default function AutomationPage() {
                   )}
                 </div>
                 <p className={`text-xs ${textSecondary} mt-2`}>
-                  Найдите свой бизнес на Яндекс.Картах → скопируйте URL страницы → вставьте сюда
+                  {t("automation.yandexLinkHelp")}
                 </p>
               </div>
             </>
@@ -425,10 +425,10 @@ export default function AutomationPage() {
               <div className={`text-sm ${textSecondary}`}>
                 <p className="font-medium text-yellow-400 mb-1">{t("automation.howItWorks")}</p>
                 <ul className="space-y-1 list-disc list-inside">
-                  <li>Клиент получает сообщение с просьбой оценить визит (1-5 ⭐)</li>
-                  <li>Оценки 4-5: предлагаем оставить отзыв на Google/2GIS/Яндекс.Карты</li>
-                  <li>Оценки 1-3: просим описать проблему (негатив не уходит в публику!)</li>
-                  <li>Вы получаете уведомление о каждом отзыве</li>
+                  <li>{t("automation.howItWorks1")}</li>
+                  <li>{t("automation.howItWorks2")}</li>
+                  <li>{t("automation.howItWorks3")}</li>
+                  <li>{t("automation.howItWorks4")}</li>
                 </ul>
               </div>
             </div>
@@ -514,9 +514,9 @@ export default function AutomationPage() {
             <div className="flex items-start gap-2">
               <Info className="h-4 w-4 text-green-400 mt-0.5" />
               <div className={`text-sm ${textSecondary}`}>
-                <p className="font-medium text-green-400 mb-1">Пример сообщения:</p>
+                <p className="font-medium text-green-400 mb-1">{t("automation.messageExample")}</p>
                 <p className="italic">
-                  "Привет, Анна! Давно вас не видели! 💜 Мы скучаем! Вот вам скидка {settings.reactivationDiscount}% на следующий визит. Промокод: WELCOME{settings.reactivationDiscount}"
+                  {t("automation.reactivationExample").replace("{discount}", String(settings.reactivationDiscount))}
                 </p>
               </div>
             </div>
@@ -531,21 +531,21 @@ export default function AutomationPage() {
             <ShoppingBag className="h-5 w-5 text-green-400" />
           </div>
           <div>
-            <h3 className={`font-semibold ${textPrimary}`}>Уведомления о заказах</h3>
-            <p className={`text-sm ${textSecondary}`}>Автоматические уведомления клиентам при смене статуса заказа</p>
+            <h3 className={`font-semibold ${textPrimary}`}>{t("automation.orderNotifications")}</h3>
+            <p className={`text-sm ${textSecondary}`}>{t("automation.orderNotificationsDesc")}</p>
           </div>
           <div className="ml-auto">
-            <span className="px-2 py-1 bg-green-500/10 text-green-400 text-xs rounded-full font-medium">Активно</span>
+            <span className="px-2 py-1 bg-green-500/10 text-green-400 text-xs rounded-full font-medium">{t("automation.active")}</span>
           </div>
         </div>
 
         <div className="space-y-2 mb-4">
           {[
-            { status: "Подтверждён", emoji: "✅", desc: "Заказ принят и подтверждён" },
-            { status: "В обработке", emoji: "⚙️", desc: "Идёт сборка / обработка заказа" },
-            { status: "Отправлен", emoji: "🚚", desc: "Заказ передан в доставку" },
-            { status: "Доставлен", emoji: "🎉", desc: "Клиент получил заказ" },
-            { status: "Отменён", emoji: "❌", desc: "Заказ отменён" },
+            { status: t("automation.statusConfirmed"), emoji: "✅", desc: t("automation.statusConfirmedDesc") },
+            { status: t("automation.statusProcessing"), emoji: "⚙️", desc: t("automation.statusProcessingDesc") },
+            { status: t("automation.statusShipped"), emoji: "🚚", desc: t("automation.statusShippedDesc") },
+            { status: t("automation.statusDelivered"), emoji: "🎉", desc: t("automation.statusDeliveredDesc") },
+            { status: t("automation.statusCancelled"), emoji: "❌", desc: t("automation.statusCancelledDesc") },
           ].map((item) => (
             <div key={item.status} className={`flex items-center gap-3 p-3 rounded-lg ${isDark ? "bg-white/5" : "bg-gray-50"}`}>
               <span className="text-lg">{item.emoji}</span>
@@ -562,11 +562,9 @@ export default function AutomationPage() {
           <div className="flex items-start gap-2">
             <Info className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
             <div className={`text-sm ${textSecondary}`}>
-              <p className="font-medium text-green-400 mb-1">Как это работает:</p>
+              <p className="font-medium text-green-400 mb-1">{t("automation.howItWorks")}</p>
               <p>
-                Когда вы меняете статус заказа в разделе{" "}
-                <span className="font-medium">Заказы</span>, клиент автоматически получает
-                Telegram-уведомление с актуальным статусом. Никаких настроек не требуется — всё работает сразу.
+                {t("automation.orderHowItWorks")}
               </p>
             </div>
           </div>

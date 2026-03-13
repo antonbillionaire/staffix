@@ -40,11 +40,11 @@ interface Funnel {
   client: number;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: typeof Target }> = {
-  cold: { label: "Холодный", color: "text-blue-500", bg: "bg-blue-500/10", icon: Snowflake },
-  warm: { label: "Тёплый", color: "text-amber-500", bg: "bg-amber-500/10", icon: Flame },
-  hot: { label: "Горячий", color: "text-red-500", bg: "bg-red-500/10", icon: Zap },
-  client: { label: "Клиент", color: "text-green-500", bg: "bg-green-500/10", icon: UserCheck },
+const STATUS_CONFIG: Record<string, { labelKey: string; color: string; bg: string; icon: typeof Target }> = {
+  cold: { labelKey: "leads.statusCold", color: "text-blue-500", bg: "bg-blue-500/10", icon: Snowflake },
+  warm: { labelKey: "leads.statusWarm", color: "text-amber-500", bg: "bg-amber-500/10", icon: Flame },
+  hot: { labelKey: "leads.statusHot", color: "text-red-500", bg: "bg-red-500/10", icon: Zap },
+  client: { labelKey: "leads.statusClient", color: "text-green-500", bg: "bg-green-500/10", icon: UserCheck },
 };
 
 const CHANNEL_CONFIG: Record<string, { label: string; emoji: string }> = {
@@ -131,10 +131,10 @@ export default function LeadsPage() {
       <div className="mb-6">
         <h1 className={`text-2xl font-bold ${textPrimary} flex items-center gap-2`}>
           <Target className="h-6 w-6 text-indigo-500" />
-          {t("nav.myLeads") || "Мои Лиды"}
+          {t("nav.myLeads")}
         </h1>
         <p className={`text-sm ${textSecondary} mt-1`}>
-          {t("leads.subtitle") || "Воронка квалификации клиентов из всех каналов"}
+          {t("leads.subtitle")}
         </p>
       </div>
 
@@ -157,7 +157,7 @@ export default function LeadsPage() {
                 <div className={`p-1.5 rounded-lg ${config.bg}`}>
                   <Icon className={`h-4 w-4 ${config.color}`} />
                 </div>
-                <span className={`text-xs font-medium ${textSecondary}`}>{config.label}</span>
+                <span className={`text-xs font-medium ${textSecondary}`}>{t(config.labelKey)}</span>
               </div>
               <div className={`text-2xl font-bold ${textPrimary}`}>{count}</div>
               <div className={`text-xs ${textSecondary}`}>{pct}%</div>
@@ -176,7 +176,7 @@ export default function LeadsPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t("leads.search") || "Поиск по имени..."}
+              placeholder={t("leads.search")}
               className={`w-full pl-9 pr-3 py-2 rounded-lg text-sm border ${border} ${
                 isDark ? "bg-gray-700 text-white" : "bg-gray-50 text-gray-900"
               } focus:outline-none focus:ring-2 focus:ring-indigo-500`}
@@ -193,7 +193,7 @@ export default function LeadsPage() {
                 isDark ? "bg-gray-700 text-white" : "bg-gray-50 text-gray-900"
               } focus:outline-none`}
             >
-              <option value="">{t("leads.allChannels") || "Все каналы"}</option>
+              <option value="">{t("leads.allChannels")}</option>
               <option value="whatsapp">WhatsApp</option>
               <option value="instagram">Instagram</option>
               <option value="messenger">Messenger</option>
@@ -209,7 +209,7 @@ export default function LeadsPage() {
           <div className="p-12 text-center">
             <Target className={`h-12 w-12 mx-auto mb-3 ${textSecondary} opacity-50`} />
             <p className={`text-sm ${textSecondary}`}>
-              {t("leads.empty") || "Лидов пока нет. Они появятся когда клиенты напишут вашему боту."}
+              {t("leads.empty")}
             </p>
           </div>
         ) : (
@@ -218,19 +218,19 @@ export default function LeadsPage() {
               <thead>
                 <tr className={`border-b ${border} ${isDark ? "bg-gray-700/50" : "bg-gray-50"}`}>
                   <th className={`text-left text-xs font-medium ${textSecondary} uppercase px-4 py-3`}>
-                    {t("leads.name") || "Имя"}
+                    {t("leads.name")}
                   </th>
                   <th className={`text-left text-xs font-medium ${textSecondary} uppercase px-4 py-3`}>
-                    {t("leads.channel") || "Канал"}
+                    {t("leads.channel")}
                   </th>
                   <th className={`text-left text-xs font-medium ${textSecondary} uppercase px-4 py-3`}>
-                    {t("leads.status") || "Статус"}
+                    {t("leads.status")}
                   </th>
                   <th className={`text-left text-xs font-medium ${textSecondary} uppercase px-4 py-3 hidden md:table-cell`}>
-                    {t("leads.lastActivity") || "Последняя активность"}
+                    {t("leads.lastActivity")}
                   </th>
                   <th className={`text-left text-xs font-medium ${textSecondary} uppercase px-4 py-3 hidden lg:table-cell`}>
-                    {t("leads.reason") || "Причина"}
+                    {t("leads.reason")}
                   </th>
                 </tr>
               </thead>
@@ -259,7 +259,7 @@ export default function LeadsPage() {
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusCfg.bg} ${statusCfg.color}`}>
                           <StatusIcon className="h-3 w-3" />
-                          {statusCfg.label}
+                          {t(statusCfg.labelKey)}
                         </span>
                       </td>
                       <td className={`px-4 py-3 hidden md:table-cell text-sm ${textSecondary}`}>

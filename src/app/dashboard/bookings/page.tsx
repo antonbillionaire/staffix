@@ -149,7 +149,7 @@ export default function BookingsPage() {
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              {f === "upcoming" ? "Предстоящие" : f === "all" ? "Все" : "Прошедшие"}
+              {f === "upcoming" ? t("bookingsPage.filterUpcoming") : f === "all" ? t("bookingsPage.filterAll") : t("bookingsPage.filterPast")}
             </button>
           ))}
         </div>
@@ -185,7 +185,7 @@ export default function BookingsPage() {
                   )}
                   <div className={`flex items-center gap-2 text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
                     <Scissors className={`h-4 w-4 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
-                    <span className="font-medium">{booking.serviceName || "Услуга"}</span>
+                    <span className="font-medium">{booking.serviceName || t("bookingsPage.service")}</span>
                     {booking.staffName && (
                       <>
                         {" · "}
@@ -195,7 +195,7 @@ export default function BookingsPage() {
                     {booking.servicePrice && (
                       <>
                         {" · "}
-                        {booking.servicePrice.toLocaleString()} сум
+                        {booking.servicePrice.toLocaleString()} {t("bookingsPage.currency")}
                       </>
                     )}
                   </div>

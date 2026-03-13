@@ -146,7 +146,7 @@ export default function ServicesPage() {
         const csv = XLSX.utils.sheet_to_csv(ws, { FS: ";", rawNumbers: true });
         setImportCsv(csv);
       } catch {
-        setImportResult({ message: "Ошибка чтения Excel файла" });
+        setImportResult({ message: t("servicesPage.excelReadError") });
       } finally {
         setParsingFile(false);
       }
@@ -171,7 +171,7 @@ export default function ServicesPage() {
       setImportResult({ message: data.message || data.error, errors: data.errors });
       if (data.created > 0) await fetchServices();
     } catch {
-      setImportResult({ message: "Ошибка при импорте" });
+      setImportResult({ message: t("servicesPage.importError") });
     } finally {
       setImporting(false);
     }
@@ -198,7 +198,7 @@ export default function ServicesPage() {
             className={`px-3 py-2 rounded-lg font-medium flex items-center gap-2 text-sm border ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
           >
             <Upload className="h-4 w-4" />
-            Импорт CSV
+            {t("servicesPage.importCsv")}
           </button>
           <button
             onClick={() => openModal()}
@@ -215,7 +215,7 @@ export default function ServicesPage() {
         {loading ? (
           <div className={`p-8 text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}>
             <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-            <p>Загрузка...</p>
+            <p>{t("servicesPage.loading")}</p>
           </div>
         ) : services.length === 0 ? (
           <div className={`p-8 text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}>
@@ -315,14 +315,14 @@ export default function ServicesPage() {
 
               <div>
                 <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
-                  Описание
+                  {t("servicesPage.description")}
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  placeholder="Опишите процедуру, что входит, особенности..."
+                  placeholder={t("servicesPage.descriptionPlaceholder")}
                   rows={3}
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
                 />
@@ -390,7 +390,7 @@ export default function ServicesPage() {
           <div className={`${isDark ? "bg-[#12122a]" : "bg-white"} rounded-lg p-6 w-full max-w-lg mx-4`}>
             <div className="flex items-center justify-between mb-4">
               <h3 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>
-                Импорт услуг
+                {t("servicesPage.importServices")}
               </h3>
               <button onClick={() => setIsImportOpen(false)} className={`${isDark ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"}`}>
                 <X className="h-5 w-5" />
@@ -398,22 +398,22 @@ export default function ServicesPage() {
             </div>
 
             <div className={`text-sm mb-4 p-3 rounded-lg ${isDark ? "bg-white/5 text-gray-400" : "bg-gray-50 text-gray-600"}`}>
-              <p className="font-medium mb-2">Импорт услуг</p>
-              <p className="text-xs mb-1"><span className="font-medium">Обязательные поля:</span> Название, Цена</p>
-              <p className="text-xs mb-2"><span className="font-medium">Необязательные:</span> Длительность (мин), Описание</p>
+              <p className="font-medium mb-2">{t("servicesPage.importServices")}</p>
+              <p className="text-xs mb-1"><span className="font-medium">{t("servicesPage.requiredFields")}</span> {t("servicesPage.requiredFieldsList")}</p>
+              <p className="text-xs mb-2"><span className="font-medium">{t("servicesPage.optionalFields")}</span> {t("servicesPage.optionalFieldsList")}</p>
               <code className={`text-xs block ${isDark ? "text-green-400" : "text-green-700"}`}>
-                Название;Цена;Длительность (мин);Описание
+                {t("servicesPage.csvHeader")}
               </code>
               <code className={`text-xs block mt-1 ${isDark ? "text-blue-400" : "text-blue-700"}`}>
-                Стрижка;5000;30;Классическая стрижка волос
+                {t("servicesPage.csvExample")}
               </code>
-              <p className="mt-2 text-xs">Форматы: .xlsx, .xls, .csv, .txt. Колонки определяются автоматически по заголовкам.</p>
+              <p className="mt-2 text-xs">{t("servicesPage.supportedFormats")}</p>
             </div>
 
             <div className="space-y-3">
               <div>
                 <label className={`block text-sm font-medium mb-1 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                  Загрузить файл (.xlsx, .xls, .csv)
+                  {t("servicesPage.uploadFile")}
                 </label>
                 <input
                   type="file"
@@ -425,13 +425,13 @@ export default function ServicesPage() {
 
               <div>
                 <label className={`block text-sm font-medium mb-1 ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                  Или вставьте текст CSV
+                  {t("servicesPage.orPasteCsv")}
                 </label>
                 <textarea
                   value={importCsv}
                   onChange={(e) => setImportCsv(e.target.value)}
                   rows={6}
-                  placeholder={"Стрижка;5000;30\nМаникюр;3000;60\nПедикюр;4000;90"}
+                  placeholder={t("servicesPage.csvPlaceholder")}
                   className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-600" : "border-gray-300"}`}
                 />
               </div>
@@ -451,7 +451,7 @@ export default function ServicesPage() {
                 onClick={() => setIsImportOpen(false)}
                 className={`flex-1 px-4 py-2 border rounded-lg font-medium ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
               >
-                Закрыть
+                {t("servicesPage.close")}
               </button>
               <button
                 onClick={handleImport}
@@ -459,7 +459,7 @@ export default function ServicesPage() {
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {importing && <Loader2 className="h-4 w-4 animate-spin" />}
-                Импортировать
+                {t("servicesPage.import")}
               </button>
             </div>
           </div>

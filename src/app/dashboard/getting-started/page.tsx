@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import Link from "next/link";
 import {
   CheckCircle,
@@ -50,149 +51,9 @@ interface Step {
   done?: boolean;
 }
 
-const SERVICE_STEPS: Omit<Step, "done">[] = [
-  {
-    id: "services",
-    title: "Добавьте услуги и цены",
-    description:
-      "Внесите все ваши услуги с ценами и продолжительностью. AI-сотрудник будет рекомендовать их клиентам и принимать записи.",
-    link: "/dashboard/services",
-    linkLabel: "Добавить услуги",
-    icon: Scissors,
-    time: "10 мин",
-    tip: "Добавьте 3-5 самых популярных услуг — этого достаточно для начала. Остальные можно добавить позже.",
-  },
-  {
-    id: "staff",
-    title: "Добавьте сотрудников",
-    description:
-      "Укажите мастеров или специалистов. Клиенты смогут записываться к конкретному человеку, AI знает расписание каждого.",
-    link: "/dashboard/staff",
-    linkLabel: "Добавить сотрудников",
-    icon: Users,
-    time: "5 мин",
-    optional: true,
-    tip: "Если работаете один — пропустите этот шаг. Добавьте себя как сотрудника только если хотите, чтобы клиенты видели ваше имя.",
-  },
-  {
-    id: "faq",
-    title: "Добавьте часто задаваемые вопросы",
-    description:
-      "Внесите типичные вопросы клиентов (адрес, парковка, противопоказания, акции). AI будет отвечать на них автоматически.",
-    link: "/dashboard/faq",
-    linkLabel: "Добавить FAQ",
-    icon: HelpCircle,
-    time: "10 мин",
-    optional: true,
-    tip: "Подумайте: что чаще всего спрашивают клиенты по телефону? Перенесите эти ответы в FAQ.",
-  },
-  {
-    id: "bot",
-    title: "Создайте и подключите Telegram-бота",
-    description:
-      "Создайте бота через @BotFather, скопируйте токен и вставьте в Staffix. Бот сразу начнёт отвечать клиентам.",
-    link: "/dashboard/bot",
-    linkLabel: "Подключить бота",
-    icon: Bot,
-    time: "5 мин",
-    tip: "В разделе «Бот» есть пошаговая инструкция. Займёт ровно 5 минут, никаких технических знаний не нужно.",
-  },
-  {
-    id: "test",
-    title: "Напишите вашему боту первое сообщение",
-    description:
-      "Найдите вашего бота в Telegram по username, напишите /start и проверьте как он отвечает. Запишитесь как будто вы клиент.",
-    link: "/dashboard/bot",
-    linkLabel: "Открыть настройки бота",
-    icon: MessageCircle,
-    time: "5 мин",
-    tip: "Попросите друга написать боту — его впечатления покажут насколько удобен AI для новых клиентов.",
-  },
-  {
-    id: "invite",
-    title: "Пригласите первых клиентов",
-    description:
-      "Скопируйте ссылку на бота (t.me/ВАШ_БОТ) и отправьте 5-10 постоянным клиентам. Попросите их записаться через бота.",
-    link: "/dashboard/broadcasts",
-    linkLabel: "Сделать рассылку",
-    icon: Star,
-    time: "5 мин",
-    tip: "Напишите клиентам лично: «Привет! Теперь можно записаться онлайн через нашего бота 24/7 — попробуй!»",
-  },
-];
-
-const STORE_STEPS: Omit<Step, "done">[] = [
-  {
-    id: "products",
-    title: "Добавьте товары в каталог",
-    description:
-      "Внесите ваши товары с ценами, фото и описанием. AI-ассистент будет рекомендовать товары и принимать заказы.",
-    link: "/dashboard/products",
-    linkLabel: "Добавить товары",
-    icon: Package,
-    time: "15 мин",
-    tip: "Начните с 10-20 самых популярных товаров. Качественные фото и описания повышают конверсию в заказ.",
-  },
-  {
-    id: "faq",
-    title: "Добавьте информацию о доставке и оплате",
-    description:
-      "Укажите условия доставки, зоны, сроки и стоимость. AI будет отвечать на эти вопросы автоматически.",
-    link: "/dashboard/faq",
-    linkLabel: "Добавить FAQ",
-    icon: HelpCircle,
-    time: "10 мин",
-    tip: "Самые частые вопросы покупателей: как доставляете, сколько стоит, какие способы оплаты, можно ли вернуть товар.",
-  },
-  {
-    id: "payment",
-    title: "Подключите систему оплаты",
-    description:
-      "Добавьте Payme, Click или Kaspi Pay. Клиенты смогут оплачивать заказы прямо в боте без звонков.",
-    link: "/dashboard/bot",
-    linkLabel: "Настроить оплату",
-    icon: CreditCard,
-    time: "10 мин",
-    optional: true,
-    tip: "Для начала можно принимать оплату наличными или переводом. Онлайн-оплату подключите когда пойдут первые заказы.",
-  },
-  {
-    id: "bot",
-    title: "Создайте и подключите Telegram-бота",
-    description:
-      "Создайте бота через @BotFather, скопируйте токен. Клиенты будут оформлять заказы через Telegram 24/7.",
-    link: "/dashboard/bot",
-    linkLabel: "Подключить бота",
-    icon: Bot,
-    time: "5 мин",
-    tip: "Telegram-бот — самый быстрый канал для заказов в СНГ. Конверсия в покупку обычно выше чем на сайте.",
-  },
-  {
-    id: "test",
-    title: "Сделайте тестовый заказ",
-    description:
-      "Напишите боту /start, выберите товар и оформите заказ. Проверьте что всё работает и вы получили уведомление.",
-    link: "/dashboard/orders",
-    linkLabel: "Открыть заказы",
-    icon: ShoppingCart,
-    time: "5 мин",
-    tip: "Проверьте весь путь: выбор товара → оформление → ваше уведомление → статус заказа. Это то, что пройдёт каждый клиент.",
-  },
-  {
-    id: "invite",
-    title: "Запустите первую рассылку",
-    description:
-      "Сообщите клиентам о новом боте. Предложите скидку 10% за первый заказ через Telegram.",
-    link: "/dashboard/broadcasts",
-    linkLabel: "Создать рассылку",
-    icon: Zap,
-    time: "10 мин",
-    tip: "Напишите: «Теперь у нас есть Telegram-бот! Закажи прямо сейчас и получи скидку 10% на первый заказ».",
-  },
-];
-
 export default function GettingStartedPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isDark = theme === "dark";
 
   const [business, setBusiness] = useState<Business | null>(null);
@@ -216,6 +77,135 @@ export default function GettingStartedPage() {
   }, []);
 
   const isStore = business?.dashboardMode === "sales";
+
+  const SERVICE_STEPS: Omit<Step, "done">[] = [
+    {
+      id: "services",
+      title: t("gettingStarted.service.services.title"),
+      description: t("gettingStarted.service.services.description"),
+      link: "/dashboard/services",
+      linkLabel: t("gettingStarted.service.services.linkLabel"),
+      icon: Scissors,
+      time: t("gettingStarted.service.services.time"),
+      tip: t("gettingStarted.service.services.tip"),
+    },
+    {
+      id: "staff",
+      title: t("gettingStarted.service.staff.title"),
+      description: t("gettingStarted.service.staff.description"),
+      link: "/dashboard/staff",
+      linkLabel: t("gettingStarted.service.staff.linkLabel"),
+      icon: Users,
+      time: t("gettingStarted.service.staff.time"),
+      optional: true,
+      tip: t("gettingStarted.service.staff.tip"),
+    },
+    {
+      id: "faq",
+      title: t("gettingStarted.service.faq.title"),
+      description: t("gettingStarted.service.faq.description"),
+      link: "/dashboard/faq",
+      linkLabel: t("gettingStarted.service.faq.linkLabel"),
+      icon: HelpCircle,
+      time: t("gettingStarted.service.faq.time"),
+      optional: true,
+      tip: t("gettingStarted.service.faq.tip"),
+    },
+    {
+      id: "bot",
+      title: t("gettingStarted.service.bot.title"),
+      description: t("gettingStarted.service.bot.description"),
+      link: "/dashboard/bot",
+      linkLabel: t("gettingStarted.service.bot.linkLabel"),
+      icon: Bot,
+      time: t("gettingStarted.service.bot.time"),
+      tip: t("gettingStarted.service.bot.tip"),
+    },
+    {
+      id: "test",
+      title: t("gettingStarted.service.test.title"),
+      description: t("gettingStarted.service.test.description"),
+      link: "/dashboard/bot",
+      linkLabel: t("gettingStarted.service.test.linkLabel"),
+      icon: MessageCircle,
+      time: t("gettingStarted.service.test.time"),
+      tip: t("gettingStarted.service.test.tip"),
+    },
+    {
+      id: "invite",
+      title: t("gettingStarted.service.invite.title"),
+      description: t("gettingStarted.service.invite.description"),
+      link: "/dashboard/broadcasts",
+      linkLabel: t("gettingStarted.service.invite.linkLabel"),
+      icon: Star,
+      time: t("gettingStarted.service.invite.time"),
+      tip: t("gettingStarted.service.invite.tip"),
+    },
+  ];
+
+  const STORE_STEPS: Omit<Step, "done">[] = [
+    {
+      id: "products",
+      title: t("gettingStarted.store.products.title"),
+      description: t("gettingStarted.store.products.description"),
+      link: "/dashboard/products",
+      linkLabel: t("gettingStarted.store.products.linkLabel"),
+      icon: Package,
+      time: t("gettingStarted.store.products.time"),
+      tip: t("gettingStarted.store.products.tip"),
+    },
+    {
+      id: "faq",
+      title: t("gettingStarted.store.faq.title"),
+      description: t("gettingStarted.store.faq.description"),
+      link: "/dashboard/faq",
+      linkLabel: t("gettingStarted.store.faq.linkLabel"),
+      icon: HelpCircle,
+      time: t("gettingStarted.store.faq.time"),
+      tip: t("gettingStarted.store.faq.tip"),
+    },
+    {
+      id: "payment",
+      title: t("gettingStarted.store.payment.title"),
+      description: t("gettingStarted.store.payment.description"),
+      link: "/dashboard/bot",
+      linkLabel: t("gettingStarted.store.payment.linkLabel"),
+      icon: CreditCard,
+      time: t("gettingStarted.store.payment.time"),
+      optional: true,
+      tip: t("gettingStarted.store.payment.tip"),
+    },
+    {
+      id: "bot",
+      title: t("gettingStarted.store.bot.title"),
+      description: t("gettingStarted.store.bot.description"),
+      link: "/dashboard/bot",
+      linkLabel: t("gettingStarted.store.bot.linkLabel"),
+      icon: Bot,
+      time: t("gettingStarted.store.bot.time"),
+      tip: t("gettingStarted.store.bot.tip"),
+    },
+    {
+      id: "test",
+      title: t("gettingStarted.store.test.title"),
+      description: t("gettingStarted.store.test.description"),
+      link: "/dashboard/orders",
+      linkLabel: t("gettingStarted.store.test.linkLabel"),
+      icon: ShoppingCart,
+      time: t("gettingStarted.store.test.time"),
+      tip: t("gettingStarted.store.test.tip"),
+    },
+    {
+      id: "invite",
+      title: t("gettingStarted.store.invite.title"),
+      description: t("gettingStarted.store.invite.description"),
+      link: "/dashboard/broadcasts",
+      linkLabel: t("gettingStarted.store.invite.linkLabel"),
+      icon: Zap,
+      time: t("gettingStarted.store.invite.time"),
+      tip: t("gettingStarted.store.invite.tip"),
+    },
+  ];
 
   const baseSteps = isStore ? STORE_STEPS : SERVICE_STEPS;
 
@@ -258,10 +248,10 @@ export default function GettingStartedPage() {
           </div>
           <div>
             <h1 className={`text-2xl font-bold ${textPrimary}`}>
-              {business ? `Добро пожаловать, ${business.name}!` : "Добро пожаловать в Staffix!"}
+              {business ? `${t("gettingStarted.welcomeName")} ${business.name}!` : t("gettingStarted.welcomeDefault")}
             </h1>
             <p className={textSecondary}>
-              {isStore ? "Настройка интернет-магазина" : "Настройка AI-сотрудника для вашего бизнеса"}
+              {isStore ? t("gettingStarted.subtitleStore") : t("gettingStarted.subtitleService")}
             </p>
           </div>
         </div>
@@ -270,10 +260,10 @@ export default function GettingStartedPage() {
         <div className={`${bgCard} border ${borderColor} rounded-xl p-5`}>
           <div className="flex items-center justify-between mb-3">
             <span className={`text-sm font-medium ${textPrimary}`}>
-              Прогресс настройки
+              {t("gettingStarted.progressTitle")}
             </span>
             <span className={`text-sm font-bold ${progressPercent === 100 ? "text-green-400" : "text-blue-400"}`}>
-              {completedCount} / {steps.length} шагов
+              {completedCount} / {steps.length} {t("gettingStarted.stepsCount")}
             </span>
           </div>
           <div className={`h-2.5 rounded-full ${isDark ? "bg-white/10" : "bg-gray-100"}`}>
@@ -288,12 +278,12 @@ export default function GettingStartedPage() {
           </div>
           {progressPercent === 100 && (
             <p className="text-green-400 text-sm mt-2 font-medium">
-              Отлично! Все шаги выполнены. Ваш AI-сотрудник готов к работе!
+              {t("gettingStarted.allDone")}
             </p>
           )}
           {progressPercent < 100 && (
             <p className={`${textSecondary} text-xs mt-2`}>
-              Расчётное время: ~{steps.filter((s) => !s.done).reduce((sum, s) => sum + parseInt(s.time), 0)} мин
+              {t("gettingStarted.estimatedTime")} ~{steps.filter((s) => !s.done).reduce((sum, s) => sum + parseInt(s.time), 0)} {t("gettingStarted.min")}
             </p>
           )}
         </div>
@@ -335,7 +325,7 @@ export default function GettingStartedPage() {
                           </h3>
                           {step.optional && (
                             <span className={`text-xs px-2 py-0.5 rounded-full ${isDark ? "bg-white/5 text-gray-400" : "bg-gray-100 text-gray-500"}`}>
-                              необязательно
+                              {t("gettingStarted.optional")}
                             </span>
                           )}
                         </div>
@@ -358,7 +348,7 @@ export default function GettingStartedPage() {
                           href={step.link}
                           className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-lg border ${isDark ? "border-white/10 text-gray-400 hover:text-white" : "border-gray-200 text-gray-500 hover:text-gray-700"} transition-colors`}
                         >
-                          Изменить
+                          {t("gettingStarted.edit")}
                         </Link>
                       )}
                     </div>
@@ -372,7 +362,7 @@ export default function GettingStartedPage() {
                         className={`flex items-center gap-1.5 mt-3 text-xs ${isDark ? "text-blue-400 hover:text-blue-300" : "text-blue-600 hover:text-blue-700"} transition-colors`}
                       >
                         <Play className="h-3 w-3" />
-                        {isExpanded ? "Скрыть совет" : "Совет от Staffix"}
+                        {isExpanded ? t("gettingStarted.hideTip") : t("gettingStarted.showTip")}
                         {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                       </button>
                     )}
@@ -392,14 +382,14 @@ export default function GettingStartedPage() {
 
       {/* Bottom links */}
       <div className={`mt-8 ${bgCard} border ${borderColor} rounded-xl p-6`}>
-        <h3 className={`font-semibold ${textPrimary} mb-4`}>Полезные ресурсы</h3>
+        <h3 className={`font-semibold ${textPrimary} mb-4`}>{t("gettingStarted.usefulResources")}</h3>
         <div className="grid sm:grid-cols-3 gap-3">
           <Link
             href="/dashboard/support"
             className={`flex items-center gap-2 p-3 rounded-xl ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-50 hover:bg-gray-100"} transition-colors`}
           >
             <HelpCircle className="h-4 w-4 text-blue-400" />
-            <span className={`text-sm ${textPrimary}`}>Центр поддержки</span>
+            <span className={`text-sm ${textPrimary}`}>{t("gettingStarted.supportCenter")}</span>
           </Link>
           <a
             href="https://t.me/staffix_support_bot"
@@ -408,25 +398,25 @@ export default function GettingStartedPage() {
             className={`flex items-center gap-2 p-3 rounded-xl ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-50 hover:bg-gray-100"} transition-colors`}
           >
             <MessageCircle className="h-4 w-4 text-purple-400" />
-            <span className={`text-sm ${textPrimary}`}>Telegram-поддержка</span>
+            <span className={`text-sm ${textPrimary}`}>{t("gettingStarted.telegramSupport")}</span>
           </a>
           <Link
             href="/dashboard"
             className={`flex items-center gap-2 p-3 rounded-xl ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-50 hover:bg-gray-100"} transition-colors`}
           >
             <Zap className="h-4 w-4 text-yellow-400" />
-            <span className={`text-sm ${textPrimary}`}>В дашборд</span>
+            <span className={`text-sm ${textPrimary}`}>{t("gettingStarted.toDashboard")}</span>
           </Link>
         </div>
       </div>
 
       <div className={`mt-4 text-center text-xs ${textSecondary}`}>
         <Clock className="h-3.5 w-3.5 inline mr-1" />
-        У вас 14 дней бесплатного периода. Если нужна помощь с настройкой —{" "}
+        {t("gettingStarted.trialNotice")}{" "}
         <a href="https://t.me/staffix_support_bot" className="text-blue-400 hover:underline">
-          напишите нам в Telegram
+          {t("gettingStarted.trialNoticeLink")}
         </a>
-        , поможем за 15 минут.
+        {t("gettingStarted.trialNoticeSuffix")}
       </div>
     </div>
   );

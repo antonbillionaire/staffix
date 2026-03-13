@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Send,
   Plus,
@@ -37,23 +38,9 @@ interface Broadcast {
   stats: BroadcastStats;
 }
 
-const segmentLabels: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
-  all: { label: "Все клиенты", icon: <Users className="h-4 w-4" />, color: "text-blue-400" },
-  vip: { label: "VIP", icon: <Crown className="h-4 w-4" />, color: "text-yellow-400" },
-  active: { label: "Активные", icon: <Sparkles className="h-4 w-4" />, color: "text-green-400" },
-  inactive: { label: "Неактивные", icon: <Moon className="h-4 w-4" />, color: "text-gray-400" },
-};
-
-const statusLabels: Record<string, { label: string; bg: string; text: string }> = {
-  draft: { label: "Черновик", bg: "bg-gray-500/10", text: "text-gray-400" },
-  scheduled: { label: "Запланирована", bg: "bg-blue-500/10", text: "text-blue-400" },
-  sending: { label: "Отправляется", bg: "bg-yellow-500/10", text: "text-yellow-400" },
-  sent: { label: "Отправлена", bg: "bg-green-500/10", text: "text-green-400" },
-  cancelled: { label: "Отменена", bg: "bg-red-500/10", text: "text-red-400" },
-};
-
 export default function BroadcastsPage() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -65,6 +52,21 @@ export default function BroadcastsPage() {
   const [targetSegment, setTargetSegment] = useState("all");
   const [sendNow, setSendNow] = useState(true);
   const [creating, setCreating] = useState(false);
+
+  const segmentLabels: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+    all: { label: t("broadcasts.segmentAll"), icon: <Users className="h-4 w-4" />, color: "text-blue-400" },
+    vip: { label: t("broadcasts.segmentVip"), icon: <Crown className="h-4 w-4" />, color: "text-yellow-400" },
+    active: { label: t("broadcasts.segmentActive"), icon: <Sparkles className="h-4 w-4" />, color: "text-green-400" },
+    inactive: { label: t("broadcasts.segmentInactive"), icon: <Moon className="h-4 w-4" />, color: "text-gray-400" },
+  };
+
+  const statusLabels: Record<string, { label: string; bg: string; text: string }> = {
+    draft: { label: t("broadcasts.statusDraft"), bg: "bg-gray-500/10", text: "text-gray-400" },
+    scheduled: { label: t("broadcasts.statusScheduled"), bg: "bg-blue-500/10", text: "text-blue-400" },
+    sending: { label: t("broadcasts.statusSending"), bg: "bg-yellow-500/10", text: "text-yellow-400" },
+    sent: { label: t("broadcasts.statusSent"), bg: "bg-green-500/10", text: "text-green-400" },
+    cancelled: { label: t("broadcasts.statusCancelled"), bg: "bg-red-500/10", text: "text-red-400" },
+  };
 
   // Theme-aware styles
   const isDark = theme === "dark";
@@ -120,11 +122,11 @@ export default function BroadcastsPage() {
         fetchBroadcasts();
       } else {
         const error = await res.json();
-        alert(error.error || "Ошибка при создании рассылки");
+        alert(error.error || t("broadcasts.createError"));
       }
     } catch (error) {
       console.error("Error creating broadcast:", error);
-      alert("Ошибка при создании рассылки");
+      alert(t("broadcasts.createError"));
     } finally {
       setCreating(false);
     }
@@ -144,9 +146,9 @@ export default function BroadcastsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-2xl font-bold ${textPrimary}`}>Рассылки</h1>
+          <h1 className={`text-2xl font-bold ${textPrimary}`}>{t("broadcasts.title")}</h1>
           <p className={`${textSecondary} mt-1`}>
-            Отправляйте сообщения своим клиентам в Telegram
+            {t("broadcasts.subtitle")}
           </p>
         </div>
         <button
@@ -154,7 +156,7 @@ export default function BroadcastsPage() {
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
         >
           <Plus className="h-4 w-4" />
-          Новая рассылка
+          {t("broadcasts.newBroadcast")}
         </button>
       </div>
 
@@ -163,14 +165,14 @@ export default function BroadcastsPage() {
         <div className={`${cardBg} border ${borderColor} rounded-xl p-4`}>
           <div className="flex items-center gap-2 mb-2">
             <MessageSquare className="h-4 w-4 text-blue-500" />
-            <span className={`text-xs ${textSecondary}`}>Всего рассылок</span>
+            <span className={`text-xs ${textSecondary}`}>{t("broadcasts.totalBroadcasts")}</span>
           </div>
           <p className={`text-2xl font-bold ${textPrimary}`}>{broadcasts.length}</p>
         </div>
         <div className={`${cardBg} border ${borderColor} rounded-xl p-4`}>
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle className="h-4 w-4 text-green-500" />
-            <span className={`text-xs ${textSecondary}`}>Отправлено</span>
+            <span className={`text-xs ${textSecondary}`}>{t("broadcasts.sent")}</span>
           </div>
           <p className={`text-2xl font-bold ${textPrimary}`}>
             {broadcasts.filter((b) => b.status === "sent").length}
@@ -179,7 +181,7 @@ export default function BroadcastsPage() {
         <div className={`${cardBg} border ${borderColor} rounded-xl p-4`}>
           <div className="flex items-center gap-2 mb-2">
             <Clock className="h-4 w-4 text-yellow-500" />
-            <span className={`text-xs ${textSecondary}`}>Черновики</span>
+            <span className={`text-xs ${textSecondary}`}>{t("broadcasts.drafts")}</span>
           </div>
           <p className={`text-2xl font-bold ${textPrimary}`}>
             {broadcasts.filter((b) => b.status === "draft").length}
@@ -188,7 +190,7 @@ export default function BroadcastsPage() {
         <div className={`${cardBg} border ${borderColor} rounded-xl p-4`}>
           <div className="flex items-center gap-2 mb-2">
             <Send className="h-4 w-4 text-purple-500" />
-            <span className={`text-xs ${textSecondary}`}>Доставлено сообщений</span>
+            <span className={`text-xs ${textSecondary}`}>{t("broadcasts.deliveredMessages")}</span>
           </div>
           <p className={`text-2xl font-bold ${textPrimary}`}>
             {broadcasts.reduce((sum, b) => sum + b.stats.sent, 0)}
@@ -199,10 +201,10 @@ export default function BroadcastsPage() {
       {/* Filters */}
       <div className="flex gap-2">
         {[
-          { key: "all", label: "Все" },
-          { key: "sent", label: "Отправленные" },
-          { key: "draft", label: "Черновики" },
-          { key: "scheduled", label: "Запланированные" },
+          { key: "all", label: t("broadcasts.filterAll") },
+          { key: "sent", label: t("broadcasts.filterSent") },
+          { key: "draft", label: t("broadcasts.drafts") },
+          { key: "scheduled", label: t("broadcasts.filterScheduled") },
         ].map((f) => (
           <button
             key={f.key}
@@ -226,15 +228,15 @@ export default function BroadcastsPage() {
       ) : broadcasts.length === 0 ? (
         <div className={`${cardBg} border ${borderColor} rounded-xl p-12 text-center`}>
           <Send className={`h-12 w-12 ${isDark ? "text-gray-600" : "text-gray-400"} mx-auto mb-4`} />
-          <h3 className={`text-lg font-medium ${textPrimary} mb-2`}>Нет рассылок</h3>
+          <h3 className={`text-lg font-medium ${textPrimary} mb-2`}>{t("broadcasts.noBroadcasts")}</h3>
           <p className={`${textSecondary} mb-4`}>
-            Создайте первую рассылку для ваших клиентов
+            {t("broadcasts.noBroadcastsDesc")}
           </p>
           <button
             onClick={() => setShowModal(true)}
             className="px-4 py-2 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
           >
-            Создать рассылку
+            {t("broadcasts.createBroadcast")}
           </button>
         </div>
       ) : (
@@ -273,7 +275,7 @@ export default function BroadcastsPage() {
                       </span>
                       {broadcast.sentAt && (
                         <span className={textTertiary}>
-                          Отправлена: {formatDate(broadcast.sentAt)}
+                          {t("broadcasts.sentAt")} {formatDate(broadcast.sentAt)}
                         </span>
                       )}
                     </div>
@@ -285,20 +287,20 @@ export default function BroadcastsPage() {
                       <p className={`text-xl font-bold ${textPrimary}`}>
                         {broadcast.stats.total}
                       </p>
-                      <p className={`text-xs ${textTertiary}`}>Получателей</p>
+                      <p className={`text-xs ${textTertiary}`}>{t("broadcasts.recipientsCount")}</p>
                     </div>
                     <div className="text-center">
                       <p className="text-xl font-bold text-green-500">
                         {broadcast.stats.sent}
                       </p>
-                      <p className={`text-xs ${textTertiary}`}>Доставлено</p>
+                      <p className={`text-xs ${textTertiary}`}>{t("broadcasts.delivered")}</p>
                     </div>
                     {broadcast.stats.failed > 0 && (
                       <div className="text-center">
                         <p className="text-xl font-bold text-red-500">
                           {broadcast.stats.failed}
                         </p>
-                        <p className={`text-xs ${textTertiary}`}>Ошибок</p>
+                        <p className={`text-xs ${textTertiary}`}>{t("broadcasts.errors")}</p>
                       </div>
                     )}
                   </div>
@@ -314,7 +316,7 @@ export default function BroadcastsPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className={`${modalBg} rounded-2xl p-6 w-full max-w-lg border ${isDark ? "border-white/10" : "border-gray-200"}`}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className={`text-xl font-bold ${textPrimary}`}>Новая рассылка</h2>
+              <h2 className={`text-xl font-bold ${textPrimary}`}>{t("broadcasts.newBroadcast")}</h2>
               <button
                 onClick={() => setShowModal(false)}
                 className={`p-2 ${isDark ? "hover:bg-white/10" : "hover:bg-gray-100"} rounded-lg transition-colors`}
@@ -326,25 +328,25 @@ export default function BroadcastsPage() {
             <div className="space-y-4">
               <div>
                 <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
-                  Название рассылки
+                  {t("broadcasts.broadcastName")}
                 </label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Новогодняя акция"
+                  placeholder={t("broadcasts.broadcastNamePlaceholder")}
                   className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:border-blue-500`}
                 />
               </div>
 
               <div>
                 <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
-                  Текст сообщения
+                  {t("broadcasts.messageText")}
                 </label>
                 <textarea
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  placeholder="Напишите текст рассылки..."
+                  placeholder={t("broadcasts.messageTextPlaceholder")}
                   rows={4}
                   className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none`}
                 />
@@ -352,7 +354,7 @@ export default function BroadcastsPage() {
 
               <div>
                 <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
-                  Получатели
+                  {t("broadcasts.recipients")}
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {Object.entries(segmentLabels).map(([key, { label, icon, color }]) => (
@@ -383,7 +385,7 @@ export default function BroadcastsPage() {
                   className="w-5 h-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500"
                 />
                 <label htmlFor="sendNow" className={textSecondary}>
-                  Отправить сразу
+                  {t("broadcasts.sendNow")}
                 </label>
               </div>
             </div>
@@ -393,7 +395,7 @@ export default function BroadcastsPage() {
                 onClick={() => setShowModal(false)}
                 className={`flex-1 px-4 py-3 ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} ${textSecondary} rounded-xl font-medium transition-colors`}
               >
-                Отмена
+                {t("broadcasts.cancel")}
               </button>
               <button
                 onClick={handleCreate}
@@ -405,7 +407,7 @@ export default function BroadcastsPage() {
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
-                {sendNow ? "Отправить" : "Сохранить"}
+                {sendNow ? t("broadcasts.send") : t("broadcasts.save")}
               </button>
             </div>
           </div>
