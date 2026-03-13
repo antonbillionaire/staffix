@@ -20,6 +20,7 @@ import {
   CreditCard,
   Target,
   Megaphone,
+  MessageSquare,
 } from "lucide-react";
 
 const adminNav = [
@@ -27,6 +28,7 @@ const adminNav = [
   { name: "Клиенты", href: "/admin/users", icon: Users },
   { name: "Подписки", href: "/admin/subscriptions", icon: CreditCard },
   { name: "Лиды", href: "/admin/sales-leads", icon: Target },
+  { name: "Сообщения", href: "/admin/messages", icon: MessageSquare },
   { name: "Кампании", href: "/admin/outreach", icon: Megaphone },
   { name: "Рассылки", href: "/admin/broadcasts", icon: Mail },
   { name: "Автоматизации", href: "/admin/automations", icon: Zap },
