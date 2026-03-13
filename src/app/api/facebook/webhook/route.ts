@@ -24,6 +24,23 @@ import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { markWebhookProcessed } from "@/lib/webhook-dedup";
 
+const META_API_BASE = "https://graph.facebook.com/v21.0";
+
+// Fetch Facebook Messenger user's name by PSID
+async function fetchFBUserName(psid: string, pageAccessToken: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(
+      `${META_API_BASE}/${psid}?fields=first_name,last_name&access_token=${pageAccessToken}`
+    );
+    if (!res.ok) return undefined;
+    const data = await res.json();
+    const parts = [data.first_name, data.last_name].filter(Boolean);
+    return parts.length > 0 ? parts.join(" ") : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // ─── GET: Webhook verification ───────────────────────────────────────────────
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -211,11 +228,15 @@ async function processBusinessFBMessage(
 
     await sendFBTyping(business.fbPageAccessToken, msg.senderId, msg.pageId);
 
+    // Fetch sender name from Facebook Messenger API
+    const senderName = await fetchFBUserName(msg.senderId, business.fbPageAccessToken);
+
     const reply = await generateChannelAIResponse(
       businessId,
       "facebook",
       msg.senderId,
-      msg.text
+      msg.text,
+      senderName
     );
 
     await sendFBMessage(business.fbPageAccessToken, msg.senderId, reply, msg.pageId);

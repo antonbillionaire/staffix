@@ -22,6 +22,20 @@ import { markWebhookProcessed } from "@/lib/webhook-dedup";
 
 const META_API_BASE = "https://graph.facebook.com/v21.0";
 
+// Fetch Instagram user's name by IG-scoped ID (works for DMs and comments)
+async function fetchIGUserName(igScopedId: string, accessToken: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(
+      `${META_API_BASE}/${igScopedId}?fields=name,username&access_token=${accessToken}`
+    );
+    if (!res.ok) return undefined;
+    const data = await res.json();
+    return data.name || (data.username ? `@${data.username}` : undefined);
+  } catch {
+    return undefined;
+  }
+}
+
 // ─── GET: Webhook verification ───────────────────────────────────────────────
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -231,11 +245,15 @@ async function processIGMessage(
   await sendIGSenderAction(pageId, business.fbPageAccessToken, senderId, "mark_seen");
   await sendIGSenderAction(pageId, business.fbPageAccessToken, senderId, "typing_on");
 
+  // Fetch sender name from Instagram API (non-blocking — if fails, proceeds without name)
+  const senderName = await fetchIGUserName(senderId, business.fbPageAccessToken);
+
   const reply = await generateChannelAIResponse(
     business.id,
     "instagram",
     senderId,
-    text
+    text,
+    senderName
   );
 
   await sendIGMessage(pageId, business.fbPageAccessToken, senderId, reply);
@@ -302,12 +320,16 @@ async function processIGComment(
 
   const pageId = business.fbPageId || accountId;
 
+  // Fetch commenter name from Instagram API
+  const commenterName = await fetchIGUserName(commenterId, business.fbPageAccessToken);
+
   // Generate AI response based on comment context
   const reply = await generateChannelAIResponse(
     business.id,
     "instagram_comment",
     commenterId,
-    `[${contextLabel}] ${commentText}`
+    `[${contextLabel}] ${commentText}`,
+    commenterName
   );
 
   // Send private DM reply to the commenter (1 per comment, 7-day window)
