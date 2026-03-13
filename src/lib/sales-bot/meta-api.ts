@@ -66,6 +66,33 @@ export async function sendInstagramMessage(
 }
 
 // ========================================
+// INSTAGRAM USER PROFILE
+// ========================================
+
+/**
+ * Fetch Instagram user's name and username by their IG-scoped ID.
+ * Requires: instagram_manage_messages (already approved).
+ * Returns { name, username } or null on failure.
+ */
+export async function getInstagramUserProfile(
+  igScopedUserId: string
+): Promise<{ name: string | null; username: string | null } | null> {
+  const accessToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+  if (!accessToken) return null;
+
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/v21.0/${igScopedUserId}?fields=name,username&access_token=${accessToken}`
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    return { name: data.name || null, username: data.username || null };
+  } catch {
+    return null;
+  }
+}
+
+// ========================================
 // INSTAGRAM SENDER ACTIONS (UX)
 // ========================================
 

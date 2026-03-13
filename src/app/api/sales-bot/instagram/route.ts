@@ -8,6 +8,7 @@ import {
   markMessageSeen,
   showTypingIndicator,
   verifyMetaWebhook,
+  getInstagramUserProfile,
 } from "@/lib/sales-bot/meta-api";
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
 import { markWebhookProcessed } from "@/lib/webhook-dedup";
@@ -84,22 +85,33 @@ async function generateAIResponse(
   }
 }
 
-// Save/update lead in DB
+// Save/update lead in DB, fetch IG profile if name is missing
 async function upsertLead(
   instagramId: string,
   channel: string,
   name?: string
 ) {
   try {
+    // If no name provided (DM), try to fetch from Instagram API
+    let displayName = name || null;
+    if (!displayName) {
+      const profile = await getInstagramUserProfile(instagramId);
+      if (profile) {
+        displayName = profile.name || (profile.username ? `@${profile.username}` : null);
+      }
+    }
+
     await prisma.salesLead.upsert({
       where: { instagramId },
       create: {
         instagramId,
         channel,
-        name: name || null,
+        name: displayName,
         stage: "new",
       },
       update: {
+        // Update name if we now have one and it was missing before
+        ...(displayName ? { name: displayName } : {}),
         updatedAt: new Date(),
       },
     });
