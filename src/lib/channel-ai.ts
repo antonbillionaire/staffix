@@ -23,6 +23,9 @@ import {
   salesToolDefinitions,
   createOrder,
   getClientOrders,
+  getProductDetails,
+  getCategories,
+  getUpsellSuggestions,
 } from "@/lib/sales-tools";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -41,7 +44,7 @@ const channelBookingTools: any[] = bookingToolDefinitions.filter(
 const channelSalesTools: any[] = [
   ...salesToolDefinitions.filter(
     (t: { name: string }) =>
-      ["create_order", "get_client_orders", "search_products"].includes(t.name)
+      ["search_products", "get_product_details", "get_categories", "create_order", "get_client_orders", "get_upsell_suggestions"].includes(t.name)
   ),
   ...bookingToolDefinitions.filter(
     (t: { name: string }) =>
@@ -300,7 +303,9 @@ async function handleChannelToolCall(
           toolInput.client_phone,
           toolInput.client_address,
           toolInput.payment_method,
-          toolInput.notes
+          toolInput.notes,
+          channel,
+          clientId
         );
         return JSON.stringify(result);
       }
@@ -308,6 +313,21 @@ async function handleChannelToolCall(
       case "get_client_orders": {
         const tgId = channel === "telegram" ? BigInt(clientId) : BigInt(0);
         const result = await getClientOrders(businessId, tgId);
+        return JSON.stringify(result);
+      }
+
+      case "get_product_details": {
+        const result = await getProductDetails(businessId, toolInput.product_id);
+        return JSON.stringify(result);
+      }
+
+      case "get_categories": {
+        const result = await getCategories(businessId);
+        return JSON.stringify(result);
+      }
+
+      case "get_upsell_suggestions": {
+        const result = await getUpsellSuggestions(businessId, toolInput.ordered_product_ids);
         return JSON.stringify(result);
       }
 

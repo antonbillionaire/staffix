@@ -401,7 +401,9 @@ export async function createOrder(
   clientPhone?: string,
   clientAddress?: string,
   paymentMethod?: string,
-  notes?: string
+  notes?: string,
+  channel?: string,
+  channelClientId?: string
 ): Promise<SalesToolResult> {
   try {
     if (!items || items.length === 0) {
@@ -553,6 +555,8 @@ export async function createOrder(
         clientPhone: clientPhone || null,
         clientAddress: clientAddress || null,
         clientTelegramId: telegramId,
+        clientChannel: channel || (telegramId > BigInt(0) ? "telegram" : null),
+        clientChannelId: channelClientId || null,
         clientNotes: notes || null,
         totalPrice: finalPrice,
         paymentMethod: paymentMethod || null,

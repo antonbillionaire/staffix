@@ -225,6 +225,7 @@ export default function ServicesPage() {
             </p>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className={`${isDark ? "bg-white/5 border-white/5" : "bg-gray-50 border-gray-200"} border-b`}>
               <tr>
@@ -234,7 +235,7 @@ export default function ServicesPage() {
                 <th className={`text-left px-4 py-3 text-sm font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>
                   {t("servicesPage.price")}
                 </th>
-                <th className={`text-left px-4 py-3 text-sm font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                <th className={`text-left px-4 py-3 text-sm font-medium hidden sm:table-cell ${isDark ? "text-gray-400" : "text-gray-500"}`}>
                   {t("servicesPage.duration")}
                 </th>
                 <th className={`text-right px-4 py-3 text-sm font-medium ${isDark ? "text-gray-400" : "text-gray-500"}`}>
@@ -256,7 +257,7 @@ export default function ServicesPage() {
                   <td className={`px-4 py-3 ${isDark ? "text-gray-300" : "text-gray-600"}`}>
                     {formatPrice(service.price)}
                   </td>
-                  <td className={`px-4 py-3 ${isDark ? "text-gray-300" : "text-gray-600"}`}>
+                  <td className={`px-4 py-3 hidden sm:table-cell ${isDark ? "text-gray-300" : "text-gray-600"}`}>
                     {service.duration} {t("servicesPage.minutes")}
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -277,6 +278,7 @@ export default function ServicesPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

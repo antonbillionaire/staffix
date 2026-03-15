@@ -150,6 +150,60 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    // Load channel leads (WA/IG/FB) that are NOT already in Client table
+    // These represent customers from non-Telegram channels
+    const channelLeads = await prisma.lead.findMany({
+      where: {
+        businessId,
+        channel: { in: ["whatsapp", "instagram", "facebook"] },
+        ...(search
+          ? { clientName: { contains: search, mode: "insensitive" as const } }
+          : {}),
+      },
+      orderBy: { lastInteractionAt: "desc" },
+    });
+
+    // Convert leads to unified customer format
+    const channelCustomers = channelLeads.map((lead) => ({
+      id: lead.id,
+      telegramId: null,
+      name: lead.clientName || "Клиент",
+      phone: null,
+      totalVisits: 0,
+      lastVisitDate: lead.lastInteractionAt,
+      isBlocked: false,
+      createdAt: lead.createdAt,
+      isActive: lead.lastInteractionAt
+        ? new Date(lead.lastInteractionAt) > thirtyDaysAgo
+        : false,
+      isVip: lead.status === "client",
+      messagesCount: 0,
+      bookingsCount: 0,
+      avgRating: null,
+      segment: lead.status === "client" ? "vip" : lead.lastInteractionAt && new Date(lead.lastInteractionAt) > thirtyDaysAgo ? "active" : "inactive",
+      channel: lead.channel,
+      leadStatus: lead.status,
+      loyaltyPoints: 0,
+      loyaltyVisits: 0,
+      loyaltyTotalSpent: 0,
+      loyaltyProgramIds: [],
+      loyaltyCashbackPercent: null,
+      loyaltyTier: null,
+    }));
+
+    // Merge: Telegram clients + channel leads
+    const allCustomers = [
+      ...enrichedClients.map((c) => ({ ...c, channel: "telegram" as string, leadStatus: null as string | null })),
+      ...channelCustomers,
+    ];
+
+    // Sort by last activity
+    allCustomers.sort((a, b) => {
+      const aDate = a.lastVisitDate ? new Date(a.lastVisitDate).getTime() : 0;
+      const bDate = b.lastVisitDate ? new Date(b.lastVisitDate).getTime() : 0;
+      return bDate - aDate;
+    });
+
     // Stats — use counts from DB
     const [totalAll, blockedCount] = await Promise.all([
       prisma.client.count({ where: { businessId } }),
@@ -157,21 +211,21 @@ export async function GET(request: NextRequest) {
     ]);
 
     const stats = {
-      total: totalAll,
-      active: 0, // approximate — exact would require extra queries
+      total: totalAll + channelLeads.length,
+      active: 0,
       inactive: 0,
       vip: 0,
       blocked: blockedCount,
     };
 
     return NextResponse.json({
-      customers: enrichedClients,
+      customers: allCustomers,
       stats,
       pagination: {
         page,
         limit,
-        totalCount,
-        totalPages: Math.ceil(totalCount / limit),
+        totalCount: totalCount + channelLeads.length,
+        totalPages: Math.ceil((totalCount + channelLeads.length) / limit),
       },
     });
   } catch (error) {

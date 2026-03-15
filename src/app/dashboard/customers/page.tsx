@@ -33,8 +33,10 @@ import {
 
 interface Customer {
   id: string;
-  telegramId: string;
+  telegramId: string | null;
   name: string;
+  channel?: string;
+  leadStatus?: string | null;
   phone: string | null;
   totalVisits: number;
   lastVisitDate: string | null;
@@ -309,7 +311,7 @@ export default function CustomersPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <button
           onClick={() => { setSegment("all"); setPagination(p => ({ ...p, page: 1 })); }}
           className={`${cardBg} border rounded-xl p-4 text-left transition-colors ${
@@ -408,11 +410,11 @@ export default function CustomersPage() {
                 <tr className={`border-b ${borderColor} ${tableBg}`}>
                   <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thClient")}</th>
                   <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thStatus")}</th>
-                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thVisits")}</th>
-                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thActivity")}</th>
-                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thRating")}</th>
-                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thPoints")}</th>
-                  <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thLastVisit")}</th>
+                  <th className={`text-left py-3 px-4 text-xs font-medium hidden md:table-cell ${textTertiary} uppercase`}>{t("customers.thVisits")}</th>
+                  <th className={`text-left py-3 px-4 text-xs font-medium hidden lg:table-cell ${textTertiary} uppercase`}>{t("customers.thActivity")}</th>
+                  <th className={`text-left py-3 px-4 text-xs font-medium hidden lg:table-cell ${textTertiary} uppercase`}>{t("customers.thRating")}</th>
+                  <th className={`text-left py-3 px-4 text-xs font-medium hidden md:table-cell ${textTertiary} uppercase`}>{t("customers.thPoints")}</th>
+                  <th className={`text-left py-3 px-4 text-xs font-medium hidden lg:table-cell ${textTertiary} uppercase`}>{t("customers.thLastVisit")}</th>
                   <th className={`text-right py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thActions")}</th>
                 </tr>
               </thead>
@@ -421,7 +423,19 @@ export default function CustomersPage() {
                   <tr key={customer.id} className={`border-b ${borderColor} ${hoverBg}`}>
                     <td className="py-3 px-4">
                       <div>
-                        <p className={`${textPrimary} font-medium`}>{customer.name}</p>
+                        <p className={`${textPrimary} font-medium flex items-center gap-2`}>
+                          {customer.name}
+                          {customer.channel && customer.channel !== "telegram" && (
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${
+                              customer.channel === "whatsapp" ? "bg-green-500/20 text-green-400" :
+                              customer.channel === "instagram" ? "bg-pink-500/20 text-pink-400" :
+                              customer.channel === "facebook" ? "bg-blue-500/20 text-blue-400" :
+                              "bg-gray-500/20 text-gray-400"
+                            }`}>
+                              {customer.channel === "whatsapp" ? "WA" : customer.channel === "instagram" ? "IG" : "FB"}
+                            </span>
+                          )}
+                        </p>
                         {customer.phone && (
                           <p className={`text-sm ${textTertiary} flex items-center gap-1`}>
                             <Phone className="h-3 w-3" />
@@ -433,7 +447,7 @@ export default function CustomersPage() {
                     <td className="py-3 px-4">
                       {getSegmentBadge(customer)}
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 hidden md:table-cell">
                       <div className="flex items-center gap-3 text-sm">
                         <Link
                           href={`/dashboard/customers/${customer.id}?tab=bookings`}
@@ -453,7 +467,7 @@ export default function CustomersPage() {
                         </Link>
                       </div>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 hidden lg:table-cell">
                       <Link
                         href={`/dashboard/customers/${customer.id}?tab=bookings`}
                         className={`${textSecondary} hover:text-blue-500 transition-colors`}
@@ -461,7 +475,7 @@ export default function CustomersPage() {
                         {customer.totalVisits} {t("customers.visitsCount")}
                       </Link>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 hidden lg:table-cell">
                       {customer.avgRating ? (
                         <span className="flex items-center gap-1 text-yellow-500">
                           <Star className="h-4 w-4 fill-yellow-500" />
@@ -471,7 +485,7 @@ export default function CustomersPage() {
                         <span className={textTertiary}>—</span>
                       )}
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 hidden md:table-cell">
                       <button
                         onClick={() => { setLoyaltyCustomer(customer); setLoyaltyAmount(""); }}
                         className={`flex items-center gap-1 text-sm ${customer.loyaltyPoints > 0 ? "text-purple-500" : textTertiary} hover:text-purple-400 transition-colors`}
@@ -481,7 +495,7 @@ export default function CustomersPage() {
                         {customer.loyaltyPoints > 0 ? customer.loyaltyPoints : "—"}
                       </button>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 hidden lg:table-cell">
                       <div className={`flex items-center gap-2 ${textSecondary}`}>
                         <Clock className="h-4 w-4" />
                         <span className="text-sm">{formatDate(customer.lastVisitDate)}</span>

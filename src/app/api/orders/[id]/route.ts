@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { sendWAMessage } from "@/lib/whatsapp-utils";
 
 async function getUserBusiness(): Promise<string | null> {
   const session = await auth();
@@ -54,9 +55,9 @@ export async function PATCH(
       include: { items: true },
     });
 
-    // Если статус изменился — уведомить клиента в Telegram
-    if (body.status && body.status !== order.status && order.clientTelegramId) {
-      notifyClientStatusChange(businessId, order.clientTelegramId, updated).catch(() => {});
+    // Notify client about status change (all channels)
+    if (body.status && body.status !== order.status) {
+      notifyClientOrderStatus(businessId, order, updated).catch(() => {});
     }
 
     return NextResponse.json({ order: updated });
@@ -66,40 +67,83 @@ export async function PATCH(
   }
 }
 
-async function notifyClientStatusChange(
+const STATUS_MESSAGES: Record<string, string> = {
+  confirmed: "✅ Ваш заказ подтверждён! Мы начинаем обработку.",
+  processing: "⚙️ Ваш заказ в обработке.",
+  shipped: "🚚 Ваш заказ отправлен! Ожидайте доставку.",
+  delivered: "🎉 Ваш заказ доставлен! Надеемся, всё понравилось.",
+  cancelled: "❌ Ваш заказ отменён. Свяжитесь с нами если это ошибка.",
+};
+
+async function notifyClientOrderStatus(
   businessId: string,
-  clientTelegramId: bigint,
-  order: { orderNumber: number; status: string; totalPrice: number }
+  originalOrder: { clientTelegramId: bigint | null; clientChannel: string | null; clientChannelId: string | null },
+  updatedOrder: { orderNumber: number; status: string; totalPrice: number }
 ): Promise<void> {
+  const statusText = STATUS_MESSAGES[updatedOrder.status];
+  if (!statusText) return;
+
   const business = await prisma.business.findUnique({
     where: { id: businessId },
-    select: { botToken: true, name: true },
+    select: { botToken: true, name: true, waPhoneNumberId: true, waAccessToken: true },
   });
-
-  if (!business?.botToken) return;
-
-  const statusMessages: Record<string, string> = {
-    confirmed: "✅ Ваш заказ подтверждён! Мы начинаем обработку.",
-    processing: "⚙️ Ваш заказ в обработке.",
-    shipped: "🚚 Ваш заказ отправлен! Ожидайте доставку.",
-    delivered: "🎉 Ваш заказ доставлен! Надеемся, всё понравилось.",
-    cancelled: "❌ Ваш заказ отменён. Свяжитесь с нами если это ошибка.",
-  };
-
-  const statusText = statusMessages[order.status];
-  if (!statusText) return;
+  if (!business) return;
 
   const message =
     `${statusText}\n\n` +
-    `🛒 Заказ #${order.orderNumber} | ${order.totalPrice.toLocaleString("ru-RU")}\n` +
+    `🛒 Заказ #${updatedOrder.orderNumber} | ${updatedOrder.totalPrice.toLocaleString("ru-RU")}\n` +
     `От: ${business.name}`;
 
-  await fetch(`https://api.telegram.org/bot${business.botToken}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: clientTelegramId.toString(),
-      text: message,
-    }),
-  }).catch(() => {});
+  const channel = originalOrder.clientChannel;
+
+  // Telegram notification
+  if ((channel === "telegram" || !channel) && originalOrder.clientTelegramId && business.botToken) {
+    await fetch(`https://api.telegram.org/bot${business.botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: originalOrder.clientTelegramId.toString(),
+        text: message,
+      }),
+    }).catch(() => {});
+    return;
+  }
+
+  // WhatsApp notification
+  if (channel === "whatsapp" && originalOrder.clientChannelId && business.waPhoneNumberId && business.waAccessToken) {
+    await sendWAMessage(
+      business.waPhoneNumberId,
+      business.waAccessToken,
+      originalOrder.clientChannelId,
+      message
+    ).catch(() => {});
+    return;
+  }
+
+  // Instagram / Facebook notification
+  if ((channel === "instagram" || channel === "facebook") && originalOrder.clientChannelId) {
+    // IG and FB use the same Graph API for sending messages
+    const pageToken = await getPageAccessToken(businessId);
+    if (!pageToken) return;
+
+    await fetch(`https://graph.facebook.com/v21.0/me/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${pageToken}`,
+      },
+      body: JSON.stringify({
+        recipient: { id: originalOrder.clientChannelId },
+        message: { text: message },
+      }),
+    }).catch(() => {});
+  }
+}
+
+async function getPageAccessToken(businessId: string): Promise<string | null> {
+  const business = await prisma.business.findUnique({
+    where: { id: businessId },
+    select: { fbPageAccessToken: true },
+  });
+  return business?.fbPageAccessToken || null;
 }

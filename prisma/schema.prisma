@@ -1238,6 +1238,8 @@ model Order {
   clientPhone     String?
   clientAddress   String?     // для доставки
   clientTelegramId BigInt?
+  clientChannel   String?     // telegram | whatsapp | instagram | facebook
+  clientChannelId String?     // channel-specific client ID (waId, igScopedId, etc.)
   clientNotes     String?     // пожелания клиента
 
   // Позиции заказа
