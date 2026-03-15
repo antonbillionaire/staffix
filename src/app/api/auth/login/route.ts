@@ -54,12 +54,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Remove password from response
+    // Remove password and sensitive business fields from response
     const { password: _, ...userWithoutPassword } = user;
+    const sanitizedUser = {
+      ...userWithoutPassword,
+      businesses: userWithoutPassword.businesses.map(({ botToken, fbPageAccessToken, waAccessToken, webhookSecret, igBusinessAccountId, fbPageId, waPhoneNumberId, ...safeBusiness }) => safeBusiness),
+    };
 
     return NextResponse.json({
       message: "Вход выполнен",
-      user: userWithoutPassword,
+      user: sanitizedUser,
     });
   } catch (error) {
     console.error("Login error:", error);

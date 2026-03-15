@@ -1,7 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// Routes that must remain public (no auth check)
+const PUBLIC_API_PREFIXES = [
+  "/api/telegram/webhook",
+  "/api/instagram/webhook",
+  "/api/facebook/webhook",
+  "/api/whatsapp/webhook",
+  "/api/sales-bot/",
+  "/api/webhooks/",
+  "/api/auth/",
+  "/api/cron/",
+  "/api/health",
+  "/api/consultation/",
+  "/api/dev/",
+];
+
+function isPublicApiRoute(pathname: string): boolean {
+  return PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  // ─── AUTH: Protect dashboard pages and API routes ───
+  const sessionCookie =
+    request.cookies.get("__Secure-authjs.session-token")?.value ||
+    request.cookies.get("authjs.session-token")?.value; // dev fallback
+
+  if (pathname.startsWith("/dashboard") && !sessionCookie) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("callbackUrl", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (
+    pathname.startsWith("/api/") &&
+    !isPublicApiRoute(pathname) &&
+    !sessionCookie &&
+    request.method !== "GET" // allow GET for public data fetches
+  ) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
   // ─── CSRF: Origin check for API mutations (not webhooks/cron/auth) ───
   if (

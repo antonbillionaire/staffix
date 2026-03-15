@@ -16,6 +16,7 @@ import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { parseWAWebhook, sendWAMessage, markWAMessageRead } from "@/lib/whatsapp-utils";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
+import { checkSubscriptionLimit, incrementMessageCount } from "@/lib/subscription-check";
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { markWebhookProcessed } from "@/lib/webhook-dedup";
@@ -140,26 +141,21 @@ async function processWAMessage(
         waPhoneNumberId: true,
         waAccessToken: true,
         waActive: true,
-        subscription: { select: { messagesUsed: true, messagesLimit: true, expiresAt: true } },
       },
     });
 
     if (!business?.waActive || !business.waPhoneNumberId || !business.waAccessToken) return;
 
     // Check message limit
-    const sub = business.subscription;
-    if (sub) {
-      const isExpired = new Date(sub.expiresAt) < new Date();
-      const limitReached = sub.messagesLimit !== -1 && sub.messagesUsed >= sub.messagesLimit;
-      if (isExpired || limitReached) {
-        await sendWAMessage(
-          business.waPhoneNumberId,
-          business.waAccessToken,
-          msg.waId,
-          "Извините, временно не можем обработать ваш запрос. Пожалуйста, свяжитесь с нами напрямую."
-        );
-        return;
-      }
+    const { allowed, reason } = await checkSubscriptionLimit(businessId);
+    if (!allowed) {
+      await sendWAMessage(
+        business.waPhoneNumberId,
+        business.waAccessToken,
+        msg.waId,
+        "Извините, временно не можем обработать ваш запрос. Пожалуйста, свяжитесь с нами напрямую."
+      );
+      return;
     }
 
     // Mark message as read
@@ -178,12 +174,7 @@ async function processWAMessage(
     await sendWAMessage(business.waPhoneNumberId, business.waAccessToken, msg.waId, reply);
 
     // Increment message usage
-    if (sub) {
-      await prisma.subscription.update({
-        where: { businessId },
-        data: { messagesUsed: { increment: 1 } },
-      });
-    }
+    await incrementMessageCount(businessId);
   } catch (e) {
     console.error("processWAMessage error:", e);
   }

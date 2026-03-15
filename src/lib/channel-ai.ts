@@ -19,6 +19,11 @@ import {
   cancelBooking,
   searchProducts,
 } from "@/lib/booking-tools";
+import {
+  salesToolDefinitions,
+  createOrder,
+  getClientOrders,
+} from "@/lib/sales-tools";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -30,6 +35,19 @@ const channelBookingTools: any[] = bookingToolDefinitions.filter(
   (t: { name: string }) =>
     ["check_availability", "create_booking", "get_services", "get_staff", "update_lead_status", "get_my_bookings", "cancel_booking", "notify_manager", "search_products"].includes(t.name)
 );
+
+// Channel sales tools — for store/shop businesses (create_order, get_client_orders + shared tools)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const channelSalesTools: any[] = [
+  ...salesToolDefinitions.filter(
+    (t: { name: string }) =>
+      ["create_order", "get_client_orders", "search_products"].includes(t.name)
+  ),
+  ...bookingToolDefinitions.filter(
+    (t: { name: string }) =>
+      ["update_lead_status", "notify_manager"].includes(t.name)
+  ),
+];
 
 /**
  * Get or create a ChannelConversation record for this client
@@ -201,7 +219,8 @@ export function buildChannelSystemPrompt(
  */
 async function handleChannelToolCall(
   toolName: string,
-  toolInput: Record<string, string>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  toolInput: Record<string, any>,
   businessId: string,
   clientId: string,
   channel: string
@@ -268,6 +287,28 @@ async function handleChannelToolCall(
       case "search_products": {
         const results = await searchProducts(businessId, toolInput.query, toolInput.category);
         return JSON.stringify(results);
+      }
+
+      case "create_order": {
+        // createOrder expects telegramId: bigint — use BigInt(0) for non-Telegram channels
+        const tgId = channel === "telegram" ? BigInt(clientId) : BigInt(0);
+        const result = await createOrder(
+          businessId,
+          tgId,
+          toolInput.client_name,
+          toolInput.items,
+          toolInput.client_phone,
+          toolInput.client_address,
+          toolInput.payment_method,
+          toolInput.notes
+        );
+        return JSON.stringify(result);
+      }
+
+      case "get_client_orders": {
+        const tgId = channel === "telegram" ? BigInt(clientId) : BigInt(0);
+        const result = await getClientOrders(businessId, tgId);
+        return JSON.stringify(result);
       }
 
       case "notify_manager": {
@@ -347,13 +388,17 @@ export async function generateChannelAIResponse(
       { role: "user", content: userMessage },
     ];
 
-    // Call Claude with booking tools
+    // Select tools based on business type
+    const isStoreBusiness = biz.businessType === "store" || biz.businessType === "shop" || biz.businessType === "sales";
+    const tools = isStoreBusiness ? channelSalesTools : channelBookingTools;
+
+    // Call Claude with appropriate tools
     let response = await anthropic.messages.create({
       model: "claude-sonnet-4-5-20250929",
       max_tokens: 1024,
       system: systemPrompt,
       messages,
-      tools: channelBookingTools,
+      tools,
     });
 
     // Tool loop — process tool_use responses (max 5 iterations)

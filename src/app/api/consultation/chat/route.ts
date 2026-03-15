@@ -5,9 +5,9 @@ import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
-    // DB-based rate limiting: 10 messages per 15 min per IP
+    // DB-based rate limiting: 5 messages per 60 min per IP
     const ip = getClientIp(req);
-    const { allowed } = await rateLimit(`consultation:${ip}`, 10, 15);
+    const { allowed } = await rateLimit(`consultation:${ip}`, 5, 60);
     if (!allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
@@ -20,6 +20,15 @@ export async function POST(req: NextRequest) {
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
         { error: "Messages are required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate message length to prevent abuse
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.content && lastMessage.content.length > 500) {
+      return NextResponse.json(
+        { error: "Message too long. Maximum 500 characters." },
         { status: 400 }
       );
     }
@@ -46,7 +55,7 @@ export async function POST(req: NextRequest) {
       : CONSULTATION_SYSTEM_PROMPT;
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 1024,
       system: systemPrompt,
       messages: recentMessages,

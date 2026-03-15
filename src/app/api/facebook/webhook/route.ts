@@ -23,6 +23,7 @@ import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { markWebhookProcessed } from "@/lib/webhook-dedup";
+import { checkSubscriptionLimit, incrementMessageCount } from "@/lib/subscription-check";
 
 const META_API_BASE = "https://graph.facebook.com/v21.0";
 
@@ -202,28 +203,21 @@ async function processBusinessFBMessage(
       select: {
         fbPageAccessToken: true,
         fbActive: true,
-        subscription: {
-          select: { messagesUsed: true, messagesLimit: true, expiresAt: true },
-        },
       },
     });
 
     if (!business?.fbActive || !business.fbPageAccessToken) return;
 
     // Check message limit
-    const sub = business.subscription;
-    if (sub) {
-      const isExpired = new Date(sub.expiresAt) < new Date();
-      const limitReached = sub.messagesLimit !== -1 && sub.messagesUsed >= sub.messagesLimit;
-      if (isExpired || limitReached) {
-        await sendFBMessage(
-          business.fbPageAccessToken,
-          msg.senderId,
-          "Извините, временно не можем обработать ваш запрос. Свяжитесь с нами напрямую.",
-          msg.pageId
-        );
-        return;
-      }
+    const { allowed } = await checkSubscriptionLimit(businessId);
+    if (!allowed) {
+      await sendFBMessage(
+        business.fbPageAccessToken,
+        msg.senderId,
+        "Извините, временно не можем обработать ваш запрос. Свяжитесь с нами напрямую.",
+        msg.pageId
+      );
+      return;
     }
 
     await sendFBTyping(business.fbPageAccessToken, msg.senderId, msg.pageId);
@@ -241,12 +235,7 @@ async function processBusinessFBMessage(
 
     await sendFBMessage(business.fbPageAccessToken, msg.senderId, reply, msg.pageId);
 
-    if (sub) {
-      await prisma.subscription.update({
-        where: { businessId },
-        data: { messagesUsed: { increment: 1 } },
-      });
-    }
+    await incrementMessageCount(businessId);
   } catch (e) {
     console.error("processBusinessFBMessage error:", e);
   }
@@ -288,14 +277,10 @@ async function processLeadAdEvent(evt: {
   }
 
   // Check subscription limits
-  const sub = business.subscription;
-  if (sub) {
-    const isExpired = new Date(sub.expiresAt) < new Date();
-    const limitReached = sub.messagesLimit !== -1 && sub.messagesUsed >= sub.messagesLimit;
-    if (isExpired || limitReached) {
-      console.log(`[LeadAds] Business ${business.id} subscription expired or limit reached`);
-      return;
-    }
+  const { allowed: subAllowed } = await checkSubscriptionLimit(business.id);
+  if (!subAllowed) {
+    console.log(`[LeadAds] Business ${business.id} subscription expired or limit reached`);
+    return;
   }
 
   // Fetch full lead data from Graph API
@@ -367,11 +352,8 @@ async function processLeadAdEvent(evt: {
   }
 
   // Increment message usage if we sent a message
-  if (phone && business.waActive && sub) {
-    await prisma.subscription.update({
-      where: { businessId: business.id },
-      data: { messagesUsed: { increment: 1 } },
-    });
+  if (phone && business.waActive) {
+    await incrementMessageCount(business.id);
   }
 
   console.log(`[LeadAds] Lead ${evt.leadId} processed for business ${business.id}`);

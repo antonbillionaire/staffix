@@ -8,6 +8,11 @@ import { subscribePageToWebhooks } from "@/lib/sales-bot/meta-api";
 const SECRET = process.env.DEMO_SECRET;
 
 export async function POST(request: NextRequest) {
+  // Completely disabled in production
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not available" }, { status: 404 });
+  }
+
   if (!SECRET) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

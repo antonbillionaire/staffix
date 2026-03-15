@@ -9,6 +9,11 @@ const DEMO_SECRET = process.env.DEMO_SECRET;
 
 export async function POST(request: NextRequest) {
   try {
+    // Completely disabled in production
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json({ error: "Not available" }, { status: 404 });
+    }
+
     // Endpoint disabled unless DEMO_SECRET is explicitly set in environment variables
     if (!DEMO_SECRET) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -19,6 +19,7 @@ import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
 import { getPageAccessToken } from "@/lib/facebook-utils";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { markWebhookProcessed } from "@/lib/webhook-dedup";
+import { checkSubscriptionLimit, incrementMessageCount } from "@/lib/subscription-check";
 
 const META_API_BASE = "https://graph.facebook.com/v21.0";
 
@@ -193,9 +194,6 @@ async function processIGMessage(
       id: true,
       fbPageId: true,
       fbPageAccessToken: true,
-      subscription: {
-        select: { messagesUsed: true, messagesLimit: true, expiresAt: true },
-      },
     },
   });
 
@@ -226,19 +224,15 @@ async function processIGMessage(
   }
 
   // Check subscription limits
-  const sub = business.subscription;
-  if (sub) {
-    const isExpired = new Date(sub.expiresAt) < new Date();
-    const limitReached = sub.messagesLimit !== -1 && sub.messagesUsed >= sub.messagesLimit;
-    if (isExpired || limitReached) {
-      await sendIGMessage(
-        business.fbPageId || accountId,
-        business.fbPageAccessToken,
-        senderId,
-        "Извините, временно не можем обработать ваш запрос. Свяжитесь с нами напрямую."
-      );
-      return;
-    }
+  const { allowed: subAllowed } = await checkSubscriptionLimit(business.id);
+  if (!subAllowed) {
+    await sendIGMessage(
+      business.fbPageId || accountId,
+      business.fbPageAccessToken,
+      senderId,
+      "Извините, временно не можем обработать ваш запрос. Свяжитесь с нами напрямую."
+    );
+    return;
   }
 
   const pageId = business.fbPageId || accountId;
@@ -259,12 +253,7 @@ async function processIGMessage(
   await sendIGMessage(pageId, business.fbPageAccessToken, senderId, reply);
 
   // Increment message usage
-  if (sub) {
-    await prisma.subscription.update({
-      where: { businessId: business.id },
-      data: { messagesUsed: { increment: 1 } },
-    });
-  }
+  await incrementMessageCount(business.id);
 }
 
 // ─── Comment-to-DM processing ────────────────────────────────────────────────
@@ -288,9 +277,6 @@ async function processIGComment(
       id: true,
       fbPageId: true,
       fbPageAccessToken: true,
-      subscription: {
-        select: { messagesUsed: true, messagesLimit: true, expiresAt: true },
-      },
     },
   });
 
@@ -311,12 +297,8 @@ async function processIGComment(
   }
 
   // Check subscription limits
-  const sub = business.subscription;
-  if (sub) {
-    const isExpired = new Date(sub.expiresAt) < new Date();
-    const limitReached = sub.messagesLimit !== -1 && sub.messagesUsed >= sub.messagesLimit;
-    if (isExpired || limitReached) return; // Silently skip — don't reply to comments if over limit
-  }
+  const { allowed: commentSubAllowed } = await checkSubscriptionLimit(business.id);
+  if (!commentSubAllowed) return; // Silently skip — don't reply to comments if over limit
 
   const pageId = business.fbPageId || accountId;
 
@@ -336,11 +318,8 @@ async function processIGComment(
   // Send private DM reply to the commenter (1 per comment, 7-day window)
   const sent = await sendIGPrivateReply(pageId, business.fbPageAccessToken, commentId, reply);
 
-  if (sent && sub) {
-    await prisma.subscription.update({
-      where: { businessId: business.id },
-      data: { messagesUsed: { increment: 1 } },
-    });
+  if (sent) {
+    await incrementMessageCount(business.id);
   }
 }
 
