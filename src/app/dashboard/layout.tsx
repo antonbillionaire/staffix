@@ -656,7 +656,7 @@ export default function DashboardLayout({
       {/* Main content */}
       <div className="lg:pl-72">
         {/* Top bar */}
-        <header className={`sticky top-0 z-30 h-16 ${isDark ? "bg-[#0a0a1a]/80" : "bg-white/80"} backdrop-blur-xl border-b ${borderColor} flex items-center justify-between px-4 lg:px-8`}>
+        <header className={`sticky top-0 z-30 h-16 ${isDark ? "bg-[#0a0a1a]/95" : "bg-white/95"} border-b ${borderColor} flex items-center justify-between px-4 lg:px-8`}>
           <div className="flex items-center">
             <button
               onClick={() => setSidebarOpen(true)}

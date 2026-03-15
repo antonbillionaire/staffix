@@ -121,15 +121,15 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#0a0a1a] text-white overflow-hidden">
-      {/* Animated background gradient - reduced on mobile for performance */}
-      <div className="fixed inset-0 pointer-events-none hidden md:block">
-        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-blue-500/20 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-[120px]" />
-        <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-cyan-500/10 rounded-full blur-[100px]" />
+      {/* Background gradient - static, GPU-optimized with will-change and reduced blur */}
+      <div className="fixed inset-0 pointer-events-none hidden md:block" style={{ willChange: "transform" }}>
+        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-blue-500/15 rounded-full blur-[80px]" />
+        <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-purple-500/15 rounded-full blur-[80px]" />
+        <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-cyan-500/8 rounded-full blur-[60px]" />
       </div>
-      <div className="fixed inset-0 pointer-events-none md:hidden">
-        <div className="absolute top-0 left-1/4 w-[300px] h-[300px] bg-blue-500/15 rounded-full blur-[60px]" />
-        <div className="absolute bottom-0 right-1/4 w-[250px] h-[250px] bg-purple-500/15 rounded-full blur-[60px]" />
+      <div className="fixed inset-0 pointer-events-none md:hidden" style={{ willChange: "transform" }}>
+        <div className="absolute top-0 left-1/4 w-[300px] h-[300px] bg-blue-500/10 rounded-full blur-[40px]" />
+        <div className="absolute bottom-0 right-1/4 w-[250px] h-[250px] bg-purple-500/10 rounded-full blur-[40px]" />
       </div>
 
       {/* Header */}
@@ -208,7 +208,7 @@ export default function Home() {
       <section className="relative z-10 container mx-auto px-4 pt-20 pb-32">
         <div className="max-w-5xl mx-auto text-center">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-2 mb-8 backdrop-blur-sm">
+          <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-2 mb-8">
             <Sparkles className="h-4 w-4 text-yellow-400" />
             <span className="text-sm text-gray-300">{t("home.badge")}</span>
           </div>
@@ -235,7 +235,7 @@ export default function Home() {
             </Link>
             <Link
               href="#features"
-              className="bg-white/5 border border-white/10 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-white/10 transition-colors flex items-center justify-center gap-2 backdrop-blur-sm"
+              className="bg-white/5 border border-white/10 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
             >
               {t("home.ctaSecondary")}
               <ChevronRight className="h-5 w-5" />
@@ -254,7 +254,7 @@ export default function Home() {
             <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-purple-500 to-cyan-500 rounded-2xl blur opacity-30" />
 
             {/* Chat mockup */}
-            <div className="relative bg-[#12122a] border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
+            <div className="relative bg-[#12122a] border border-white/10 rounded-2xl p-6">
               <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/10">
                 <Image src="/new-logo/2_sfx_icon.png" alt="Staffix AI" width={40} height={40} className="w-10 h-10 rounded-full object-cover" />
                 <div>
@@ -648,7 +648,7 @@ export default function Home() {
               {/* Glow */}
               <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-cyan-500/20 rounded-3xl blur-2xl" />
 
-              <div className="relative bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-white/10 rounded-3xl p-12 backdrop-blur-sm">
+              <div className="relative bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-white/10 rounded-3xl p-12">
                 <h2 className="text-3xl md:text-5xl font-bold mb-6">
                   {t("home.cta.title")}
                 </h2>
