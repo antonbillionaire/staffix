@@ -191,11 +191,22 @@ export async function PUT(request: Request) {
     if (deliveryFreeFrom !== undefined) updateData.deliveryFreeFrom = deliveryFreeFrom ? (parseInt(deliveryFreeFrom, 10) || null) : null;
     if (deliveryZones !== undefined) updateData.deliveryZones = deliveryZones || null;
 
-    // WhatsApp
+    // WhatsApp — validate phone number ID format if activating
     if (waPhoneNumberId !== undefined) updateData.waPhoneNumberId = waPhoneNumberId || null;
     if (waAccessToken !== undefined) updateData.waAccessToken = waAccessToken || null;
     if (waVerifyToken !== undefined) updateData.waVerifyToken = waVerifyToken || null;
-    if (waActive !== undefined) updateData.waActive = Boolean(waActive);
+    if (waActive !== undefined) {
+      // Validate required fields before activating
+      const phoneId = waPhoneNumberId ?? existingBusiness.waPhoneNumberId;
+      const token = waAccessToken ?? existingBusiness.waAccessToken;
+      if (waActive && (!phoneId || !token)) {
+        return NextResponse.json(
+          { error: "WhatsApp Phone Number ID and Access Token are required to activate" },
+          { status: 400 }
+        );
+      }
+      updateData.waActive = Boolean(waActive);
+    }
 
     // Facebook Messenger
     if (fbPageId !== undefined) updateData.fbPageId = fbPageId || null;
