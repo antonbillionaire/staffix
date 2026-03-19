@@ -26,6 +26,25 @@ const ALLOWED_TYPES = [
   "image/gif",
 ];
 
+// Fallback: some OS/browsers send empty or wrong MIME type — resolve by extension
+const EXT_TO_MIME: Record<string, string> = {
+  ".pdf":  "application/pdf",
+  ".doc":  "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".txt":  "text/plain",
+  ".xls":  "application/vnd.ms-excel",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".png":  "image/png",
+  ".jpg":  "image/jpeg",
+  ".jpeg": "image/jpeg",
+};
+
+function resolveFileType(file: File): string {
+  if (file.type && ALLOWED_TYPES.includes(file.type)) return file.type;
+  const ext = ("." + file.name.split(".").pop()?.toLowerCase()) as string;
+  return EXT_TO_MIME[ext] ?? file.type;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Auth: NextAuth session
@@ -77,8 +96,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file type
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    // Validate file type (with extension fallback for Windows/browsers sending empty MIME)
+    const resolvedType = resolveFileType(file);
+    if (!ALLOWED_TYPES.includes(resolvedType)) {
       return NextResponse.json(
         { error: "Неподдерживаемый тип файла. Разрешены: PDF, DOC, DOCX, TXT, XLS, XLSX, PNG, JPG" },
         { status: 400 }
@@ -90,13 +110,13 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes);
 
     // For images (logo), convert to base64 data URL
-    const isImage = file.type.startsWith("image/");
+    const isImage = resolvedType.startsWith("image/");
     let fileUrl = "";
 
     if (isImage) {
       // Store logo as base64 data URL
       const base64 = buffer.toString("base64");
-      fileUrl = `data:${file.type};base64,${base64}`;
+      fileUrl = `data:${resolvedType};base64,${base64}`;
     } else {
       // For documents, we don't need to store the file - just the extracted text
       fileUrl = `document://${file.name}`;
@@ -107,13 +127,13 @@ export async function POST(request: NextRequest) {
     let parseError: string | null = null;
 
     try {
-      console.log(`[Document Upload] Parsing file: ${file.name}, type: ${file.type}, size: ${file.size}`);
+      console.log(`[Document Upload] Parsing file: ${file.name}, type: ${resolvedType}, size: ${file.size}`);
 
-      if (file.type === "text/plain") {
+      if (resolvedType === "text/plain") {
         extractedText = buffer.toString("utf-8");
         console.log(`[Document Upload] TXT parsed, length: ${extractedText.length}`);
 
-      } else if (file.type === "application/pdf") {
+      } else if (resolvedType === "application/pdf") {
         try {
           const { PDFParse } = await import("pdf-parse");
           const parser = new PDFParse({ data: buffer });
@@ -127,8 +147,8 @@ export async function POST(request: NextRequest) {
         }
 
       } else if (
-        file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-        file.type === "application/msword"
+        resolvedType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        resolvedType === "application/msword"
       ) {
         try {
           const mammoth = await import("mammoth");
@@ -141,8 +161,8 @@ export async function POST(request: NextRequest) {
         }
 
       } else if (
-        file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-        file.type === "application/vnd.ms-excel"
+        resolvedType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+        resolvedType === "application/vnd.ms-excel"
       ) {
         try {
           const XLSX = await import("xlsx");
@@ -177,7 +197,7 @@ export async function POST(request: NextRequest) {
         name: file.name,
         type: documentType,
         url: fileUrl,
-        mimeType: file.type,
+        mimeType: resolvedType,
         size: file.size,
         businessId: business.id,
         extractedText: extractedText,
