@@ -53,6 +53,8 @@ interface BizData {
   name: string;
   botActive: boolean;
   botUsername?: string;
+  waActive: boolean;
+  metaConnected: boolean;
 }
 
 export default function DashboardPage() {
@@ -94,6 +96,8 @@ export default function DashboardPage() {
               name: data.business.name,
               botActive: data.business.botActive || false,
               botUsername: data.business.botUsername,
+              waActive: data.business.waActive || false,
+              metaConnected: !!(data.business.igActive || data.business.fbPageId),
             });
           }
         }
@@ -234,31 +238,39 @@ export default function DashboardPage() {
           {/* WhatsApp */}
           <Link
             href="/dashboard/channels/whatsapp"
-            className={`${cardBg} border ${borderColor} hover:border-green-500/30 rounded-xl p-4 flex items-center gap-3 transition-all group`}
+            className={`${cardBg} border ${bizData?.waActive ? "border-green-500/30 hover:border-green-500/50" : `${borderColor} hover:border-green-500/30`} rounded-xl p-4 flex items-center gap-3 transition-all group`}
           >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? "bg-white/5" : "bg-gray-100"}`}>
-              <Globe className={`h-5 w-5 ${textMuted}`} />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bizData?.waActive ? "bg-green-500/20" : isDark ? "bg-white/5" : "bg-gray-100"}`}>
+              <Globe className={`h-5 w-5 ${bizData?.waActive ? "text-green-400" : textMuted}`} />
             </div>
             <div className="flex-1">
               <p className={`font-medium ${textPrimary}`}>{t("nav.whatsapp")}</p>
-              <p className={`text-xs ${textMuted}`}>{t("dashboard.configure")}</p>
+              <p className={`text-xs ${bizData?.waActive ? "text-green-400" : textMuted}`}>
+                {bizData?.waActive ? t("dashboard.connected") : t("dashboard.configure")}
+              </p>
             </div>
-            <ArrowRight className={`h-4 w-4 ${textMuted} group-hover:text-green-400 transition-colors flex-shrink-0`} />
+            {bizData?.waActive
+              ? <CheckCircle2 className="h-5 w-5 text-green-400 flex-shrink-0" />
+              : <ArrowRight className={`h-4 w-4 ${textMuted} group-hover:text-green-400 transition-colors flex-shrink-0`} />}
           </Link>
 
           {/* Instagram & Facebook */}
           <Link
             href="/dashboard/channels/meta"
-            className={`${cardBg} border ${borderColor} hover:border-purple-500/30 rounded-xl p-4 flex items-center gap-3 transition-all group`}
+            className={`${cardBg} border ${bizData?.metaConnected ? "border-green-500/30 hover:border-green-500/50" : `${borderColor} hover:border-purple-500/30`} rounded-xl p-4 flex items-center gap-3 transition-all group`}
           >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? "bg-white/5" : "bg-gray-100"}`}>
-              <Send className={`h-5 w-5 ${textMuted}`} />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bizData?.metaConnected ? "bg-green-500/20" : isDark ? "bg-white/5" : "bg-gray-100"}`}>
+              <Send className={`h-5 w-5 ${bizData?.metaConnected ? "text-green-400" : textMuted}`} />
             </div>
             <div className="flex-1">
               <p className={`font-medium ${textPrimary}`}>Instagram & FB</p>
-              <p className={`text-xs ${textMuted}`}>{t("dashboard.configure")}</p>
+              <p className={`text-xs ${bizData?.metaConnected ? "text-green-400" : textMuted}`}>
+                {bizData?.metaConnected ? t("dashboard.connected") : t("dashboard.configure")}
+              </p>
             </div>
-            <ArrowRight className={`h-4 w-4 ${textMuted} group-hover:text-purple-400 transition-colors flex-shrink-0`} />
+            {bizData?.metaConnected
+              ? <CheckCircle2 className="h-5 w-5 text-green-400 flex-shrink-0" />
+              : <ArrowRight className={`h-4 w-4 ${textMuted} group-hover:text-purple-400 transition-colors flex-shrink-0`} />}
           </Link>
         </div>
       </div>
