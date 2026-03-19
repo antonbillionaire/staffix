@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Clock,
   Zap,
+  Unplug,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -30,6 +31,7 @@ export default function TelegramChannelPage() {
   const [copied, setCopied] = useState(false);
   const [tokenError, setTokenError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   const [botInfo, setBotInfo] = useState({
     connected: false,
@@ -104,6 +106,22 @@ export default function TelegramChannelPage() {
       setTokenError(err instanceof Error ? err.message : t("botPage.saveError"));
     } finally {
       setSavingToken(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!confirm("Отключить Telegram-бота? Бот перестанет отвечать клиентам. Вы сможете подключить его снова в любое время.")) return;
+    setDisconnecting(true);
+    try {
+      const res = await fetch("/api/business/telegram", { method: "DELETE" });
+      if (res.ok) {
+        setBotInfo({ connected: false, username: "", name: "" });
+        setToken("");
+      }
+    } catch {
+      // silent
+    } finally {
+      setDisconnecting(false);
     }
   };
 
@@ -251,14 +269,32 @@ export default function TelegramChannelPage() {
         )}
 
         {botInfo.connected ? (
-          <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <Check className="h-5 w-5 text-green-400" />
-              <div>
-                <p className="text-green-400 font-medium">{t("botPage.botConnected")}</p>
-                <p className={textSecondary + " text-sm"}>@{botInfo.username}</p>
+          <div className="space-y-3">
+            <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+              <div className="flex items-center gap-3">
+                <Check className="h-5 w-5 text-green-400" />
+                <div>
+                  <p className="text-green-400 font-medium">{t("botPage.botConnected")}</p>
+                  <p className={textSecondary + " text-sm"}>@{botInfo.username}</p>
+                </div>
               </div>
             </div>
+            <button
+              onClick={handleDisconnect}
+              disabled={disconnecting}
+              className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-all ${
+                isDark
+                  ? "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                  : "border-red-200 text-red-500 hover:bg-red-50"
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              {disconnecting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Unplug className="h-4 w-4" />
+              )}
+              {disconnecting ? "Отключение..." : "Отключить бота"}
+            </button>
           </div>
         ) : (
           <div className="space-y-4">
