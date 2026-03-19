@@ -543,7 +543,6 @@ export default function KnowledgeBasePage() {
                   <label className={`text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>
                     {t("botPage.specialInstructions")}
                   </label>
-                  <span className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>{aiSettings.rules.length} / 2000</span>
                 </div>
                 <div className="flex flex-wrap gap-2 mb-3">
                   {[
@@ -578,7 +577,6 @@ export default function KnowledgeBasePage() {
                   onChange={(e) => setAiSettings({ ...aiSettings, rules: e.target.value })}
                   placeholder={t("botPage.instructionsPlaceholder")}
                   rows={7}
-                  maxLength={2000}
                   className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none`}
                 />
                 <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"} mt-2`}>{t("botPage.rulesHelp")}</p>
