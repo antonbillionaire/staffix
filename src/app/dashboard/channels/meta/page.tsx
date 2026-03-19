@@ -15,6 +15,7 @@ import {
   Facebook,
   MessageSquare,
   Target,
+  AlertTriangle,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -122,6 +123,17 @@ export default function MetaChannelsPage() {
           {t("channels.meta.subtitle")}
         </p>
       </div>
+
+      {/* Account warning */}
+      {!isAnyConnected && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-300 space-y-1">
+            <p className="font-medium">Перед подключением убедитесь:</p>
+            <p>В браузере вы вошли в <strong>свой личный Facebook аккаунт</strong> — тот, который является администратором вашей Facebook страницы. Если в браузере залогинен чужой аккаунт — выйдите из него на facebook.com и войдите под своим.</p>
+          </div>
+        </div>
+      )}
 
       {/* Success / Error Messages */}
       {successMessage && (
