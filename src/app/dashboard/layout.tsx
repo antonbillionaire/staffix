@@ -165,6 +165,7 @@ export default function DashboardLayout({
   const [businessName, setBusinessName] = useState("");
   const [businessType, setBusinessType] = useState<string | null>(null);
   const [dashboardMode, setDashboardMode] = useState<string | null>(null);
+  const [isAdminUser, setIsAdminUser] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [notifMenuOpen, setNotifMenuOpen] = useState(false);
@@ -252,6 +253,7 @@ export default function DashboardLayout({
             setBusinessName(data.business.name);
             setBusinessType(data.business.businessType || null);
             setDashboardMode(data.business.dashboardMode || "service");
+            setIsAdminUser(!!data.isAdmin);
             if (data.business.subscription) {
               const sub = data.business.subscription;
               const expiresAt = new Date(sub.expiresAt);
@@ -384,12 +386,12 @@ export default function DashboardLayout({
           </button>
         </div>
 
-        {/* Business name + mode toggle */}
+        {/* Business name + mode toggle (mode switch only for admin) */}
         {businessName && (
           <div className={`px-5 py-4 border-b ${borderColor} flex-shrink-0`}>
             <p className={`text-xs ${textMuted} uppercase tracking-wider`}>{t("sidebar.yourBusiness")}</p>
             <p className={`text-sm font-medium ${textPrimary} truncate mt-1`}>{businessName}</p>
-            <button
+            {isAdminUser && <button
               onClick={handleSwitchMode}
               disabled={switchingMode}
               className={`mt-2 flex items-center gap-2 w-full px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
@@ -410,7 +412,7 @@ export default function DashboardLayout({
               }`}>
                 {isSales ? "Shop" : "Service"}
               </span>
-            </button>
+            </button>}
           </div>
         )}
 

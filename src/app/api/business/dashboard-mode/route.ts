@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { isAdmin } from "@/lib/admin";
 
 export async function PATCH(request: Request) {
   try {
     const session = await auth();
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
+    }
+
+    if (!isAdmin(session.user.email)) {
+      return NextResponse.json({ error: "Только администратор может менять режим" }, { status: 403 });
     }
 
     const user = await prisma.user.findUnique({ where: { email: session.user.email } });

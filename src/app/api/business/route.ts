@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { randomBytes } from "crypto";
+import { isAdmin } from "@/lib/admin";
 
 // GET - получить данные бизнеса текущего пользователя
 export async function GET() {
@@ -65,6 +66,7 @@ export async function GET() {
         fbPageAccessToken: business.fbPageAccessToken ? "***" : null,
       },
       stats: { bookingsToday, totalClients },
+      isAdmin: isAdmin(session?.user?.email),
     });
   } catch (error) {
     console.error("Get business error:", error);
