@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { sendWAMessage } from "@/lib/whatsapp-utils";
+import { notifyWarehouseOrderConfirmed } from "@/lib/notifications";
 
 async function getUserBusiness(): Promise<string | null> {
   const session = await auth();
@@ -58,6 +59,19 @@ export async function PATCH(
     // Notify client about status change (all channels)
     if (body.status && body.status !== order.status) {
       notifyClientOrderStatus(businessId, order, updated).catch(() => {});
+
+      // When confirmed → notify warehouse staff with "Pack" button
+      if (body.status === "confirmed") {
+        notifyWarehouseOrderConfirmed(businessId, {
+          orderNumber: updated.orderNumber,
+          totalPrice: updated.totalPrice,
+          items: updated.items.map((i) => ({ name: i.name, quantity: i.quantity, price: i.price })),
+          clientName: updated.clientName,
+          clientPhone: updated.clientPhone,
+          clientAddress: updated.clientAddress,
+          orderId: updated.id,
+        }).catch(() => {});
+      }
     }
 
     return NextResponse.json({ order: updated });

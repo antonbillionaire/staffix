@@ -26,6 +26,7 @@ import {
 import Link from "next/link";
 
 interface Stats {
+  dashboardMode?: string;
   totalMessages: number;
   totalBookings: number;
   totalClients: number;
@@ -72,6 +73,8 @@ export default function StatisticsPage() {
   const borderColor = isDark ? "border-white/5" : "border-gray-200";
   const textPrimary = isDark ? "text-white" : "text-gray-900";
   const textSecondary = isDark ? "text-gray-400" : "text-gray-600";
+
+  const isSalesMode = stats.dashboardMode === "sales";
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -173,8 +176,8 @@ export default function StatisticsPage() {
           <p className={textSecondary}>{t("statistics.totalMessages")}</p>
         </div>
 
-        {/* Show orders for shops, bookings for services */}
-        {(stats.totalOrders ?? 0) > 0 || (stats.orderRevenue ?? 0) > 0 ? (
+        {/* Sales mode: orders card / Service mode: bookings card */}
+        {isSalesMode ? (
           <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
             <div className="flex items-center justify-between">
               <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center">
@@ -331,22 +334,24 @@ export default function StatisticsPage() {
       {/* Conversion */}
       <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className={`text-lg font-semibold ${textPrimary}`}>{t("statistics.conversionToBookings")}</h3>
+          <h3 className={`text-lg font-semibold ${textPrimary}`}>
+            {isSalesMode ? t("statistics.conversionToOrders") : t("statistics.conversionToBookings")}
+          </h3>
           <span className={`text-2xl font-bold ${textPrimary}`}>{stats.conversionRate}%</span>
         </div>
         <div className={`h-3 ${isDark ? "bg-white/10" : "bg-gray-200"} rounded-full overflow-hidden`}>
           <div
             className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all"
-            style={{ width: `${stats.conversionRate}%` }}
+            style={{ width: `${Math.min(stats.conversionRate, 100)}%` }}
           />
         </div>
         <p className={`text-sm ${textSecondary} mt-2`}>
-          {t("statistics.conversionDescription")}
+          {isSalesMode ? t("statistics.conversionOrdersDescription") : t("statistics.conversionDescription")}
         </p>
       </div>
 
-      {/* Order Analytics (for shops) */}
-      {(stats.totalOrders ?? 0) > 0 && (
+      {/* Order Analytics (sales mode only) */}
+      {isSalesMode && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Orders by Status */}
           <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
@@ -464,32 +469,34 @@ export default function StatisticsPage() {
           )}
         </div>
 
-        {/* Bookings by Status */}
-        <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
-          <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>{t("statistics.bookingsByStatus")}</h3>
-          {stats.bookingsByStatus ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-yellow-500/10 rounded-lg">
-                <span className="text-yellow-400">{t("statistics.bookingsPending")}</span>
-                <span className={`font-bold ${textPrimary}`}>{stats.bookingsByStatus.pending}</span>
+        {/* Bookings by Status (service mode only) */}
+        {!isSalesMode && (
+          <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
+            <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>{t("statistics.bookingsByStatus")}</h3>
+            {stats.bookingsByStatus ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-yellow-500/10 rounded-lg">
+                  <span className="text-yellow-400">{t("statistics.bookingsPending")}</span>
+                  <span className={`font-bold ${textPrimary}`}>{stats.bookingsByStatus.pending}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-blue-500/10 rounded-lg">
+                  <span className="text-blue-400">{t("statistics.bookingsConfirmed")}</span>
+                  <span className={`font-bold ${textPrimary}`}>{stats.bookingsByStatus.confirmed}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg">
+                  <span className="text-green-400">{t("statistics.bookingsCompleted")}</span>
+                  <span className={`font-bold ${textPrimary}`}>{stats.bookingsByStatus.completed}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-lg">
+                  <span className="text-red-400">{t("statistics.bookingsCancelled")}</span>
+                  <span className={`font-bold ${textPrimary}`}>{stats.bookingsByStatus.cancelled}</span>
+                </div>
               </div>
-              <div className="flex items-center justify-between p-3 bg-blue-500/10 rounded-lg">
-                <span className="text-blue-400">{t("statistics.bookingsConfirmed")}</span>
-                <span className={`font-bold ${textPrimary}`}>{stats.bookingsByStatus.confirmed}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg">
-                <span className="text-green-400">{t("statistics.bookingsCompleted")}</span>
-                <span className={`font-bold ${textPrimary}`}>{stats.bookingsByStatus.completed}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-lg">
-                <span className="text-red-400">{t("statistics.bookingsCancelled")}</span>
-                <span className={`font-bold ${textPrimary}`}>{stats.bookingsByStatus.cancelled}</span>
-              </div>
-            </div>
-          ) : (
-            <p className={textSecondary}>{t("statistics.noBookingsData")}</p>
-          )}
-        </div>
+            ) : (
+              <p className={textSecondary}>{t("statistics.noBookingsData")}</p>
+            )}
+          </div>
+        )}
 
         {/* Quick Stats */}
         <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
@@ -501,7 +508,7 @@ export default function StatisticsPage() {
                 <span className={textSecondary}>{t("statistics.revenue")}</span>
               </div>
               <span className={`font-bold ${textPrimary}`}>
-                {stats.totalRevenue?.toLocaleString() || 0}₸
+                {(isSalesMode ? (stats.orderRevenue || 0) : (stats.totalRevenue || 0)).toLocaleString()}
               </span>
             </div>
             <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">

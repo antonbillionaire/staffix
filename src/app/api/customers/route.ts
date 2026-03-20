@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     }
 
     const businessId = user.businesses[0].id;
+    const dashboardMode = user.businesses[0].dashboardMode || "service";
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
     // Get related data only for the current page's clients
     const clientTelegramIds = clients.map((c) => c.telegramId);
 
-    const [conversations, bookings, reviews] = await Promise.all([
+    const [conversations, bookings, reviews, orders] = await Promise.all([
       prisma.conversation.findMany({
         where: { businessId, clientTelegramId: { in: clientTelegramIds } },
         include: { _count: { select: { messages: true } } },
@@ -85,6 +86,12 @@ export async function GET(request: NextRequest) {
       prisma.review.findMany({
         where: { businessId, clientTelegramId: { in: clientTelegramIds } },
       }),
+      dashboardMode === "sales"
+        ? prisma.order.findMany({
+            where: { businessId, clientTelegramId: { in: clientTelegramIds } },
+            select: { clientTelegramId: true, totalPrice: true, status: true },
+          })
+        : Promise.resolve([]),
     ]);
 
     const conversationMap = new Map(
@@ -107,11 +114,24 @@ export async function GET(request: NextRequest) {
       reviewsByClient.get(key)!.push(r);
     });
 
+    // Orders per client (sales mode)
+    const ordersByClient = new Map<string, { count: number; totalSpent: number }>();
+    orders.forEach((o) => {
+      if (o.clientTelegramId) {
+        const key = o.clientTelegramId.toString();
+        const existing = ordersByClient.get(key) || { count: 0, totalSpent: 0 };
+        existing.count++;
+        existing.totalSpent += o.totalPrice;
+        ordersByClient.set(key, existing);
+      }
+    });
+
     const enrichedClients = clients.map((client) => {
       const telegramKey = client.telegramId.toString();
       const conversation = conversationMap.get(telegramKey);
       const clientBookings = bookingsByClient.get(telegramKey) || [];
       const clientReviews = reviewsByClient.get(telegramKey) || [];
+      const clientOrders = ordersByClient.get(telegramKey) || { count: 0, totalSpent: 0 };
 
       const hasRecentVisit = client.lastVisitDate
         ? new Date(client.lastVisitDate) > thirtyDaysAgo
@@ -120,7 +140,7 @@ export async function GET(request: NextRequest) {
         ? new Date(client.lastMessageAt) > thirtyDaysAgo
         : false;
       const isActive = hasRecentVisit || hasRecentMessages || clientBookings.length > 0;
-      const isVip = client.totalVisits >= 5 || clientBookings.length >= 5;
+      const isVip = client.totalVisits >= 5 || clientBookings.length >= 5 || clientOrders.count >= 5;
       const avgRating =
         clientReviews.length > 0
           ? clientReviews.reduce((sum, r) => sum + r.rating, 0) / clientReviews.length
@@ -139,6 +159,8 @@ export async function GET(request: NextRequest) {
         isVip,
         messagesCount: conversation?._count?.messages || 0,
         bookingsCount: clientBookings.length,
+        ordersCount: clientOrders.count,
+        ordersTotalSpent: clientOrders.totalSpent,
         avgRating,
         segment: isVip ? "vip" : isActive ? "active" : "inactive",
         loyaltyPoints: client.loyaltyPoints,
@@ -179,6 +201,8 @@ export async function GET(request: NextRequest) {
       isVip: lead.status === "client",
       messagesCount: 0,
       bookingsCount: 0,
+      ordersCount: 0,
+      ordersTotalSpent: 0,
       avgRating: null,
       segment: lead.status === "client" ? "vip" : lead.lastInteractionAt && new Date(lead.lastInteractionAt) > thirtyDaysAgo ? "active" : "inactive",
       channel: lead.channel,
@@ -219,6 +243,7 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json({
+      dashboardMode,
       customers: allCustomers,
       stats,
       pagination: {

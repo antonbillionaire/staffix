@@ -29,6 +29,7 @@ import {
   Award,
   Plus,
   Minus,
+  ShoppingCart,
 } from "lucide-react";
 
 interface Customer {
@@ -46,6 +47,8 @@ interface Customer {
   isVip: boolean;
   messagesCount: number;
   bookingsCount: number;
+  ordersCount?: number;
+  ordersTotalSpent?: number;
   avgRating: number | null;
   segment: "vip" | "active" | "inactive";
   loyaltyPoints: number;
@@ -94,6 +97,7 @@ export default function CustomersPage() {
   });
   const [search, setSearch] = useState("");
   const [segment, setSegment] = useState("all");
+  const [dashboardMode, setDashboardMode] = useState("service");
 
   // Import state
   const [showImportModal, setShowImportModal] = useState(false);
@@ -118,6 +122,7 @@ export default function CustomersPage() {
   const inputBorder = isDark ? "border-white/10" : "border-gray-300";
   const hoverBg = isDark ? "hover:bg-white/5" : "hover:bg-gray-50";
   const tableBg = isDark ? "bg-white/5" : "bg-gray-50";
+  const isSalesMode = dashboardMode === "sales";
 
   const fetchCustomers = useCallback(async () => {
     setLoading(true);
@@ -135,6 +140,7 @@ export default function CustomersPage() {
         setCustomers(data.customers);
         setStats(data.stats);
         setPagination(data.pagination);
+        if (data.dashboardMode) setDashboardMode(data.dashboardMode);
       }
     } catch (error) {
       console.error("Error fetching customers:", error);
@@ -410,11 +416,17 @@ export default function CustomersPage() {
                 <tr className={`border-b ${borderColor} ${tableBg}`}>
                   <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thClient")}</th>
                   <th className={`text-left py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thStatus")}</th>
-                  <th className={`text-left py-3 px-4 text-xs font-medium hidden md:table-cell ${textTertiary} uppercase`}>{t("customers.thVisits")}</th>
-                  <th className={`text-left py-3 px-4 text-xs font-medium hidden lg:table-cell ${textTertiary} uppercase`}>{t("customers.thActivity")}</th>
+                  <th className={`text-left py-3 px-4 text-xs font-medium hidden md:table-cell ${textTertiary} uppercase`}>
+                    {isSalesMode ? t("customers.thOrders") : t("customers.thVisits")}
+                  </th>
+                  <th className={`text-left py-3 px-4 text-xs font-medium hidden lg:table-cell ${textTertiary} uppercase`}>
+                    {isSalesMode ? t("customers.thTotalSpent") : t("customers.thActivity")}
+                  </th>
                   <th className={`text-left py-3 px-4 text-xs font-medium hidden lg:table-cell ${textTertiary} uppercase`}>{t("customers.thRating")}</th>
                   <th className={`text-left py-3 px-4 text-xs font-medium hidden md:table-cell ${textTertiary} uppercase`}>{t("customers.thPoints")}</th>
-                  <th className={`text-left py-3 px-4 text-xs font-medium hidden lg:table-cell ${textTertiary} uppercase`}>{t("customers.thLastVisit")}</th>
+                  <th className={`text-left py-3 px-4 text-xs font-medium hidden lg:table-cell ${textTertiary} uppercase`}>
+                    {isSalesMode ? t("customers.thLastOrder") : t("customers.thLastVisit")}
+                  </th>
                   <th className={`text-right py-3 px-4 text-xs font-medium ${textTertiary} uppercase`}>{t("customers.thActions")}</th>
                 </tr>
               </thead>
@@ -448,32 +460,59 @@ export default function CustomersPage() {
                       {getSegmentBadge(customer)}
                     </td>
                     <td className="py-3 px-4 hidden md:table-cell">
-                      <div className="flex items-center gap-3 text-sm">
-                        <Link
-                          href={`/dashboard/customers/${customer.id}?tab=bookings`}
-                          className={`flex items-center gap-1 ${textSecondary} hover:text-blue-500 transition-colors`}
-                          title={t("customers.clientBookings")}
-                        >
-                          <Calendar className="h-3 w-3" />
-                          {customer.bookingsCount}
-                        </Link>
-                        <Link
-                          href={`/dashboard/customers/${customer.id}?tab=messages`}
-                          className={`flex items-center gap-1 ${textSecondary} hover:text-blue-500 transition-colors`}
-                          title={t("customers.clientMessages")}
-                        >
-                          <MessageSquare className="h-3 w-3" />
-                          {customer.messagesCount}
-                        </Link>
-                      </div>
+                      {isSalesMode ? (
+                        <div className="flex items-center gap-3 text-sm">
+                          <Link
+                            href={`/dashboard/customers/${customer.id}?tab=orders`}
+                            className={`flex items-center gap-1 ${textSecondary} hover:text-blue-500 transition-colors`}
+                            title={t("customers.clientOrders")}
+                          >
+                            <ShoppingCart className="h-3 w-3" />
+                            {customer.ordersCount || 0}
+                          </Link>
+                          <Link
+                            href={`/dashboard/customers/${customer.id}?tab=messages`}
+                            className={`flex items-center gap-1 ${textSecondary} hover:text-blue-500 transition-colors`}
+                            title={t("customers.clientMessages")}
+                          >
+                            <MessageSquare className="h-3 w-3" />
+                            {customer.messagesCount}
+                          </Link>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3 text-sm">
+                          <Link
+                            href={`/dashboard/customers/${customer.id}?tab=bookings`}
+                            className={`flex items-center gap-1 ${textSecondary} hover:text-blue-500 transition-colors`}
+                            title={t("customers.clientBookings")}
+                          >
+                            <Calendar className="h-3 w-3" />
+                            {customer.bookingsCount}
+                          </Link>
+                          <Link
+                            href={`/dashboard/customers/${customer.id}?tab=messages`}
+                            className={`flex items-center gap-1 ${textSecondary} hover:text-blue-500 transition-colors`}
+                            title={t("customers.clientMessages")}
+                          >
+                            <MessageSquare className="h-3 w-3" />
+                            {customer.messagesCount}
+                          </Link>
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-4 hidden lg:table-cell">
-                      <Link
-                        href={`/dashboard/customers/${customer.id}?tab=bookings`}
-                        className={`${textSecondary} hover:text-blue-500 transition-colors`}
-                      >
-                        {customer.totalVisits} {t("customers.visitsCount")}
-                      </Link>
+                      {isSalesMode ? (
+                        <span className={textSecondary}>
+                          {(customer.ordersTotalSpent || 0).toLocaleString()}
+                        </span>
+                      ) : (
+                        <Link
+                          href={`/dashboard/customers/${customer.id}?tab=bookings`}
+                          className={`${textSecondary} hover:text-blue-500 transition-colors`}
+                        >
+                          {customer.totalVisits} {t("customers.visitsCount")}
+                        </Link>
+                      )}
                     </td>
                     <td className="py-3 px-4 hidden lg:table-cell">
                       {customer.avgRating ? (

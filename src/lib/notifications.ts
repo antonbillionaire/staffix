@@ -97,6 +97,139 @@ export async function sendOwnerNotification(
 }
 
 // ========================================
+// ORDER STATUS — ROLE-BASED NOTIFICATIONS
+// ========================================
+
+interface OrderNotifyData {
+  orderNumber: number;
+  totalPrice: number;
+  items: Array<{ name: string; quantity: number; price: number }>;
+  clientName: string;
+  clientPhone?: string | null;
+  clientAddress?: string | null;
+  orderId: string;
+}
+
+/**
+ * Notify warehouse staff when order is confirmed — "Pack this order" with inline button.
+ */
+export async function notifyWarehouseOrderConfirmed(
+  businessId: string,
+  data: OrderNotifyData
+): Promise<void> {
+  try {
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { botToken: true },
+    });
+    if (!business?.botToken) return;
+
+    const warehouseStaff = await prisma.staff.findMany({
+      where: {
+        businessId,
+        telegramChatId: { not: null },
+        notificationsEnabled: true,
+        role: { in: ["warehouse", "admin"] },
+      },
+      select: { telegramChatId: true, name: true },
+    });
+
+    if (warehouseStaff.length === 0) return;
+
+    const itemsList = data.items
+      .map((i) => `• ${i.name} × ${i.quantity}`)
+      .join("\n");
+
+    const message =
+      `📦 <b>Заказ #${data.orderNumber} подтверждён — собирайте!</b>\n\n` +
+      `👤 ${data.clientName}${data.clientPhone ? ` | ${data.clientPhone}` : ""}\n` +
+      (data.clientAddress ? `📍 ${data.clientAddress}\n` : "") +
+      `\n<b>Состав:</b>\n${itemsList}\n\n` +
+      `💰 Итого: ${data.totalPrice.toLocaleString("ru-RU")}`;
+
+    const inlineKeyboard = {
+      inline_keyboard: [
+        [{ text: "✅ Собрано", callback_data: `order_packed_${data.orderId}` }],
+      ],
+    };
+
+    for (const staff of warehouseStaff) {
+      if (staff.telegramChatId) {
+        await fetch(`https://api.telegram.org/bot${business.botToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: staff.telegramChatId.toString(),
+            text: message,
+            parse_mode: "HTML",
+            reply_markup: inlineKeyboard,
+          }),
+        }).catch((e) => console.error(`[Notify] Warehouse staff ${staff.name} error:`, e));
+      }
+    }
+  } catch (err) {
+    console.error("notifyWarehouseOrderConfirmed error:", err);
+  }
+}
+
+/**
+ * Notify manager when warehouse marks order as packed.
+ */
+export async function notifyManagerOrderPacked(
+  businessId: string,
+  orderNumber: number,
+  orderId: string
+): Promise<void> {
+  try {
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { botToken: true, ownerTelegramChatId: true },
+    });
+    if (!business?.botToken) return;
+
+    const message =
+      `✅ <b>Заказ #${orderNumber} собран!</b>\n\n` +
+      `Организуйте доставку.\n` +
+      `🔗 Управление: staffix.io/dashboard/orders`;
+
+    // Notify owner
+    if (business.ownerTelegramChatId) {
+      await sendTelegramMsg(business.botToken, business.ownerTelegramChatId, message).catch(() => {});
+    }
+
+    // Notify managers
+    const managers = await prisma.staff.findMany({
+      where: {
+        businessId,
+        telegramChatId: { not: null },
+        notificationsEnabled: true,
+        role: { in: ["admin", "manager"] },
+      },
+      select: { telegramChatId: true },
+    });
+
+    for (const mgr of managers) {
+      if (mgr.telegramChatId) {
+        await sendTelegramMsg(business.botToken, mgr.telegramChatId, message).catch(() => {});
+      }
+    }
+
+    // Dashboard notification
+    await prisma.notification.create({
+      data: {
+        businessId,
+        type: "order_packed",
+        title: `Заказ #${orderNumber} собран`,
+        message: "Склад собрал заказ. Организуйте доставку.",
+        metadata: { orderId, orderNumber },
+      },
+    });
+  } catch (err) {
+    console.error("notifyManagerOrderPacked error:", err);
+  }
+}
+
+// ========================================
 // BOOKING NOTIFICATION
 // ========================================
 

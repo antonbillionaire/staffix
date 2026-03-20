@@ -29,7 +29,7 @@ import {
   cancelBooking,
   updateLeadStatus,
 } from "@/lib/booking-tools";
-import { sendBookingNotification } from "@/lib/notifications";
+import { sendBookingNotification, notifyManagerOrderPacked } from "@/lib/notifications";
 import { formatDateRu } from "@/lib/automation";
 import { dispatchCrmEvent } from "@/lib/crm-integrations";
 import { salesToolDefinitions, executeSalesTool, notifyManagerByTelegram } from "@/lib/sales-tools";
@@ -915,6 +915,75 @@ async function handleCallbackQuery(
           ? `Спасибо за оценку ${stars}! Мы очень рады! 💜\n\nРасскажите подробнее — что понравилось больше всего? Ваш отзыв поможет нам стать ещё лучше:`
           : `Спасибо за оценку ${stars}.\n\nНам очень важно понять, что пошло не так. Пожалуйста, расскажите подробнее:`;
         await editMessageText(botToken, chatId, messageId, prompt);
+      }
+    }
+    return;
+  }
+
+  // ---- ORDER PACKED (warehouse staff presses "Собрано") ----
+  if (data.startsWith("order_packed_")) {
+    const orderId = data.replace("order_packed_", "");
+
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, businessId },
+    });
+
+    if (!order) {
+      await answerCallbackQuery(botToken, callbackQuery.id, "Заказ не найден");
+      return;
+    }
+
+    if (order.status !== "confirmed") {
+      await answerCallbackQuery(botToken, callbackQuery.id, `Заказ уже в статусе: ${order.status}`);
+      return;
+    }
+
+    // Update order status to processing
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: "processing" },
+    });
+
+    await answerCallbackQuery(botToken, callbackQuery.id, "Заказ отмечен как собранный!");
+
+    if (messageId) {
+      await editMessageText(
+        botToken, chatId, messageId,
+        `✅ Заказ #${order.orderNumber} отмечен как собранный!\n\nМенеджер уведомлён для организации доставки.`
+      );
+    }
+
+    // Notify managers and owner
+    notifyManagerOrderPacked(businessId, order.orderNumber, orderId).catch(() => {});
+
+    // Notify client that order is being processed
+    const statusText = "⚙️ Ваш заказ в обработке.";
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { botToken: true, name: true, waPhoneNumberId: true, waAccessToken: true, fbPageAccessToken: true },
+    });
+    if (business) {
+      const clientMsg =
+        `${statusText}\n\n` +
+        `🛒 Заказ #${order.orderNumber} | ${order.totalPrice.toLocaleString("ru-RU")}\n` +
+        `От: ${business.name}`;
+
+      const channel = order.clientChannel;
+      if ((channel === "telegram" || !channel) && order.clientTelegramId && business.botToken) {
+        await fetch(`https://api.telegram.org/bot${business.botToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: order.clientTelegramId.toString(), text: clientMsg }),
+        }).catch(() => {});
+      } else if (channel === "whatsapp" && order.clientChannelId && business.waPhoneNumberId && business.waAccessToken) {
+        const { sendWAMessage } = await import("@/lib/whatsapp-utils");
+        await sendWAMessage(business.waPhoneNumberId, business.waAccessToken, order.clientChannelId, clientMsg).catch(() => {});
+      } else if ((channel === "instagram" || channel === "facebook") && order.clientChannelId && business.fbPageAccessToken) {
+        await fetch(`https://graph.facebook.com/v21.0/me/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${business.fbPageAccessToken}` },
+          body: JSON.stringify({ recipient: { id: order.clientChannelId }, message: { text: clientMsg } }),
+        }).catch(() => {});
       }
     }
     return;

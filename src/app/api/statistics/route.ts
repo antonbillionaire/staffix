@@ -390,12 +390,19 @@ export async function GET(request: NextRequest) {
       ? Math.round(totalResponseMs / responseCount / 1000) // seconds
       : 0;
 
+    // Conversion rate depends on business mode
+    const isSalesMode = business.dashboardMode === "sales";
+    const conversionRateAdjusted = isSalesMode
+      ? (totalClients > 0 ? Math.round((totalOrders / totalClients) * 100) : 0)
+      : conversionRate;
+
     return NextResponse.json({
+      dashboardMode: business.dashboardMode || "service",
       totalMessages,
       totalBookings,
       totalClients: clients.length || totalClients,
       avgResponseTime,
-      conversionRate,
+      conversionRate: conversionRateAdjusted,
       popularQuestions,
       messagesByDay,
       // Trends
