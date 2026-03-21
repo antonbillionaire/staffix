@@ -372,10 +372,12 @@ export async function generateChannelAIResponse(
   clientName?: string
 ): Promise<string> {
   try {
+    console.log(`[Channel AI] START: business=${businessId}, channel=${channel}, clientId=${clientId}, name=${clientName}`);
     const [biz, conv] = await Promise.all([
       loadBusinessProfile(businessId),
       getOrCreateChannelConv(businessId, channel, clientId, clientName),
     ]);
+    console.log(`[Channel AI] Conv: id=${conv.id}, historyLen=${((conv.history as unknown[]) || []).length}`);
 
     if (!biz) return "Извините, произошла ошибка. Пожалуйста, свяжитесь с нами напрямую.";
 
@@ -548,14 +550,19 @@ export async function generateChannelAIResponse(
       { role: "assistant" as const, content: replyText },
     ] as HistoryMessage[]).slice(-40); // keep last 40 messages
 
-    await prisma.channelConversation.update({
-      where: { id: conv.id },
-      data: {
-        history: updatedHistory,
-        messageCount: { increment: 1 },
-        clientName: clientName || conv.clientName,
-      },
-    });
+    try {
+      await prisma.channelConversation.update({
+        where: { id: conv.id },
+        data: {
+          history: updatedHistory,
+          messageCount: { increment: 1 },
+          clientName: clientName || conv.clientName,
+        },
+      });
+      console.log(`[Channel AI] SAVED: conv=${conv.id}, newHistoryLen=${updatedHistory.length}`);
+    } catch (saveErr) {
+      console.error(`[Channel AI] SAVE FAILED: conv=${conv.id}`, saveErr);
+    }
 
     return replyText;
   } catch (e) {
