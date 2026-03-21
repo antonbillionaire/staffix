@@ -560,7 +560,14 @@ export async function generateChannelAIResponse(
 
     return replyText;
   } catch (e) {
-    console.error(`Channel AI error (${channel}):`, e);
+    const errMsg = e instanceof Error ? e.message : String(e);
+    console.error(`Channel AI error (${channel}):`, errMsg);
+
+    // Specific message for Anthropic overload (529)
+    if (errMsg.includes("overloaded") || errMsg.includes("529")) {
+      return "Извините, сервер AI временно перегружен. Пожалуйста, попробуйте через 1-2 минуты.";
+    }
+
     return "Извините, произошла техническая ошибка. Пожалуйста, напишите нам позже.";
   }
 }

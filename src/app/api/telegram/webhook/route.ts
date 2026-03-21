@@ -739,6 +739,12 @@ async function generateAIResponse(
     const errMsg = error instanceof Error ? error.message : String(error);
     const errStack = error instanceof Error ? error.stack : '';
     console.error(`[Webhook] generateAIResponse FAILED: ${errMsg}\n${errStack}`);
+
+    // Specific message for Anthropic overload (529)
+    if (errMsg.includes("overloaded") || errMsg.includes("529")) {
+      return "Извините, сервер AI временно перегружен. Пожалуйста, попробуйте через 1-2 минуты.";
+    }
+
     return "Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте позже.";
   }
 }
