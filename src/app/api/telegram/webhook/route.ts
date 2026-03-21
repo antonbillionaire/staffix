@@ -7,7 +7,7 @@
 export const maxDuration = 300;
 
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { callClaudeWithRetry } from "@/lib/claude-retry";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import {
@@ -593,8 +593,7 @@ async function generateAIResponse(
       { role: "user", content: userMessage },
     ].slice(-20);
 
-    // 6. Вызываем Claude API с tools
-    const anthropic = new Anthropic({ apiKey });
+    // 6. Вызываем Claude API с tools (with retry on overload)
 
     // Выбираем tools в зависимости от режима
     const activeTools = salesMode ? salesToolDefinitions : bookingToolDefinitions;
@@ -607,7 +606,7 @@ async function generateAIResponse(
     const systemWithDate = systemPrompt + systemHint;
 
     console.log(`[Webhook] Calling Claude API for business=${businessId}, salesMode=${salesMode}`);
-    let response = await anthropic.messages.create({
+    let response = await callClaudeWithRetry({
       model: "claude-sonnet-4-5-20250929",
       max_tokens: 1024,
       system: systemWithDate,
@@ -676,7 +675,7 @@ async function generateAIResponse(
 
       // Вызываем Claude снова с результатами
       try {
-        response = await anthropic.messages.create({
+        response = await callClaudeWithRetry({
           model: "claude-sonnet-4-5-20250929",
           max_tokens: 1024,
           system: systemWithDate,

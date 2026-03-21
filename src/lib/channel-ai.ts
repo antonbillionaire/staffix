@@ -5,7 +5,6 @@
  * and notifications.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { dispatchCrmEvent } from "@/lib/crm-integrations";
 import {
@@ -28,7 +27,7 @@ import {
   getUpsellSuggestions,
 } from "@/lib/sales-tools";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { callClaudeWithRetry } from "@/lib/claude-retry";
 
 type HistoryMessage = { role: "user" | "assistant"; content: string };
 
@@ -412,8 +411,8 @@ export async function generateChannelAIResponse(
     const isStoreBusiness = biz.businessType === "store" || biz.businessType === "shop" || biz.businessType === "sales";
     const tools = isStoreBusiness ? channelSalesTools : channelBookingTools;
 
-    // Call Claude with appropriate tools
-    let response = await anthropic.messages.create({
+    // Call Claude with appropriate tools (with retry on overload)
+    let response = await callClaudeWithRetry({
       model: "claude-sonnet-4-5-20250929",
       max_tokens: 1024,
       system: systemPrompt,
@@ -468,12 +467,12 @@ export async function generateChannelAIResponse(
 
       // Call Claude again with tool results
       try {
-        response = await anthropic.messages.create({
+        response = await callClaudeWithRetry({
           model: "claude-sonnet-4-5-20250929",
           max_tokens: 1024,
           system: systemPrompt,
           messages,
-          tools: channelBookingTools,
+          tools,
         });
       } catch (apiError) {
         console.error("[Channel AI] API error after tool execution:", apiError);
