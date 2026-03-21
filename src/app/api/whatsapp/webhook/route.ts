@@ -16,10 +16,12 @@ import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { parseWAWebhook, sendWAMessage, markWAMessageRead } from "@/lib/whatsapp-utils";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
+import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
 import { checkSubscriptionLimit, incrementMessageCount } from "@/lib/subscription-check";
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { markWebhookProcessed } from "@/lib/webhook-dedup";
+import { sendWhatsAppMessage } from "@/lib/sales-bot/meta-api";
 
 // ─── GET: Webhook verification from Meta ────────────────────────────────────
 export async function GET(request: Request) {
@@ -122,8 +124,11 @@ export async function POST(request: Request) {
       console.log(`[WA Webhook] Auto-route: found business=${business?.id || 'NONE'} for phoneNumberId=${msg.phoneNumberId}`);
       if (business) {
         await processWAMessage(business.id, msg);
+      } else {
+        // Fallback: Staffix sales bot (Victor)
+        console.log(`[WA Webhook] No business found, falling back to sales bot for ${msg.waId}`);
+        await processWASalesBot(msg);
       }
-      // No fallback sales bot for WhatsApp (no Staffix WA number yet)
     }
   } catch (e) {
     console.error("WA message processing error:", e);
@@ -179,5 +184,40 @@ async function processWAMessage(
     await incrementMessageCount(businessId);
   } catch (e) {
     console.error("processWAMessage error:", e);
+  }
+}
+
+/**
+ * Fallback: Staffix sales bot (Victor) for WhatsApp.
+ * Used when phoneNumberId doesn't match any customer business.
+ */
+async function processWASalesBot(
+  msg: { waId: string; name: string; text: string; messageId: string; phoneNumberId: string }
+) {
+  try {
+    // Save/update sales lead
+    await prisma.salesLead.upsert({
+      where: { whatsappPhone: msg.waId },
+      create: {
+        whatsappPhone: msg.waId,
+        name: msg.name,
+        channel: "whatsapp",
+        stage: "new",
+      },
+      update: {
+        name: msg.name,
+        updatedAt: new Date(),
+      },
+    }).catch(() => {});
+
+    // Generate sales bot response
+    const reply = await generateStaffixSalesResponse("whatsapp", msg.waId, msg.text);
+
+    // Send via Staffix's own WA number
+    await sendWhatsAppMessage(msg.waId, reply);
+
+    console.log(`[WA Webhook] Sales bot replied to ${msg.waId}`);
+  } catch (e) {
+    console.error("[WA Webhook] Sales bot error:", e);
   }
 }
