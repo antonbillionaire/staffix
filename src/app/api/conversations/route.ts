@@ -185,9 +185,11 @@ export async function GET(request: NextRequest) {
       orderBy: { updatedAt: "desc" },
     });
 
+    console.log(`[Conversations API] Found ${channelConvs.length} channel conversations for business ${business.id}`);
     for (const conv of channelConvs) {
       const history = (conv.history as Array<{ role: string; content: string }>) || [];
       const lastMsg = history[history.length - 1];
+      console.log(`  - ${conv.channel}: clientId=${conv.clientId}, name=${conv.clientName}, msgs=${conv.messageCount}, historyLen=${history.length}`);
 
       allConversations.push({
         clientId: conv.clientId,

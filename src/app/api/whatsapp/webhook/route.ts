@@ -109,6 +109,7 @@ export async function POST(request: Request) {
 
   // Process BEFORE returning 200 — Vercel kills serverless functions after response
   try {
+    console.log(`[WA Webhook] Processing message from ${msg.waId} (name: ${msg.name}), phoneNumberId: ${msg.phoneNumberId}, businessId param: ${businessId || 'auto'}`);
     if (businessId) {
       // Legacy: explicit businessId in URL
       await processWAMessage(businessId, msg);
@@ -118,6 +119,7 @@ export async function POST(request: Request) {
         where: { waPhoneNumberId: msg.phoneNumberId, waActive: true },
         select: { id: true },
       });
+      console.log(`[WA Webhook] Auto-route: found business=${business?.id || 'NONE'} for phoneNumberId=${msg.phoneNumberId}`);
       if (business) {
         await processWAMessage(business.id, msg);
       }
