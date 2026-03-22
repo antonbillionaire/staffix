@@ -544,10 +544,12 @@ export async function generateChannelAIResponse(
     }
 
     // Save only text messages to history (not tool_use/tool_result blocks)
+    // Strip "— staffix.io" signature from history so Claude doesn't copy it
+    const replyForHistory = replyText.replace(/\n\n— staffix\.io$/g, "").trim();
     const updatedHistory = ([
       ...history,
       { role: "user" as const, content: userMessage },
-      { role: "assistant" as const, content: replyText },
+      { role: "assistant" as const, content: replyForHistory },
     ] as HistoryMessage[]).slice(-40); // keep last 40 messages
 
     try {
