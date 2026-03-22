@@ -100,6 +100,12 @@ export default function MessagesPage() {
 
   useEffect(() => {
     fetchConversations();
+
+    // Auto-refresh every 5 seconds to show new messages
+    const interval = setInterval(() => {
+      fetchConversations();
+    }, 5000);
+    return () => clearInterval(interval);
   }, [fetchConversations]);
 
   const fetchMessages = async (clientId: string, channel: string) => {
