@@ -137,6 +137,7 @@ function buildNavConfig(isSales: boolean): NavEntry[] {
         { nameKey: "nav.myLeads", href: "/dashboard/leads", icon: Target },
         { nameKey: "nav.myClients", href: "/dashboard/customers", icon: UserCircle },
         { nameKey: "nav.myMessages", href: "/dashboard/messages", icon: Mail, badge: "messages" as const },
+        { nameKey: "nav.myComments", href: "/dashboard/comments", icon: MessageSquare },
         { nameKey: "nav.myStats", href: "/dashboard/statistics", icon: BarChart3 },
         { nameKey: "nav.myBroadcasts", href: "/dashboard/broadcasts", icon: Send },
         { nameKey: "nav.myAutomation", href: "/dashboard/automation", icon: Zap },
