@@ -11,6 +11,9 @@ import {
   ExternalLink,
   Instagram,
   RefreshCw,
+  Reply,
+  Send,
+  X,
 } from "lucide-react";
 
 interface Comment {
@@ -35,6 +38,8 @@ export default function CommentsPage() {
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<Post[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
 
   const isDark = theme === "dark";
   const cardBg = isDark ? "bg-[#12122a]" : "bg-white";
@@ -81,6 +86,28 @@ export default function CommentsPage() {
       }
     } catch (e) {
       console.error("Hide comment error:", e);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const replyToComment = async (commentId: string) => {
+    if (!replyText.trim()) return;
+    setActionLoading(commentId);
+    try {
+      const res = await fetch("/api/instagram/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commentId, message: replyText.trim() }),
+      });
+      if (res.ok) {
+        setReplyingTo(null);
+        setReplyText("");
+        // Refresh to show new reply
+        fetchComments();
+      }
+    } catch (e) {
+      console.error("Reply error:", e);
     } finally {
       setActionLoading(null);
     }
@@ -179,8 +206,8 @@ export default function CommentsPage() {
             {/* Comments */}
             <div className="divide-y divide-gray-200 dark:divide-white/5">
               {post.comments.map((comment) => (
+                <div key={comment.id}>
                 <div
-                  key={comment.id}
                   className={`flex items-start justify-between p-4 ${
                     comment.hidden ? (isDark ? "bg-yellow-500/5" : "bg-yellow-50") : ""
                   }`}
@@ -204,6 +231,16 @@ export default function CommentsPage() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 ml-3 flex-shrink-0">
+                    <button
+                      onClick={() => { setReplyingTo(replyingTo === comment.id ? null : comment.id); setReplyText(""); }}
+                      disabled={actionLoading === comment.id}
+                      className={`p-2 rounded-lg transition-colors ${
+                        isDark ? "hover:bg-white/10" : "hover:bg-gray-100"
+                      } ${replyingTo === comment.id ? "text-blue-500" : textSecondary} hover:text-blue-500 disabled:opacity-50`}
+                      title="Ответить"
+                    >
+                      <Reply className="h-4 w-4" />
+                    </button>
                     <button
                       onClick={() => hideComment(comment.id, !comment.hidden)}
                       disabled={actionLoading === comment.id}
@@ -231,6 +268,35 @@ export default function CommentsPage() {
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
+                </div>
+
+                {/* Reply input */}
+                {replyingTo === comment.id && (
+                  <div className={`flex items-center gap-2 px-4 pb-3`}>
+                    <input
+                      type="text"
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && replyToComment(comment.id)}
+                      placeholder="Написать ответ..."
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm ${isDark ? "bg-white/5 text-white border-white/10" : "bg-gray-50 text-gray-900 border-gray-200"} border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => replyToComment(comment.id)}
+                      disabled={!replyText.trim() || actionLoading === comment.id}
+                      className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    >
+                      {actionLoading === comment.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    </button>
+                    <button
+                      onClick={() => { setReplyingTo(null); setReplyText(""); }}
+                      className={`p-2 rounded-lg ${isDark ? "hover:bg-white/10" : "hover:bg-gray-100"} ${textSecondary}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
                 </div>
               ))}
             </div>

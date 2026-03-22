@@ -118,6 +118,40 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
+// POST /api/instagram/comments — reply to a comment (public reply on the post)
+export async function POST(request: NextRequest) {
+  try {
+    const business = await getBusinessForUser();
+    if (!business) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { commentId, message } = await request.json();
+    if (!commentId || !message) {
+      return NextResponse.json({ error: "commentId and message required" }, { status: 400 });
+    }
+
+    const token = business.fbPageAccessToken;
+
+    const res = await fetch(
+      `${META_API}/${commentId}/replies?message=${encodeURIComponent(message)}&access_token=${token}`,
+      { method: "POST" }
+    );
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("[IG Comments] Reply error:", err);
+      return NextResponse.json({ error: "Failed to reply to comment", details: err }, { status: 500 });
+    }
+
+    const data = await res.json();
+    return NextResponse.json({ success: true, replyId: data.id });
+  } catch (error) {
+    console.error("[IG Comments] POST error:", error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
+
 // DELETE /api/instagram/comments — delete a comment
 export async function DELETE(request: NextRequest) {
   try {
