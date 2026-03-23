@@ -155,8 +155,11 @@ async function processWAMessage(
     if (!business?.waActive || !business.waPhoneNumberId) return;
 
     // Prefer System User token (never expires), fall back to business token
-    const waToken = process.env.WHATSAPP_ACCESS_TOKEN || business.waAccessToken;
+    const envToken = process.env.WHATSAPP_ACCESS_TOKEN;
+    const dbToken = business.waAccessToken;
+    const waToken = envToken || dbToken;
     if (!waToken) return;
+    console.log(`[WA Webhook] Token source: ${envToken ? 'ENV' : 'DB'}, starts=${waToken.substring(0, 10)}..., len=${waToken.length}`);
 
     // Check message limit
     const { allowed, reason } = await checkSubscriptionLimit(businessId);
