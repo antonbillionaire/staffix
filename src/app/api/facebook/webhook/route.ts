@@ -209,10 +209,13 @@ async function processBusinessFBMessage(
     if (!business?.fbActive) return;
 
     // Prefer System User token (never expires), fall back to business token
-    const fbToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN
+    const baseFbToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN
       || process.env.STAFFIX_FB_PAGE_ACCESS_TOKEN
       || business.fbPageAccessToken;
-    if (!fbToken) return;
+    if (!baseFbToken) return;
+
+    // Convert System User token → Page Access Token (required for Messenger API)
+    const fbToken = await getPageAccessToken(msg.pageId, baseFbToken).catch(() => baseFbToken);
 
     // Check message limit
     const { allowed } = await checkSubscriptionLimit(businessId);

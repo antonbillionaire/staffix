@@ -228,24 +228,23 @@ async function processIGMessage(
     return;
   }
 
+  // Convert System User token → Page Access Token (required for IG Messages API)
+  const pageId = business.fbPageId || accountId;
+  const pageToken = await getPageAccessToken(pageId, effectiveIGToken).catch(() => effectiveIGToken);
+  console.log(`[IG Webhook] Token: effectiveLen=${effectiveIGToken.length}, pageTokenLen=${pageToken.length}, pageId=${pageId}`);
+
   // Check subscription limits
   const { allowed: subAllowed } = await checkSubscriptionLimit(business.id);
   if (!subAllowed) {
-    await sendIGMessage(
-      business.fbPageId || accountId,
-      effectiveIGToken,
-      senderId,
-      "Извините, временно не можем обработать ваш запрос. Свяжитесь с нами напрямую."
-    );
+    await sendIGMessage(pageId, pageToken, senderId, "Извините, временно не можем обработать ваш запрос. Свяжитесь с нами напрямую.");
     return;
   }
 
-  const pageId = business.fbPageId || accountId;
-  await sendIGSenderAction(pageId, effectiveIGToken, senderId, "mark_seen");
-  await sendIGSenderAction(pageId, effectiveIGToken, senderId, "typing_on");
+  await sendIGSenderAction(pageId, pageToken, senderId, "mark_seen");
+  await sendIGSenderAction(pageId, pageToken, senderId, "typing_on");
 
-  // Fetch sender name from Instagram API (non-blocking — if fails, proceeds without name)
-  const senderName = await fetchIGUserName(senderId, effectiveIGToken);
+  // Fetch sender name from Instagram API
+  const senderName = await fetchIGUserName(senderId, pageToken);
 
   const reply = await generateChannelAIResponse(
     business.id,
@@ -255,8 +254,7 @@ async function processIGMessage(
     senderName
   );
 
-  console.log(`[IG Webhook] Sending reply to ${senderId} via pageId=${pageId}, tokenSource=${effectiveIGToken === process.env.FACEBOOK_PAGE_ACCESS_TOKEN ? 'ENV' : effectiveIGToken === process.env.STAFFIX_FB_PAGE_ACCESS_TOKEN ? 'STAFFIX_ENV' : 'DB'}, tokenLen=${effectiveIGToken.length}`);
-  const sendResult = await sendIGMessage(pageId, effectiveIGToken, senderId, reply);
+  const sendResult = await sendIGMessage(pageId, pageToken, senderId, reply);
   console.log(`[IG Webhook] sendIGMessage result: ${sendResult}`);
 
   // Increment message usage
