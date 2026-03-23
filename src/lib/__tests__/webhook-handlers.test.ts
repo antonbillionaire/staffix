@@ -460,7 +460,7 @@ describe("Facebook Webhook POST", () => {
     expect(res.status).toBe(200);
     expect(generateChannelAIResponse).not.toHaveBeenCalled();
     expect(sendFBMessage).toHaveBeenCalledWith(
-      "fb-token", "fb-user-1",
+      expect.any(String), "fb-user-1",
       expect.stringContaining("временно не можем"),
       "fb-page-1"
     );

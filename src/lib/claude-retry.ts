@@ -5,15 +5,22 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 type MessageCreateParams = Anthropic.MessageCreateParamsNonStreaming;
 type Message = Anthropic.Message;
+
+// Lazy init to avoid constructor issues in test mocks
+let _anthropic: Anthropic | null = null;
+function getClient(): Anthropic {
+  if (!_anthropic) {
+    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  }
+  return _anthropic;
+}
 
 export async function callClaudeWithRetry(params: MessageCreateParams, retries = 2): Promise<Message> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      return await anthropic.messages.create(params);
+      return await getClient().messages.create(params);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       const isOverloaded = msg.includes("overloaded") || msg.includes("529");
@@ -28,6 +35,5 @@ export async function callClaudeWithRetry(params: MessageCreateParams, retries =
       throw error;
     }
   }
-  // TypeScript: unreachable but needed for type safety
   throw new Error("Retry exhausted");
 }
