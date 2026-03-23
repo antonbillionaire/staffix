@@ -255,7 +255,9 @@ async function processIGMessage(
     senderName
   );
 
-  await sendIGMessage(pageId, effectiveIGToken, senderId, reply);
+  console.log(`[IG Webhook] Sending reply to ${senderId} via pageId=${pageId}, tokenSource=${effectiveIGToken === process.env.FACEBOOK_PAGE_ACCESS_TOKEN ? 'ENV' : effectiveIGToken === process.env.STAFFIX_FB_PAGE_ACCESS_TOKEN ? 'STAFFIX_ENV' : 'DB'}, tokenLen=${effectiveIGToken.length}`);
+  const sendResult = await sendIGMessage(pageId, effectiveIGToken, senderId, reply);
+  console.log(`[IG Webhook] sendIGMessage result: ${sendResult}`);
 
   // Increment message usage
   await incrementMessageCount(business.id);

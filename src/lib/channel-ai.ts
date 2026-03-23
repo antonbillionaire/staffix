@@ -398,8 +398,12 @@ export async function generateChannelAIResponse(
 
     const systemPrompt = buildChannelSystemPrompt(biz, channel);
 
-    // Parse existing history
-    const history = (conv.history as HistoryMessage[]) || [];
+    // Parse existing history — strip any "— staffix.io" signatures so Claude doesn't copy them
+    const history = ((conv.history as HistoryMessage[]) || []).map((m) =>
+      m.role === "assistant"
+        ? { ...m, content: m.content.replace(/\n+— staffix\.io/g, "").trim() }
+        : m
+    );
 
     // Keep last 20 messages to avoid token overflow
     const recentHistory = history.slice(-20);
