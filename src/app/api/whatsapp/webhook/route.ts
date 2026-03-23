@@ -154,8 +154,8 @@ async function processWAMessage(
 
     if (!business?.waActive || !business.waPhoneNumberId) return;
 
-    // Use business token, fall back to System User token (never expires)
-    const waToken = business.waAccessToken || process.env.WHATSAPP_ACCESS_TOKEN;
+    // Prefer System User token (never expires), fall back to business token
+    const waToken = process.env.WHATSAPP_ACCESS_TOKEN || business.waAccessToken;
     if (!waToken) return;
 
     // Check message limit

@@ -208,10 +208,10 @@ async function processBusinessFBMessage(
 
     if (!business?.fbActive) return;
 
-    // Use business token, fall back to System User token if expired
-    const fbToken = business.fbPageAccessToken
-      || process.env.FACEBOOK_PAGE_ACCESS_TOKEN
-      || process.env.STAFFIX_FB_PAGE_ACCESS_TOKEN;
+    // Prefer System User token (never expires), fall back to business token
+    const fbToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN
+      || process.env.STAFFIX_FB_PAGE_ACCESS_TOKEN
+      || business.fbPageAccessToken;
     if (!fbToken) return;
 
     // Check message limit

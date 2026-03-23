@@ -14,21 +14,29 @@ export function verifyMetaWebhookSignature(
   rawBody: string,
   signatureHeader: string | null
 ): boolean {
-  const appSecret = process.env.META_APP_SECRET;
+  // Collect all possible app secrets (main app + Instagram app)
+  const secrets = [
+    process.env.META_APP_SECRET,
+    process.env.INSTAGRAM_APP_SECRET,
+  ].filter(Boolean) as string[];
 
-  // If no app secret configured, skip verification (development mode)
-  if (!appSecret) return true;
+  // If no secrets configured, skip verification (development mode)
+  if (secrets.length === 0) return true;
 
   // If Meta didn't send a signature, reject
   if (!signatureHeader) return false;
 
-  // Expected format: "sha256=<hex_digest>"
-  const expectedSignature =
-    "sha256=" + createHmac("sha256", appSecret).update(rawBody).digest("hex");
+  // Try each secret — Instagram webhooks may use a different app secret
+  for (const secret of secrets) {
+    const expectedSignature =
+      "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");
 
-  // Use constant-time comparison to prevent timing attacks
-  const expected = Buffer.from(expectedSignature);
-  const received = Buffer.from(signatureHeader);
-  if (expected.length !== received.length) return false;
-  return timingSafeEqual(expected, received);
+    const expected = Buffer.from(expectedSignature);
+    const received = Buffer.from(signatureHeader);
+    if (expected.length === received.length && timingSafeEqual(expected, received)) {
+      return true;
+    }
+  }
+
+  return false;
 }
