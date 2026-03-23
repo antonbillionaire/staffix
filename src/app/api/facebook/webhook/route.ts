@@ -206,13 +206,19 @@ async function processBusinessFBMessage(
       },
     });
 
-    if (!business?.fbActive || !business.fbPageAccessToken) return;
+    if (!business?.fbActive) return;
+
+    // Use business token, fall back to System User token if expired
+    const fbToken = business.fbPageAccessToken
+      || process.env.FACEBOOK_PAGE_ACCESS_TOKEN
+      || process.env.STAFFIX_FB_PAGE_ACCESS_TOKEN;
+    if (!fbToken) return;
 
     // Check message limit
     const { allowed } = await checkSubscriptionLimit(businessId);
     if (!allowed) {
       await sendFBMessage(
-        business.fbPageAccessToken,
+        fbToken,
         msg.senderId,
         "Извините, временно не можем обработать ваш запрос. Свяжитесь с нами напрямую.",
         msg.pageId
@@ -220,10 +226,10 @@ async function processBusinessFBMessage(
       return;
     }
 
-    await sendFBTyping(business.fbPageAccessToken, msg.senderId, msg.pageId);
+    await sendFBTyping(fbToken, msg.senderId, msg.pageId);
 
     // Fetch sender name from Facebook Messenger API
-    const senderName = await fetchFBUserName(msg.senderId, business.fbPageAccessToken);
+    const senderName = await fetchFBUserName(msg.senderId, fbToken);
 
     const reply = await generateChannelAIResponse(
       businessId,
@@ -233,7 +239,7 @@ async function processBusinessFBMessage(
       senderName
     );
 
-    await sendFBMessage(business.fbPageAccessToken, msg.senderId, reply, msg.pageId);
+    await sendFBMessage(fbToken, msg.senderId, reply, msg.pageId);
 
     await incrementMessageCount(businessId);
   } catch (e) {

@@ -103,8 +103,9 @@ export async function POST(request: Request) {
       where: businessId ? { id: businessId } : { waPhoneNumberId: msg.phoneNumberId, waActive: true },
       select: { waPhoneNumberId: true, waAccessToken: true },
     });
-    if (biz?.waPhoneNumberId && biz.waAccessToken) {
-      sendWAMessage(biz.waPhoneNumberId, biz.waAccessToken, msg.waId, "Извините, я пока могу работать только с текстовыми сообщениями. Напишите ваш вопрос текстом.").catch(() => {});
+    const nonTextToken = biz?.waAccessToken || process.env.WHATSAPP_ACCESS_TOKEN;
+    if (biz?.waPhoneNumberId && nonTextToken) {
+      sendWAMessage(biz.waPhoneNumberId, nonTextToken, msg.waId, "Извините, я пока могу работать только с текстовыми сообщениями. Напишите ваш вопрос текстом.").catch(() => {});
     }
     return respond200();
   }
@@ -151,14 +152,18 @@ async function processWAMessage(
       },
     });
 
-    if (!business?.waActive || !business.waPhoneNumberId || !business.waAccessToken) return;
+    if (!business?.waActive || !business.waPhoneNumberId) return;
+
+    // Use business token, fall back to System User token (never expires)
+    const waToken = business.waAccessToken || process.env.WHATSAPP_ACCESS_TOKEN;
+    if (!waToken) return;
 
     // Check message limit
     const { allowed, reason } = await checkSubscriptionLimit(businessId);
     if (!allowed) {
       await sendWAMessage(
         business.waPhoneNumberId,
-        business.waAccessToken,
+        waToken,
         msg.waId,
         "Извините, временно не можем обработать ваш запрос. Пожалуйста, свяжитесь с нами напрямую."
       );
@@ -166,7 +171,7 @@ async function processWAMessage(
     }
 
     // Mark message as read
-    await markWAMessageRead(business.waPhoneNumberId, business.waAccessToken, msg.messageId);
+    await markWAMessageRead(business.waPhoneNumberId, waToken, msg.messageId);
 
     // Generate AI response
     const reply = await generateChannelAIResponse(
@@ -178,7 +183,7 @@ async function processWAMessage(
     );
 
     // Send reply
-    await sendWAMessage(business.waPhoneNumberId, business.waAccessToken, msg.waId, reply);
+    await sendWAMessage(business.waPhoneNumberId, waToken, msg.waId, reply);
 
     // Increment message usage
     await incrementMessageCount(businessId);

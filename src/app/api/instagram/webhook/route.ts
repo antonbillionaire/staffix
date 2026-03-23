@@ -197,7 +197,12 @@ async function processIGMessage(
     },
   });
 
-  if (!business || !business.fbPageAccessToken) {
+  // Use business token, fall back to System User token if expired
+  const effectiveIGToken = business?.fbPageAccessToken
+    || process.env.FACEBOOK_PAGE_ACCESS_TOKEN
+    || process.env.STAFFIX_FB_PAGE_ACCESS_TOKEN;
+
+  if (!business || !effectiveIGToken) {
     // Not a customer business — fall back to Staffix sales bot
     console.log(`[IG Webhook] No business found for account ${accountId}, falling back to sales bot`);
     const staffixToken =
@@ -228,7 +233,7 @@ async function processIGMessage(
   if (!subAllowed) {
     await sendIGMessage(
       business.fbPageId || accountId,
-      business.fbPageAccessToken,
+      effectiveIGToken,
       senderId,
       "Извините, временно не можем обработать ваш запрос. Свяжитесь с нами напрямую."
     );
@@ -236,11 +241,11 @@ async function processIGMessage(
   }
 
   const pageId = business.fbPageId || accountId;
-  await sendIGSenderAction(pageId, business.fbPageAccessToken, senderId, "mark_seen");
-  await sendIGSenderAction(pageId, business.fbPageAccessToken, senderId, "typing_on");
+  await sendIGSenderAction(pageId, effectiveIGToken, senderId, "mark_seen");
+  await sendIGSenderAction(pageId, effectiveIGToken, senderId, "typing_on");
 
   // Fetch sender name from Instagram API (non-blocking — if fails, proceeds without name)
-  const senderName = await fetchIGUserName(senderId, business.fbPageAccessToken);
+  const senderName = await fetchIGUserName(senderId, effectiveIGToken);
 
   const reply = await generateChannelAIResponse(
     business.id,
@@ -250,7 +255,7 @@ async function processIGMessage(
     senderName
   );
 
-  await sendIGMessage(pageId, business.fbPageAccessToken, senderId, reply);
+  await sendIGMessage(pageId, effectiveIGToken, senderId, reply);
 
   // Increment message usage
   await incrementMessageCount(business.id);
