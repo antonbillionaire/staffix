@@ -506,7 +506,7 @@ describe("Telegram Webhook POST", () => {
     } as never);
 
     // getOrCreateConversation
-    vi.mocked((prisma as Record<string, unknown>).conversation as { findUnique: ReturnType<typeof vi.fn> }).findUnique
+    vi.mocked((prisma as unknown as Record<string, unknown>).conversation as { findUnique: ReturnType<typeof vi.fn> }).findUnique
       .mockResolvedValue({ id: "conv-1", messages: [] });
 
     mockFetch.mockResolvedValue({
