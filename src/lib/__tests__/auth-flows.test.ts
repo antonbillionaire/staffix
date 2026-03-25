@@ -64,7 +64,7 @@ function makeNextRequest(url: string, body: unknown, cookies?: Record<string, st
     body: JSON.stringify(body),
   });
   // Simulate NextRequest with cookies
-  (req as Record<string, unknown>).cookies = {
+  (req as unknown as Record<string, unknown>).cookies = {
     get: (name: string) => (cookies?.[name] ? { value: cookies[name] } : undefined),
   };
   return req;
@@ -166,7 +166,7 @@ describe("POST /api/auth/login", () => {
   });
 
   it("rate limited -> 429", async () => {
-    vi.mocked(rateLimit).mockResolvedValueOnce({ allowed: false, retryAfterSeconds: 600 });
+    vi.mocked(rateLimit).mockResolvedValueOnce({ allowed: false, remaining: 0, retryAfterSeconds: 600 });
 
     const POST = await importHandler();
     const req = makeNextRequest("https://staffix.io/api/auth/login", {
@@ -261,7 +261,7 @@ describe("POST /api/auth/register", () => {
   });
 
   it("rate limited -> 429", async () => {
-    vi.mocked(rateLimit).mockResolvedValueOnce({ allowed: false, retryAfterSeconds: 3600 });
+    vi.mocked(rateLimit).mockResolvedValueOnce({ allowed: false, remaining: 0, retryAfterSeconds: 3600 });
 
     const POST = await importHandler();
     const req = makeNextRequest("https://staffix.io/api/auth/register", {
@@ -431,7 +431,7 @@ describe("POST /api/auth/forgot-password", () => {
   });
 
   it("rate limited -> 429", async () => {
-    vi.mocked(rateLimit).mockResolvedValueOnce({ allowed: false, retryAfterSeconds: 600 });
+    vi.mocked(rateLimit).mockResolvedValueOnce({ allowed: false, remaining: 0, retryAfterSeconds: 600 });
 
     const POST = await importHandler();
     const req = makeNextRequest("https://staffix.io/api/auth/forgot-password", {
