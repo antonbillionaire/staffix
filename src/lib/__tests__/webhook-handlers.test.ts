@@ -493,7 +493,7 @@ describe("Telegram Webhook POST", () => {
       id: "biz-tg",
       name: "Test Biz",
       botToken: "123:ABC",
-      webhookSecret: null,
+      webhookSecret: "test-secret",
     } as never);
 
     // checkMessageLimit
@@ -517,7 +517,10 @@ describe("Telegram Webhook POST", () => {
     const POST = await importHandler();
     const req = new Request("https://staffix.io/api/telegram/webhook?businessId=biz-tg", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "x-telegram-bot-api-secret-token": "test-secret",
+      },
       body: JSON.stringify(tgBody),
     });
     const res = await POST(req as never);
@@ -566,7 +569,7 @@ describe("Telegram Webhook POST", () => {
       id: "biz-tg",
       name: "Test Biz",
       botToken: "123:ABC",
-      webhookSecret: null,
+      webhookSecret: "test-secret",
     } as never);
 
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue({
@@ -585,7 +588,10 @@ describe("Telegram Webhook POST", () => {
     const POST = await importHandler();
     const req = new Request("https://staffix.io/api/telegram/webhook?businessId=biz-tg", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "x-telegram-bot-api-secret-token": "test-secret",
+      },
       body: JSON.stringify(tgBody),
     });
     const res = await POST(req as never);

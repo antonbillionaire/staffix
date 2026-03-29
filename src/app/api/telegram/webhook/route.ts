@@ -1112,12 +1112,14 @@ export async function POST(request: NextRequest) {
     const rawBody = await request.text();
 
     // Верификация secret_token (Telegram шлёт его as-is в хедере X-Telegram-Bot-Api-Secret-Token)
-    if (business.webhookSecret) {
-      const receivedToken = request.headers.get("x-telegram-bot-api-secret-token");
-      if (!receivedToken || receivedToken !== business.webhookSecret) {
-        console.error(`Telegram webhook: invalid secret_token for businessId=${businessId}`);
-        return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
-      }
+    const receivedToken = request.headers.get("x-telegram-bot-api-secret-token");
+    if (!business.webhookSecret) {
+      console.error(`Telegram webhook: no webhookSecret configured for businessId=${businessId} — rejecting`);
+      return NextResponse.json({ error: "Webhook secret not configured" }, { status: 403 });
+    }
+    if (!receivedToken || receivedToken !== business.webhookSecret) {
+      console.error(`Telegram webhook: invalid secret_token for businessId=${businessId}`);
+      return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
     }
 
     const update: TelegramUpdate = JSON.parse(rawBody);

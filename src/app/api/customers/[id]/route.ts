@@ -177,12 +177,22 @@ export async function PATCH(
       return NextResponse.json({ error: "Клиент не найден" }, { status: 404 });
     }
 
+    // Validate input lengths
+    const name = body.name ?? client.name;
+    const phone = body.phone ?? client.phone;
+    if (typeof name === "string" && name.length > 100) {
+      return NextResponse.json({ error: "Name too long (max 100)" }, { status: 400 });
+    }
+    if (typeof phone === "string" && phone.length > 20) {
+      return NextResponse.json({ error: "Phone too long (max 20)" }, { status: 400 });
+    }
+
     const updatedClient = await prisma.client.update({
       where: { id },
       data: {
         isBlocked: body.isBlocked ?? client.isBlocked,
-        name: body.name ?? client.name,
-        phone: body.phone ?? client.phone,
+        name,
+        phone,
       },
     });
 

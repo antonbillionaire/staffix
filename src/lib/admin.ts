@@ -1,15 +1,10 @@
-// Admin configuration
-// Add emails here OR set ADMIN_EMAILS env variable in Vercel (comma-separated)
-
-const hardcoded = [
-  "director.kbridge@gmail.com",
-];
+// Admin configuration — set ADMIN_EMAILS env variable in Vercel (comma-separated)
 
 const fromEnv = process.env.ADMIN_EMAILS
   ? process.env.ADMIN_EMAILS.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean)
   : [];
 
-export const ADMIN_EMAILS = [...new Set([...hardcoded, ...fromEnv])];
+export const ADMIN_EMAILS = fromEnv;
 
 export function isAdmin(email: string | null | undefined): boolean {
   if (!email) return false;

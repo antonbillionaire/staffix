@@ -20,8 +20,11 @@ export function verifyMetaWebhookSignature(
     process.env.INSTAGRAM_APP_SECRET,
   ].filter(Boolean) as string[];
 
-  // If no secrets configured, skip verification (development mode)
-  if (secrets.length === 0) return true;
+  // If no secrets configured, reject (fail-secure)
+  if (secrets.length === 0) {
+    console.error("[Webhook Verify] No META_APP_SECRET or INSTAGRAM_APP_SECRET configured — rejecting webhook");
+    return false;
+  }
 
   // If Meta didn't send a signature, reject
   if (!signatureHeader) return false;

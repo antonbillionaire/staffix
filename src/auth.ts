@@ -6,20 +6,20 @@ import bcrypt from "bcryptjs";
 import { notifyNewRegistration } from "@/lib/admin-notify";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  // Session: JWT with 30-day persistence (survives browser close)
+  // Session: JWT with 14-day persistence (survives browser close)
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 14 * 24 * 60 * 60, // 14 days
   },
   cookies: {
     sessionToken: {
       name: `__Secure-authjs.session-token`,
       options: {
         httpOnly: true,
-        sameSite: "lax",
+        sameSite: "strict",
         path: "/",
         secure: true,
-        maxAge: 30 * 24 * 60 * 60, // 30 days — persistent cookie, survives browser close
+        maxAge: 14 * 24 * 60 * 60, // 14 days — persistent cookie, survives browser close
       },
     },
   },

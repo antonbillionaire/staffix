@@ -9,9 +9,10 @@ describe("verifyMetaWebhookSignature", () => {
     process.env = { ...originalEnv };
   });
 
-  it("returns true when META_APP_SECRET is not set (dev mode)", () => {
+  it("returns false when META_APP_SECRET is not set (fail-secure)", () => {
     delete process.env.META_APP_SECRET;
-    expect(verifyMetaWebhookSignature("any body", null)).toBe(true);
+    delete process.env.INSTAGRAM_APP_SECRET;
+    expect(verifyMetaWebhookSignature("any body", null)).toBe(false);
   });
 
   it("returns false when signature header is missing", () => {

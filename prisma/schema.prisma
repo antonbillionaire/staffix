@@ -404,6 +404,9 @@ model Subscription {
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  @@index([plan, expiresAt])
+  @@index([status, expiresAt])
 }
 
 // Загруженные документы
@@ -884,6 +887,7 @@ model ChannelMessage {
 
   @@index([businessId, channel])
   @@index([businessId, clientId])
+  @@index([businessId, createdAt])
   @@index([chatId, channel])
 }
 

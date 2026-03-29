@@ -133,10 +133,11 @@ export async function POST(request: NextRequest) {
 
     const token = business.fbPageAccessToken;
 
-    const res = await fetch(
-      `${META_API}/${commentId}/replies?message=${encodeURIComponent(message)}&access_token=${token}`,
-      { method: "POST" }
-    );
+    const res = await fetch(`${META_API}/${commentId}/replies`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, access_token: token }),
+    });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

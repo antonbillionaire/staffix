@@ -24,9 +24,6 @@ export async function GET() {
   // 2. ANTHROPIC_API_KEY
   const apiKey = process.env.ANTHROPIC_API_KEY;
   checks.anthropicKeySet = !!apiKey;
-  if (apiKey) {
-    checks.anthropicKeyPrefix = apiKey.slice(0, 7) + "...";
-  }
 
   // 3. Test Anthropic API
   if (apiKey) {

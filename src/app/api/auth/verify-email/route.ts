@@ -12,14 +12,15 @@ function generateVerificationCode(): string {
 // Verify code
 export async function POST(request: NextRequest) {
   try {
-    // Rate limit: 5 attempts per 15 minutes per IP
+    const { email, code } = await request.json();
+
+    // Rate limit: 5 attempts per 15 minutes per IP + per email
     const ip = getClientIp(request);
-    const { allowed } = await rateLimit(`verify:${ip}`, 5, 15);
-    if (!allowed) {
+    const { allowed: ipAllowed } = await rateLimit(`verify:${ip}`, 5, 15);
+    const { allowed: emailAllowed } = email ? await rateLimit(`verify:email:${email.toLowerCase()}`, 5, 15) : { allowed: true };
+    if (!ipAllowed || !emailAllowed) {
       return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
     }
-
-    const { email, code } = await request.json();
 
     if (!email || !code) {
       return NextResponse.json(

@@ -76,8 +76,8 @@ export function middleware(request: NextRequest) {
   if (refCode && /^[a-zA-Z0-9_-]{3,32}$/.test(refCode)) {
     // 60-day cookie for referral attribution
     response.cookies.set("staffix_ref", refCode, {
-      maxAge: 60 * 24 * 60 * 60, // 60 days
-      httpOnly: false,
+      maxAge: 30 * 24 * 60 * 60, // 30 days
+      httpOnly: true,
       sameSite: "lax",
       path: "/",
     });
