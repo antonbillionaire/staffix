@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, X, User, Loader2, Camera, CalendarDays, MessageCircle, BedDouble, BarChart3 } from "lucide-react";
+import { Plus, Pencil, Trash2, X, User, Loader2, Camera, CalendarDays, MessageCircle, BedDouble } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import Link from "next/link";
 
 interface Staff {
   id: string;
@@ -351,24 +350,13 @@ export default function StaffPage() {
             {t("staffPage.subtitle")}
           </p>
         </div>
-        <div className="flex gap-2">
-          {!isSales && (
-            <Link
-              href="/dashboard/staff/statistics"
-              className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 border ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
-            >
-              <BarChart3 className="h-4 w-4" />
-              {t("staffPage.statistics") || "Статистика"}
-            </Link>
-          )}
-          <button
-            onClick={() => openModal()}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            {t("staffPage.add")}
-          </button>
-        </div>
+        <button
+          onClick={() => openModal()}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2"
+        >
+          <Plus className="h-4 w-4" />
+          {t("staffPage.add")}
+        </button>
       </div>
 
       {/* Staff list */}
