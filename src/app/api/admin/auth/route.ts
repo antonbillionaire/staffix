@@ -15,6 +15,9 @@ export async function GET() {
 
     const adminStatus = isAdmin(session.user.email);
 
+    // Debug log — remove after confirming admin access works
+    console.log(`[Admin Auth] email=${session.user.email}, isAdmin=${adminStatus}, ADMIN_EMAILS=${process.env.ADMIN_EMAILS || "NOT SET"}`);
+
     return NextResponse.json({
       isAdmin: adminStatus,
       email: session.user.email,
