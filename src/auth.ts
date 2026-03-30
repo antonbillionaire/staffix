@@ -16,7 +16,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       name: `__Secure-authjs.session-token`,
       options: {
         httpOnly: true,
-        sameSite: "strict",
+        sameSite: "lax", // "lax" required for OAuth redirects (Google callback is cross-site)
         path: "/",
         secure: true,
         maxAge: 14 * 24 * 60 * 60, // 14 days — persistent cookie, survives browser close
