@@ -853,13 +853,13 @@ async function notifyNewOrder(
       }
     }
 
-    // Уведомляем сотрудников (admin/manager с включёнными уведомлениями)
+    // Уведомляем сотрудников (admin/operator с включёнными уведомлениями)
     const staffMembers = await prisma.staff.findMany({
       where: {
         businessId,
         telegramChatId: { not: null },
         notificationsEnabled: true,
-        role: { in: ["admin", "manager"] },
+        role: { in: ["admin", "operator"] },
       },
       select: { telegramChatId: true, name: true },
     });

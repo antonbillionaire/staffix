@@ -173,7 +173,9 @@ export async function notifyWarehouseOrderConfirmed(
 }
 
 /**
- * Notify manager when warehouse marks order as packed.
+ * Notify operator when warehouse marks order as packed.
+ * Flow: Warehouse packed → Operator organizes delivery.
+ * Owner/admin get notified for monitoring only.
  */
 export async function notifyManagerOrderPacked(
   businessId: string,
@@ -187,30 +189,51 @@ export async function notifyManagerOrderPacked(
     });
     if (!business?.botToken) return;
 
-    const message =
+    const operatorMessage =
       `✅ <b>Заказ #${orderNumber} собран!</b>\n\n` +
       `Организуйте доставку.\n` +
       `🔗 Управление: staffix.io/dashboard/orders`;
 
-    // Notify owner
+    const ownerMessage =
+      `✅ <b>Заказ #${orderNumber} собран</b>\n\n` +
+      `Склад собрал, передано оператору на доставку.`;
+
+    // Notify owner (monitoring)
     if (business.ownerTelegramChatId) {
-      await sendTelegramMsg(business.botToken, business.ownerTelegramChatId, message).catch(() => {});
+      await sendTelegramMsg(business.botToken, business.ownerTelegramChatId, ownerMessage).catch(() => {});
     }
 
-    // Notify managers
-    const managers = await prisma.staff.findMany({
+    // Notify operators (action required — organize delivery)
+    const operators = await prisma.staff.findMany({
       where: {
         businessId,
         telegramChatId: { not: null },
         notificationsEnabled: true,
-        role: { in: ["admin", "manager"] },
+        role: { in: ["operator"] },
       },
       select: { telegramChatId: true },
     });
 
-    for (const mgr of managers) {
-      if (mgr.telegramChatId) {
-        await sendTelegramMsg(business.botToken, mgr.telegramChatId, message).catch(() => {});
+    for (const op of operators) {
+      if (op.telegramChatId) {
+        await sendTelegramMsg(business.botToken, op.telegramChatId, operatorMessage).catch(() => {});
+      }
+    }
+
+    // Notify admins (monitoring)
+    const admins = await prisma.staff.findMany({
+      where: {
+        businessId,
+        telegramChatId: { not: null },
+        notificationsEnabled: true,
+        role: "admin",
+      },
+      select: { telegramChatId: true },
+    });
+
+    for (const adm of admins) {
+      if (adm.telegramChatId) {
+        await sendTelegramMsg(business.botToken, adm.telegramChatId, ownerMessage).catch(() => {});
       }
     }
 
@@ -220,7 +243,7 @@ export async function notifyManagerOrderPacked(
         businessId,
         type: "order_packed",
         title: `Заказ #${orderNumber} собран`,
-        message: "Склад собрал заказ. Организуйте доставку.",
+        message: "Склад собрал заказ. Передано оператору на доставку.",
         metadata: { orderId, orderNumber },
       },
     });
