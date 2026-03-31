@@ -8,6 +8,23 @@ import { prisma } from "@/lib/prisma";
 
 // Max file size: 10MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const PARSE_TIMEOUT_MS = 15000;
+
+function decodeTextBuffer(buffer: Buffer): string {
+  if (buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) return buffer.slice(3).toString("utf-8");
+  if (buffer[0] === 0xFF && buffer[1] === 0xFE) return buffer.slice(2).toString("utf16le");
+  if (buffer[0] === 0xFE && buffer[1] === 0xFF) return new TextDecoder("utf-16be").decode(buffer.slice(2));
+  const utf8 = buffer.toString("utf-8");
+  if (!utf8.includes("\uFFFD")) return utf8;
+  try { return new TextDecoder("windows-1251").decode(buffer); } catch { return utf8; }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label}: превышено время ожидания (${ms / 1000}с)`)), ms)),
+  ]);
+}
 
 // Allowed file types
 const ALLOWED_TYPES = [
@@ -130,20 +147,34 @@ export async function POST(request: NextRequest) {
       console.log(`[Document Upload] Parsing file: ${file.name}, type: ${resolvedType}, size: ${file.size}`);
 
       if (resolvedType === "text/plain") {
-        extractedText = buffer.toString("utf-8");
+        extractedText = decodeTextBuffer(buffer);
         console.log(`[Document Upload] TXT parsed, length: ${extractedText.length}`);
 
       } else if (resolvedType === "application/pdf") {
         try {
-          const { PDFParse } = await import("pdf-parse");
-          const parser = new PDFParse({ data: buffer });
-          const textResult = await parser.getText();
-          extractedText = textResult.text;
-          await parser.destroy();
+          const parsePdf = async () => {
+            const { PDFParse } = await import("pdf-parse");
+            const parser = new PDFParse({ data: buffer });
+            const textResult = await parser.getText();
+            await parser.destroy();
+            return textResult.text;
+          };
+          extractedText = await withTimeout(parsePdf(), PARSE_TIMEOUT_MS, "PDF парсинг");
+          if (!extractedText || extractedText.trim().length < 10) {
+            parseError = "PDF содержит изображения, а не текст. Загрузите текстовый PDF или скопируйте содержимое в TXT файл.";
+            extractedText = null;
+          }
           console.log(`[Document Upload] PDF parsed, length: ${extractedText?.length || 0}`);
         } catch (pdfErr) {
-          console.error(`[Document Upload] PDF parser unavailable:`, pdfErr);
-          parseError = "PDF парсер недоступен на сервере";
+          const msg = pdfErr instanceof Error ? pdfErr.message : String(pdfErr);
+          if (msg.toLowerCase().includes("password") || msg.toLowerCase().includes("encrypt")) {
+            parseError = "PDF защищён паролем. Снимите пароль и загрузите снова.";
+          } else if (msg.includes("превышено время")) {
+            parseError = msg;
+          } else {
+            parseError = "Ошибка парсинга PDF. Попробуйте скопировать текст в TXT файл.";
+          }
+          console.error(`[Document Upload] PDF error:`, msg);
         }
 
       } else if (
@@ -151,13 +182,27 @@ export async function POST(request: NextRequest) {
         resolvedType === "application/msword"
       ) {
         try {
-          const mammoth = await import("mammoth");
-          const result = await mammoth.extractRawText({ buffer });
-          extractedText = result.value;
+          const parseDoc = async () => {
+            const mammoth = await import("mammoth");
+            const result = await mammoth.extractRawText({ buffer });
+            return result.value;
+          };
+          extractedText = await withTimeout(parseDoc(), PARSE_TIMEOUT_MS, "Word парсинг");
+          if (!extractedText || extractedText.trim().length === 0) {
+            parseError = "Документ пуст или не содержит текста.";
+            extractedText = null;
+          }
           console.log(`[Document Upload] Word parsed, length: ${extractedText?.length || 0}`);
         } catch (docErr) {
-          console.error(`[Document Upload] Word parser unavailable:`, docErr);
-          parseError = "Word парсер недоступен на сервере";
+          const msg = docErr instanceof Error ? docErr.message : String(docErr);
+          if (msg.toLowerCase().includes("password") || msg.toLowerCase().includes("encrypt")) {
+            parseError = "Документ защищён паролем. Снимите пароль и загрузите снова.";
+          } else if (msg.includes("превышено время")) {
+            parseError = msg;
+          } else {
+            parseError = "Ошибка парсинга Word. Попробуйте скопировать текст в TXT файл.";
+          }
+          console.error(`[Document Upload] Word error:`, msg);
         }
 
       } else if (
@@ -165,25 +210,37 @@ export async function POST(request: NextRequest) {
         resolvedType === "application/vnd.ms-excel"
       ) {
         try {
-          const XLSX = await import("xlsx");
-          console.log(`[Document Upload] Starting Excel parsing...`);
-          const workbook = XLSX.read(buffer, { type: "buffer" });
-          console.log(`[Document Upload] Excel workbook loaded, sheets: ${workbook.SheetNames.join(", ")}`);
-          const texts: string[] = [];
-          for (const sheetName of workbook.SheetNames) {
-            const sheet = workbook.Sheets[sheetName];
-            const csv = XLSX.utils.sheet_to_csv(sheet);
-            texts.push(`=== ${sheetName} ===\n${csv}`);
+          const parseXls = async () => {
+            const XLSX = await import("xlsx");
+            const workbook = XLSX.read(buffer, { type: "buffer" });
+            const texts: string[] = [];
+            for (const sheetName of workbook.SheetNames) {
+              const sheet = workbook.Sheets[sheetName];
+              const csv = XLSX.utils.sheet_to_csv(sheet);
+              texts.push(`=== ${sheetName} ===\n${csv}`);
+            }
+            return texts.join("\n\n");
+          };
+          extractedText = await withTimeout(parseXls(), PARSE_TIMEOUT_MS, "Excel парсинг");
+          if (!extractedText || extractedText.trim().length === 0) {
+            parseError = "Excel файл пуст.";
+            extractedText = null;
           }
-          extractedText = texts.join("\n\n");
-          console.log(`[Document Upload] Excel parsed, total length: ${extractedText.length}`);
+          console.log(`[Document Upload] Excel parsed, length: ${extractedText?.length || 0}`);
         } catch (xlsErr) {
-          console.error(`[Document Upload] Excel parser unavailable:`, xlsErr);
-          parseError = "Excel парсер недоступен на сервере";
+          const msg = xlsErr instanceof Error ? xlsErr.message : String(xlsErr);
+          if (msg.toLowerCase().includes("password") || msg.toLowerCase().includes("encrypt")) {
+            parseError = "Excel файл защищён паролем. Снимите пароль и загрузите снова.";
+          } else if (msg.includes("превышено время")) {
+            parseError = msg;
+          } else {
+            parseError = "Ошибка парсинга Excel. Попробуйте сохранить как CSV и загрузить.";
+          }
+          console.error(`[Document Upload] Excel error:`, msg);
         }
 
       } else {
-        console.log(`[Document Upload] Unsupported file type for parsing: ${file.type}`);
+        console.log(`[Document Upload] Unsupported file type for parsing: ${resolvedType}`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
