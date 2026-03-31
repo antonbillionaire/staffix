@@ -1048,9 +1048,45 @@ model SalesLead {
   // История разговора с ботом Staffix
   history           Json      @default("[]")  // [{role, content}]
 
+  // Демо-встречи
+  demoBookings      DemoBooking[]
+
   @@index([stage])
   @@index([channel])
   @@index([createdAt])
+}
+
+// Записи на демо-встречу (Staffix sales)
+model DemoBooking {
+  id                String    @id @default(cuid())
+
+  // Связь с лидом
+  salesLeadId       String
+  salesLead         SalesLead @relation(fields: [salesLeadId], references: [id], onDelete: Cascade)
+
+  // Контакты лида
+  contactName       String
+  contactPhone      String?
+  contactTelegram   String?
+  contactWhatsapp   String?
+  businessName      String?
+  businessType      String?
+  businessAddress   String?
+
+  // Расписание
+  scheduledAt       DateTime              // дата и время демо
+  duration          Int       @default(60) // минут
+  status            String    @default("scheduled") // scheduled, confirmed, completed, cancelled, no_show
+
+  // Заметки
+  notes             String?
+  cancelReason      String?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([scheduledAt])
+  @@index([status])
 }
 
 // ========================================
