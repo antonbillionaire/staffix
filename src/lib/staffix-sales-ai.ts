@@ -215,6 +215,26 @@ async function getOrCreateLead(
   name?: string,
   phone?: string
 ) {
+  // Telegram uses BigInt telegramChatId
+  if (channel === "telegram") {
+    let lead = await prisma.salesLead.findUnique({
+      where: { telegramChatId: BigInt(channelId) },
+    });
+    if (!lead) {
+      lead = await prisma.salesLead.create({
+        data: {
+          channel: "telegram",
+          telegramChatId: BigInt(channelId),
+          name: name || null,
+          phone: phone || null,
+          stage: "new",
+          history: [],
+        },
+      });
+    }
+    return lead;
+  }
+
   const channelField =
     channel === "whatsapp" ? "whatsappPhone" :
     channel === "facebook" ? "fbPsid" :

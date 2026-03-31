@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
-import { getSalesSystemPrompt } from "@/lib/sales-bot/system-prompt";
+import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 // Telegram types
@@ -189,84 +188,7 @@ async function updateLeadStage(
   }
 }
 
-// Generate AI response
-async function generateAIResponse(
-  userMessage: string,
-  chatId: number,
-  userName: string
-): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return "Извините, сервис временно недоступен. Пожалуйста, посетите https://staffix.io";
-  }
-
-  try {
-    const anthropic = new Anthropic({ apiKey });
-
-    // Get conversation history from DB (persisted across restarts)
-    let history = await getLeadHistory(chatId);
-
-    // Keep last 20 messages for context
-    if (history.length > 20) {
-      history = history.slice(-20);
-    }
-
-    // Add user message
-    history.push({ role: "user", content: userMessage });
-
-    const systemPrompt =
-      getSalesSystemPrompt() +
-      `\n\nТекущий собеседник: ${userName} (Telegram chat ID: ${chatId})`;
-
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250929",
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: history,
-    });
-
-    const assistantMessage =
-      response.content[0].type === "text"
-        ? response.content[0].text
-        : "Извините, не могу обработать ваш запрос.";
-
-    // Add assistant response to history and persist to DB
-    history.push({ role: "assistant", content: assistantMessage });
-    await saveLeadHistory(chatId, history);
-
-    // Detect lead stage transitions based on AI response content
-    const lowerMsg = (userMessage + " " + assistantMessage).toLowerCase();
-    if (
-      lowerMsg.includes("попробовать") ||
-      lowerMsg.includes("пробный") ||
-      lowerMsg.includes("бесплатн") ||
-      lowerMsg.includes("trial") ||
-      lowerMsg.includes("зарегистрир")
-    ) {
-      await updateLeadStage(chatId, "interested");
-    }
-    if (
-      lowerMsg.includes("staffix.io") &&
-      (lowerMsg.includes("перейду") ||
-        lowerMsg.includes("посмотрю") ||
-        lowerMsg.includes("зайду"))
-    ) {
-      await updateLeadStage(chatId, "trial_started");
-      // Notify admin about hot lead
-      await notifyAdmin(
-        `🔥 <b>Горячий лид!</b>\n\n` +
-          `<b>Имя:</b> ${userName}\n` +
-          `<b>Chat ID:</b> ${chatId}\n` +
-          `<b>Статус:</b> Переходит на staffix.io для регистрации`
-      );
-    }
-
-    return assistantMessage;
-  } catch (error) {
-    console.error("Sales bot: Error generating AI response:", error);
-    return "Произошла ошибка. Пожалуйста, попробуйте позже или посетите https://staffix.io";
-  }
-}
+// generateAIResponse replaced by generateStaffixSalesResponse (with tool support)
 
 // Webhook handler
 export async function POST(request: NextRequest) {
@@ -458,8 +380,13 @@ export async function POST(request: NextRequest) {
     // Show typing indicator
     await sendTypingAction(chatId);
 
-    // Generate AI response
-    const aiResponse = await generateAIResponse(userMessage, chatId, userName);
+    // Generate AI response (with tool support: schedule_demo, notify_owner)
+    const aiResponse = await generateStaffixSalesResponse(
+      "telegram",
+      String(chatId),
+      userMessage,
+      userName
+    );
 
     // Send response
     await sendTelegramMessage(chatId, aiResponse);
