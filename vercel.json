@@ -1,5 +1,5 @@
 {
-  "buildCommand": "prisma generate && prisma migrate resolve --applied 0_init || true && prisma migrate deploy && next build",
+  "buildCommand": "prisma generate && (prisma migrate resolve --applied 0_init || true) && (prisma migrate resolve --rolled-back 20260331_fix_booking_relations || true) && prisma migrate deploy && next build",
   "installCommand": "npm install",
   "trailingSlash": false,
   "redirects": [
