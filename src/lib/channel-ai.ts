@@ -80,6 +80,7 @@ async function loadBusinessProfile(businessId: string) {
     select: {
       name: true,
       businessType: true,
+      dashboardMode: true,
       phone: true,
       address: true,
       workingHours: true,
@@ -276,14 +277,22 @@ async function handleChannelToolCall(
       }
 
       case "get_my_bookings": {
-        // Channel clients use string clientId, convert for Telegram-based booking lookup
-        const bookings = await getClientBookings(businessId, BigInt(clientId));
-        return JSON.stringify(bookings);
+        // Channel clients use string clientId, convert for booking lookup
+        try {
+          const bookings = await getClientBookings(businessId, BigInt(clientId));
+          return JSON.stringify(bookings);
+        } catch {
+          return JSON.stringify({ bookings: [], message: "Бронирования не найдены" });
+        }
       }
 
       case "cancel_booking": {
-        const result = await cancelBooking(toolInput.booking_id, BigInt(clientId));
-        return JSON.stringify(result);
+        try {
+          const result = await cancelBooking(toolInput.booking_id, BigInt(clientId));
+          return JSON.stringify(result);
+        } catch {
+          return JSON.stringify({ success: false, error: "Не удалось отменить бронирование" });
+        }
       }
 
       case "search_products": {
@@ -414,7 +423,8 @@ export async function generateChannelAIResponse(
     ];
 
     // Select tools based on business type
-    const isStoreBusiness = biz.businessType === "store" || biz.businessType === "shop" || biz.businessType === "sales";
+    const storeTypes = ["store", "shop", "sales", "delivery", "restaurant", "cafe", "flowers", "bakery", "pharmacy"];
+    const isStoreBusiness = storeTypes.includes(biz.businessType || "") || (biz.dashboardMode === "sales");
     const tools = isStoreBusiness ? channelSalesTools : channelBookingTools;
 
     // Call Claude with appropriate tools (with retry on overload)

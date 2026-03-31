@@ -520,6 +520,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "dashboard.statsAfterActivation": "Статистика появится после активации AI-сотрудника",
     "dashboard.online": "Онлайн",
     "dashboard.offline": "Офлайн",
+    "dashboard.paymentSuccess": "Оплата прошла успешно!",
+    "dashboard.paymentSuccessDesc": "Ваша подписка активирована. Спасибо за покупку!",
 
     // Automation Page
     "automation.description": "Настройте автоматические напоминания, сбор отзывов и реактивацию клиентов",
@@ -2186,6 +2188,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "dashboard.statsAfterActivation": "Statistics will appear after AI employee activation",
     "dashboard.online": "Online",
     "dashboard.offline": "Offline",
+    "dashboard.paymentSuccess": "Payment successful!",
+    "dashboard.paymentSuccessDesc": "Your subscription is now active. Thank you for your purchase!",
 
     // Automation Page
     "automation.description": "Set up automatic reminders, review collection, and customer reactivation",
@@ -3852,6 +3856,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "dashboard.statsAfterActivation": "AI xodim faollashtirilgandan keyin statistika paydo bo'ladi",
     "dashboard.online": "Onlayn",
     "dashboard.offline": "Oflayn",
+    "dashboard.paymentSuccess": "To'lov muvaffaqiyatli o'tdi!",
+    "dashboard.paymentSuccessDesc": "Obunangiz faollashtirildi. Xaridingiz uchun rahmat!",
 
     // Automation Page
     "automation.description": "Avtomatik eslatmalar, sharhlar yig'ish va mijozlarni qaytarishni sozlang",
@@ -5516,6 +5522,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "dashboard.statsAfterActivation": "AI қызметкер іске қосылғаннан кейін статистика пайда болады",
     "dashboard.online": "Онлайн",
     "dashboard.offline": "Офлайн",
+    "dashboard.paymentSuccess": "Төлем сәтті өтті!",
+    "dashboard.paymentSuccessDesc": "Жазылымыңыз белсендірілді. Сатып алғаныңыз үшін рахмет!",
 
     // Automation Page
     "automation.description": "Автоматты еске салуларды, пікірлер жинауды және клиенттерді қайтаруды баптаңыз",

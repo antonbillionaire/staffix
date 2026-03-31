@@ -74,6 +74,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Нет данных CSV" }, { status: 400 });
     }
 
+    // Size limit: 5MB
+    if (csvText.length > 5 * 1024 * 1024) {
+      return NextResponse.json({ error: "Файл слишком большой. Максимум 5 МБ" }, { status: 400 });
+    }
+
     const rows = parseCsv(csvText);
     if (rows.length === 0) {
       return NextResponse.json({ error: "Файл пустой" }, { status: 400 });
@@ -129,6 +134,11 @@ export async function POST(request: NextRequest) {
 
     if (dataRows.length === 0) {
       return NextResponse.json({ error: "Нет строк с данными" }, { status: 400 });
+    }
+
+    // Row limit: max 10000
+    if (dataRows.length > 10000) {
+      return NextResponse.json({ error: `Слишком много строк: ${dataRows.length}. Максимум 10 000` }, { status: 400 });
     }
 
     // Preview mode: return column mapping + sample rows without importing

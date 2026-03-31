@@ -26,10 +26,10 @@ export async function markWebhookProcessed(messageId: string): Promise<boolean> 
 
 /**
  * Clean up old dedup entries (call from cron job).
- * Removes entries older than 24 hours.
+ * Removes entries older than 48 hours.
  */
 export async function cleanupWebhookDedup(): Promise<number> {
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
   const result = await prisma.webhookDedup.deleteMany({
     where: { processedAt: { lt: cutoff } },
   });

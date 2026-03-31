@@ -36,9 +36,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (password.length < 8) {
+    if (password.length < 10) {
       return NextResponse.json(
-        { error: "Пароль должен быть минимум 8 символов" },
+        { error: "Пароль должен быть минимум 10 символов и содержать хотя бы одну букву и одну цифру" },
+        { status: 400 }
+      );
+    }
+
+    if (!/[a-zA-Zа-яА-ЯёЁ]/.test(password) || !/\d/.test(password)) {
+      return NextResponse.json(
+        { error: "Пароль должен содержать хотя бы одну букву и одну цифру" },
         { status: 400 }
       );
     }

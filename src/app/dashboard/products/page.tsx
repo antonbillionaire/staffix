@@ -43,6 +43,7 @@ export default function ProductsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [saveError, setSaveError] = useState("");
 
   // CSV Import state
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -91,11 +92,13 @@ export default function ProductsPage() {
   const openCreate = () => {
     setEditingProduct(null);
     setForm(EMPTY_FORM);
+    setSaveError("");
     setIsModalOpen(true);
   };
 
   const openEdit = (p: Product) => {
     setEditingProduct(p);
+    setSaveError("");
     setForm({
       name: p.name,
       description: p.description || "",
@@ -139,10 +142,11 @@ export default function ProductsPage() {
 
       if (res.ok) {
         setIsModalOpen(false);
+        setSaveError("");
         fetchProducts();
       } else {
         const data = await res.json();
-        alert(data.error || t("products.saveError"));
+        setSaveError(data.error || t("products.saveError"));
       }
     } finally {
       setSaving(false);
@@ -478,6 +482,11 @@ export default function ProductsPage() {
             </div>
 
             <div className="p-5 space-y-4">
+              {saveError && (
+                <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg text-sm">
+                  {saveError}
+                </div>
+              )}
               {/* Название */}
               <div>
                 <label className={`block text-sm font-medium mb-1 ${text}`}>

@@ -154,7 +154,7 @@ export default function StatisticsPage() {
               className={`flex items-center gap-2 px-4 py-2 ${cardBg} border ${borderColor} rounded-lg text-sm font-medium ${textSecondary} hover:text-blue-500 transition-colors`}
             >
               <Users className="h-4 w-4" />
-              Мастера
+              {t("nav.myTeam")}
             </Link>
           )}
 

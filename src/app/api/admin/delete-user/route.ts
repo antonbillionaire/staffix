@@ -27,9 +27,20 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const email = req.nextUrl.searchParams.get("email");
+  let body: { confirm?: boolean; email?: string } = {};
+  try {
+    body = await req.json();
+  } catch {
+    // Fall back to query params for email
+  }
+
+  const email = body.email || req.nextUrl.searchParams.get("email");
   if (!email) {
     return NextResponse.json({ error: "Email required" }, { status: 400 });
+  }
+
+  if (body.confirm !== true) {
+    return NextResponse.json({ error: "Confirmation required. Send { confirm: true, email } in request body." }, { status: 400 });
   }
 
   try {

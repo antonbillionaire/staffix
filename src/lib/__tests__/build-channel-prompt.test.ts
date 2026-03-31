@@ -6,6 +6,7 @@ function makeBiz(overrides: Record<string, unknown> = {}) {
   return {
     name: "Test Salon",
     businessType: "salon",
+    dashboardMode: "service",
     phone: "+998901234567",
     address: "ул. Тестовая, 1",
     workingHours: "09:00-18:00",

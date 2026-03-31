@@ -101,7 +101,7 @@ export default function DashboardPage() {
             });
           }
         }
-      } catch {}
+      } catch (err) { console.error("Failed to fetch business:", err); }
       finally { setLoading(false); }
     };
     fetchBiz();
@@ -116,7 +116,7 @@ export default function DashboardPage() {
           const data = await res.json();
           setStatsData(data);
         }
-      } catch {}
+      } catch (err) { console.error("Failed to fetch dashboard stats:", err); }
       finally { setStatsLoading(false); }
     };
     fetchStats();
@@ -192,8 +192,8 @@ export default function DashboardPage() {
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 flex items-center gap-3">
           <CheckCircle2 className="h-6 w-6 text-green-400 flex-shrink-0" />
           <div>
-            <p className="text-green-400 font-semibold">Оплата прошла успешно!</p>
-            <p className={`text-sm ${textSecondary}`}>Ваша подписка активирована. Спасибо за покупку!</p>
+            <p className="text-green-400 font-semibold">{t("dashboard.paymentSuccess")}</p>
+            <p className={`text-sm ${textSecondary}`}>{t("dashboard.paymentSuccessDesc")}</p>
           </div>
           <button onClick={() => setShowPaymentSuccess(false)} className="ml-auto text-gray-400 hover:text-white">
             &times;

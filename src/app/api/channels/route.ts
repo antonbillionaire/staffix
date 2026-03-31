@@ -25,10 +25,8 @@ export async function GET() {
           select: {
             id: true,
             botActive: true,
-            botToken: true,
             botUsername: true,
             fbPageId: true,
-            fbPageAccessToken: true,
             fbActive: true,
             igBusinessAccountId: true,
             igUsername: true,
@@ -56,13 +54,13 @@ export async function GET() {
       {
         channel: "telegram",
         isConnected: biz.botActive || false,
-        isVerified: !!biz.botToken,
+        isVerified: biz.botActive || false,
         details: { username: biz.botUsername },
       },
       {
         channel: "facebook",
         isConnected: biz.fbActive || false,
-        isVerified: !!biz.fbPageAccessToken,
+        isVerified: !!biz.fbPageId,
         details: { pageId: biz.fbPageId },
         tokenWarning: biz.fbActive && tokenWarning,
       },

@@ -302,10 +302,10 @@ model Booking {
   business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   serviceId     String?
-  service       Service?  @relation(fields: [serviceId], references: [id])
+  service       Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
 
   staffId       String?
-  staff         Staff?    @relation(fields: [staffId], references: [id])
+  staff         Staff?    @relation(fields: [staffId], references: [id], onDelete: SetNull)
 
   // Автоматизации
   reminders     ScheduledReminder[]
@@ -315,6 +315,8 @@ model Booking {
 
   @@index([businessId])
   @@index([businessId, date])
+  @@index([staffId, date])
+  @@index([businessId, clientTelegramId, date])
 }
 
 // Диалоги с клиентами
