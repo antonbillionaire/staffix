@@ -89,10 +89,15 @@ function sleep(ms: number) {
 }
 
 export async function POST(request: NextRequest) {
-  // Admin only
-  const session = await auth();
-  if (!session?.user?.email || !isAdmin(session.user.email)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Auth: admin session OR CRON_SECRET header
+  const authHeader = request.headers.get("authorization");
+  if (authHeader === `Bearer ${process.env.CRON_SECRET}`) {
+    // OK — authenticated via secret
+  } else {
+    const session = await auth();
+    if (!session?.user?.email || !isAdmin(session.user.email)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
   const resendKey = process.env.RESEND_API_KEY;
