@@ -10,7 +10,7 @@ ALTER TABLE "Booking" ADD CONSTRAINT "Booking_staffId_fkey"
   FOREIGN KEY ("staffId") REFERENCES "Staff"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- Fix #16: Add index on (staffId, date) in Booking
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "Booking_staffId_date_idx" ON "Booking"("staffId", "date");
+CREATE INDEX IF NOT EXISTS "Booking_staffId_date_idx" ON "Booking"("staffId", "date");
 
 -- Fix #17: Add index on (businessId, clientTelegramId, date) in Booking
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "Booking_businessId_clientTelegramId_date_idx" ON "Booking"("businessId", "clientTelegramId", "date");
+CREATE INDEX IF NOT EXISTS "Booking_businessId_clientTelegramId_date_idx" ON "Booking"("businessId", "clientTelegramId", "date");
