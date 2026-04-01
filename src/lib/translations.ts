@@ -1678,6 +1678,23 @@ export const translations: Record<Language, Record<string, string>> = {
     "support.faqWhatsappNotWorkingAnswer": "Проверьте:\n✅ Тоггл «Активировать WhatsApp» включён\n✅ Phone Number ID — только цифры, 16-17 знаков\n✅ Access Token начинается с EAAA... и не истёк (временный токен живёт 24 часа — создайте постоянный через System Users в Meta Business)\n✅ Verify Token в Staffix совпадает с тем что вы вводили в Meta\n✅ В Meta Developers → WhatsApp → Configuration — Webhook зелёный (активен)\n✅ В подписках Webhook выбрано событие messages\n\nЕсли всё верно, но не работает — напишите нам с скриншотом страницы Configuration.",
     "support.faqWhatsappToken": "Где взять постоянный Access Token для WhatsApp?",
     "support.faqWhatsappTokenAnswer": "Временный токен истекает через 24 часа. Постоянный:\n1. business.facebook.com → Настройки → Системные пользователи\n2. Добавить системного пользователя → роль Admin\n3. Создать токен → выберите приложение Staffix AI\n4. Разрешения: whatsapp_business_messaging + whatsapp_business_management\n5. Создать токен → скопируйте\n6. Вставьте в Staffix → Бот → WhatsApp → Access Token → Сохранить\n\nЭтот токен бессрочный.",
+
+    // AI Learning
+    "nav.aiLearning": "AI Обучение",
+    "aiLearning.title": "AI Обучение",
+    "aiLearning.corrections": "Коррекции",
+    "aiLearning.insights": "Инсайты",
+    "aiLearning.clientProfiles": "Профили клиентов",
+    "aiLearning.noCorrections": "Пока нет коррекций",
+    "aiLearning.noInsights": "Пока нет инсайтов",
+    "aiLearning.usedTimes": "Использовано {count} раз",
+    "aiLearning.statusNew": "Новые",
+    "aiLearning.statusAccepted": "Принятые",
+    "aiLearning.statusDismissed": "Отклонённые",
+    "aiLearning.accept": "Принять",
+    "aiLearning.dismiss": "Отклонить",
+    "aiLearning.clientProfilesInfo": "Профили клиентов создаются автоматически",
+    "aiLearning.clientProfilesDesc": "Профили клиентов формируются автоматически из переписок. Просмотрите детали клиентов в разделе Клиенты.",
   },
 
   en: {
@@ -3346,6 +3363,23 @@ export const translations: Record<Language, Record<string, string>> = {
     "support.faqWhatsappNotWorkingAnswer": "Check:\n✅ 'Activate WhatsApp' toggle is on\n✅ Phone Number ID — digits only, 16-17 characters\n✅ Access Token starts with EAAA... and hasn't expired (temporary token lasts 24 hours — create a permanent one via System Users in Meta Business)\n✅ Verify Token in Staffix matches what you entered in Meta\n✅ In Meta Developers → WhatsApp → Configuration — Webhook is green (active)\n✅ In Webhook subscriptions, messages event is selected\n\nIf everything is correct but it doesn't work — contact us with a screenshot of the Configuration page.",
     "support.faqWhatsappToken": "Where to get a permanent Access Token for WhatsApp?",
     "support.faqWhatsappTokenAnswer": "Temporary token expires in 24 hours. Permanent:\n1. business.facebook.com → Settings → System Users\n2. Add system user → Admin role\n3. Generate token → select Staffix AI app\n4. Permissions: whatsapp_business_messaging + whatsapp_business_management\n5. Generate token → copy\n6. Paste in Staffix → Bot → WhatsApp → Access Token → Save\n\nThis token is permanent.",
+
+    // AI Learning
+    "nav.aiLearning": "AI Learning",
+    "aiLearning.title": "AI Learning",
+    "aiLearning.corrections": "Corrections",
+    "aiLearning.insights": "Insights",
+    "aiLearning.clientProfiles": "Client Profiles",
+    "aiLearning.noCorrections": "No corrections yet",
+    "aiLearning.noInsights": "No insights yet",
+    "aiLearning.usedTimes": "Used {count} times",
+    "aiLearning.statusNew": "New",
+    "aiLearning.statusAccepted": "Accepted",
+    "aiLearning.statusDismissed": "Dismissed",
+    "aiLearning.accept": "Accept",
+    "aiLearning.dismiss": "Dismiss",
+    "aiLearning.clientProfilesInfo": "Client profiles are built automatically",
+    "aiLearning.clientProfilesDesc": "Client profiles are built automatically from conversations. View client details in the Customers section.",
   },
 
   uz: {
@@ -5012,6 +5046,23 @@ export const translations: Record<Language, Record<string, string>> = {
     "support.faqWhatsappNotWorkingAnswer": "Tekshiring:\n✅ «WhatsApp faollashtirish» tugmasi yoqilgan\n✅ Phone Number ID — faqat raqamlar, 16-17 belgi\n✅ Access Token EAAA... bilan boshlanadi va muddati o'tmagan\n✅ Verify Token Staffix da Meta dagi bilan mos keladi\n✅ Meta Developers → WhatsApp → Configuration — Webhook yashil (faol)\n✅ Webhook obunalarida messages hodisasi tanlangan\n\nHammasi to'g'ri bo'lsa ham ishlamayotgan bo'lsa — Configuration sahifasi skrinshotini yuboring.",
     "support.faqWhatsappToken": "WhatsApp uchun doimiy Access Token ni qayerdan olish?",
     "support.faqWhatsappTokenAnswer": "Vaqtinchalik token 24 soatda tugaydi. Doimiy:\n1. business.facebook.com → Sozlamalar → Tizim foydalanuvchilari\n2. Tizim foydalanuvchisi qo'shing → Admin roli\n3. Token yaratish → Staffix AI ilovasini tanlang\n4. Ruxsatlar: whatsapp_business_messaging + whatsapp_business_management\n5. Token yaratish → nusxalang\n6. Staffix → Bot → WhatsApp → Access Token ga qo'ying → Saqlash\n\nBu token muddatsiz.",
+
+    // AI Learning
+    "nav.aiLearning": "AI O'rganish",
+    "aiLearning.title": "AI O'rganish",
+    "aiLearning.corrections": "Tuzatishlar",
+    "aiLearning.insights": "Tavsiyalar",
+    "aiLearning.clientProfiles": "Mijozlar profili",
+    "aiLearning.noCorrections": "Hali tuzatishlar yo'q",
+    "aiLearning.noInsights": "Hali tavsiyalar yo'q",
+    "aiLearning.usedTimes": "{count} marta ishlatilgan",
+    "aiLearning.statusNew": "Yangi",
+    "aiLearning.statusAccepted": "Qabul qilingan",
+    "aiLearning.statusDismissed": "Rad etilgan",
+    "aiLearning.accept": "Qabul qilish",
+    "aiLearning.dismiss": "Rad etish",
+    "aiLearning.clientProfilesInfo": "Mijozlar profili avtomatik yaratiladi",
+    "aiLearning.clientProfilesDesc": "Mijozlar profili yozishmalardan avtomatik shakllanadi. Mijozlar tafsilotlarini Mijozlar bo'limida ko'ring.",
   },
 
   kz: {
@@ -6678,5 +6729,22 @@ export const translations: Record<Language, Record<string, string>> = {
     "support.faqWhatsappNotWorkingAnswer": "Тексеріңіз:\n✅ «WhatsApp іске қосу» батырмасы қосылған\n✅ Phone Number ID — тек цифрлар, 16-17 таңба\n✅ Access Token EAAA... басталады және мерзімі өтпеген\n✅ Verify Token Staffix-те Meta-дағымен сәйкес келеді\n✅ Meta Developers → WhatsApp → Configuration — Webhook жасыл (белсенді)\n✅ Webhook жазылымдарында messages оқиғасы таңдалған\n\nБарлығы дұрыс болса да жұмыс істемесе — Configuration бетінің скриншотын жіберіңіз.",
     "support.faqWhatsappToken": "WhatsApp үшін тұрақты Access Token қайдан алу?",
     "support.faqWhatsappTokenAnswer": "Уақытша токен 24 сағатта аяқталады. Тұрақты:\n1. business.facebook.com → Баптаулар → Жүйелік пайдаланушылар\n2. Жүйелік пайдаланушы қосыңыз → Admin рөлі\n3. Токен жасау → Staffix AI қолданбасын таңдаңыз\n4. Рұқсаттар: whatsapp_business_messaging + whatsapp_business_management\n5. Токен жасау → көшіріңіз\n6. Staffix → Бот → WhatsApp → Access Token-ға қойыңыз → Сақтау\n\nБұл токен мерзімсіз.",
+
+    // AI Learning
+    "nav.aiLearning": "AI Oqytu",
+    "aiLearning.title": "AI Oqytu",
+    "aiLearning.corrections": "Түзетулер",
+    "aiLearning.insights": "Ұсыныстар",
+    "aiLearning.clientProfiles": "Клиент профильдері",
+    "aiLearning.noCorrections": "Әлі түзетулер жоқ",
+    "aiLearning.noInsights": "Әлі ұсыныстар жоқ",
+    "aiLearning.usedTimes": "{count} рет қолданылды",
+    "aiLearning.statusNew": "Жаңа",
+    "aiLearning.statusAccepted": "Қабылданған",
+    "aiLearning.statusDismissed": "Қабылданбаған",
+    "aiLearning.accept": "Қабылдау",
+    "aiLearning.dismiss": "Қабылдамау",
+    "aiLearning.clientProfilesInfo": "Клиент профильдері автоматты құрылады",
+    "aiLearning.clientProfilesDesc": "Клиент профильдері жазысулардан автоматты қалыптасады. Клиент мәліметтерін Клиенттер бөлімінде қараңыз.",
   },
 };

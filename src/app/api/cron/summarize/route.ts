@@ -104,6 +104,54 @@ export async function GET(request: Request) {
       }
     }
 
+    // 5. Channel conversations (WhatsApp/Instagram/Facebook) needing summary
+    try {
+      const channelConvs = await prisma.channelConversation.findMany({
+        where: { needsSummary: true },
+        select: { id: true },
+        take: MAX_CONVERSATIONS,
+      });
+
+      if (channelConvs.length > 0) {
+        const { generateChannelConversationSummary, updateChannelClientSummary } = await import("@/lib/channel-memory");
+
+        for (const conv of channelConvs) {
+          try {
+            await generateChannelConversationSummary(conv.id);
+            results.conversationsSummarized++;
+          } catch (error) {
+            results.errors.push(`ChannelConv ${conv.id}: ${error}`);
+          }
+        }
+      }
+
+      // 6. Channel clients needing summary update
+      const channelClients = await prisma.channelClient.findMany({
+        where: {
+          aiSummary: null,
+          totalMessages: { gte: 5 },
+        },
+        select: { id: true },
+        take: MAX_CLIENTS,
+      });
+
+      if (channelClients.length > 0) {
+        const { updateChannelClientSummary } = await import("@/lib/channel-memory");
+
+        for (const client of channelClients) {
+          try {
+            await updateChannelClientSummary(client.id);
+            results.clientsUpdated++;
+          } catch (error) {
+            results.errors.push(`ChannelClient ${client.id}: ${error}`);
+          }
+        }
+      }
+    } catch (channelErr) {
+      console.error("Channel summarization error:", channelErr);
+      results.errors.push(`Channel: ${channelErr}`);
+    }
+
     return NextResponse.json({
       success: true,
       ...results,

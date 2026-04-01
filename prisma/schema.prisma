@@ -197,6 +197,10 @@ model Business {
   channelMessages      ChannelMessage[]
   leads                Lead[]
 
+  // AI Learning
+  botCorrections     BotCorrection[]
+  aiInsightRecords   AiInsight[]
+
   // Программы лояльности (может быть несколько типов)
   loyaltyPrograms    LoyaltyProgram[]
 
@@ -832,6 +836,15 @@ model ChannelClient {
   notes                 String?
   customFields          Json?
 
+  // AI Memory — профиль клиента
+  aiSummary             String?   @db.Text    // AI-generated: "Постоянный клиент, предпочитает массаж, приходит каждые 2 недели"
+  preferences           Json?                  // { preferredServices: [...], preferredTime: "morning", allergies: [...] }
+  importantNotes        String?   @db.Text    // "VIP", "аллергия на аммиак", "всегда опаздывает на 10 мин"
+  communicationStyle    String?               // formal, friendly, casual (auto-detected)
+  totalVisits           Int       @default(0)
+  lastVisitDate         DateTime?
+  summaryUpdatedAt      DateTime?
+
   businessId            String
   business              Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
@@ -1106,6 +1119,13 @@ model ChannelConversation {
   history      Json      @default("[]")
   messageCount Int       @default(0)
 
+  // AI Memory — summary и метаданные разговора
+  summary       String?   @db.Text    // AI-generated summary каждые 10 сообщений
+  topic         String?               // booking, inquiry, complaint, feedback, order, other
+  outcome       String?               // booked, answered, escalated, unresolved, ordered
+  needsSummary  Boolean   @default(false)
+  extractedInfo Json?                 // { clientNotes: [...], detectedPreferences: [...] }
+
   businessId   String
   business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
@@ -1114,6 +1134,53 @@ model ChannelConversation {
 
   @@unique([businessId, channel, clientId])
   @@index([businessId, channel])
+  @@index([needsSummary])
+}
+
+// ========================================
+// AI LEARNING — коррекции и инсайты
+// ========================================
+
+// Коррекции бота — владелец исправляет ответы, они становятся правилами
+model BotCorrection {
+  id                String    @id @default(cuid())
+
+  originalQuestion  String    @db.Text   // вопрос клиента
+  wrongAnswer       String    @db.Text   // неправильный ответ бота
+  correctAnswer     String    @db.Text   // правильный ответ от владельца
+
+  scope             String    @default("global") // global = для всех, client = для конкретного клиента
+  keywords          String[]  @default([])       // ключевые слова для матчинга
+  isActive          Boolean   @default(true)
+  usageCount        Int       @default(0)        // сколько раз применялось
+
+  businessId        String
+  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([businessId, isActive])
+}
+
+// AI-инсайты — паттерны которые бот обнаружил и предлагает владельцу
+model AiInsight {
+  id                String    @id @default(cuid())
+
+  type              String    // faq_suggestion, popular_question, client_pattern, improvement
+  title             String    // краткое описание
+  description       String    @db.Text  // подробное описание
+  data              Json?     // доп данные: { question: "...", frequency: 5 }
+
+  status            String    @default("new") // new, accepted, dismissed
+
+  businessId        String
+  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([businessId, status])
 }
 
 // ========================================

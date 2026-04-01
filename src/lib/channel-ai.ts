@@ -33,10 +33,34 @@ type HistoryMessage = { role: "user" | "assistant"; content: string };
 
 // Channel booking tools — subset of full booking tools + lead qualification
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const channelBookingTools: any[] = bookingToolDefinitions.filter(
-  (t: { name: string }) =>
-    ["check_availability", "create_booking", "get_services", "get_staff", "update_lead_status", "get_my_bookings", "cancel_booking", "notify_manager", "search_products"].includes(t.name)
-);
+// AI Learning: tool for saving client notes
+const saveClientNoteTool = {
+  name: "save_client_note",
+  description: "Сохранить важную заметку о клиенте (предпочтение, аллергия, важная деталь). Используй когда узнаёшь что-то важное о клиенте в разговоре.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      note_type: {
+        type: "string",
+        enum: ["preference", "allergy", "important", "style"],
+        description: "Тип заметки: preference=предпочтение, allergy=аллергия/противопоказание, important=важная информация, style=стиль общения",
+      },
+      content: {
+        type: "string",
+        description: "Содержание заметки",
+      },
+    },
+    required: ["note_type", "content"],
+  },
+};
+
+const channelBookingTools: any[] = [
+  ...bookingToolDefinitions.filter(
+    (t: { name: string }) =>
+      ["check_availability", "create_booking", "get_services", "get_staff", "update_lead_status", "get_my_bookings", "cancel_booking", "notify_manager", "search_products"].includes(t.name)
+  ),
+  saveClientNoteTool,
+];
 
 // Channel sales tools — for store/shop businesses (create_order, get_client_orders + shared tools)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -49,6 +73,7 @@ const channelSalesTools: any[] = [
     (t: { name: string }) =>
       ["update_lead_status", "notify_manager"].includes(t.name)
   ),
+  saveClientNoteTool,
 ];
 
 /**
@@ -209,6 +234,8 @@ export function buildChannelSystemPrompt(
 
 Если клиент спрашивает о товаре, которого нет в списке выше, или если нужно найти товар по ключевому слову или категории — используй инструмент search_products. Он ищет по всей базе товаров (не только по тем, что в списке выше).
 
+Если в разговоре узнаёшь что-то важное о клиенте (предпочтения, аллергии, важные детали, стиль общения) — вызови save_client_note чтобы запомнить это. Делай это тихо, не сообщай клиенту.
+
 Отвечай на языке клиента (русский, узбекский, казахский, английский).`;
 
   const today = new Date().toISOString().split("T")[0];
@@ -360,6 +387,16 @@ async function handleChannelToolCall(
         return JSON.stringify({ success: true, message: "Менеджер уведомлён" });
       }
 
+      case "save_client_note": {
+        try {
+          const { saveClientNote } = await import("@/lib/channel-memory");
+          await saveClientNote(businessId, channel, clientId, toolInput.note_type, toolInput.content);
+          return JSON.stringify({ success: true, message: "Заметка сохранена" });
+        } catch {
+          return JSON.stringify({ success: false, error: "Не удалось сохранить заметку" });
+        }
+      }
+
       default:
         return JSON.stringify({ error: `Unknown tool: ${toolName}` });
     }
@@ -405,7 +442,24 @@ export async function generateChannelAIResponse(
       },
     }).catch((e) => console.error("[CRM] message_received dispatch error:", e));
 
-    const systemPrompt = buildChannelSystemPrompt(biz, channel);
+    let systemPrompt = buildChannelSystemPrompt(biz, channel);
+
+    // AI Learning: load client context and corrections (non-blocking on failure)
+    try {
+      const { buildChannelClientContext, buildClientContextBlock, loadActiveCorrections } = await import("@/lib/channel-memory");
+      const [clientContext, corrections] = await Promise.all([
+        buildChannelClientContext(businessId, channel, clientId).catch(() => null),
+        loadActiveCorrections(businessId).catch(() => ""),
+      ]);
+      if (clientContext) {
+        systemPrompt += "\n\n" + buildClientContextBlock(clientContext);
+      }
+      if (corrections) {
+        systemPrompt += "\n\n" + corrections;
+      }
+    } catch (memErr) {
+      console.error("[Channel AI] Memory load error (non-fatal):", memErr);
+    }
 
     // Parse existing history — strip any "— staffix.io" signatures so Claude doesn't copy them
     const history = ((conv.history as HistoryMessage[]) || []).map((m) =>
@@ -576,6 +630,14 @@ export async function generateChannelAIResponse(
         },
       });
       console.log(`[Channel AI] SAVED: conv=${conv.id}, newHistoryLen=${updatedHistory.length}`);
+
+      // AI Learning: flag for summary every 10 messages
+      if ((conv.messageCount + 1) % 10 === 0) {
+        prisma.channelConversation.update({
+          where: { id: conv.id },
+          data: { needsSummary: true },
+        }).catch(() => {});
+      }
     } catch (saveErr) {
       console.error(`[Channel AI] SAVE FAILED: conv=${conv.id}`, saveErr);
     }

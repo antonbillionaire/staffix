@@ -108,6 +108,7 @@ function buildNavConfig(isSales: boolean): NavEntry[] {
           ],
         },
         { nameKey: "nav.knowledge", href: "/dashboard/knowledge", icon: FileText },
+        { nameKey: "nav.aiLearning", href: "/dashboard/ai-learning", icon: Sparkles },
       ],
     },
     {
