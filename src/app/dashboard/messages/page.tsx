@@ -15,6 +15,8 @@ import {
   Instagram,
   Facebook,
   Send,
+  ThumbsDown,
+  X,
 } from "lucide-react";
 
 interface ConversationItem {
@@ -71,6 +73,12 @@ export default function MessagesPage() {
   const [clientName, setClientName] = useState<string | null>(null);
   const [filterChannel, setFilterChannel] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // AI Learning: correction modal
+  const [correctionMsg, setCorrectionMsg] = useState<ChatMessage | null>(null);
+  const [correctionText, setCorrectionText] = useState("");
+  const [correctionSaving, setCorrectionSaving] = useState(false);
+  const [correctionSuccess, setCorrectionSuccess] = useState(false);
 
   const isDark = theme === "dark";
   const cardBg = isDark ? "bg-[#12122a]" : "bg-white";
@@ -320,7 +328,7 @@ export default function MessagesPage() {
                   messages.map((msg) => (
                     <div
                       key={msg.id}
-                      className={`flex ${msg.role === "user" ? "justify-start" : "justify-end"}`}
+                      className={`flex group ${msg.role === "user" ? "justify-start" : "justify-end"}`}
                     >
                       <div className={`max-w-[85%] sm:max-w-[75%] flex gap-2 ${msg.role === "user" ? "" : "flex-row-reverse"}`}>
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-1 ${
@@ -349,6 +357,15 @@ export default function MessagesPage() {
                             <span className={`text-xs ${textTertiary}`}>
                               {formatTime(msg.createdAt)}
                             </span>
+                            {msg.role === "assistant" && (
+                              <button
+                                onClick={() => { setCorrectionMsg(msg); setCorrectionText(""); setCorrectionSuccess(false); }}
+                                className={`ml-2 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity ${isDark ? "hover:bg-red-500/20 text-red-400" : "hover:bg-red-50 text-red-500"}`}
+                                title="Неправильный ответ"
+                              >
+                                <ThumbsDown className="h-3 w-3" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -369,6 +386,81 @@ export default function MessagesPage() {
           )}
         </div>
       </div>
+
+      {/* AI Learning: Correction Modal */}
+      {correctionMsg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className={`w-full max-w-lg rounded-xl ${cardBg} border ${borderColor} p-6`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-lg font-semibold ${textPrimary}`}>Исправить ответ бота</h3>
+              <button onClick={() => setCorrectionMsg(null)} className={textSecondary}><X className="h-5 w-5" /></button>
+            </div>
+
+            {correctionSuccess ? (
+              <div className="text-center py-6">
+                <div className="text-green-500 text-lg font-medium mb-2">Коррекция сохранена!</div>
+                <p className={`text-sm ${textSecondary}`}>Бот учтёт это в следующих ответах.</p>
+                <button onClick={() => setCorrectionMsg(null)} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">Закрыть</button>
+              </div>
+            ) : (
+              <>
+                <div className="mb-4">
+                  <label className={`text-xs font-medium ${textSecondary} mb-1 block`}>Ответ бота (неправильный)</label>
+                  <div className={`p-3 rounded-lg text-sm line-through opacity-60 ${isDark ? "bg-red-500/10 text-red-300" : "bg-red-50 text-red-700"}`}>
+                    {correctionMsg.content.substring(0, 300)}{correctionMsg.content.length > 300 ? "..." : ""}
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <label className={`text-xs font-medium ${textSecondary} mb-1 block`}>Как нужно было ответить</label>
+                  <textarea
+                    value={correctionText}
+                    onChange={(e) => setCorrectionText(e.target.value)}
+                    placeholder="Напишите правильный ответ..."
+                    rows={4}
+                    className={`w-full p-3 rounded-lg text-sm border ${borderColor} ${isDark ? "bg-white/5 text-white" : "bg-gray-50 text-gray-900"} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  />
+                </div>
+
+                <div className="flex gap-3 justify-end">
+                  <button onClick={() => setCorrectionMsg(null)} className={`px-4 py-2 rounded-lg text-sm ${textSecondary} ${hoverBg}`}>Отмена</button>
+                  <button
+                    disabled={!correctionText.trim() || correctionSaving}
+                    onClick={async () => {
+                      setCorrectionSaving(true);
+                      try {
+                        // Find the previous user message as the "question"
+                        const msgIndex = messages.findIndex(m => m.id === correctionMsg.id);
+                        const prevUserMsg = messages.slice(0, msgIndex).reverse().find(m => m.role === "user");
+
+                        const res = await fetch("/api/corrections", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            originalQuestion: prevUserMsg?.content || "Контекст разговора",
+                            wrongAnswer: correctionMsg.content,
+                            correctAnswer: correctionText.trim(),
+                          }),
+                        });
+                        if (res.ok) {
+                          setCorrectionSuccess(true);
+                        }
+                      } catch (err) {
+                        console.error("Correction save error:", err);
+                      } finally {
+                        setCorrectionSaving(false);
+                      }
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50"
+                  >
+                    {correctionSaving ? "Сохранение..." : "Сохранить коррекцию"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
