@@ -522,6 +522,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "dashboard.offline": "Офлайн",
     "dashboard.paymentSuccess": "Оплата прошла успешно!",
     "dashboard.paymentSuccessDesc": "Ваша подписка активирована. Спасибо за покупку!",
+    "checkout.paymentError": "Ошибка создания оплаты",
+    "checkout.linkError": "Не удалось получить ссылку на оплату",
+    "checkout.processingError": "Ошибка обработки платежа",
 
     // Automation Page
     "automation.description": "Настройте автоматические напоминания, сбор отзывов и реактивацию клиентов",
@@ -2207,6 +2210,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "dashboard.offline": "Offline",
     "dashboard.paymentSuccess": "Payment successful!",
     "dashboard.paymentSuccessDesc": "Your subscription is now active. Thank you for your purchase!",
+    "checkout.paymentError": "Payment creation error",
+    "checkout.linkError": "Could not get payment link",
+    "checkout.processingError": "Payment processing error",
 
     // Automation Page
     "automation.description": "Set up automatic reminders, review collection, and customer reactivation",
@@ -3892,6 +3898,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "dashboard.offline": "Oflayn",
     "dashboard.paymentSuccess": "To'lov muvaffaqiyatli o'tdi!",
     "dashboard.paymentSuccessDesc": "Obunangiz faollashtirildi. Xaridingiz uchun rahmat!",
+    "checkout.paymentError": "To'lov yaratishda xatolik",
+    "checkout.linkError": "To'lov havolasini olib bo'lmadi",
+    "checkout.processingError": "To'lovni qayta ishlashda xatolik",
 
     // Automation Page
     "automation.description": "Avtomatik eslatmalar, sharhlar yig'ish va mijozlarni qaytarishni sozlang",
@@ -5575,6 +5584,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "dashboard.offline": "Офлайн",
     "dashboard.paymentSuccess": "Төлем сәтті өтті!",
     "dashboard.paymentSuccessDesc": "Жазылымыңыз белсендірілді. Сатып алғаныңыз үшін рахмет!",
+    "checkout.paymentError": "Төлем жасау қатесі",
+    "checkout.linkError": "Төлем сілтемесін алу мүмкін болмады",
+    "checkout.processingError": "Төлемді өңдеу қатесі",
 
     // Automation Page
     "automation.description": "Автоматты еске салуларды, пікірлер жинауды және клиенттерді қайтаруды баптаңыз",

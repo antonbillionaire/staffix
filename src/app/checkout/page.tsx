@@ -16,11 +16,13 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { PLANS, type PlanId } from "@/lib/plans";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 function CheckoutContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { status } = useSession();
+  const { t } = useLanguage();
 
   const planKey = (searchParams.get("plan") || "pro") as PlanId;
   const billing = (searchParams.get("billing") || "monthly") as "monthly" | "yearly";
@@ -63,17 +65,17 @@ function CheckoutContent() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Ошибка создания оплаты");
+        throw new Error(data.error || t("checkout.paymentError"));
       }
 
       // Redirect to PayPro Global checkout
       if (data.checkoutUrl) {
         window.location.href = data.checkoutUrl;
       } else {
-        throw new Error("Не удалось получить ссылку на оплату");
+        throw new Error(t("checkout.linkError"));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка обработки платежа");
+      setError(err instanceof Error ? err.message : t("checkout.processingError"));
       setLoading(false);
     }
   };
