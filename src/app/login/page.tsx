@@ -24,19 +24,19 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+      // Use NextAuth signIn to create proper session cookie
+      const result = await signIn("credentials", {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Ошибка входа");
+      if (result?.error) {
+        throw new Error(result.error);
       }
 
       router.push("/dashboard");
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка входа");
     } finally {
