@@ -293,6 +293,18 @@ export async function PATCH(
         return NextResponse.json({ success: true, message: "Онбординг сброшен — пользователь пройдёт его заново" });
       }
 
+      case "verify_email": {
+        await prisma.user.update({
+          where: { id },
+          data: {
+            emailVerified: true,
+            verificationToken: null,
+            verificationExpires: null,
+          },
+        });
+        return NextResponse.json({ success: true, message: "Email подтверждён вручную" });
+      }
+
       default:
         return NextResponse.json(
           { error: "Неизвестное действие" },

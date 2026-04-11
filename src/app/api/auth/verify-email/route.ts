@@ -56,8 +56,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if code matches
-    if (user.verificationToken !== code) {
+    // Check if code matches (trim whitespace from user input)
+    if (user.verificationToken !== String(code).trim()) {
       return NextResponse.json(
         { error: "Неверный код" },
         { status: 400 }
