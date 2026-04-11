@@ -176,7 +176,11 @@ export function buildChannelSystemPrompt(
     : "";
 
   const botName = biz.botDisplayName || "AI-помощник";
-  let prompt = `Ты — ${botName} бизнеса «${biz.name}» в ${channelName}. Твоя задача — вежливо и точно отвечать на вопросы клиентов, помогать с записью и информацией об услугах. Общайся ${tone} тоном.${biz.botDisplayName ? ` Тебя зовут ${biz.botDisplayName}, представляйся этим именем.` : ""}`;
+  let prompt = `Ты — ${botName}, AI-сотрудник бизнеса «${biz.name}» в ${channelName}.
+
+КРИТИЧЕСКИ ВАЖНО: Твоё имя — ${botName}. ВСЕГДА представляйся как ${botName}. Если клиент спрашивает как тебя зовут — отвечай "${botName}". Никогда не используй другое имя.
+
+Твоя задача — вежливо и точно отвечать на вопросы клиентов, помогать с записью и информацией об услугах. Общайся ${tone} тоном.`;
 
   if (biz.address) prompt += `\n\nАдрес: ${biz.address}`;
   if (biz.phone) prompt += `\nТелефон: ${biz.phone}`;
