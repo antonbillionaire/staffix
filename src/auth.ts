@@ -40,17 +40,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           throw new Error("Email и пароль обязательны");
         }
 
+        const emailLower = (credentials.email as string).toLowerCase().trim();
         const user = await prisma.user.findUnique({
+          where: { email: emailLower },
+        });
+
+        // Also try original case if lowercase not found
+        const finalUser = user || await prisma.user.findUnique({
           where: { email: credentials.email as string },
         });
 
-        if (!user || !user.password) {
+        if (!finalUser || !finalUser.password) {
           throw new Error("Неверный email или пароль");
         }
 
         const isPasswordValid = await bcrypt.compare(
           credentials.password as string,
-          user.password
+          finalUser.password
         );
 
         if (!isPasswordValid) {
@@ -58,20 +64,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
 
         // Check email verification
-        if (!user.emailVerified) {
+        if (!finalUser.emailVerified) {
           throw new Error("Пожалуйста, подтвердите email");
         }
 
         // Track last login
         prisma.user.update({
-          where: { id: user.id },
+          where: { id: finalUser.id },
           data: { lastLoginAt: new Date() },
         }).catch(() => {});
 
         return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
+          id: finalUser.id,
+          email: finalUser.email,
+          name: finalUser.name,
         };
       },
     }),
