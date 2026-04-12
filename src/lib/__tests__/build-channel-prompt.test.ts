@@ -100,7 +100,7 @@ describe("buildChannelSystemPrompt", () => {
   it("uses botDisplayName when set", () => {
     const prompt = buildChannelSystemPrompt(makeBiz({ botDisplayName: "Виктор" }), "whatsapp");
     expect(prompt).toContain("Виктор");
-    expect(prompt).toContain("Тебя зовут Виктор");
+    expect(prompt).toContain("Ты — Виктор");
   });
 
   it("uses AI-помощник when botDisplayName is null", () => {
