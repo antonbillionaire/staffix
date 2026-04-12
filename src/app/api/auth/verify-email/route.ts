@@ -14,10 +14,10 @@ export async function POST(request: NextRequest) {
   try {
     const { email, code } = await request.json();
 
-    // Rate limit: 5 attempts per 15 minutes per IP + per email
+    // Rate limit: 10 attempts per 5 minutes per IP + per email
     const ip = getClientIp(request);
-    const { allowed: ipAllowed } = await rateLimit(`verify:${ip}`, 5, 15);
-    const { allowed: emailAllowed } = email ? await rateLimit(`verify:email:${email.toLowerCase()}`, 5, 15) : { allowed: true };
+    const { allowed: ipAllowed } = await rateLimit(`verify:${ip}`, 10, 5);
+    const { allowed: emailAllowed } = email ? await rateLimit(`verify:email:${email.toLowerCase()}`, 10, 5) : { allowed: true };
     if (!ipAllowed || !emailAllowed) {
       return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
     }
@@ -29,9 +29,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find user by email
+    // Find user by email (case-insensitive)
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: email.toLowerCase().trim() },
+    }) || await prisma.user.findUnique({
+      where: { email: email.trim() },
     });
 
     if (!user) {
@@ -106,7 +108,9 @@ export async function PUT(request: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: email.toLowerCase().trim() },
+    }) || await prisma.user.findUnique({
+      where: { email: email.trim() },
     });
 
     if (!user) {
@@ -125,7 +129,7 @@ export async function PUT(request: NextRequest) {
 
     // Generate new 6-digit code
     const verificationCode = generateVerificationCode();
-    const verificationExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    const verificationExpires = new Date(Date.now() + 60 * 60 * 1000); // 60 minutes
 
     await prisma.user.update({
       where: { id: user.id },

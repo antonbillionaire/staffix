@@ -50,9 +50,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Normalize email to lowercase
+    const normalizedEmail = email.toLowerCase().trim();
+
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (existingUser) {
@@ -72,11 +75,11 @@ export async function POST(request: NextRequest) {
     const user = await prisma.user.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
         emailVerified: false,
         verificationToken: verificationCode,
-        verificationExpires: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+        verificationExpires: new Date(Date.now() + 60 * 60 * 1000), // 60 minutes
         referredByCode: referralCode,
         businesses: {
           create: {
