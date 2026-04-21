@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, X, Loader2, Package, Tag, Search, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Loader2, Package, Tag, Search, Upload, ImagePlus } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -53,6 +53,7 @@ export default function ProductsPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ message: string; errors?: string[] } | null>(null);
   const [parsingFile, setParsingFile] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Preview state
   const [previewData, setPreviewData] = useState<{
@@ -654,24 +655,75 @@ export default function ProductsPage() {
                   {t("products.imageLabel") || "Фото товара"}
                 </label>
                 <div className="flex gap-3 items-start">
-                  {form.imageUrl && (
-                    <img
-                      src={form.imageUrl}
-                      alt="Preview"
-                      className="w-16 h-16 rounded-lg object-cover border flex-shrink-0"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                    />
+                  {form.imageUrl ? (
+                    <div className="relative flex-shrink-0">
+                      <img
+                        src={form.imageUrl}
+                        alt="Preview"
+                        className="w-20 h-20 rounded-lg object-cover border"
+                        onError={(e) => { (e.target as HTMLImageElement).src = ""; }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, imageUrl: "" }))}
+                        className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className={`w-20 h-20 rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer flex-shrink-0 hover:border-blue-400 transition-colors ${isDark ? "border-gray-600 hover:bg-gray-700" : "border-gray-300 hover:bg-gray-50"}`}>
+                      {uploadingImage ? (
+                        <Loader2 className={`w-6 h-6 animate-spin ${sub}`} />
+                      ) : (
+                        <>
+                          <ImagePlus className={`w-5 h-5 ${sub}`} />
+                          <span className={`text-[10px] mt-1 ${sub}`}>Фото</span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="hidden"
+                        disabled={uploadingImage}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 5 * 1024 * 1024) {
+                            setSaveError("Файл слишком большой. Максимум 5 МБ");
+                            return;
+                          }
+                          setUploadingImage(true);
+                          setSaveError("");
+                          try {
+                            const fd = new FormData();
+                            fd.append("file", file);
+                            const res = await fetch("/api/upload/image", { method: "POST", body: fd });
+                            const data = await res.json();
+                            if (data.url) {
+                              setForm((f) => ({ ...f, imageUrl: data.url }));
+                            } else {
+                              setSaveError(data.error || "Ошибка загрузки фото");
+                            }
+                          } catch {
+                            setSaveError("Ошибка загрузки фото");
+                          } finally {
+                            setUploadingImage(false);
+                          }
+                        }}
+                      />
+                    </label>
                   )}
                   <div className="flex-1">
                     <input
                       type="url"
                       value={form.imageUrl}
                       onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
-                      placeholder={t("products.imagePlaceholder") || "https://example.com/photo.jpg"}
+                      placeholder={t("products.imagePlaceholder") || "Или вставьте ссылку на фото"}
                       className={`w-full px-3 py-2 rounded-lg border text-sm outline-none ${input}`}
                     />
                     <p className={`text-xs mt-1 ${sub}`}>
-                      {t("products.imageHint") || "Вставьте ссылку на фото товара (URL)"}
+                      {t("products.imageHint") || "Загрузите фото или вставьте URL"}
                     </p>
                   </div>
                 </div>
