@@ -721,7 +721,7 @@ async function generateAIResponse(
       } catch (apiError) {
         // If API fails after successful tool execution, build response from tool results
         console.error("[Webhook] API error after tool execution:", apiError);
-        return buildFallbackFromToolResults(lastToolResults, salesMode);
+        return { text: buildFallbackFromToolResults(lastToolResults, salesMode), imageUrls: [] };
       }
     }
 
