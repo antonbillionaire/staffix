@@ -58,11 +58,46 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { accessToken, businessId, wabaId, phoneNumberId } = body;
+  const { code, businessId, wabaId, phoneNumberId } = body;
+  let { accessToken } = body;
 
-  if (!accessToken || !businessId) {
+  if (!businessId) {
     return NextResponse.json(
-      { error: "Missing accessToken or businessId" },
+      { error: "Missing businessId" },
+      { status: 400 }
+    );
+  }
+
+  // If we received a code instead of accessToken, exchange it for a token
+  if (code && !accessToken) {
+    try {
+      const appId = process.env.META_APP_ID || process.env.NEXT_PUBLIC_META_APP_ID;
+      const appSecret = process.env.META_APP_SECRET;
+      const tokenRes = await fetch(
+        `${META_GRAPH_BASE}/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&code=${code}`
+      );
+      const tokenData = await tokenRes.json();
+      if (tokenData.error) {
+        console.error("[WA] Code exchange error:", tokenData.error);
+        return NextResponse.json(
+          { error: "Failed to exchange code for token: " + (tokenData.error.message || "Unknown error") },
+          { status: 400 }
+        );
+      }
+      accessToken = tokenData.access_token;
+      console.log("[WA] Exchanged code for access token successfully");
+    } catch (err) {
+      console.error("[WA] Code exchange failed:", err);
+      return NextResponse.json(
+        { error: "Failed to exchange authorization code" },
+        { status: 500 }
+      );
+    }
+  }
+
+  if (!accessToken) {
+    return NextResponse.json(
+      { error: "Missing accessToken or code" },
       { status: 400 }
     );
   }

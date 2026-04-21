@@ -30,7 +30,7 @@ declare global {
     FB: {
       init: (params: Record<string, unknown>) => void;
       login: (
-        callback: (response: { authResponse?: { code?: string; accessToken?: string } }) => void,
+        callback: (response: { authResponse?: { code?: string; accessToken?: string } | null }) => void,
         options: Record<string, unknown>
       ) => void;
     };
@@ -182,17 +182,21 @@ export default function WhatsAppChannelPage() {
     window.FB.login(
       (response) => {
         window.removeEventListener("message", sessionInfoListener);
+        // With response_type:"code", authResponse contains code instead of accessToken
+        const code = response.authResponse?.code;
         const token = response.authResponse?.accessToken;
+        const authValue = code || token;
 
-        if (token) {
-          setSavedCode(token);
+        if (authValue) {
+          setSavedCode(authValue);
 
-          // Send token + embedded signup IDs to backend
+          // Send code/token + embedded signup IDs to backend
           fetch("/api/auth/whatsapp/callback", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              accessToken: token,
+              code: code || undefined,
+              accessToken: token || undefined,
               businessId,
               wabaId: embeddedData.waba_id,
               phoneNumberId: embeddedData.phone_number_id,
@@ -223,10 +227,10 @@ export default function WhatsAppChannelPage() {
       },
       {
         config_id: configId,
+        response_type: "code",
+        override_default_response_type: true,
         extras: {
           setup: {},
-          featureType: "",
-          sessionInfoVersion: "3",
         },
       }
     );
