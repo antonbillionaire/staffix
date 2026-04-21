@@ -283,6 +283,7 @@ export async function searchProducts(
           : p.stock < LOW_STOCK_THRESHOLD ? `Осталось ${p.stock} шт.`
           : `В наличии (${p.stock}+ шт.)`,
         shortDescription: p.description ? p.description.slice(0, 150) : null,
+        imageUrl: p.imageUrl || null,
       })),
     };
   } catch (error) {
@@ -350,6 +351,7 @@ export async function getProductDetails(
             : product.stock < 5
             ? `Осталось ${product.stock} шт.`
             : `В наличии (${product.stock}+ шт.)`,
+        imageUrl: product.imageUrl || null,
       },
     };
   } catch (error) {

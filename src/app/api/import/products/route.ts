@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import Anthropic from "@anthropic-ai/sdk";
 
 async function getUserBusiness(): Promise<string | null> {
   const session = await auth();
@@ -67,8 +68,53 @@ export async function POST(request: NextRequest) {
     if (!businessId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
-    const csvText: string = body.csv;
+    let csvText: string = body.csv || "";
     const isPreview: boolean = body.preview === true;
+    const pdfBase64: string | undefined = body.pdfBase64;
+
+    // PDF import: extract text from PDF, then use AI to convert to CSV
+    if (pdfBase64 && !csvText) {
+      try {
+        const buffer = Buffer.from(pdfBase64, "base64");
+
+        // Parse PDF to text
+        const { PDFParse } = await import("pdf-parse");
+        const parser = new PDFParse({ data: buffer });
+        const textResult = await parser.getText();
+        await parser.destroy();
+        const pdfText = textResult.text;
+
+        if (!pdfText || pdfText.trim().length < 20) {
+          return NextResponse.json({
+            error: "PDF содержит изображения, а не текст. Загрузите текстовый PDF или используйте Excel/CSV.",
+          }, { status: 400 });
+        }
+
+        // Use Claude to extract products from PDF text
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const aiResponse = await anthropic.messages.create({
+          model: "claude-sonnet-4-5-20250929",
+          max_tokens: 4096,
+          system: "You extract product/service catalogs from text and output CSV. Always output ONLY CSV data with a header row, nothing else. Use semicolon (;) as delimiter. Columns: название;цена;категория;описание. If price is not found, put 0. If category is not clear, leave empty. Output in the same language as the source text.",
+          messages: [{ role: "user", content: `Extract all products/services with prices from this catalog text and output as CSV (semicolon-separated):\n\n${pdfText.slice(0, 30000)}` }],
+        });
+
+        const aiText = aiResponse.content.find(b => b.type === "text")?.text || "";
+        if (!aiText || aiText.trim().length < 10) {
+          return NextResponse.json({
+            error: "Не удалось извлечь товары из PDF. Попробуйте Excel/CSV формат.",
+          }, { status: 400 });
+        }
+
+        csvText = aiText.trim();
+        console.log(`[PDF Import] Extracted ${csvText.split("\n").length - 1} products from PDF`);
+      } catch (pdfErr) {
+        console.error("[PDF Import] Error:", pdfErr);
+        return NextResponse.json({
+          error: "Ошибка обработки PDF. Попробуйте Excel/CSV формат.",
+        }, { status: 500 });
+      }
+    }
 
     if (!csvText || typeof csvText !== "string") {
       return NextResponse.json({ error: "Нет данных CSV" }, { status: 400 });

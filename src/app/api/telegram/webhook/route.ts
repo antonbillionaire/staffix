@@ -72,6 +72,10 @@ interface TelegramUpdate {
       first_name: string;
       last_name?: string;
     };
+    location?: {
+      latitude: number;
+      longitude: number;
+    };
   };
   callback_query?: {
     id: string;
@@ -122,6 +126,33 @@ async function sendTelegramMessage(
     return ok;
   } catch (error) {
     console.error("Error sending Telegram message:", error);
+    return false;
+  }
+}
+
+async function sendTelegramPhoto(
+  botToken: string,
+  chatId: number,
+  photoUrl: string,
+  caption?: string
+): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${botToken}/sendPhoto`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          photo: photoUrl,
+          caption: caption ? caption.slice(0, 1024) : undefined,
+          parse_mode: caption ? "HTML" : undefined,
+        }),
+      }
+    );
+    return response.ok;
+  } catch (error) {
+    console.error("Error sending Telegram photo:", error);
     return false;
   }
 }
@@ -499,12 +530,17 @@ function buildFallbackFromToolResults(toolResults: any[], salesMode: boolean): s
     : "Готово! Чем ещё могу помочь?";
 }
 
+interface AIResponseWithMedia {
+  text: string;
+  imageUrls: string[];
+}
+
 async function generateAIResponse(
   businessId: string,
   telegramId: bigint,
   userMessage: string,
   userName: string
-): Promise<string> {
+): Promise<AIResponseWithMedia> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
@@ -733,7 +769,23 @@ async function generateAIResponse(
       });
     }
 
-    return assistantMessage;
+    // Extract imageUrls from tool results (for product photos)
+    const imageUrls: string[] = [];
+    for (const tr of lastToolResults) {
+      try {
+        const content = typeof tr.content === "string" ? JSON.parse(tr.content) : tr.content;
+        if (content?.products) {
+          for (const p of content.products) {
+            if (p.imageUrl) imageUrls.push(p.imageUrl);
+          }
+        }
+        if (content?.product?.imageUrl) {
+          imageUrls.push(content.product.imageUrl);
+        }
+      } catch { /* not JSON, skip */ }
+    }
+
+    return { text: assistantMessage, imageUrls };
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : String(error);
     const errStack = error instanceof Error ? error.stack : '';
@@ -741,10 +793,10 @@ async function generateAIResponse(
 
     // Specific message for Anthropic overload (529)
     if (errMsg.includes("overloaded") || errMsg.includes("529")) {
-      return "Извините, сервер AI временно перегружен. Пожалуйста, попробуйте через 1-2 минуты.";
+      return { text: "Извините, сервер AI временно перегружен. Пожалуйста, попробуйте через 1-2 минуты.", imageUrls: [] };
     }
 
-    return "Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте позже.";
+    return { text: "Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте позже.", imageUrls: [] };
   }
 }
 
@@ -1136,8 +1188,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Обрабатываем только текстовые сообщения
-    if (!update.message?.text && !update.message?.contact) {
+    // Обрабатываем только текстовые сообщения, контакты и геолокации
+    if (!update.message?.text && !update.message?.contact && !update.message?.location) {
       return NextResponse.json({ ok: true });
     }
 
@@ -1176,6 +1228,48 @@ export async function POST(request: NextRequest) {
         botToken,
         chatId,
         `Спасибо! Ваш номер ${phone} сохранён. Чем могу помочь?`
+      );
+      return NextResponse.json({ ok: true });
+    }
+
+    // Обработка геолокации (клиент отправил местоположение для доставки)
+    if (message.location) {
+      const { latitude, longitude } = message.location;
+      const mapsLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
+      const clientName = userName || "Клиент";
+
+      // Уведомить владельца/менеджеров
+      const ownerChatId = business.ownerTelegramChatId;
+      if (ownerChatId) {
+        const notifyBot = business.botToken;
+        if (notifyBot) {
+          await sendTelegramMessage(
+            notifyBot,
+            Number(ownerChatId),
+            `📍 ${clientName} отправил геолокацию:\n${mapsLink}\n\nTelegram ID: ${message.from.id}`
+          );
+        }
+      }
+
+      // Уведомить сотрудников с включёнными уведомлениями
+      const staffWithNotify = await prisma.staff.findMany({
+        where: { businessId: business.id, adminNotifications: true, telegramChatId: { not: null } },
+        select: { telegramChatId: true },
+      });
+      for (const s of staffWithNotify) {
+        if (s.telegramChatId) {
+          await sendTelegramMessage(
+            botToken,
+            Number(s.telegramChatId),
+            `📍 ${clientName} отправил геолокацию:\n${mapsLink}`
+          );
+        }
+      }
+
+      await sendTelegramMessage(
+        botToken,
+        chatId,
+        `📍 Спасибо! Ваша геолокация получена и передана менеджеру. Мы свяжемся с вами для подтверждения доставки.`
       );
       return NextResponse.json({ ok: true });
     }
@@ -1385,10 +1479,15 @@ export async function POST(request: NextRequest) {
       userMessage,
       userName
     );
-    console.log(`[Webhook] AI response generated (${aiResponse.length} chars)`);
+    console.log(`[Webhook] AI response generated (${aiResponse.text.length} chars, ${aiResponse.imageUrls.length} images)`);
 
-    // Отправляем ответ
-    await sendTelegramMessage(botToken, chatId, aiResponse);
+    // Отправляем текстовый ответ
+    await sendTelegramMessage(botToken, chatId, aiResponse.text);
+
+    // Отправляем фото товаров (если есть)
+    for (const imgUrl of aiResponse.imageUrls.slice(0, 5)) {
+      await sendTelegramPhoto(botToken, chatId, imgUrl);
+    }
 
     // Увеличиваем счётчик использованных сообщений (не блокируем ответ)
     // Note: totalConversations is now incremented in getOrCreateConversation only for NEW conversations

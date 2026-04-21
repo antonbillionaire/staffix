@@ -178,7 +178,41 @@ export default function ProductsPage() {
     setImportResult(null);
     const ext = file.name.split(".").pop()?.toLowerCase();
 
-    if (ext === "xlsx" || ext === "xls") {
+    if (ext === "pdf") {
+      // PDF: send to backend for AI-powered extraction
+      setParsingFile(true);
+      try {
+        const buf = await file.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = btoa(binary);
+
+        const res = await fetch("/api/import/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pdfBase64: base64, preview: true }),
+        });
+        const data = await res.json();
+        if (data.preview) {
+          setPreviewData(data);
+          // Reconstruct CSV for import step
+          const headerRow = data.mapping.map((m: { headerName: string }) => m.headerName).join(";");
+          const dataRows = (data.sampleRows as Record<string, string>[]).map((r: Record<string, string>) =>
+            data.mapping.map((m: { field: string }) => r[m.field] || "").join(";")
+          );
+          setImportCsv(headerRow + "\n" + dataRows.join("\n"));
+        } else if (data.error) {
+          setImportResult({ message: data.error });
+        }
+      } catch {
+        setImportResult({ message: t("products.importError") });
+      } finally {
+        setParsingFile(false);
+      }
+    } else if (ext === "xlsx" || ext === "xls") {
       setParsingFile(true);
       try {
         const mod = await import("xlsx");
@@ -652,7 +686,7 @@ export default function ProductsPage() {
                 <label className={`block text-sm font-medium mb-1 ${text}`}>{t("products.uploadFile")}</label>
                 <input
                   type="file"
-                  accept=".csv,.txt,.xlsx,.xls"
+                  accept=".csv,.txt,.xlsx,.xls,.pdf"
                   onChange={handleFileUpload}
                   className={`w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700 ${sub}`}
                 />
