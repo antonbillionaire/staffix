@@ -1120,17 +1120,17 @@ export async function POST(request: NextRequest) {
     const businessId = searchParams.get("businessId");
     const legacyToken = searchParams.get("token"); // Legacy support
 
-    let business: { id: string; name: string; botToken: string; webhookSecret: string | null } | null = null;
+    let business: { id: string; name: string; botToken: string; webhookSecret: string | null; ownerTelegramChatId: string | null } | null = null;
     let botToken: string | null = null;
 
     if (businessId) {
       // New method: find by businessId
       const foundBusiness = await prisma.business.findUnique({
         where: { id: businessId },
-        select: { id: true, name: true, botToken: true, webhookSecret: true },
+        select: { id: true, name: true, botToken: true, webhookSecret: true, ownerTelegramChatId: true },
       });
       if (foundBusiness?.botToken) {
-        business = { id: foundBusiness.id, name: foundBusiness.name, botToken: foundBusiness.botToken, webhookSecret: foundBusiness.webhookSecret };
+        business = { id: foundBusiness.id, name: foundBusiness.name, botToken: foundBusiness.botToken, webhookSecret: foundBusiness.webhookSecret, ownerTelegramChatId: foundBusiness.ownerTelegramChatId };
         botToken = foundBusiness.botToken;
       }
     } else if (legacyToken) {
@@ -1139,7 +1139,7 @@ export async function POST(request: NextRequest) {
       if (foundBusiness) {
         const fullBusiness = await prisma.business.findUnique({
           where: { id: foundBusiness.id },
-          select: { id: true, name: true, botToken: true, webhookSecret: true },
+          select: { id: true, name: true, botToken: true, webhookSecret: true, ownerTelegramChatId: true },
         });
         if (fullBusiness?.botToken) {
           business = { id: fullBusiness.id, name: fullBusiness.name, botToken: fullBusiness.botToken, webhookSecret: fullBusiness.webhookSecret };
