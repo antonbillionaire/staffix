@@ -15,6 +15,7 @@ interface Product {
   sku: string | null;
   category: string | null;
   tags: string[];
+  imageUrl: string | null;
   isActive: boolean;
 }
 
@@ -27,6 +28,7 @@ const EMPTY_FORM = {
   sku: "",
   category: "",
   tags: "",
+  imageUrl: "",
 };
 
 export default function ProductsPage() {
@@ -108,6 +110,7 @@ export default function ProductsPage() {
       sku: p.sku || "",
       category: p.category || "",
       tags: p.tags.join(", "),
+      imageUrl: p.imageUrl || "",
     });
     setIsModalOpen(true);
   };
@@ -125,6 +128,7 @@ export default function ProductsPage() {
         sku: form.sku.trim() || null,
         category: form.category.trim() || null,
         tags: form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
+        imageUrl: form.imageUrl.trim() || null,
         isActive: true,
       };
 
@@ -417,12 +421,21 @@ export default function ProductsPage() {
                 key={product.id}
                 className={`${card} border rounded-xl p-4 flex items-center gap-4 ${!product.isActive ? "opacity-60" : ""}`}
               >
-                {/* Иконка */}
-                <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                  isDark ? "bg-gray-700" : "bg-gray-100"
-                }`}>
-                  <Package className={`w-6 h-6 ${sub}`} />
-                </div>
+                {/* Фото или иконка */}
+                {product.imageUrl ? (
+                  <img
+                    src={product.imageUrl}
+                    alt={product.name}
+                    className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                ) : (
+                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    isDark ? "bg-gray-700" : "bg-gray-100"
+                  }`}>
+                    <Package className={`w-6 h-6 ${sub}`} />
+                  </div>
+                )}
 
                 {/* Инфо */}
                 <div className="flex-1 min-w-0">
@@ -633,6 +646,35 @@ export default function ProductsPage() {
                   className={`w-full px-3 py-2 rounded-lg border text-sm outline-none ${input}`}
                 />
                 <p className={`text-xs mt-1 ${sub}`}>{t("products.tagsHint")}</p>
+              </div>
+
+              {/* Фото товара */}
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${text}`}>
+                  {t("products.imageLabel") || "Фото товара"}
+                </label>
+                <div className="flex gap-3 items-start">
+                  {form.imageUrl && (
+                    <img
+                      src={form.imageUrl}
+                      alt="Preview"
+                      className="w-16 h-16 rounded-lg object-cover border flex-shrink-0"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  )}
+                  <div className="flex-1">
+                    <input
+                      type="url"
+                      value={form.imageUrl}
+                      onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
+                      placeholder={t("products.imagePlaceholder") || "https://example.com/photo.jpg"}
+                      className={`w-full px-3 py-2 rounded-lg border text-sm outline-none ${input}`}
+                    />
+                    <p className={`text-xs mt-1 ${sub}`}>
+                      {t("products.imageHint") || "Вставьте ссылку на фото товара (URL)"}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
