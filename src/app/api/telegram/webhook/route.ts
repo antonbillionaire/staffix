@@ -545,7 +545,7 @@ async function generateAIResponse(
 
   if (!apiKey) {
     console.error("[Webhook] ANTHROPIC_API_KEY is not set!");
-    return "Извините, сервис временно недоступен. Попробуйте позже.";
+    return { text: "Извините, сервис временно недоступен. Попробуйте позже.", imageUrls: [] };
   }
 
   try {
@@ -554,7 +554,7 @@ async function generateAIResponse(
     const businessContext = await buildBusinessContext(businessId);
     if (!businessContext) {
       console.error(`[Webhook] buildBusinessContext returned null for ${businessId}`);
-      return "Извините, произошла ошибка. Попробуйте позже.";
+      return { text: "Извините, произошла ошибка. Попробуйте позже.", imageUrls: [] };
     }
     console.log(`[Webhook] Business context loaded: ${businessContext.name}`);
 
