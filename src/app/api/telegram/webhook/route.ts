@@ -1120,7 +1120,7 @@ export async function POST(request: NextRequest) {
     const businessId = searchParams.get("businessId");
     const legacyToken = searchParams.get("token"); // Legacy support
 
-    let business: { id: string; name: string; botToken: string; webhookSecret: string | null; ownerTelegramChatId: string | null } | null = null;
+    let business: { id: string; name: string; botToken: string; webhookSecret: string | null; ownerTelegramChatId: bigint | null } | null = null;
     let botToken: string | null = null;
 
     if (businessId) {
@@ -1142,7 +1142,7 @@ export async function POST(request: NextRequest) {
           select: { id: true, name: true, botToken: true, webhookSecret: true, ownerTelegramChatId: true },
         });
         if (fullBusiness?.botToken) {
-          business = { id: fullBusiness.id, name: fullBusiness.name, botToken: fullBusiness.botToken, webhookSecret: fullBusiness.webhookSecret };
+          business = { id: fullBusiness.id, name: fullBusiness.name, botToken: fullBusiness.botToken, webhookSecret: fullBusiness.webhookSecret, ownerTelegramChatId: fullBusiness.ownerTelegramChatId };
           botToken = fullBusiness.botToken;
         }
       }
@@ -1253,7 +1253,7 @@ export async function POST(request: NextRequest) {
 
       // Уведомить сотрудников с включёнными уведомлениями
       const staffWithNotify = await prisma.staff.findMany({
-        where: { businessId: business.id, adminNotifications: true, telegramChatId: { not: null } },
+        where: { businessId: business.id, notificationsEnabled: true, telegramChatId: { not: null } },
         select: { telegramChatId: true },
       });
       for (const s of staffWithNotify) {
