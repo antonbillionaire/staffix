@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     const systemPrompt = buildChannelSystemPrompt(business, "test");
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250514",
+      model: "claude-sonnet-4-5-20250929",
       max_tokens: 500,
       system: systemPrompt + "\n\nЭто тестовое сообщение от владельца бизнеса. Отвечай как если бы это был реальный клиент. НЕ используй инструменты (записи, квалификация) — просто ответь текстом.",
       messages: [{ role: "user", content: message }],
