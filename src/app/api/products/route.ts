@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     if (!businessId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await request.json();
-    const { name, description, price, oldPrice, stock, sku, category, tags, imageUrl } = body;
+    const { name, description, price, oldPrice, stock, sku, category, tags, imageUrl, productUrl } = body;
 
     if (!name || price === undefined) {
       return NextResponse.json({ error: "name и price обязательны" }, { status: 400 });
@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
         category: category || null,
         tags: tags || [],
         imageUrl: imageUrl || null,
+        productUrl: productUrl || null,
         isActive: true,
       },
     });

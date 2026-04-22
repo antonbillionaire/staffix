@@ -1302,6 +1302,7 @@ model Product {
 
   // Медиа
   imageUrl    String?
+  productUrl  String?   // ссылка на товар на сайте магазина
 
   isActive    Boolean   @default(true)
 

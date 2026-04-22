@@ -47,6 +47,7 @@ export async function PATCH(
         category: body.category !== undefined ? body.category : undefined,
         tags: body.tags !== undefined ? body.tags : undefined,
         imageUrl: body.imageUrl !== undefined ? body.imageUrl : undefined,
+        productUrl: body.productUrl !== undefined ? body.productUrl : undefined,
         isActive: body.isActive !== undefined ? body.isActive : undefined,
       },
     });

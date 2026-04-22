@@ -16,6 +16,7 @@ interface Product {
   category: string | null;
   tags: string[];
   imageUrl: string | null;
+  productUrl: string | null;
   isActive: boolean;
 }
 
@@ -29,6 +30,7 @@ const EMPTY_FORM = {
   category: "",
   tags: "",
   imageUrl: "",
+  productUrl: "",
 };
 
 export default function ProductsPage() {
@@ -112,6 +114,7 @@ export default function ProductsPage() {
       category: p.category || "",
       tags: p.tags.join(", "),
       imageUrl: p.imageUrl || "",
+      productUrl: p.productUrl || "",
     });
     setIsModalOpen(true);
   };
@@ -130,6 +133,7 @@ export default function ProductsPage() {
         category: form.category.trim() || null,
         tags: form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
         imageUrl: form.imageUrl.trim() || null,
+        productUrl: form.productUrl.trim() || null,
         isActive: true,
       };
 
@@ -728,6 +732,23 @@ export default function ProductsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Ссылка на товар */}
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${text}`}>
+                  {t("products.productUrlLabel") || "Ссылка на товар"}
+                </label>
+                <input
+                  type="url"
+                  value={form.productUrl}
+                  onChange={(e) => setForm((f) => ({ ...f, productUrl: e.target.value }))}
+                  placeholder={t("products.productUrlPlaceholder") || "https://shop.uz/product/123"}
+                  className={`w-full px-3 py-2 rounded-lg border text-sm outline-none ${input}`}
+                />
+                <p className={`text-xs mt-1 ${sub}`}>
+                  {t("products.productUrlHint") || "Бот отправит ссылку клиенту вместе с описанием товара"}
+                </p>
+              </div>
             </div>
 
             <div className={`flex gap-3 p-5 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
@@ -775,6 +796,62 @@ export default function ProductsPage() {
                 <p className="mt-2 text-xs">{t("products.importFormats")}</p>
                 <p className="mt-1 text-xs opacity-70">{t("products.importKnowledgeHint")}</p>
               </div>
+
+              {/* Import from URL */}
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${text}`}>
+                  {t("products.importFromUrl") || "Импорт с сайта (URL)"}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    placeholder="https://shop.uz/catalog"
+                    className={`flex-1 px-3 py-2 rounded-lg border text-sm outline-none ${input}`}
+                    id="import-url-input"
+                  />
+                  <button
+                    onClick={async () => {
+                      const urlInput = document.getElementById("import-url-input") as HTMLInputElement;
+                      const url = urlInput?.value?.trim();
+                      if (!url) return;
+                      setParsingFile(true);
+                      setImportResult(null);
+                      setPreviewData(null);
+                      try {
+                        const res = await fetch("/api/import/products", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ importUrl: url, preview: true }),
+                        });
+                        const data = await res.json();
+                        if (data.preview) {
+                          setPreviewData(data);
+                          const headerRow = data.mapping.map((m: { headerName: string }) => m.headerName).join(";");
+                          const dataRows = (data.sampleRows as Record<string, string>[]).map((r: Record<string, string>) =>
+                            data.mapping.map((m: { field: string }) => r[m.field] || "").join(";")
+                          );
+                          setImportCsv(headerRow + "\n" + dataRows.join("\n"));
+                        } else {
+                          setImportResult({ message: data.error || "Failed to import" });
+                        }
+                      } catch {
+                        setImportResult({ message: t("products.importError") });
+                      } finally {
+                        setParsingFile(false);
+                      }
+                    }}
+                    disabled={parsingFile}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium"
+                  >
+                    {t("products.extractProducts") || "Извлечь"}
+                  </button>
+                </div>
+                <p className={`text-xs mt-1 ${sub}`}>
+                  {t("products.importUrlHint") || "AI извлечёт товары и цены с указанной страницы"}
+                </p>
+              </div>
+
+              <div className={`text-center text-xs ${sub}`}>— {t("products.or") || "или"} —</div>
 
               <div>
                 <label className={`block text-sm font-medium mb-1 ${text}`}>{t("products.uploadFile")}</label>

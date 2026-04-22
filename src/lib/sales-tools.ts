@@ -284,6 +284,7 @@ export async function searchProducts(
           : `В наличии (${p.stock}+ шт.)`,
         shortDescription: p.description ? p.description.slice(0, 150) : null,
         imageUrl: p.imageUrl || null,
+        productUrl: p.productUrl || null,
       })),
     };
   } catch (error) {
@@ -352,6 +353,7 @@ export async function getProductDetails(
             ? `Осталось ${product.stock} шт.`
             : `В наличии (${product.stock}+ шт.)`,
         imageUrl: product.imageUrl || null,
+        productUrl: product.productUrl || null,
       },
     };
   } catch (error) {

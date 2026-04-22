@@ -71,6 +71,63 @@ export async function POST(request: NextRequest) {
     let csvText: string = body.csv || "";
     const isPreview: boolean = body.preview === true;
     const pdfBase64: string | undefined = body.pdfBase64;
+    const importUrl: string | undefined = body.importUrl;
+
+    // URL import: fetch website page, extract products with AI
+    if (importUrl && !csvText) {
+      try {
+        const url = new URL(importUrl);
+        if (!["http:", "https:"].includes(url.protocol)) {
+          return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
+        }
+
+        const pageRes = await fetch(importUrl, {
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; Staffix/1.0)" },
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!pageRes.ok) {
+          return NextResponse.json({ error: `Failed to fetch page: ${pageRes.status}` }, { status: 400 });
+        }
+
+        const html = await pageRes.text();
+        if (!html || html.length < 100) {
+          return NextResponse.json({ error: "Page is empty or too short" }, { status: 400 });
+        }
+
+        // Strip scripts/styles, keep text content (limit to 50KB for AI)
+        const cleanHtml = html
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+          .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, "")
+          .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, "")
+          .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, "")
+          .slice(0, 50000);
+
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const aiResponse = await anthropic.messages.create({
+          model: "claude-sonnet-4-5-20250929",
+          max_tokens: 4096,
+          system: "You extract product catalogs from HTML pages and output CSV. Always output ONLY CSV data with a header row, nothing else. Use semicolon (;) as delimiter. Columns: название;цена;категория;описание;ссылка. Extract product name, price (number only), category if visible, short description, and product page URL if available. If price is not found, put 0. Output in the same language as the source page.",
+          messages: [{ role: "user", content: `Extract all products with prices from this website HTML and output as CSV (semicolon-separated). Source URL: ${importUrl}\n\n${cleanHtml}` }],
+        });
+
+        const aiText = aiResponse.content.find(b => b.type === "text")?.text || "";
+        if (!aiText || aiText.trim().length < 10) {
+          return NextResponse.json({
+            error: "Could not extract products from this page. Try a different page or use CSV/Excel.",
+          }, { status: 400 });
+        }
+
+        csvText = aiText.trim();
+        console.log(`[URL Import] Extracted ${csvText.split("\n").length - 1} products from ${importUrl}`);
+      } catch (urlErr) {
+        console.error("[URL Import] Error:", urlErr);
+        const msg = urlErr instanceof Error ? urlErr.message : "Unknown error";
+        return NextResponse.json({
+          error: msg.includes("timeout") ? "Website took too long to respond. Try a different URL." : "Failed to import from URL. Try CSV/Excel.",
+        }, { status: 500 });
+      }
+    }
 
     // PDF import: extract text from PDF, then use AI to convert to CSV
     if (pdfBase64 && !csvText) {
@@ -139,6 +196,7 @@ export async function POST(request: NextRequest) {
       stock: ["остаток", "stock", "количество", "qty", "quantity", "кол-во"],
       sku: ["артикул", "sku", "код", "code"],
       oldPrice: ["старая цена", "old price", "старая_цена", "скидка от", "old_price", "oldprice"],
+      productUrl: ["ссылка", "url", "link", "страница", "page_url", "product_url"],
     };
 
     const FIELD_LABELS: Record<string, string> = {
@@ -149,6 +207,7 @@ export async function POST(request: NextRequest) {
       stock: "Остаток",
       sku: "Артикул",
       oldPrice: "Старая цена",
+      productUrl: "Ссылка",
     };
 
     const firstRow = rows[0].map((c) => c.toLowerCase().trim());
