@@ -217,7 +217,10 @@ export async function processReminders() {
   });
 
   for (const business of businesses) {
-    if (!business.botToken || !business.automationSettings) continue;
+    if (!business.botToken || !business.automationSettings) {
+      if (!business.botToken) console.warn(`[Automation] Business ${business.id} has no botToken — skipping reminders`);
+      continue;
+    }
 
     const settings = business.automationSettings;
 
@@ -384,7 +387,10 @@ export async function processReviewRequests() {
   });
 
   for (const business of businesses) {
-    if (!business.botToken || !business.automationSettings) continue;
+    if (!business.botToken || !business.automationSettings) {
+      if (!business.botToken) console.warn(`[Automation] Business ${business.id} has no botToken — skipping reviews`);
+      continue;
+    }
 
     const settings = business.automationSettings;
     const delayMs = settings.reviewDelayHours * 60 * 60 * 1000;
@@ -464,7 +470,10 @@ export async function processReactivation() {
   });
 
   for (const business of businesses) {
-    if (!business.botToken || !business.automationSettings) continue;
+    if (!business.botToken || !business.automationSettings) {
+      if (!business.botToken) console.warn(`[Automation] Business ${business.id} has no botToken — skipping reactivation`);
+      continue;
+    }
 
     const settings = business.automationSettings;
     const reactivationThreshold = new Date(

@@ -75,6 +75,8 @@ export async function sendOwnerNotification(
       sendTelegramMsg(business.botToken, business.ownerTelegramChatId, text).catch(
         (err) => console.error("Owner notify TG error:", err)
       );
+    } else if (!business.ownerTelegramChatId) {
+      console.warn(`[Notify] Owner of business ${businessId} has no Telegram chatId — notification skipped`);
     }
 
     // 2. WhatsApp (if connected and owner phone is available)

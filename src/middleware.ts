@@ -54,12 +54,10 @@ export function middleware(request: NextRequest) {
     ["POST", "PUT", "DELETE", "PATCH"].includes(request.method)
   ) {
     const origin = request.headers.get("origin");
-    if (origin) {
-      const allowed = ["https://www.staffix.io", "https://staffix.io"];
-      if (process.env.NODE_ENV === "development") allowed.push("http://localhost:3000");
-      if (!allowed.includes(origin)) {
-        return new Response("Forbidden: invalid origin", { status: 403 });
-      }
+    const allowed = ["https://www.staffix.io", "https://staffix.io"];
+    if (process.env.NODE_ENV === "development") allowed.push("http://localhost:3000");
+    if (!origin || !allowed.includes(origin)) {
+      return new Response("Forbidden: invalid or missing origin", { status: 403 });
     }
   }
 
