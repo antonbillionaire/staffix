@@ -72,6 +72,8 @@ export default function StaffPage() {
 
   const SALES_ROLES = [
     { value: "admin", label: t("staffPage.roleAdmin") },
+    { value: "manager", label: t("staffPage.roleManager") },
+    { value: "sales_manager", label: t("staffPage.roleSalesManager") },
     { value: "operator", label: t("staffPage.roleOperator") },
     { value: "warehouse", label: t("staffPage.roleWarehouse") },
     { value: "custom", label: t("staffPage.roleCustom") },
@@ -442,24 +444,30 @@ export default function StaffPage() {
                   </span>
                 </div>
               )}
-              {/* Seller referral link */}
+              {/* Ссылка продавца для клиентов */}
               {botUsername && dashboardMode === "sales" && (
                 <div className={`mt-2 pt-2 ${person.telegramUsername ? "" : "mt-3 pt-3"} border-t ${isDark ? "border-white/5" : "border-gray-100"}`}>
                   <div className="flex items-center gap-2">
-                    <span className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                    <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
                       {t("staffPage.sellerLink") || "Ссылка для клиентов:"}
                     </span>
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
                         const link = `https://t.me/${botUsername}?start=s_${person.id}`;
                         navigator.clipboard.writeText(link);
+                        const btn = e.currentTarget;
+                        const original = btn.textContent;
+                        btn.textContent = t("staffPage.linkCopied") || "Скопировано!";
+                        btn.classList.add("bg-green-600");
+                        btn.classList.remove("bg-blue-600");
+                        setTimeout(() => { btn.textContent = original; btn.classList.remove("bg-green-600"); btn.classList.add("bg-blue-600"); }, 2000);
                       }}
-                      className={`text-xs px-2 py-0.5 rounded ${isDark ? "bg-blue-500/10 text-blue-400 hover:bg-blue-500/20" : "bg-blue-50 text-blue-600 hover:bg-blue-100"}`}
+                      className="text-xs px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 font-medium"
                     >
-                      {t("staffPage.copyLink") || "Копировать"}
+                      {t("staffPage.copyLink") || "Копировать ссылку"}
                     </button>
                   </div>
-                  <p className={`text-[10px] mt-0.5 font-mono ${isDark ? "text-gray-600" : "text-gray-400"}`}>
+                  <p className={`text-[10px] mt-1 font-mono truncate ${isDark ? "text-gray-600" : "text-gray-400"}`}>
                     t.me/{botUsername}?start=s_{person.id.slice(0, 8)}...
                   </p>
                 </div>
