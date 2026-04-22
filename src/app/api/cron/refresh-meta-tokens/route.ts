@@ -69,6 +69,9 @@ export async function GET(request: Request) {
         }
       } catch (e) {
         console.error(`Page token refresh failed for business ${biz.id}:`, e);
+        // Don't save partial update — user token without page token will break webhooks
+        failed++;
+        continue;
       }
     }
 

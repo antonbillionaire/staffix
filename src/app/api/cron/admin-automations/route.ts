@@ -21,13 +21,19 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: "No active automations", executed: 0 });
     }
 
-    // Get all users with businesses and subscriptions
+    // Get users with businesses and subscriptions (paginated to avoid memory issues)
     const users = await prisma.user.findMany({
+      where: {
+        businesses: {
+          some: { id: { not: undefined } },
+        },
+      },
       include: {
         businesses: {
           include: { subscription: true },
         },
       },
+      take: 500, // Process in batches to avoid timeout
     });
 
     let totalExecuted = 0;

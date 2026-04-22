@@ -9,6 +9,7 @@ import {
   IPN_TYPES,
 } from "@/lib/paypro";
 import { notifyNewPayment } from "@/lib/admin-notify";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,6 +20,13 @@ export async function POST(request: NextRequest) {
     if (!verifyIP(ip)) {
       console.error(`PayPro webhook: rejected IP ${ip}`);
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // Rate limit: max 30 requests per minute per IP
+    const { allowed } = await rateLimit(`paypro:${ip}`, 30, 1);
+    if (!allowed) {
+      console.error(`PayPro webhook: rate limit exceeded for IP ${ip}`);
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
 
     // Parse form data (PayPro sends application/x-www-form-urlencoded)

@@ -73,6 +73,13 @@ export async function POST(request: NextRequest) {
     try {
       const appId = process.env.META_APP_ID || process.env.NEXT_PUBLIC_META_APP_ID;
       const appSecret = process.env.META_APP_SECRET;
+      if (!appId || !appSecret) {
+        console.error("[WA] Missing META_APP_ID or META_APP_SECRET env variables");
+        return NextResponse.json(
+          { error: "Server configuration error. Contact support." },
+          { status: 500 }
+        );
+      }
       const tokenRes = await fetch(
         `${META_GRAPH_BASE}/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&code=${code}`
       );
