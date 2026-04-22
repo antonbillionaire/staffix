@@ -1274,8 +1274,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Команда /start
-    if (userMessage === "/start") {
+    // Команда /start (с возможным параметром продавца: /start s_staffId)
+    if (userMessage === "/start" || userMessage.startsWith("/start ")) {
+      // Проверяем параметр продавца: /start s_STAFFID
+      const startParam = userMessage.split(" ")[1] || "";
+      if (startParam.startsWith("s_")) {
+        const sellerStaffId = startParam.slice(2);
+        // Привязываем клиента к продавцу
+        try {
+          await prisma.client.upsert({
+            where: { businessId_telegramId: { businessId: business.id, telegramId } },
+            create: {
+              businessId: business.id,
+              telegramId,
+              name: userName,
+              assignedStaffId: sellerStaffId,
+            },
+            update: {
+              assignedStaffId: sellerStaffId,
+            },
+          });
+          console.log(`[Webhook] Client ${telegramId} assigned to staff ${sellerStaffId}`);
+        } catch (e) {
+          console.error("[Webhook] Failed to assign client to staff:", e);
+        }
+        // Continue to show welcome message (don't return — let it flow to welcome)
+      }
+
       const senderUsername = message.from.username?.toLowerCase().replace("@", "") || "";
 
       // Проверяем: это мастер подключается к уведомлениям?

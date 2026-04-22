@@ -540,6 +540,16 @@ export async function createOrder(
 
     // ======== END LOYALTY ========
 
+    // Получаем привязку клиента к продавцу (если есть)
+    let assignedStaffId: string | null = null;
+    if (telegramId > BigInt(0)) {
+      const client = await prisma.client.findUnique({
+        where: { businessId_telegramId: { businessId, telegramId } },
+        select: { assignedStaffId: true },
+      });
+      assignedStaffId = client?.assignedStaffId || null;
+    }
+
     // Получаем следующий номер заказа
     const lastOrder = await prisma.order.findFirst({
       where: { businessId },
@@ -562,6 +572,7 @@ export async function createOrder(
         clientNotes: notes || null,
         totalPrice: finalPrice,
         paymentMethod: paymentMethod || null,
+        staffId: assignedStaffId,
         status: "new",
         items: {
           create: orderItemsData.map((item) => ({
@@ -624,7 +635,7 @@ export async function createOrder(
     }
 
     // Уведомляем владельца через Telegram + отправляем кнопки оплаты клиенту
-    notifyNewOrder(businessId, order, orderItemsData, telegramId).catch(() => {});
+    notifyNewOrder(businessId, order, orderItemsData, telegramId, assignedStaffId).catch(() => {});
 
     // Диспатчим в CRM
     dispatchCrmEvent(businessId, "booking_created", {
@@ -783,7 +794,8 @@ async function notifyNewOrder(
   businessId: string,
   order: { id: string; orderNumber: number; totalPrice: number; clientName: string; clientPhone: string | null; clientAddress: string | null },
   items: Array<{ name: string; price: number; quantity: number }>,
-  clientTelegramId?: bigint
+  clientTelegramId?: bigint,
+  assignedStaffId?: string | null
 ): Promise<void> {
   try {
     const business = await prisma.business.findUnique({
@@ -855,14 +867,12 @@ async function notifyNewOrder(
       }
     }
 
-    // Уведомляем сотрудников (admin/operator с включёнными уведомлениями)
+    // Уведомляем сотрудников: если назначен продавец — только его, иначе всех admin/operator
+    const staffWhere = assignedStaffId
+      ? { id: assignedStaffId, businessId, telegramChatId: { not: null } as const }
+      : { businessId, telegramChatId: { not: null } as const, notificationsEnabled: true, role: { in: ["admin", "operator"] } };
     const staffMembers = await prisma.staff.findMany({
-      where: {
-        businessId,
-        telegramChatId: { not: null },
-        notificationsEnabled: true,
-        role: { in: ["admin", "operator"] },
-      },
+      where: staffWhere,
       select: { telegramChatId: true, name: true },
     });
     for (const staff of staffMembers) {

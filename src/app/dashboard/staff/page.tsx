@@ -87,6 +87,7 @@ export default function StaffPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dashboardMode, setDashboardMode] = useState<string>("service");
+  const [botUsername, setBotUsername] = useState<string>("");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
@@ -142,6 +143,7 @@ export default function StaffPage() {
       .then((r) => r.json())
       .then((data) => {
         if (data.business?.dashboardMode) setDashboardMode(data.business.dashboardMode);
+        if (data.business?.botUsername) setBotUsername(data.business.botUsername);
       })
       .catch(() => {});
   }, [fetchStaff]);
@@ -438,6 +440,28 @@ export default function StaffPage() {
                     <span className={`w-1.5 h-1.5 rounded-full ${person.telegramChatId ? "bg-green-400" : isDark ? "bg-gray-600" : "bg-gray-400"}`} />
                     {person.telegramChatId ? t("staffPage.connected") : t("staffPage.notConnected")}
                   </span>
+                </div>
+              )}
+              {/* Seller referral link */}
+              {botUsername && dashboardMode === "sales" && (
+                <div className={`mt-2 pt-2 ${person.telegramUsername ? "" : "mt-3 pt-3"} border-t ${isDark ? "border-white/5" : "border-gray-100"}`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                      {t("staffPage.sellerLink") || "Ссылка для клиентов:"}
+                    </span>
+                    <button
+                      onClick={() => {
+                        const link = `https://t.me/${botUsername}?start=s_${person.id}`;
+                        navigator.clipboard.writeText(link);
+                      }}
+                      className={`text-xs px-2 py-0.5 rounded ${isDark ? "bg-blue-500/10 text-blue-400 hover:bg-blue-500/20" : "bg-blue-50 text-blue-600 hover:bg-blue-100"}`}
+                    >
+                      {t("staffPage.copyLink") || "Копировать"}
+                    </button>
+                  </div>
+                  <p className={`text-[10px] mt-0.5 font-mono ${isDark ? "text-gray-600" : "text-gray-400"}`}>
+                    t.me/{botUsername}?start=s_{person.id.slice(0, 8)}...
+                  </p>
                 </div>
               )}
             </div>

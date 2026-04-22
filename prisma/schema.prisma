@@ -269,6 +269,7 @@ model Staff {
   business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   bookings      Booking[]
+  orders        Order[]
   schedule      StaffSchedule[]
   timeOffs      StaffTimeOff[]
 
@@ -614,6 +615,9 @@ model Client {
 
   // Когда последний раз обновлялся AI summary
   summaryUpdatedAt  DateTime?
+
+  // Привязка к продавцу (через ссылку t.me/bot?start=s_staffId)
+  assignedStaffId   String?
 
   businessId        String
   business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -1367,6 +1371,10 @@ model Order {
   // Уведомления
   notifiedOwner   Boolean     @default(false)
 
+  // Привязка к продавцу/менеджеру
+  staffId         String?
+  staff           Staff?      @relation(fields: [staffId], references: [id], onDelete: SetNull)
+
   businessId      String
   business        Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
@@ -1377,6 +1385,7 @@ model Order {
   @@index([businessId, status])
   @@index([businessId, createdAt])
   @@index([businessId, clientTelegramId])
+  @@index([staffId])
 }
 
 // Позиции заказа
