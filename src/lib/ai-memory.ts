@@ -46,6 +46,7 @@ interface ClientContext {
 
 interface BusinessContext {
   name: string;
+  botDisplayName: string | null;
   businessType: string | null;
   businessTypes: string[];
   industryCategory: string | null;
@@ -288,6 +289,7 @@ export async function buildBusinessContext(
 
     return {
       name: business.name,
+      botDisplayName: (biz.botDisplayName as string | null) ?? null,
       businessType: business.businessType,
       businessTypes: biz.businessTypes || [],
       industryCategory: business.industryCategory,
@@ -361,7 +363,11 @@ export function buildSystemPrompt(
     ? business.businessTypes.join(", ")
     : business.businessType || "не указан";
 
-  let prompt = `Ты — AI-сотрудник компании "${business.name}".
+  const botName = business.botDisplayName || "AI-помощник";
+
+  let prompt = `Ты — ${botName}, AI-сотрудник компании "${business.name}".
+
+КРИТИЧЕСКИ ВАЖНО: Твоё имя — ${botName}. ВСЕГДА представляйся как ${botName}. Если клиент спрашивает как тебя зовут — отвечай "${botName}". Никогда не используй другое имя.
 
 ## Язык общения:
 ${langInstruction}
