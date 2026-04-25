@@ -281,9 +281,10 @@ export async function sendWelcomeEmail(
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
 
     const { error } = await resend.emails.send({
-      from: FROM_EMAIL,
+      from: "Staffix Support <support@staffix.io>",
       to: email,
-      subject: "Добро пожаловать в Staffix! Запустите AI-сотрудника за 5 минут",
+      replyTo: "support@staffix.io",
+      subject: `Добро пожаловать в Staffix, ${name}! Ваш AI-сотрудник готов к настройке`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -291,71 +292,99 @@ export async function sendWelcomeEmail(
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #0a0a1a; margin: 0; padding: 40px 20px;">
-          <div style="max-width: 560px; margin: 0 auto; background: linear-gradient(135deg, #12122a 0%, #1a1a3a 100%); border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); overflow: hidden;">
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f5f7; margin: 0; padding: 40px 20px; color: #1a1a2e;">
+          <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden;">
 
             <!-- Header -->
-            <div style="padding: 32px 32px 24px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.05); background: linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(139,92,246,0.1) 100%);">
-              <div style="display: inline-block; width: 56px; height: 56px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); border-radius: 16px; margin-bottom: 16px; text-align: center; line-height: 56px; font-size: 28px;">🤖</div>
-              <h1 style="color: #ffffff; font-size: 26px; font-weight: 700; margin: 0 0 8px;">Добро пожаловать!</h1>
-              <p style="color: #9ca3af; font-size: 15px; margin: 0;">Staffix готов к запуску, ${name}</p>
+            <div style="padding: 32px 32px 24px; border-bottom: 1px solid #e5e7eb;">
+              <h1 style="color: #1a1a2e; font-size: 24px; font-weight: 700; margin: 0 0 8px;">Здравствуйте, ${name}!</h1>
+              <p style="color: #4b5563; font-size: 15px; margin: 0; line-height: 1.6;">
+                Команда Staffix благодарит вас за регистрацию. Мы рады приветствовать вас на платформе.
+              </p>
             </div>
 
-            <!-- Content -->
-            <div style="padding: 32px;">
-              <p style="color: #9ca3af; font-size: 15px; line-height: 1.7; margin: 0 0 28px;">
-                Email подтверждён ✅<br>
-                У вас есть <strong style="color: #fff;">14 дней бесплатного доступа</strong>. Запустите AI-сотрудника прямо сейчас — это займёт 5 минут.
+            <!-- Intro -->
+            <div style="padding: 28px 32px 12px;">
+              <p style="color: #374151; font-size: 15px; line-height: 1.7; margin: 0 0 20px;">
+                Вы получили <strong>14 дней бесплатного доступа</strong> со всеми функциями. Чтобы AI-сотрудник заработал на полную мощность, потребуется около 15 минут на настройку.
               </p>
 
-              <!-- Steps -->
-              <div style="margin-bottom: 28px;">
-                <p style="color: #ffffff; font-size: 15px; font-weight: 600; margin: 0 0 16px;">Как запустить за 5 шагов:</p>
+              <p style="color: #374151; font-size: 15px; font-weight: 600; margin: 0 0 8px;">Первые шаги</p>
+            </div>
 
-                ${[
-                  ["1", "#3b82f6", "Создайте Telegram-бота", "Откройте Telegram, напишите @BotFather, отправьте /newbot — получите токен."],
-                  ["2", "#8b5cf6", "Добавьте токен в Staffix", "В дашборде → Настройки бота → вставьте токен → нажмите «Подключить»."],
-                  ["3", "#06b6d4", "Добавьте услуги", "Раздел «Услуги» → добавьте название, цену и длительность каждой услуги."],
-                  ["4", "#10b981", "Добавьте мастеров", "Раздел «Сотрудники» → добавьте мастеров и настройте их расписание."],
-                  ["5", "#f59e0b", "Протестируйте бота", "Напишите вашему боту в Telegram: «Хочу записаться» — AI всё сделает сам."],
-                ].map(([num, color, title, desc]) => `
-                  <div style="display: flex; gap: 16px; margin-bottom: 16px; align-items: flex-start;">
-                    <div style="flex-shrink: 0; width: 32px; height: 32px; background: ${color}20; border: 1px solid ${color}40; border-radius: 50%; text-align: center; line-height: 32px; font-size: 14px; font-weight: 700; color: ${color};">${num}</div>
-                    <div>
-                      <p style="color: #ffffff; font-size: 14px; font-weight: 600; margin: 4px 0 4px;">${title}</p>
-                      <p style="color: #6b7280; font-size: 13px; margin: 0; line-height: 1.5;">${desc}</p>
-                    </div>
-                  </div>
-                `).join("")}
-              </div>
+            <!-- Steps -->
+            <div style="padding: 0 32px 24px;">
+              ${[
+                ["1", "Подключите канал общения с клиентами", "Telegram, WhatsApp, Instagram или Facebook — где общаются ваши клиенты. Подключение занимает 2–5 минут.", "/dashboard/channels"],
+                ["2", "Загрузите данные о бизнесе в Базу знаний", "Прайс, описание услуг, FAQ, документы. Поддерживаются PDF, DOCX, Excel, TXT. Чем больше данных — тем точнее отвечает AI.", "/dashboard/knowledge"],
+                ["3", "Настройте услуги или товары", "Добавьте всё что вы продаёте — с ценами, описанием и фото. Каталог можно загрузить из Excel, PDF или прямо с вашего сайта по URL.", "/dashboard/services"],
+                ["4", "Добавьте команду", "Сотрудники, расписание, ставки и комиссии. Каждый продавец получит персональную ссылку для своих клиентов — заказы будут идти именно ему.", "/dashboard/staff"],
+                ["5", "Протестируйте AI-сотрудника", "Напишите вашему боту первое сообщение и посмотрите как он отвечает. Если ответ нужно поправить — нажмите кнопку коррекции прямо в чате.", "/dashboard"],
+              ].map(([num, title, desc, link]) => `
+                <table cellpadding="0" cellspacing="0" border="0" style="width: 100%; margin-bottom: 18px;">
+                  <tr>
+                    <td valign="top" style="width: 36px; padding-right: 14px;">
+                      <div style="width: 28px; height: 28px; background: #1a1a2e; border-radius: 50%; text-align: center; line-height: 28px; font-size: 13px; font-weight: 700; color: #ffffff;">${num}</div>
+                    </td>
+                    <td valign="top">
+                      <p style="color: #1a1a2e; font-size: 15px; font-weight: 600; margin: 4px 0 4px;">${title}</p>
+                      <p style="color: #6b7280; font-size: 14px; margin: 0; line-height: 1.55;">${desc}</p>
+                      <a href="${appUrl}${link}" style="color: #2563eb; font-size: 13px; text-decoration: none; margin-top: 4px; display: inline-block;">Перейти →</a>
+                    </td>
+                  </tr>
+                </table>
+              `).join("")}
+            </div>
 
-              <!-- CTA Button -->
-              <a href="${appUrl}/dashboard" style="display: block; text-align: center; padding: 16px 24px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; margin-bottom: 24px;">
-                Открыть дашборд →
+            <!-- CTA Button -->
+            <div style="padding: 0 32px 24px;">
+              <a href="${appUrl}/dashboard" style="display: block; text-align: center; padding: 14px 24px; background: #1a1a2e; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">
+                Открыть дашборд
               </a>
+            </div>
 
-              <!-- Tips -->
-              <div style="background: rgba(59,130,246,0.05); border: 1px solid rgba(59,130,246,0.15); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-                <p style="color: #60a5fa; font-size: 13px; font-weight: 600; margin: 0 0 12px;">💡 Советы для максимальной эффективности:</p>
-                <ul style="color: #9ca3af; font-size: 13px; line-height: 1.8; margin: 0; padding-left: 20px;">
-                  <li>Заполните раздел «FAQ» — бот будет отвечать на частые вопросы клиентов</li>
-                  <li>Включите автоматические напоминания — снизит неявки на 40–60%</li>
-                  <li>Добавьте ссылки на Google Maps и 2GIS для сбора отзывов</li>
-                  <li>Укажите часовой пояс, чтобы записи создавались правильно</li>
+            <!-- Capabilities -->
+            <div style="padding: 0 32px 28px;">
+              <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+                <p style="color: #1a1a2e; font-size: 14px; font-weight: 600; margin: 0 0 12px;">Что умеет ваш AI-сотрудник</p>
+                <ul style="color: #4b5563; font-size: 13.5px; line-height: 1.8; margin: 0; padding-left: 18px;">
+                  <li>Отвечает за 3 секунды, 24/7, на 4 языках (русский, английский, узбекский, казахский)</li>
+                  <li>Записывает клиентов на приём, оформляет заказы, проверяет расписание мастеров</li>
+                  <li>Отправляет фото товаров и ссылки на сайт прямо в чат клиента</li>
+                  <li>Предлагает пакеты услуг со скидкой и делает допродажи</li>
+                  <li>Помнит каждого клиента — историю визитов, предпочтения, заметки</li>
+                  <li>Учитывает несовместимости услуг (не предложит массаж после ботокса)</li>
+                  <li>Автоматически считает зарплаты сотрудников (ставка + комиссия + премии и штрафы)</li>
+                  <li>Отправляет напоминания за 24ч и 2ч до визита, собирает отзывы</li>
+                  <li>Возвращает ушедших клиентов через автоматическую реактивацию</li>
                 </ul>
               </div>
+            </div>
 
-              <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 0;">
-                Есть вопросы? Напишите нам — <a href="mailto:support@staffix.io" style="color: #60a5fa;">support@staffix.io</a><br>
-                Или в Telegram: <a href="https://t.me/staffix_support" style="color: #60a5fa;">@staffix_support</a>
+            <!-- Documentation -->
+            <div style="padding: 0 32px 28px;">
+              <p style="color: #1a1a2e; font-size: 14px; font-weight: 600; margin: 0 0 8px;">Полная документация</p>
+              <p style="color: #6b7280; font-size: 14px; line-height: 1.6; margin: 0 0 8px;">
+                Подробные инструкции по каждому разделу со скриншотами и примерами:
+              </p>
+              <a href="${appUrl}/docs" style="color: #2563eb; font-size: 14px; text-decoration: none;">${appUrl}/docs</a>
+            </div>
+
+            <!-- Support -->
+            <div style="padding: 0 32px 28px;">
+              <p style="color: #1a1a2e; font-size: 14px; font-weight: 600; margin: 0 0 10px;">Нужна помощь?</p>
+              <p style="color: #6b7280; font-size: 14px; line-height: 1.7; margin: 0;">
+                Если возникнут вопросы — напишите нам. Команда поддержки отвечает в течение часа в рабочее время.<br>
+                Email: <a href="mailto:support@staffix.io" style="color: #2563eb; text-decoration: none;">support@staffix.io</a><br>
+                Telegram: <a href="https://t.me/staffix_support_bot" style="color: #2563eb; text-decoration: none;">@staffix_support_bot</a>
               </p>
             </div>
 
             <!-- Footer -->
-            <div style="padding: 20px 32px; background: rgba(0,0,0,0.2); text-align: center; border-top: 1px solid rgba(255,255,255,0.05);">
-              <p style="color: #4b5563; font-size: 12px; margin: 0;">
-                © 2025 Staffix — AI-сотрудник для вашего бизнеса<br>
-                <a href="${appUrl}" style="color: #6b7280;">staffix.io</a>
+            <div style="padding: 20px 32px; background: #f9fafb; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="color: #1a1a2e; font-size: 13px; font-weight: 600; margin: 0 0 4px;">Команда Staffix</p>
+              <p style="color: #6b7280; font-size: 12px; margin: 0;">
+                <a href="${appUrl}" style="color: #6b7280; text-decoration: none;">staffix.io</a> · AI-сотрудник для вашего бизнеса
               </p>
             </div>
           </div>
