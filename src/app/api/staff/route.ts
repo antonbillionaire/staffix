@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     }
 
     const data = await request.json();
-    const { name, role, photo, telegramUsername, notificationsEnabled } = data;
+    const { name, role, photo, telegramUsername, notificationsEnabled, baseRate, commissionPercent } = data;
 
     if (!name) {
       return NextResponse.json({ error: "Имя обязательно" }, { status: 400 });
@@ -75,6 +75,8 @@ export async function POST(request: Request) {
         photo: photo || null,
         telegramUsername: telegramUsername || null,
         notificationsEnabled: notificationsEnabled !== undefined ? notificationsEnabled : true,
+        baseRate: baseRate !== undefined && baseRate !== null && baseRate !== "" ? Math.round(Number(baseRate)) : null,
+        commissionPercent: commissionPercent !== undefined && commissionPercent !== null && commissionPercent !== "" ? Number(commissionPercent) : null,
         businessId: business.id,
       },
     });

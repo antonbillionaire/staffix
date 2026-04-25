@@ -63,6 +63,22 @@ interface BusinessContext {
   deliveryFreeFrom: number | null;
   deliveryZones: string | null;
   services: Array<{ name: string; price: number; duration: number }>;
+  servicePackages: Array<{
+    name: string;
+    description: string | null;
+    services: string[];
+    regularPrice: number;
+    finalPrice: number;
+    savedAmount: number;
+    autoSuggest: boolean;
+  }>;
+  serviceIncompatibilities: Array<{
+    serviceA: string;
+    serviceB: string;
+    cooldownDays: number;
+    bidirectional: boolean;
+    reason: string | null;
+  }>;
   staff: Array<{ name: string; role: string | null }>;
   faqs: Array<{ question: string; answer: string }>;
   documents: Array<{ name: string; extractedText: string | null }>;
@@ -225,6 +241,51 @@ export async function buildBusinessContext(
     const loyaltyPrograms = biz.loyaltyPrograms || [];
     const firstProgram = loyaltyPrograms.length > 0 ? loyaltyPrograms[0] : null;
 
+    // Load service packages and incompatibilities (in try/catch - tables may not exist yet)
+    let servicePackages: BusinessContext["servicePackages"] = [];
+    let serviceIncompatibilities: BusinessContext["serviceIncompatibilities"] = [];
+    try {
+      const pkgs = await prisma.servicePackage.findMany({
+        where: { businessId, isActive: true },
+        include: { items: { include: { service: { select: { name: true, price: true } } } } },
+      });
+      servicePackages = pkgs.map((p) => {
+        const regularPrice = p.items.reduce((sum, i) => sum + i.service.price, 0);
+        let finalPrice = regularPrice;
+        if (p.discountType === "percent" && p.discountPercent) {
+          finalPrice = Math.round(regularPrice * (1 - p.discountPercent / 100));
+        } else if (p.discountType === "fixed" && p.fixedPrice !== null) {
+          finalPrice = p.fixedPrice;
+        }
+        return {
+          name: p.name,
+          description: p.description,
+          services: p.items.map((i) => i.service.name),
+          regularPrice,
+          finalPrice,
+          savedAmount: regularPrice - finalPrice,
+          autoSuggest: p.autoSuggest,
+        };
+      });
+
+      const incs = await prisma.serviceIncompatibility.findMany({
+        where: { businessId },
+        include: {
+          serviceA: { select: { name: true } },
+          serviceB: { select: { name: true } },
+        },
+      });
+      serviceIncompatibilities = incs.map((i) => ({
+        serviceA: i.serviceA.name,
+        serviceB: i.serviceB.name,
+        cooldownDays: i.cooldownDays,
+        bidirectional: i.bidirectional,
+        reason: i.reason,
+      }));
+    } catch (e) {
+      console.log("buildBusinessContext: packages/incompatibilities query failed (table may not exist yet)", e);
+    }
+
     return {
       name: business.name,
       businessType: business.businessType,
@@ -244,6 +305,8 @@ export async function buildBusinessContext(
       deliveryFreeFrom: biz.deliveryFreeFrom ?? null,
       deliveryZones: biz.deliveryZones ?? null,
       services: business.services,
+      servicePackages,
+      serviceIncompatibilities,
       staff: business.staff,
       faqs: business.faqs,
       documents: business.documents,
@@ -318,6 +381,26 @@ ${
         .join("\n")
     : "Услуги пока не добавлены в систему"
 }
+${business.servicePackages && business.servicePackages.length > 0 ? `
+## Пакеты услуг (комбо со скидкой):
+${business.servicePackages.map((p) => {
+  const desc = p.description ? ` — ${p.description}` : "";
+  const save = p.savedAmount > 0 ? ` (экономия ${p.savedAmount} ${currencyLabel(business.country)})` : "";
+  return `- "${p.name}"${desc}: ${p.services.join(" + ")} = ${p.finalPrice} ${currencyLabel(business.country)}${save}${p.autoSuggest ? " [предлагай автоматически]" : ""}`;
+}).join("\n")}
+
+ВАЖНО про пакеты: когда клиент выбирает услугу из пакета, мягко предложи добавить остальные услуги пакета — это выгоднее. Например: "Можем сразу сделать стрижку + бороду в пакете — выйдет на 10% дешевле".
+` : ""}
+${business.serviceIncompatibilities && business.serviceIncompatibilities.length > 0 ? `
+## Несовместимость услуг:
+${business.serviceIncompatibilities.map((i) => {
+  const dir = i.bidirectional ? "↔" : "→";
+  const reason = i.reason ? ` (${i.reason})` : "";
+  return `- ${i.serviceA} ${dir} ${i.serviceB}: нельзя ранее чем через ${i.cooldownDays} дней${reason}`;
+}).join("\n")}
+
+ВАЖНО про несовместимости: перед записью на услугу из этого списка проверь историю клиента (последние визиты выше). Если недавно была несовместимая услуга — мягко предупреди клиента и предложи альтернативу или другую дату. Не отказывай резко — объясни причину.
+` : ""}
 
 ## Наши мастера/сотрудники:
 ${

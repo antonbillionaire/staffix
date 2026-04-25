@@ -13,6 +13,8 @@ interface Staff {
   telegramUsername: string | null;
   telegramChatId: string | null;
   notificationsEnabled: boolean;
+  baseRate: number | null;
+  commissionPercent: number | null;
 }
 
 interface ScheduleDay {
@@ -99,6 +101,8 @@ export default function StaffPage() {
     photo: "",
     telegramUsername: "",
     notificationsEnabled: true,
+    baseRate: "" as string | number,
+    commissionPercent: "" as string | number,
   });
 
   // Schedule modal
@@ -163,10 +167,12 @@ export default function StaffPage() {
         photo: person.photo || "",
         telegramUsername: person.telegramUsername || "",
         notificationsEnabled: person.notificationsEnabled,
+        baseRate: person.baseRate ?? "",
+        commissionPercent: person.commissionPercent ?? "",
       });
     } else {
       setEditingStaff(null);
-      setFormData({ name: "", role: "", photo: "", telegramUsername: "", notificationsEnabled: true });
+      setFormData({ name: "", role: "", photo: "", telegramUsername: "", notificationsEnabled: true, baseRate: "", commissionPercent: "" });
     }
     setIsModalOpen(true);
   };
@@ -174,7 +180,7 @@ export default function StaffPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingStaff(null);
-    setFormData({ name: "", role: "", photo: "", telegramUsername: "", notificationsEnabled: true });
+    setFormData({ name: "", role: "", photo: "", telegramUsername: "", notificationsEnabled: true, baseRate: "", commissionPercent: "" });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -560,6 +566,38 @@ export default function StaffPage() {
                 <p className={`text-xs mt-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
                   {t("staffPage.telegramHint")}
                 </p>
+              </div>
+
+              {/* Зарплата: ставка + комиссия */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
+                    {t("staffPage.baseRate") || "Ставка (за месяц)"}
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.baseRate}
+                    onChange={(e) => setFormData({ ...formData, baseRate: e.target.value })}
+                    placeholder="0"
+                    min="0"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white" : "border-gray-300"}`}
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
+                    {t("staffPage.commission") || "Комиссия %"}
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.commissionPercent}
+                    onChange={(e) => setFormData({ ...formData, commissionPercent: e.target.value })}
+                    placeholder="0"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white" : "border-gray-300"}`}
+                  />
+                </div>
               </div>
 
               {/* Notifications toggle */}

@@ -190,6 +190,11 @@ model Business {
   // CRM интеграции
   crmIntegrations    CrmIntegration[]
 
+  // Финансы (зарплаты сотрудников)
+  financeTransactions FinanceTransaction[]
+  servicePackages     ServicePackage[]
+  serviceIncompatibilities ServiceIncompatibility[]
+
   // WhatsApp/Facebook разговоры
   channelConversations ChannelConversation[]
 
@@ -245,12 +250,97 @@ model Service {
   price         Int
   duration      Int       // минуты
 
+  // Автодобавление: при выборе этой услуги автоматически предложить эти услуги
+  // Хранится массив ID услуг через запятую (для простоты)
+  autoAddServiceIds String[]  @default([])
+
   businessId    String
   business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  bookings      Booking[]
+  bookings              Booking[]
+  packageItems          ServicePackageItem[]
+  incompatibilitiesA    ServiceIncompatibility[] @relation("ServiceA")
+  incompatibilitiesB    ServiceIncompatibility[] @relation("ServiceB")
 
   @@index([businessId])
+}
+
+// Пакет услуг (комбо со скидкой или фикс. ценой)
+model ServicePackage {
+  id            String    @id @default(cuid())
+
+  name          String    // "Свадебный комплекс", "Стрижка + борода"
+  description   String?
+
+  // Тип скидки: percent (процент) | fixed (фикс. цена за весь пакет) | none (без скидки)
+  discountType  String    @default("percent")
+  discountPercent Float?  // если discountType = "percent"
+  fixedPrice    Int?      // если discountType = "fixed" — общая цена пакета
+
+  isActive      Boolean   @default(true)
+
+  // AI должен ли предлагать клиентам этот пакет автоматически
+  autoSuggest   Boolean   @default(true)
+
+  businessId    String
+  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  items         ServicePackageItem[]
+  bookings      Booking[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([businessId, isActive])
+}
+
+// Услуги внутри пакета
+model ServicePackageItem {
+  id          String          @id @default(cuid())
+
+  packageId   String
+  package     ServicePackage  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  serviceId   String
+  service     Service         @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  // Порядок в пакете (для UI)
+  sortOrder   Int             @default(0)
+
+  @@unique([packageId, serviceId])
+  @@index([packageId])
+}
+
+// Несовместимости услуг
+// "После услуги A нельзя делать услугу B в течение N дней"
+model ServiceIncompatibility {
+  id              String    @id @default(cuid())
+
+  // Первая услуга (которая делается)
+  serviceAId      String
+  serviceA        Service   @relation("ServiceA", fields: [serviceAId], references: [id], onDelete: Cascade)
+
+  // Несовместимая услуга
+  serviceBId      String
+  serviceB        Service   @relation("ServiceB", fields: [serviceBId], references: [id], onDelete: Cascade)
+
+  // Период несовместимости в днях после серии A
+  cooldownDays    Int       @default(7)
+
+  // Симметрично? (если да — то и B->A нельзя)
+  bidirectional   Boolean   @default(true)
+
+  // Причина для бота (объясняет клиенту)
+  reason          String?   // "Не рекомендуется делать массаж лица в течение 5 дней после ботокса"
+
+  businessId      String
+  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime  @default(now())
+
+  @@index([businessId])
+  @@index([serviceAId])
+  @@index([serviceBId])
 }
 
 // Мастера/сотрудники
@@ -268,12 +358,43 @@ model Staff {
   businessId    String
   business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
+  // Зарплата
+  baseRate          Int?     // Фиксированная ставка (за месяц)
+  commissionPercent Float?   // % с услуги/продажи (например 30%)
+
   bookings      Booking[]
   orders        Order[]
   schedule      StaffSchedule[]
   timeOffs      StaffTimeOff[]
+  financeTransactions FinanceTransaction[]
 
   @@index([businessId])
+}
+
+// Финансовые транзакции по сотрудникам (премии, штрафы, выплаты)
+model FinanceTransaction {
+  id          String   @id @default(cuid())
+
+  staffId     String
+  staff       Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  // Тип: bonus (премия) | fine (штраф) | payout (выплата) | adjustment (корректировка)
+  type        String
+
+  amount      Int      // сумма (положительная всегда; знак определяется типом)
+  reason      String?  // комментарий "Премия за выполнение плана", "Штраф за опоздание"
+
+  // Период к которому относится (для группировки в отчётах)
+  periodStart DateTime?
+  periodEnd   DateTime?
+
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@index([staffId, createdAt])
+  @@index([businessId, type, createdAt])
 }
 
 // FAQ / База знаний
@@ -312,6 +433,11 @@ model Booking {
   staffId       String?
   staff         Staff?    @relation(fields: [staffId], references: [id], onDelete: SetNull)
 
+  // Пакет услуг (если запись часть пакета)
+  servicePackageId String?
+  servicePackage   ServicePackage? @relation(fields: [servicePackageId], references: [id], onDelete: SetNull)
+  packageGroupId   String?  // общий ID для всех записей одного пакета (для группировки)
+
   // Автоматизации
   reminders     ScheduledReminder[]
   reviews       Review[]
@@ -322,6 +448,7 @@ model Booking {
   @@index([businessId, date])
   @@index([staffId, date])
   @@index([businessId, clientTelegramId, date])
+  @@index([packageGroupId])
 }
 
 // Диалоги с клиентами
