@@ -106,8 +106,9 @@ export async function sendFBTyping(
 export interface FBIncomingMessage {
   senderId: string;    // Facebook PSID (Page-Scoped ID)
   pageId: string;      // which page received this
-  text: string;        // message text
+  text: string;        // message text (may be empty if audioUrl is set)
   messageId: string;   // FB message ID
+  audioUrl?: string;   // direct URL to audio attachment for STT
 }
 
 /**
@@ -127,14 +128,22 @@ export function parseFBWebhookAll(body: Record<string, unknown>): FBIncomingMess
 
         // Skip echo messages (bot's own messages)
         if (message?.is_echo) continue;
-        // Skip postbacks and other non-text events
-        if (!message?.text) continue;
+        if (!message) continue;
+
+        // Detect audio attachment for transcription
+        const attachments = message.attachments as Array<{ type?: string; payload?: { url?: string } }> | undefined;
+        const audioAtt = attachments?.find((a) => a?.type === "audio");
+        const audioUrl = audioAtt?.payload?.url;
+
+        // Skip if neither text nor audio (postbacks, stickers, images)
+        if (!message.text && !audioUrl) continue;
 
         results.push({
           senderId: sender?.id,
           pageId: recipient?.id,
-          text: String(message.text),
+          text: message.text ? String(message.text) : "",
           messageId: String(message.mid || ""),
+          audioUrl,
         });
       }
     }

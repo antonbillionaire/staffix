@@ -124,7 +124,23 @@ export async function POST(request: Request) {
   // after response is sent, so fire-and-forget doesn't work reliably.
   // Meta allows up to 20s before timeout, Claude API takes ~3-5s.
   for (const msg of messages) {
-    // Handle non-text messages (images, audio, stickers, etc.)
+    // Try to transcribe audio attachments if no text
+    if (!msg.text.trim() && msg.audioUrl) {
+      try {
+        const { downloadAttachmentMedia, transcribeAudio } = await import("@/lib/voice-ai");
+        const buf = await downloadAttachmentMedia(msg.audioUrl);
+        const result = await transcribeAudio(buf, "voice.mp4");
+        const transcription = (result.text || "").trim();
+        if (transcription) {
+          console.log(`[FB Webhook] Transcribed audio (${result.language || "?"}): "${transcription.slice(0, 80)}"`);
+          msg.text = transcription;
+        }
+      } catch (e) {
+        console.error("[FB Webhook] STT failed:", e);
+      }
+    }
+
+    // Handle non-text messages (images, stickers, failed audio transcription)
     if (!msg.text.trim()) {
       if (!(await markWebhookProcessed(msg.messageId))) continue;
       const biz = await prisma.business.findFirst({
@@ -132,7 +148,7 @@ export async function POST(request: Request) {
         select: { fbPageAccessToken: true },
       });
       if (biz?.fbPageAccessToken) {
-        sendFBMessage(biz.fbPageAccessToken, msg.senderId, "Извините, я пока могу работать только с текстовыми сообщениями. Напишите ваш вопрос текстом.", msg.pageId).catch(() => {});
+        sendFBMessage(biz.fbPageAccessToken, msg.senderId, "Извините, я пока могу работать только с текстовыми и голосовыми сообщениями. Напишите ваш вопрос текстом или попробуйте записать ещё раз.", msg.pageId).catch(() => {});
       }
       continue;
     }

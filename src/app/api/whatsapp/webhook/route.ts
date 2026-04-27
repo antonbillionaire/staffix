@@ -96,7 +96,31 @@ export async function POST(request: Request) {
   // Skip duplicate webhook deliveries (before any processing)
   if (!(await markWebhookProcessed(msg.messageId))) return respond200();
 
-  // Handle non-text messages (images, audio, stickers, etc.)
+  // Try to transcribe voice/audio messages so they flow through as text
+  if ((msg.type === "audio" || msg.type === "voice") && msg.mediaId) {
+    const bizForToken = await prisma.business.findFirst({
+      where: businessId ? { id: businessId } : { waPhoneNumberId: msg.phoneNumberId, waActive: true },
+      select: { waAccessToken: true },
+    });
+    const token = bizForToken?.waAccessToken || process.env.WHATSAPP_ACCESS_TOKEN;
+    if (token) {
+      try {
+        const { downloadWAMedia, transcribeAudio } = await import("@/lib/voice-ai");
+        const buf = await downloadWAMedia(msg.mediaId, token);
+        const result = await transcribeAudio(buf, "voice.ogg");
+        const transcription = (result.text || "").trim();
+        if (transcription) {
+          console.log(`[WA Webhook] Transcribed audio (${result.language || "?"}): "${transcription.slice(0, 80)}"`);
+          msg.text = transcription;
+          msg.type = "text";
+        }
+      } catch (e) {
+        console.error("[WA Webhook] STT failed:", e);
+      }
+    }
+  }
+
+  // Handle non-text messages (images, stickers, failed audio transcription)
   if (msg.type !== "text" || !msg.text.trim()) {
     // Find business to get WA credentials and reply
     const biz = await prisma.business.findFirst({
@@ -105,7 +129,7 @@ export async function POST(request: Request) {
     });
     const nonTextToken = biz?.waAccessToken || process.env.WHATSAPP_ACCESS_TOKEN;
     if (biz?.waPhoneNumberId && nonTextToken) {
-      sendWAMessage(biz.waPhoneNumberId, nonTextToken, msg.waId, "Извините, я пока могу работать только с текстовыми сообщениями. Напишите ваш вопрос текстом.").catch(() => {});
+      sendWAMessage(biz.waPhoneNumberId, nonTextToken, msg.waId, "Извините, я пока могу работать только с текстовыми и голосовыми сообщениями. Напишите ваш вопрос текстом или попробуйте записать ещё раз.").catch(() => {});
     }
     return respond200();
   }

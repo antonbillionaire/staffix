@@ -107,8 +107,28 @@ export async function POST(request: Request) {
       if (!sender?.id || !message) continue;
       if (message.is_echo) continue;
 
-      // Handle non-text messages (images, audio, stickers, etc.)
-      if (!message.text) {
+      let messageText = (message.text as string | undefined) || "";
+
+      // Try to transcribe audio attachments if no text
+      if (!messageText) {
+        const attachments = message.attachments as Array<{ type?: string; payload?: { url?: string } }> | undefined;
+        const audioAtt = attachments?.find((a) => a?.type === "audio");
+        const audioUrl = audioAtt?.payload?.url;
+        if (audioUrl) {
+          try {
+            const { downloadAttachmentMedia, transcribeAudio } = await import("@/lib/voice-ai");
+            const buf = await downloadAttachmentMedia(audioUrl);
+            const result = await transcribeAudio(buf, "voice.mp4");
+            messageText = (result.text || "").trim();
+            console.log(`[IG Webhook] Transcribed audio (${result.language || "?"}): "${messageText.slice(0, 80)}"`);
+          } catch (e) {
+            console.error("[IG Webhook] STT failed:", e);
+          }
+        }
+      }
+
+      // Handle non-text messages (images, stickers, failed audio transcription)
+      if (!messageText) {
         const messageId = String(message.mid || "");
         if (!(await markWebhookProcessed(messageId))) continue;
         // Find business to reply
@@ -118,7 +138,7 @@ export async function POST(request: Request) {
         });
         if (biz?.fbPageAccessToken && biz.fbPageId) {
           const pgToken = await getPageAccessToken(biz.fbPageId, biz.fbPageAccessToken).catch(() => biz.fbPageAccessToken!);
-          await sendIGMessage(biz.fbPageId, pgToken, sender.id, "Извините, я пока могу работать только с текстовыми сообщениями. Напишите ваш вопрос текстом.").catch(() => {});
+          await sendIGMessage(biz.fbPageId, pgToken, sender.id, "Извините, я пока могу работать только с текстовыми и голосовыми сообщениями. Напишите ваш вопрос текстом или попробуйте записать ещё раз.").catch(() => {});
         }
         continue;
       }
@@ -126,10 +146,10 @@ export async function POST(request: Request) {
       const messageId = String(message.mid || "");
       if (!(await markWebhookProcessed(messageId))) continue;
 
-      console.log(`[IG Webhook] DM from ${sender.id} to account ${accountId}: "${String(message.text).slice(0, 50)}"`);
+      console.log(`[IG Webhook] DM from ${sender.id} to account ${accountId}: "${messageText.slice(0, 50)}"`);
 
       try {
-        await processIGMessage(accountId, sender.id, String(message.text));
+        await processIGMessage(accountId, sender.id, messageText);
       } catch (e) {
         console.error("[IG Webhook] processing error:", e);
       }

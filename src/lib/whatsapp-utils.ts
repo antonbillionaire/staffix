@@ -81,6 +81,7 @@ export interface WAIncomingMessage {
   messageId: string;   // WA message ID (for read receipts)
   phoneNumberId: string; // which number received this
   type: string;        // message type: "text", "image", "audio", etc.
+  mediaId?: string;    // for audio/voice/image — Meta media ID for download
 }
 
 export function parseWAWebhook(body: Record<string, unknown>): WAIncomingMessage | null {
@@ -103,6 +104,13 @@ export function parseWAWebhook(body: Record<string, unknown>): WAIncomingMessage
     const contact = contacts?.[0];
     const profile = contact?.profile as Record<string, string>;
 
+    // Extract media ID for audio/voice messages so caller can download and transcribe
+    let mediaId: string | undefined;
+    if (msgType === "audio" || msgType === "voice") {
+      const audio = (msg.audio || msg.voice) as Record<string, string> | undefined;
+      mediaId = audio?.id;
+    }
+
     return {
       waId: String(msg.from),
       name: profile?.name || String(msg.from),
@@ -110,6 +118,7 @@ export function parseWAWebhook(body: Record<string, unknown>): WAIncomingMessage
       messageId: String(msg.id),
       phoneNumberId: String(metadata?.phone_number_id || ""),
       type: msgType,
+      mediaId,
     };
   } catch {
     return null;
