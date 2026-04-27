@@ -12,6 +12,7 @@ import {
   Eye,
   Phone,
   Star,
+  Trash2,
 } from "lucide-react";
 
 interface SalesLead {
@@ -82,6 +83,25 @@ export default function AdminSalesLeads() {
     e.preventDefault();
     setPagination((p) => ({ ...p, page: 1 }));
     fetchData();
+  };
+
+  const [resettingId, setResettingId] = useState<string | null>(null);
+  const handleResetHistory = async (id: string, name: string | null) => {
+    if (!confirm(`Очистить историю диалога Виктора с лидом ${name || id}? AI забудет прошлые сообщения и начнёт чистый диалог в новом тоне.`)) return;
+    setResettingId(id);
+    try {
+      const res = await fetch(`/api/admin/sales-leads/${id}/reset-history`, { method: "POST" });
+      if (res.ok) {
+        alert("История очищена");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(`Ошибка: ${data.error || "не удалось очистить"}`);
+      }
+    } catch (e) {
+      alert("Ошибка сети");
+    } finally {
+      setResettingId(null);
+    }
   };
 
   const getStageBadge = (stage: string) => {
@@ -261,6 +281,7 @@ export default function AdminSalesLeads() {
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Контакт</th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Бизнес</th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Дата</th>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Действия</th>
                 </tr>
               </thead>
               <tbody>
@@ -293,6 +314,20 @@ export default function AdminSalesLeads() {
                     </td>
                     <td className="py-3 px-4">
                       <p className="text-sm text-gray-400">{formatDate(lead.createdAt)}</p>
+                    </td>
+                    <td className="py-3 px-4">
+                      <button
+                        onClick={() => handleResetHistory(lead.id, lead.name)}
+                        disabled={resettingId === lead.id}
+                        title="Очистить историю диалога Виктора"
+                        className="p-1.5 rounded-md bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 disabled:opacity-30 transition-colors"
+                      >
+                        {resettingId === lead.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </button>
                     </td>
                   </tr>
                 ))}
