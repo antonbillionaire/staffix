@@ -159,13 +159,33 @@ export async function POST(request: NextRequest) {
       // ─────────────────────────────────────────────
       for (const messaging of entry.messaging || []) {
         const senderId = messaging.sender?.id;
-        const messageText = messaging.message?.text;
+        let messageText = messaging.message?.text;
         const messageId = messaging.message?.mid;
 
-        if (!senderId || !messageText) continue;
+        if (!senderId || !messaging.message) continue;
 
         // Skip echo messages (bot's own responses sent back by Meta)
         if (messaging.message.is_echo) continue;
+
+        // Try to transcribe audio attachments if no text
+        if (!messageText) {
+          const attachments = messaging.message.attachments as Array<{ type?: string; payload?: { url?: string } }> | undefined;
+          const audioAtt = attachments?.find((a) => a?.type === "audio");
+          const audioUrl = audioAtt?.payload?.url;
+          if (audioUrl) {
+            try {
+              const { downloadAttachmentMedia, transcribeAudio } = await import("@/lib/voice-ai");
+              const buf = await downloadAttachmentMedia(audioUrl);
+              const result = await transcribeAudio(buf, "voice.mp4");
+              messageText = (result.text || "").trim();
+              console.log(`[Sales IG] Transcribed audio (${result.language || "?"}): "${messageText.slice(0, 80)}"`);
+            } catch (e) {
+              console.error("[Sales IG] STT failed:", e);
+            }
+          }
+        }
+
+        if (!messageText) continue;
 
         // Skip duplicate webhook deliveries (Meta retries if response >5s)
         if (messageId && !(await markWebhookProcessed(messageId))) continue;

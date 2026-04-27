@@ -126,13 +126,29 @@ export async function POST(request: NextRequest) {
         if (!value?.messages) continue;
 
         for (const message of value.messages) {
-          // Only handle text messages
-          if (message.type !== "text") continue;
-
           const senderPhone = message.from;
-          const messageText = message.text?.body;
+          let messageText: string | undefined = message.text?.body;
           const messageId = message.id;
 
+          // Transcribe voice/audio messages
+          if (!messageText && (message.type === "audio" || message.type === "voice")) {
+            const audioObj = message.audio || message.voice;
+            const mediaId = audioObj?.id;
+            const token = process.env.WHATSAPP_ACCESS_TOKEN || process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+            if (mediaId && token) {
+              try {
+                const { downloadWAMedia, transcribeAudio } = await import("@/lib/voice-ai");
+                const buf = await downloadWAMedia(mediaId, token);
+                const result = await transcribeAudio(buf, "voice.ogg");
+                messageText = (result.text || "").trim();
+                console.log(`[Sales WA] Transcribed audio (${result.language || "?"}): "${messageText.slice(0, 80)}"`);
+              } catch (e) {
+                console.error("[Sales WA] STT failed:", e);
+              }
+            }
+          }
+
+          // Skip non-text non-audio messages (images, stickers, failed transcription)
           if (!senderPhone || !messageText) continue;
 
           console.log(`[WA Sales Webhook] Message from ${senderPhone}: "${messageText.slice(0, 50)}"`);

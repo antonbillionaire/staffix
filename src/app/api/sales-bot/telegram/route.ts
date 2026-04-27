@@ -20,6 +20,8 @@ interface TelegramUpdate {
     };
     date: number;
     text?: string;
+    voice?: { file_id: string; duration: number; mime_type?: string; file_size?: number };
+    audio?: { file_id: string; duration: number; mime_type?: string; file_size?: number };
   };
   callback_query?: {
     id: string;
@@ -296,17 +298,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Only process text messages
-    if (!update.message?.text) {
+    // Only process text/voice/audio messages
+    if (!update.message?.text && !update.message?.voice && !update.message?.audio) {
       return NextResponse.json({ ok: true });
     }
 
     const { message } = update;
     const chatId = message.chat.id;
-    const userMessage = message.text || "";
+    let userMessage = message.text || "";
     const userName =
       message.from.first_name +
       (message.from.last_name ? ` ${message.from.last_name}` : "");
+
+    // Transcribe voice/audio via Groq Whisper
+    if (!userMessage && (message.voice || message.audio)) {
+      const fileId = message.voice?.file_id || message.audio?.file_id;
+      const botToken = process.env.SALES_BOT_TELEGRAM_TOKEN;
+      if (botToken && fileId) {
+        try {
+          const { downloadTelegramFile, transcribeAudio } = await import("@/lib/voice-ai");
+          const buf = await downloadTelegramFile(botToken, fileId);
+          const filename = message.voice ? "voice.ogg" : "audio.mp3";
+          const result = await transcribeAudio(buf, filename);
+          userMessage = (result.text || "").trim();
+          console.log(`[Sales TG] Transcribed ${message.voice ? "voice" : "audio"} (${result.language || "?"}): "${userMessage.slice(0, 80)}"`);
+        } catch (e) {
+          console.error("[Sales TG] STT failed:", e);
+        }
+      }
+      if (!userMessage) {
+        await sendTelegramMessage(
+          chatId,
+          "Извините, не удалось распознать голосовое сообщение. Пожалуйста, напишите текстом или попробуйте записать ещё раз."
+        );
+        return NextResponse.json({ ok: true });
+      }
+    }
 
     // Save/update lead
     await upsertSalesLead(
