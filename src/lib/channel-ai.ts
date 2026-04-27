@@ -264,7 +264,8 @@ async function handleChannelToolCall(
   toolInput: Record<string, any>,
   businessId: string,
   clientId: string,
-  channel: string
+  channel: string,
+  clientName?: string
 ): Promise<string> {
   try {
     switch (toolName) {
@@ -309,7 +310,8 @@ async function handleChannelToolCall(
           clientId,
           channel,
           toolInput.status,
-          toolInput.reason
+          toolInput.reason,
+          clientName
         );
         return JSON.stringify(result);
       }
@@ -530,7 +532,8 @@ export async function generateChannelAIResponse(
             block.input as Record<string, string>,
             businessId,
             clientId,
-            channel
+            channel,
+            clientName
           );
           toolResults.push({
             type: "tool_result",
