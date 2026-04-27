@@ -8,6 +8,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { getSalesSystemPrompt } from "@/lib/sales-bot/system-prompt";
+import { getInstagramUserProfile } from "@/lib/sales-bot/meta-api";
 import { notifyAdmin } from "@/lib/admin-notify";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -245,16 +246,36 @@ async function getOrCreateLead(
     ? await prisma.salesLead.findFirst({ where: { [channelField]: channelId } })
     : null;
 
+  // For Instagram, fetch profile name from Graph API if not provided
+  let resolvedName = name || null;
+  const isInstagram = channel === "instagram" || channel === "instagram_comment";
+  if (isInstagram && !resolvedName) {
+    try {
+      const profile = await getInstagramUserProfile(channelId);
+      if (profile) {
+        resolvedName = profile.name || (profile.username ? `@${profile.username}` : null);
+      }
+    } catch {
+      // Ignore profile fetch errors — lead still gets created, just without name
+    }
+  }
+
   if (!lead) {
     lead = await prisma.salesLead.create({
       data: {
         channel: channel.replace("_comment", ""),
         ...(channelField ? { [channelField]: channelId } : {}),
-        name: name || null,
+        name: resolvedName,
         phone: phone || null,
         stage: "new",
         history: [],
       },
+    });
+  } else if (isInstagram && !lead.name && resolvedName) {
+    // Backfill missing name on existing IG lead
+    lead = await prisma.salesLead.update({
+      where: { id: lead.id },
+      data: { name: resolvedName },
     });
   }
 
