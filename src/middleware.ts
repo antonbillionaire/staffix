@@ -49,8 +49,11 @@ export function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/api/") &&
     !pathname.includes("/webhook") &&
+    !pathname.startsWith("/api/sales-bot/") &&
+    !pathname.startsWith("/api/webhooks/") &&
     !pathname.startsWith("/api/cron/") &&
     !pathname.startsWith("/api/auth/") &&
+    !pathname.startsWith("/api/instagram/comments") &&
     ["POST", "PUT", "DELETE", "PATCH"].includes(request.method)
   ) {
     const origin = request.headers.get("origin");
