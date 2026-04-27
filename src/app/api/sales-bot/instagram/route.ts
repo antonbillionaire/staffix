@@ -47,7 +47,7 @@ async function generateAIResponse(
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return "Привет! Посетите https://staffix.io для получения информации.";
+    return "Здравствуйте! Посетите https://staffix.io для получения информации.";
   }
 
   try {
