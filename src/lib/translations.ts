@@ -798,6 +798,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "staffPage.roleCustom": "Другое...",
     "staffPage.roleManager": "Менеджер",
     "staffPage.roleMaster": "Мастер",
+    "staffPage.roleDoctor": "Врач",
+    "staffPage.baseRate": "Ставка (за месяц)",
+    "staffPage.commission": "Комиссия %",
 
     // Calendar
     "nav.calendar": "Календарь",
@@ -2575,6 +2578,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "staffPage.roleCustom": "Other...",
     "staffPage.roleManager": "Manager",
     "staffPage.roleMaster": "Specialist",
+    "staffPage.roleDoctor": "Doctor",
+    "staffPage.baseRate": "Base rate (per month)",
+    "staffPage.commission": "Commission %",
 
     // Calendar
     "nav.calendar": "Calendar",
@@ -4352,6 +4358,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "staffPage.roleCustom": "Boshqa...",
     "staffPage.roleManager": "Menejer",
     "staffPage.roleMaster": "Usta",
+    "staffPage.roleDoctor": "Shifokor",
+    "staffPage.baseRate": "Stavka (oyiga)",
+    "staffPage.commission": "Komissiya %",
 
     // Calendar
     "nav.calendar": "Kalendar",
@@ -6127,6 +6136,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "staffPage.roleCustom": "Басқа...",
     "staffPage.roleManager": "Менеджер",
     "staffPage.roleMaster": "Шебер",
+    "staffPage.roleDoctor": "Дәрігер",
+    "staffPage.baseRate": "Айлық (ай сайын)",
+    "staffPage.commission": "Комиссия %",
 
     // Calendar
     "nav.calendar": "Күнтізбе",

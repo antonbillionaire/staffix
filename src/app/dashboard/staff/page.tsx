@@ -84,6 +84,7 @@ export default function StaffPage() {
     { value: "admin", label: t("staffPage.roleAdmin") },
     { value: "manager", label: t("staffPage.roleManager") },
     { value: "master", label: t("staffPage.roleMaster") },
+    { value: "doctor", label: t("staffPage.roleDoctor") },
     { value: "custom", label: t("staffPage.roleCustom") },
   ];
 
