@@ -177,6 +177,18 @@ export default function ServicesPage() {
     }
   };
 
+  const [deletingAll, setDeletingAll] = useState(false);
+  const handleDeleteAll = async () => {
+    if (!confirm(t("servicesPage.confirmDeleteAll").replace("{count}", String(services.length)))) return;
+    setDeletingAll(true);
+    try {
+      await fetch("/api/services/bulk-delete", { method: "DELETE" });
+      await fetchServices();
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   const formatPrice = (price: number) => {
     const locale = language === "ru" ? "ru-RU" : language === "kz" ? "kk-KZ" : language === "uz" ? "uz-UZ" : "en-US";
     const currency = language === "en" ? "$" : language === "kz" ? " тг" : language === "uz" ? " so'm" : " сум";
@@ -193,6 +205,16 @@ export default function ServicesPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {services.length > 0 && (
+            <button
+              onClick={handleDeleteAll}
+              disabled={deletingAll}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border ${isDark ? "border-red-500/30 text-red-400 hover:bg-red-500/10" : "border-red-300 text-red-600 hover:bg-red-50"} disabled:opacity-50`}
+            >
+              {deletingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              {t("servicesPage.deleteAll")}
+            </button>
+          )}
           <button
             onClick={() => { setIsImportOpen(true); setImportResult(null); setImportCsv(""); }}
             className={`px-3 py-2 rounded-lg font-medium flex items-center gap-2 text-sm border ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
