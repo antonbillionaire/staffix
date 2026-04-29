@@ -159,18 +159,32 @@ export default function CustomersPage() {
     fetchCustomers();
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    setImportError("");
+    setImportResult(null);
+
+    if (ext === "xlsx" || ext === "xls") {
+      try {
+        const mod = await import("xlsx");
+        const XLSX = mod.default || mod;
+        const buf = await file.arrayBuffer();
+        const data = new Uint8Array(buf);
+        const wb = XLSX.read(data, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const csv = XLSX.utils.sheet_to_csv(ws, { FS: ";", rawNumbers: true });
+        setImportCsv(csv);
+      } catch {
+        setImportError("Не удалось прочитать Excel-файл. Убедитесь что это .xlsx или .xls");
+      }
+      return;
+    }
 
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      setImportCsv(text);
-      setImportError("");
-      setImportResult(null);
-    };
-    reader.readAsText(file);
+    reader.onload = (event) => setImportCsv((event.target?.result as string) || "");
+    reader.readAsText(file, "utf-8");
   };
 
   const handleImport = async () => {
@@ -609,7 +623,7 @@ export default function CustomersPage() {
                 <span className={textSecondary}>{t("customers.chooseFile")}</span>
                 <input
                   type="file"
-                  accept=".csv,.txt,.tsv"
+                  accept=".csv,.txt,.tsv,.xlsx,.xls"
                   onChange={handleFileUpload}
                   className="hidden"
                 />

@@ -194,10 +194,15 @@ export async function POST(request: NextRequest) {
       let failedCount = 0;
 
       for (const client of clients) {
+        // Personalise: replace {{имя}} / {{name}} with client.name (or empty)
+        const personalised = content
+          .replace(/\{\{\s*имя\s*\}\}/gi, client.name || "")
+          .replace(/\{\{\s*name\s*\}\}/gi, client.name || "");
+
         const result = await sendAutomationMessage(
           business.botToken,
           client.telegramId,
-          content
+          personalised
         );
 
         if (result.success) {

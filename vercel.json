@@ -20,6 +20,10 @@
   ],
   "crons": [
     {
+      "path": "/api/cron/broadcasts",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/automations",
       "schedule": "*/15 * * * *"
     },

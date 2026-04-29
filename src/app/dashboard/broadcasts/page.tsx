@@ -51,6 +51,7 @@ export default function BroadcastsPage() {
   const [content, setContent] = useState("");
   const [targetSegment, setTargetSegment] = useState("all");
   const [sendNow, setSendNow] = useState(true);
+  const [scheduledAt, setScheduledAt] = useState("");
   const [creating, setCreating] = useState(false);
   const [preview, setPreview] = useState<{ total: number; reachable: number } | null>(null);
 
@@ -125,7 +126,8 @@ export default function BroadcastsPage() {
           title,
           content,
           targetSegment,
-          sendNow,
+          sendNow: sendNow && !scheduledAt,
+          scheduledAt: !sendNow && scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
         }),
       });
 
@@ -399,17 +401,36 @@ export default function BroadcastsPage() {
                 )}
               </div>
 
-              <div className={`flex items-center gap-3 p-3 ${isDark ? "bg-white/5" : "bg-gray-100"} rounded-xl`}>
-                <input
-                  type="checkbox"
-                  id="sendNow"
-                  checked={sendNow}
-                  onChange={(e) => setSendNow(e.target.checked)}
-                  className="w-5 h-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500"
-                />
-                <label htmlFor="sendNow" className={textSecondary}>
-                  {t("broadcasts.sendNow")}
-                </label>
+              <div className="space-y-2">
+                <div className={`flex items-center gap-3 p-3 ${isDark ? "bg-white/5" : "bg-gray-100"} rounded-xl`}>
+                  <input
+                    type="checkbox"
+                    id="sendNow"
+                    checked={sendNow}
+                    onChange={(e) => { setSendNow(e.target.checked); if (e.target.checked) setScheduledAt(""); }}
+                    className="w-5 h-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="sendNow" className={textSecondary}>
+                    {t("broadcasts.sendNow")}
+                  </label>
+                </div>
+
+                {!sendNow && (
+                  <div className={`p-3 ${isDark ? "bg-white/5" : "bg-gray-100"} rounded-xl`}>
+                    <label className={`block text-xs ${textTertiary} mb-1`}>
+                      Запланировать на дату и время
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={scheduledAt}
+                      onChange={(e) => setScheduledAt(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-lg ${inputBg} border ${inputBorder} ${textPrimary} text-sm`}
+                    />
+                    <p className={`text-xs ${textTertiary} mt-1`}>
+                      Рассылка уйдёт автоматически в указанное время (точность ±5 минут).
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
