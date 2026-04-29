@@ -75,6 +75,8 @@ export default function CustomerDetailPage({
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<CustomerDetail | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [botUsername, setBotUsername] = useState<string>("");
+  const [inviteCopied, setInviteCopied] = useState(false);
   const initialTab = searchParams.get("tab");
   const bookingsRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -90,6 +92,12 @@ export default function CustomerDetailPage({
 
   useEffect(() => {
     fetchCustomer();
+    fetch("/api/business")
+      .then((r) => r.json())
+      .then((b) => {
+        if (b?.business?.botUsername) setBotUsername(b.business.botUsername);
+      })
+      .catch(() => {});
   }, [id]);
 
   // Auto-scroll to section when tab param is set
@@ -348,13 +356,54 @@ export default function CustomerDetailPage({
 
         {/* Right column - Info & Messages */}
         <div className="space-y-6">
+          {/* Invite link — only for clients without a real Telegram chat (imported via CSV) */}
+          {(customer.telegramId.startsWith("-") || customer.telegramId === "0") && (
+            <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
+              <h2 className={`text-lg font-semibold ${textPrimary} mb-2`}>
+                Клиент не подключён к боту
+              </h2>
+              <p className={`${textSecondary} text-sm mb-4`}>
+                Этот клиент импортирован, но ещё не написал /start вашему боту, поэтому рассылки до него не дойдут. Отправьте ему персональную ссылку через WhatsApp или SMS — после клика он автоматически привяжется.
+              </p>
+              <button
+                onClick={() => {
+                  if (!botUsername) {
+                    alert("Сначала подключите Telegram-бота в /dashboard/channels");
+                    return;
+                  }
+                  const url = `https://t.me/${botUsername}?start=client_${customer.id}`;
+                  navigator.clipboard.writeText(url);
+                  setInviteCopied(true);
+                  setTimeout(() => setInviteCopied(false), 2000);
+                }}
+                disabled={!botUsername}
+                className={`w-full px-4 py-2 rounded-lg text-sm font-medium ${
+                  inviteCopied
+                    ? "bg-green-500/10 text-green-400 border border-green-500/30"
+                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                } disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
+              >
+                {inviteCopied ? "Ссылка скопирована" : "Скопировать ссылку для приглашения"}
+              </button>
+              {!botUsername && (
+                <p className={`${textTertiary} text-xs mt-2`}>
+                  Telegram-бот не подключён. Зайдите в Каналы → Telegram чтобы подключить.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Customer Info */}
           <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
             <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>Информация</h2>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className={textSecondary}>Telegram ID</span>
-                <span className={`${textPrimary} font-mono text-sm`}>{customer.telegramId}</span>
+                <span className={`${textPrimary} font-mono text-sm`}>
+                  {customer.telegramId.startsWith("-") || customer.telegramId === "0"
+                    ? "не подключён"
+                    : customer.telegramId}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className={textSecondary}>Первый контакт</span>

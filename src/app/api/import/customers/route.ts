@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
       phone: ["телефон", "phone", "номер", "mobile", "тел", "сотовый"],
       email: ["email", "почта", "e-mail", "mail", "эл.почта"],
       company: ["компания", "бизнес", "business", "company", "организация", "org"],
+      telegram: ["telegram", "телеграм", "телеграмм", "tg", "username", "юзернейм", "никнейм"],
       notes: ["заметки", "notes", "комментарий", "comment", "примечание"],
       loyalty: ["лояльность", "loyalty", "статус", "status", "уровень", "level", "программа"],
     };
@@ -135,6 +136,13 @@ export async function POST(request: NextRequest) {
     let skipped = 0;
     const errors: string[] = [];
 
+    // Negative placeholder counter — guarantees unique telegramId per imported
+    // client so the @@unique([businessId, telegramId]) index doesn't conflict.
+    // Real Telegram chat_ids are positive, so any negative value flags
+    // "client has not connected the bot yet". Updated when /start with
+    // ?start=client_<id> reaches the webhook.
+    const placeholderBase = -Date.now() * 1000;
+
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
       const rowNum = hasHeader ? i + 2 : i + 1;
@@ -144,11 +152,30 @@ export async function POST(request: NextRequest) {
       const phone = colMap.phone !== undefined ? row[colMap.phone]?.trim().replace(/[^\d+]/g, "") || "" : "";
       const email = colMap.email !== undefined ? row[colMap.email]?.trim() || "" : "";
       const company = colMap.company !== undefined ? row[colMap.company]?.trim() || "" : "";
+      const telegramRaw = colMap.telegram !== undefined ? row[colMap.telegram]?.trim() || "" : "";
       const notes = colMap.notes !== undefined ? row[colMap.notes]?.trim() || "" : "";
 
       const fullName = [name, surname].filter(Boolean).join(" ").trim();
 
-      if (!fullName && !phone && !email) {
+      // Normalize Telegram username: strip @, https://t.me/, @username, t.me/username
+      let tgUsername = telegramRaw
+        .replace(/^https?:\/\/t\.me\//i, "")
+        .replace(/^t\.me\//i, "")
+        .replace(/^@/, "")
+        .trim();
+      if (tgUsername && !/^[a-zA-Z0-9_]{3,32}$/.test(tgUsername)) {
+        tgUsername = ""; // ignore garbage values
+      }
+
+      // Combine notes: keep original notes + Telegram username info (no
+      // dedicated column on Client yet; using importantNotes as carrier so
+      // the value is visible in the client card).
+      const notesParts = [];
+      if (notes) notesParts.push(notes);
+      if (tgUsername) notesParts.push(`Telegram: @${tgUsername}`);
+      const importantNotes = notesParts.join("\n");
+
+      if (!fullName && !phone && !email && !tgUsername) {
         skipped++;
         continue;
       }
@@ -169,7 +196,7 @@ export async function POST(request: NextRequest) {
                 ...(surname ? { surname } : {}),
                 ...(email ? { email } : {}),
                 ...(company ? { company } : {}),
-                ...(notes ? { importantNotes: notes } : {}),
+                ...(importantNotes ? { importantNotes } : {}),
               },
             });
             updated++;
@@ -177,18 +204,21 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Create new client (use a placeholder telegramId since it's required)
-        // Imported clients get telegramId = 0 (will be linked when they message the bot)
+        // Create new client with a unique negative placeholder telegramId.
+        // Will be replaced with real chat_id when the client uses an invite link
+        // (?start=client_<id>) or otherwise sends /start to the bot.
+        const placeholderId = BigInt(placeholderBase - i);
+
         await prisma.client.create({
           data: {
             businessId,
-            telegramId: BigInt(0),
+            telegramId: placeholderId,
             name: fullName || null,
             surname: surname || null,
             phone: phone || null,
             email: email || null,
             company: company || null,
-            importantNotes: notes || null,
+            importantNotes: importantNotes || null,
           },
         });
         created++;

@@ -52,6 +52,22 @@ export default function BroadcastsPage() {
   const [targetSegment, setTargetSegment] = useState("all");
   const [sendNow, setSendNow] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [preview, setPreview] = useState<{ total: number; reachable: number } | null>(null);
+
+  // Refresh preview counts whenever segment changes (and modal is open)
+  useEffect(() => {
+    if (!showModal) return;
+    let cancelled = false;
+    fetch(`/api/broadcasts/preview?segment=${targetSegment}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && typeof data?.total === "number") {
+          setPreview({ total: data.total, reachable: data.reachable });
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [targetSegment, showModal]);
 
   const segmentLabels: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
     all: { label: t("broadcasts.segmentAll"), icon: <Users className="h-4 w-4" />, color: "text-blue-400" },
@@ -374,6 +390,13 @@ export default function BroadcastsPage() {
                     </button>
                   ))}
                 </div>
+                {preview && (
+                  <p className={`mt-2 text-xs ${textTertiary}`}>
+                    {preview.reachable === preview.total
+                      ? `Получат сообщение: ${preview.reachable}`
+                      : `Получат сообщение: ${preview.reachable} из ${preview.total} (только клиенты, написавшие боту /start)`}
+                  </p>
+                )}
               </div>
 
               <div className={`flex items-center gap-3 p-3 ${isDark ? "bg-white/5" : "bg-gray-100"} rounded-xl`}>

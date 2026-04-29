@@ -1319,6 +1319,42 @@ export async function POST(request: NextRequest) {
     if (userMessage === "/start" || userMessage.startsWith("/start ")) {
       // Проверяем параметр продавца: /start s_STAFFID
       const startParam = userMessage.split(" ")[1] || "";
+
+      // Invite link from a broadcast / CRM card: /start client_<cuid>
+      // Links a previously-imported client (with placeholder telegramId)
+      // to their real Telegram chat_id so future broadcasts can reach them.
+      if (startParam.startsWith("client_")) {
+        const importedClientId = startParam.slice(7);
+        try {
+          const importedClient = await prisma.client.findFirst({
+            where: { id: importedClientId, businessId: business.id },
+            select: { id: true, telegramId: true, name: true },
+          });
+          if (importedClient && importedClient.telegramId <= BigInt(0)) {
+            // Check that there isn't already a real client with this chat_id
+            // for this business — if there is, we merge by deleting the
+            // imported placeholder (the real one already has bookings/history).
+            const existingReal = await prisma.client.findUnique({
+              where: { businessId_telegramId: { businessId: business.id, telegramId } },
+              select: { id: true },
+            });
+            if (existingReal && existingReal.id !== importedClient.id) {
+              await prisma.client.delete({ where: { id: importedClient.id } });
+              console.log(`[Webhook] Invite link: dropped placeholder ${importedClient.id} (real client ${existingReal.id} already exists)`);
+            } else {
+              await prisma.client.update({
+                where: { id: importedClient.id },
+                data: { telegramId, name: importedClient.name || userName },
+              });
+              console.log(`[Webhook] Invite link: linked imported client ${importedClient.id} to chat ${telegramId}`);
+            }
+          }
+        } catch (e) {
+          console.error("[Webhook] Invite link error:", e);
+        }
+        // Continue to show welcome message
+      }
+
       if (startParam.startsWith("s_")) {
         const sellerStaffId = startParam.slice(2);
         // Привязываем клиента к продавцу

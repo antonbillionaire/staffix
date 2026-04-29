@@ -107,11 +107,11 @@ export default function OnboardingPage() {
   const totalSteps = 6;
 
   // Types that are clearly "sales" or "service" — so we don't need to ask
-  const knownSalesIds = ["online_shop", "flowers", "other_sales"];
+  const knownSalesIds = ["online_shop", "flowers", "other_sales", "travel", "restaurant", "delivery", "cleaning"];
   const knownServiceIds = [
     "salon", "barbershop", "clinic", "spa", "fitness", "auto_service",
-    "delivery", "cleaning", "pet_care", "restaurant", "repair",
-    "real_estate", "travel", "photo_video", "legal", "professional",
+    "pet_care", "repair",
+    "real_estate", "photo_video", "legal", "professional",
     "education", "events",
   ];
 

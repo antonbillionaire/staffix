@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     }
 
     // Determine dashboard mode from business type
-    const SALES_IDS = ["online_shop", "flowers", "other_sales"];
+    const SALES_IDS = ["online_shop", "flowers", "other_sales", "travel", "restaurant", "delivery", "cleaning"];
     const resolvedType = businessType || (Array.isArray(businessTypes) && businessTypes[0]) || null;
     const dashboardMode = resolvedType && SALES_IDS.includes(resolvedType) ? "sales" : "service";
 

@@ -116,9 +116,13 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    let clientsWhere: Record<string, unknown> = {
+    const clientsWhere: Record<string, unknown> = {
       businessId,
       isBlocked: false,
+      // Telegram-bot can only message clients who have written /start.
+      // Imported clients have negative placeholder ids (or 0); only positive
+      // chat_ids are real Telegram chat ids.
+      telegramId: { gt: BigInt(0) },
     };
 
     // Filter by segment
@@ -142,7 +146,7 @@ export async function POST(request: NextRequest) {
 
     if (clients.length === 0) {
       return NextResponse.json(
-        { error: "Нет клиентов для рассылки в выбранном сегменте" },
+        { error: "Нет клиентов для рассылки в выбранном сегменте (только клиенты, написавшие боту /start, могут получать сообщения)" },
         { status: 400 }
       );
     }
