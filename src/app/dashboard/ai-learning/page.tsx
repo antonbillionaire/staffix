@@ -143,9 +143,11 @@ export default function AiLearningPage() {
     }
   };
 
+  // Insights tab is hidden — generator not implemented yet (model + API + UI ready,
+  // missing piece is the analysis job that writes to AiInsight). Re-enable when
+  // src/lib/ai-insights.ts is implemented and called from cron/ai-learning.
   const tabs: { key: Tab; labelKey: string; icon: typeof Brain }[] = [
     { key: "corrections", labelKey: "aiLearning.corrections", icon: ThumbsDown },
-    { key: "insights", labelKey: "aiLearning.insights", icon: Lightbulb },
     { key: "profiles", labelKey: "aiLearning.clientProfiles", icon: Users },
   ];
 
