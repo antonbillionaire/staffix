@@ -2,6 +2,7 @@
 // Only works in development or with secret key
 
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     const email = "demo@staffix.io";
-    const password = "PayProDemo2025!";
+    const password = randomBytes(16).toString("hex");
     const name = "PayPro Demo";
     const businessName = "Demo Beauty Salon";
 

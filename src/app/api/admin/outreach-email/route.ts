@@ -89,15 +89,12 @@ function sleep(ms: number) {
 }
 
 export async function POST(request: NextRequest) {
-  // Auth: admin session OR CRON_SECRET header OR DEMO_SECRET
+  // Auth: admin session OR CRON_SECRET header
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
-  const demoSecret = process.env.DEMO_SECRET;
   const bearerToken = authHeader?.replace("Bearer ", "");
 
   if (bearerToken && cronSecret && bearerToken === cronSecret) {
-    // OK
-  } else if (bearerToken && demoSecret && bearerToken === demoSecret) {
     // OK
   } else {
     const session = await auth();
