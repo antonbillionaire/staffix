@@ -75,7 +75,7 @@ export default function PackagesPage() {
   const [incModal, setIncModal] = useState<boolean>(false);
   const [incForm, setIncForm] = useState({
     serviceAId: "",
-    serviceBId: "",
+    serviceBIds: [] as string[],   // multi-select — несколько услуг которые нельзя после A
     cooldownDays: 7,
     bidirectional: true,
     reason: "",
@@ -188,17 +188,32 @@ export default function PackagesPage() {
   };
 
   const saveInc = async () => {
-    if (!incForm.serviceAId || !incForm.serviceBId) return;
+    if (!incForm.serviceAId || incForm.serviceBIds.length === 0) return;
     setSavingInc(true);
     try {
-      const res = await fetch("/api/incompatibilities", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(incForm),
-      });
-      if (res.ok) {
+      // Create one ServiceIncompatibility row per (A → Bx) pair.
+      const results = await Promise.all(
+        incForm.serviceBIds.map((serviceBId) =>
+          fetch("/api/incompatibilities", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              serviceAId: incForm.serviceAId,
+              serviceBId,
+              cooldownDays: incForm.cooldownDays,
+              bidirectional: incForm.bidirectional,
+              reason: incForm.reason,
+            }),
+          })
+        )
+      );
+      const allOk = results.every((r) => r.ok);
+      if (allOk) {
         setIncModal(false);
-        setIncForm({ serviceAId: "", serviceBId: "", cooldownDays: 7, bidirectional: true, reason: "" });
+        setIncForm({ serviceAId: "", serviceBIds: [], cooldownDays: 7, bidirectional: true, reason: "" });
+        await fetchAll();
+      } else {
+        alert("Часть правил не удалось сохранить. Проверьте список и попробуйте ещё раз.");
         await fetchAll();
       }
     } catch (e) {
@@ -522,7 +537,15 @@ export default function PackagesPage() {
                 <label className={`block text-sm mb-1 ${text}`}>{t("packages.serviceA") || "После услуги"}</label>
                 <select
                   value={incForm.serviceAId}
-                  onChange={(e) => setIncForm({ ...incForm, serviceAId: e.target.value })}
+                  onChange={(e) => {
+                    const newA = e.target.value;
+                    setIncForm({
+                      ...incForm,
+                      serviceAId: newA,
+                      // Drop B-ids that conflict with new A (rare but possible)
+                      serviceBIds: incForm.serviceBIds.filter((id) => id !== newA),
+                    });
+                  }}
                   className={`w-full px-3 py-2 rounded-lg border outline-none ${input}`}
                 >
                   <option value="">—</option>
@@ -532,17 +555,46 @@ export default function PackagesPage() {
                 </select>
               </div>
               <div>
-                <label className={`block text-sm mb-1 ${text}`}>{t("packages.serviceB") || "Нельзя делать"}</label>
-                <select
-                  value={incForm.serviceBId}
-                  onChange={(e) => setIncForm({ ...incForm, serviceBId: e.target.value })}
-                  className={`w-full px-3 py-2 rounded-lg border outline-none ${input}`}
-                >
-                  <option value="">—</option>
-                  {services.filter(s => s.id !== incForm.serviceAId).map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
+                <label className={`block text-sm mb-1 ${text}`}>
+                  {t("packages.serviceB") || "Нельзя делать"}
+                  {incForm.serviceBIds.length > 0 && (
+                    <span className={`ml-2 text-xs ${sub}`}>
+                      ({incForm.serviceBIds.length} {incForm.serviceBIds.length === 1 ? "выбрана" : "выбрано"})
+                    </span>
+                  )}
+                </label>
+                <div className={`max-h-48 overflow-y-auto rounded-lg border ${isDark ? "border-white/10 bg-[#0c0c1f]" : "border-gray-300 bg-white"}`}>
+                  {services.filter(s => s.id !== incForm.serviceAId).length === 0 ? (
+                    <p className={`text-sm p-3 ${sub}`}>Сначала выберите услугу А</p>
+                  ) : (
+                    services.filter(s => s.id !== incForm.serviceAId).map((s) => {
+                      const checked = incForm.serviceBIds.includes(s.id);
+                      return (
+                        <label
+                          key={s.id}
+                          className={`flex items-center gap-2 px-3 py-2 cursor-pointer ${isDark ? "hover:bg-white/5" : "hover:bg-gray-50"} ${checked ? (isDark ? "bg-blue-500/10" : "bg-blue-50") : ""}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setIncForm({ ...incForm, serviceBIds: [...incForm.serviceBIds, s.id] });
+                              } else {
+                                setIncForm({ ...incForm, serviceBIds: incForm.serviceBIds.filter((id) => id !== s.id) });
+                              }
+                            }}
+                            className="w-4 h-4 rounded"
+                          />
+                          <span className={`text-sm ${text}`}>{s.name}</span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+                <p className={`text-xs mt-1 ${sub}`}>
+                  Можно выбрать несколько услуг — для каждой будет создано отдельное правило
+                </p>
               </div>
               <div>
                 <label className={`block text-sm mb-1 ${text}`}>{t("packages.cooldownDays") || "Период (дней)"}</label>
@@ -580,11 +632,13 @@ export default function PackagesPage() {
               </button>
               <button
                 onClick={saveInc}
-                disabled={savingInc || !incForm.serviceAId || !incForm.serviceBId}
+                disabled={savingInc || !incForm.serviceAId || incForm.serviceBIds.length === 0}
                 className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
               >
                 {savingInc && <Loader2 className="w-4 h-4 animate-spin" />}
-                {t("packages.save") || "Сохранить"}
+                {incForm.serviceBIds.length > 1
+                  ? `Сохранить ${incForm.serviceBIds.length} правила`
+                  : (t("packages.save") || "Сохранить")}
               </button>
             </div>
           </div>
