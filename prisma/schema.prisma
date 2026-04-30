@@ -491,6 +491,10 @@ model Conversation {
   // Флаг: нужно ли обновить summary
   needsSummary        Boolean   @default(false)
 
+  // Флаг: база знаний (FAQ/документы/услуги/товары) изменилась — обрезать историю
+  // в следующем ответе бота, чтобы новые данные имели приоритет над старыми ответами
+  needsContextRefresh Boolean   @default(false)
+
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
@@ -1259,6 +1263,9 @@ model ChannelConversation {
   outcome       String?               // booked, answered, escalated, unresolved, ordered
   needsSummary  Boolean   @default(false)
   extractedInfo Json?                 // { clientNotes: [...], detectedPreferences: [...] }
+
+  // Флаг: база знаний изменилась — обрезать history в следующем ответе бота
+  needsContextRefresh Boolean @default(false)
 
   businessId   String
   business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)

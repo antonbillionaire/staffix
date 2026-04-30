@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 
 // PATCH /api/products/bulk-stock — update stock for multiple products at once
 export async function PATCH(request: NextRequest) {
@@ -72,6 +73,10 @@ export async function PATCH(request: NextRequest) {
       }).catch(() => {});
 
       results.push(updated);
+    }
+
+    if (results.length > 0) {
+      await markBusinessConversationsForRefresh(businessId);
     }
 
     return NextResponse.json({

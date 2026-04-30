@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 
 // GET - Fetch all FAQs for user's business
 export async function GET() {
@@ -64,6 +65,8 @@ export async function POST(request: NextRequest) {
         businessId: user.businesses[0].id,
       },
     });
+
+    await markBusinessConversationsForRefresh(user.businesses[0].id);
 
     return NextResponse.json({ faq });
   } catch (error) {

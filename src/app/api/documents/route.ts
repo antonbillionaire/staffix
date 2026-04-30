@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 
 // Helper: get user ID (NextAuth session)
 async function getUserId(): Promise<string | undefined> {
@@ -102,6 +103,8 @@ export async function DELETE(request: Request) {
     await prisma.document.delete({
       where: { id: documentId },
     });
+
+    await markBusinessConversationsForRefresh(business.id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
+import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 
 async function getUserBusiness(): Promise<string | null> {
   const session = await auth();
@@ -339,6 +340,7 @@ export async function POST(request: NextRequest) {
     if (productsToCreate.length > 0) {
       const result = await prisma.product.createMany({ data: productsToCreate });
       createdCount = result.count;
+      await markBusinessConversationsForRefresh(businessId);
     }
 
     return NextResponse.json({

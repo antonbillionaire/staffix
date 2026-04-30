@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 
 // No top-level imports for parsing libraries!
 // They are loaded dynamically to avoid crashes on Vercel
@@ -263,6 +264,11 @@ export async function POST(request: NextRequest) {
     });
 
     console.log(`[Document Upload] Document saved: ${document.id}, parsed: ${document.parsed}, textLength: ${extractedText?.length || 0}`);
+
+    // Бамп флага только если документ парсится — иначе он не попадает в промпт
+    if (document.parsed) {
+      await markBusinessConversationsForRefresh(business.id);
+    }
 
     return NextResponse.json({
       success: true,

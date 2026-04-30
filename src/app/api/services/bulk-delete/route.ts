@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 
 // DELETE /api/services/bulk-delete — удалить все услуги бизнеса
 export async function DELETE() {
@@ -29,6 +30,10 @@ export async function DELETE() {
     const result = await prisma.service.deleteMany({
       where: { businessId: business.id },
     });
+
+    if (result.count > 0) {
+      await markBusinessConversationsForRefresh(business.id);
+    }
 
     return NextResponse.json({
       message: `Удалено ${result.count} услуг`,

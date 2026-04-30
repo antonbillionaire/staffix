@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 
 // PUT - Update FAQ
 export async function PUT(
@@ -49,6 +50,8 @@ export async function PUT(
       data: { question, answer },
     });
 
+    await markBusinessConversationsForRefresh(user.businesses[0].id);
+
     return NextResponse.json({ faq });
   } catch (error) {
     console.error("FAQ update error:", error);
@@ -93,6 +96,8 @@ export async function DELETE(
     await prisma.fAQ.delete({
       where: { id },
     });
+
+    await markBusinessConversationsForRefresh(user.businesses[0].id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

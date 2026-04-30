@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 
 async function getUserBusiness(): Promise<string | null> {
   const session = await auth();
@@ -52,6 +53,8 @@ export async function PATCH(
       },
     });
 
+    await markBusinessConversationsForRefresh(businessId);
+
     return NextResponse.json({ product: updated });
   } catch (error) {
     console.error("PATCH /api/products/[id]:", error);
@@ -75,6 +78,8 @@ export async function DELETE(
 
     // Мягкое удаление — скрываем, не удаляем (история заказов)
     await prisma.product.update({ where: { id }, data: { isActive: false } });
+
+    await markBusinessConversationsForRefresh(businessId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

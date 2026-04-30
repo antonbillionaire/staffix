@@ -484,8 +484,42 @@ export async function generateChannelAIResponse(
         : m
     );
 
-    // Keep last 20 messages to avoid token overflow
-    const recentHistory = history.slice(-20);
+    // База знаний обновилась — стратегия зависит от того, активен ли диалог.
+    // Если диалог "остыл" (последнее сообщение давно) — обнуляем историю.
+    // Если активный — историю сохраняем, но добавляем мягкое предупреждение
+    // в системный промпт, чтобы бот не повторял свои прошлые ответы автоматически.
+    const CONTEXT_REFRESH_COOLDOWN_MS = 10 * 60 * 1000;
+    let recentHistory: HistoryMessage[];
+    let refreshSoftWarning = false;
+    if (conv.needsContextRefresh) {
+      const lastTouchedAt = conv.updatedAt instanceof Date
+        ? conv.updatedAt.getTime()
+        : new Date(conv.updatedAt).getTime();
+      const isActive =
+        Number.isFinite(lastTouchedAt) &&
+        Date.now() - lastTouchedAt < CONTEXT_REFRESH_COOLDOWN_MS;
+
+      if (isActive) {
+        recentHistory = history.slice(-20);
+        refreshSoftWarning = true;
+        console.log(`[Channel AI] Active conv ${conv.id}: keeping history, soft warning enabled`);
+      } else {
+        recentHistory = [];
+        console.log(`[Channel AI] Cold conv ${conv.id}: history trimmed (knowledge base updated)`);
+      }
+
+      await prisma.channelConversation.update({
+        where: { id: conv.id },
+        data: { needsContextRefresh: false },
+      }).catch(e => console.error("[Channel AI] reset needsContextRefresh failed:", e));
+    } else {
+      // Keep last 20 messages to avoid token overflow
+      recentHistory = history.slice(-20);
+    }
+
+    if (refreshSoftWarning) {
+      systemPrompt += `\n\n⚠️ ВНИМАНИЕ: база знаний (FAQ / услуги / товары / документы) этого бизнеса только что была обновлена. Если в твоих предыдущих ответах в этом диалоге ты называл цены, услуги, даты или другие конкретные факты — обязательно сверь их с актуальными данными выше в этом промпте. Если данные изменились — называй НОВЫЕ. Не повторяй прежние ответы автоматически. Если клиент уточняет ("какие еще даты?", "а сколько стоит?", "повтори") — отвечай по СВЕЖИМ данным, не по своему предыдущему сообщению.`;
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const messages: any[] = [
       ...recentHistory,

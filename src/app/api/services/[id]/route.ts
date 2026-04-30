@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 
 async function getUserId(): Promise<string | null> {
   const session = await auth();
@@ -61,6 +62,8 @@ export async function PUT(
       },
     });
 
+    await markBusinessConversationsForRefresh(service.businessId);
+
     return NextResponse.json({ service: updated });
   } catch (error) {
     console.error("Update service error:", error);
@@ -92,6 +95,8 @@ export async function DELETE(
     }
 
     await prisma.service.delete({ where: { id } });
+
+    await markBusinessConversationsForRefresh(service.businessId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

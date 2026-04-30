@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 
 // Helper to get user ID
 async function getUserId(): Promise<string | null> {
@@ -114,6 +115,8 @@ export async function POST(request: Request) {
         businessId: business.id,
       },
     });
+
+    await markBusinessConversationsForRefresh(business.id);
 
     return NextResponse.json({ service });
   } catch (error) {

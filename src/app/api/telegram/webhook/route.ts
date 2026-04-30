@@ -302,11 +302,21 @@ async function incrementMessageUsage(businessId: string): Promise<void> {
 // РАБОТА С РАЗГОВОРАМИ
 // ========================================
 
+// Если последнее сообщение в разговоре было давно (диалог "остыл") — при
+// обновлении базы знаний полностью обнуляем историю (анкорить уже нечего).
+// Если разговор активный — сохраняем историю, но просим бота сверить факты
+// со свежим промптом (мягкое предупреждение).
+const CONTEXT_REFRESH_COOLDOWN_MS = 10 * 60 * 1000;
+
 async function getOrCreateConversation(
   businessId: string,
   telegramId: bigint,
   clientName?: string
-): Promise<{ id: string; messages: Array<{ role: string; content: string }> }> {
+): Promise<{
+  id: string;
+  messages: Array<{ role: string; content: string }>;
+  contextRefreshSoftWarning: boolean;
+}> {
   try {
     // Ищем существующий разговор
     let conversation = await prisma.conversation.findUnique({
@@ -325,11 +335,47 @@ async function getOrCreateConversation(
     });
 
     if (conversation) {
+      let messagesAsc = conversation.messages
+        .slice()
+        .reverse()
+        .map((m) => ({ role: m.role, content: m.content }));
+      let softWarning = false;
+
+      if (conversation.needsContextRefresh) {
+        // Самое свежее сообщение (или null если их нет)
+        const lastMsgAt = conversation.messages[0]?.createdAt ?? null;
+        const isActive =
+          lastMsgAt &&
+          Date.now() - lastMsgAt.getTime() < CONTEXT_REFRESH_COOLDOWN_MS;
+
+        if (isActive) {
+          // Активный диалог — историю не трогаем, попросим бота сверить факты
+          softWarning = true;
+          console.log(
+            `[Webhook] Active conversation ${conversation.id}: keeping history, soft warning enabled`
+          );
+        } else {
+          // Остывший диалог — безопасно обнулить
+          messagesAsc = [];
+          console.log(
+            `[Webhook] Cold conversation ${conversation.id}: history trimmed (knowledge base updated)`
+          );
+        }
+
+        await prisma.conversation
+          .update({
+            where: { id: conversation.id },
+            data: { needsContextRefresh: false },
+          })
+          .catch((e) =>
+            console.error("[Webhook] reset needsContextRefresh failed:", e)
+          );
+      }
+
       return {
         id: conversation.id,
-        messages: conversation.messages
-          .reverse()
-          .map((m) => ({ role: m.role, content: m.content })),
+        messages: messagesAsc,
+        contextRefreshSoftWarning: softWarning,
       };
     }
 
@@ -350,7 +396,7 @@ async function getOrCreateConversation(
       data: { totalConversations: { increment: 1 } },
     }).catch(e => console.error("[Webhook] totalConversations increment error:", e));
 
-    return { id: conversation.id, messages: [] };
+    return { id: conversation.id, messages: [], contextRefreshSoftWarning: false };
   } catch (error) {
     console.error("Error getting conversation:", error);
     throw error;
@@ -661,7 +707,13 @@ async function generateAIResponse(
     const systemHint = salesMode
       ? `\n\nСегодня: ${today}. Используй инструменты для поиска товаров и оформления заказов.`
       : `\n\nСегодняшняя дата: ${today}. Используй инструменты для работы с записями.`;
-    const systemWithDate = systemPrompt + systemHint;
+
+    // Если база знаний только что обновилась и диалог активный — просим бота
+    // не повторять свои прошлые ответы автоматически, а сверяться с свежими данными
+    const refreshNotice = conversation.contextRefreshSoftWarning
+      ? `\n\n⚠️ ВНИМАНИЕ: база знаний (FAQ / услуги / товары / документы) этого бизнеса только что была обновлена. Если в твоих предыдущих ответах в этом диалоге ты называл цены, услуги, даты или другие конкретные факты — обязательно сверь их с актуальными данными выше в этом промпте. Если данные изменились — называй НОВЫЕ. Не повторяй прежние ответы автоматически. Если клиент уточняет ("какие еще даты?", "а сколько стоит?", "повтори") — отвечай по СВЕЖИМ данным, не по своему предыдущему сообщению.`
+      : "";
+    const systemWithDate = systemPrompt + systemHint + refreshNotice;
 
     console.log(`[Webhook] Calling Claude API for business=${businessId}, salesMode=${salesMode}`);
     let response = await callClaudeWithRetry({

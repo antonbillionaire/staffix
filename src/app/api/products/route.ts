@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 
 async function getUserBusiness(request: NextRequest): Promise<string | null> {
   const session = await auth();
@@ -79,6 +80,8 @@ export async function POST(request: NextRequest) {
         isActive: true,
       },
     });
+
+    await markBusinessConversationsForRefresh(businessId);
 
     return NextResponse.json({ product }, { status: 201 });
   } catch (error) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 
 async function getUserBusiness(): Promise<string | null> {
   const session = await auth();
@@ -162,6 +163,7 @@ export async function POST(request: NextRequest) {
     if (servicesToCreate.length > 0) {
       const result = await prisma.service.createMany({ data: servicesToCreate });
       createdCount = result.count;
+      await markBusinessConversationsForRefresh(businessId);
     }
 
     return NextResponse.json({
