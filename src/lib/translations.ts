@@ -801,6 +801,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "staffPage.roleDoctor": "Врач",
     "staffPage.baseRate": "Ставка (за месяц)",
     "staffPage.commission": "Комиссия %",
+    "staffPage.specializationPlaceholder": "Уточнение (например: Терапевт, Стилист)",
+    "staffPage.specializationHint": "Категория для группировки + конкретная специализация. AI и клиенты увидят уточнение если оно заполнено.",
 
     // Calendar
     "nav.calendar": "Календарь",
@@ -2583,6 +2585,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "staffPage.roleDoctor": "Doctor",
     "staffPage.baseRate": "Base rate (per month)",
     "staffPage.commission": "Commission %",
+    "staffPage.specializationPlaceholder": "Specialization (e.g. Therapist, Stylist)",
+    "staffPage.specializationHint": "Category for grouping + specific specialization. AI and clients will see the specialization if filled.",
 
     // Calendar
     "nav.calendar": "Calendar",
@@ -4365,6 +4369,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "staffPage.roleDoctor": "Shifokor",
     "staffPage.baseRate": "Stavka (oyiga)",
     "staffPage.commission": "Komissiya %",
+    "staffPage.specializationPlaceholder": "Mutaxassislik (masalan: Terapevt, Stilist)",
+    "staffPage.specializationHint": "Kategoriya guruhlash uchun + aniq mutaxassislik. AI va mijozlar mutaxassislikni ko'rishadi, agar to'ldirilgan bo'lsa.",
 
     // Calendar
     "nav.calendar": "Kalendar",
@@ -6145,6 +6151,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "staffPage.roleDoctor": "Дәрігер",
     "staffPage.baseRate": "Айлық (ай сайын)",
     "staffPage.commission": "Комиссия %",
+    "staffPage.specializationPlaceholder": "Мамандық (мысалы: Терапевт, Стилист)",
+    "staffPage.specializationHint": "Топтастыру үшін санат + нақты мамандық. AI және клиенттер мамандықты көреді, егер толтырылған болса.",
 
     // Calendar
     "nav.calendar": "Күнтізбе",
