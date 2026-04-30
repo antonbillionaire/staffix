@@ -37,7 +37,8 @@ interface ServicePackage {
 interface Incompatibility {
   id: string;
   serviceA: { id: string; name: string };
-  serviceB: { id: string; name: string };
+  serviceB: { id: string; name: string } | null;
+  serviceBText: string | null;
   cooldownDays: number;
   bidirectional: boolean;
   reason: string | null;
@@ -75,7 +76,9 @@ export default function PackagesPage() {
   const [incModal, setIncModal] = useState<boolean>(false);
   const [incForm, setIncForm] = useState({
     serviceAId: "",
-    serviceBIds: [] as string[],   // multi-select — несколько услуг которые нельзя после A
+    serviceBIds: [] as string[],     // multi-select — несколько услуг которые нельзя после A
+    serviceBTexts: [] as string[],   // свободный текст ограничений (солнце, баня, алкоголь)
+    customRestrictionDraft: "",      // текущий ввод нового ограничения, ещё не добавленного
     cooldownDays: 7,
     bidirectional: true,
     reason: "",
@@ -188,29 +191,43 @@ export default function PackagesPage() {
   };
 
   const saveInc = async () => {
-    if (!incForm.serviceAId || incForm.serviceBIds.length === 0) return;
+    if (!incForm.serviceAId) return;
+    if (incForm.serviceBIds.length === 0 && incForm.serviceBTexts.length === 0) return;
     setSavingInc(true);
     try {
       // Create one ServiceIncompatibility row per (A → Bx) pair.
-      const results = await Promise.all(
-        incForm.serviceBIds.map((serviceBId) =>
-          fetch("/api/incompatibilities", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              serviceAId: incForm.serviceAId,
-              serviceBId,
-              cooldownDays: incForm.cooldownDays,
-              bidirectional: incForm.bidirectional,
-              reason: incForm.reason,
-            }),
-          })
-        )
+      const linked = incForm.serviceBIds.map((serviceBId) =>
+        fetch("/api/incompatibilities", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            serviceAId: incForm.serviceAId,
+            serviceBId,
+            cooldownDays: incForm.cooldownDays,
+            bidirectional: incForm.bidirectional,
+            reason: incForm.reason,
+          }),
+        })
       );
+      // External restrictions (sun, sauna, alcohol etc.) — text-only, never bidirectional
+      const textRules = incForm.serviceBTexts.map((serviceBText) =>
+        fetch("/api/incompatibilities", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            serviceAId: incForm.serviceAId,
+            serviceBText,
+            cooldownDays: incForm.cooldownDays,
+            bidirectional: false,
+            reason: incForm.reason,
+          }),
+        })
+      );
+      const results = await Promise.all([...linked, ...textRules]);
       const allOk = results.every((r) => r.ok);
       if (allOk) {
         setIncModal(false);
-        setIncForm({ serviceAId: "", serviceBIds: [], cooldownDays: 7, bidirectional: true, reason: "" });
+        setIncForm({ serviceAId: "", serviceBIds: [], serviceBTexts: [], customRestrictionDraft: "", cooldownDays: 7, bidirectional: true, reason: "" });
         await fetchAll();
       } else {
         alert("Часть правил не удалось сохранить. Проверьте список и попробуйте ещё раз.");
@@ -381,7 +398,12 @@ export default function PackagesPage() {
                       <div className="flex items-center gap-2 flex-wrap mb-1">
                         <span className={`font-medium ${text}`}>{inc.serviceA.name}</span>
                         <span className={sub}>{inc.bidirectional ? "↔" : "→"}</span>
-                        <span className={`font-medium ${text}`}>{inc.serviceB.name}</span>
+                        <span className={`font-medium ${text}`}>
+                          {inc.serviceB?.name || inc.serviceBText || "—"}
+                          {!inc.serviceB && inc.serviceBText && (
+                            <span className={`ml-1 text-xs ${sub}`}>(внешнее)</span>
+                          )}
+                        </span>
                         <span className={`text-xs px-2 py-0.5 rounded ${isDark ? "bg-orange-500/10 text-orange-400" : "bg-orange-50 text-orange-600"}`}>
                           {inc.cooldownDays} {t("packages.days") || "дн."}
                         </span>
@@ -596,6 +618,80 @@ export default function PackagesPage() {
                   Можно выбрать несколько услуг — для каждой будет создано отдельное правило
                 </p>
               </div>
+
+              {/* External restrictions (free-form text — sun, sauna, alcohol, etc.) */}
+              <div>
+                <label className={`block text-sm mb-1 ${text}`}>
+                  Внешние ограничения (опционально)
+                  {incForm.serviceBTexts.length > 0 && (
+                    <span className={`ml-2 text-xs ${sub}`}>
+                      ({incForm.serviceBTexts.length})
+                    </span>
+                  )}
+                </label>
+                {incForm.serviceBTexts.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {incForm.serviceBTexts.map((txt, i) => (
+                      <span
+                        key={`${txt}-${i}`}
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs ${isDark ? "bg-blue-500/20 text-blue-200" : "bg-blue-100 text-blue-800"}`}
+                      >
+                        {txt}
+                        <button
+                          type="button"
+                          onClick={() => setIncForm({ ...incForm, serviceBTexts: incForm.serviceBTexts.filter((_, j) => j !== i) })}
+                          className="ml-1 hover:opacity-70"
+                          aria-label="Удалить"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={incForm.customRestrictionDraft}
+                    onChange={(e) => setIncForm({ ...incForm, customRestrictionDraft: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        const v = incForm.customRestrictionDraft.trim();
+                        if (v && !incForm.serviceBTexts.includes(v)) {
+                          setIncForm({
+                            ...incForm,
+                            serviceBTexts: [...incForm.serviceBTexts, v],
+                            customRestrictionDraft: "",
+                          });
+                        }
+                      }
+                    }}
+                    placeholder="Например: солнце, баня, алкоголь"
+                    className={`flex-1 px-3 py-2 rounded-lg border outline-none ${input}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const v = incForm.customRestrictionDraft.trim();
+                      if (v && !incForm.serviceBTexts.includes(v)) {
+                        setIncForm({
+                          ...incForm,
+                          serviceBTexts: [...incForm.serviceBTexts, v],
+                          customRestrictionDraft: "",
+                        });
+                      }
+                    }}
+                    disabled={!incForm.customRestrictionDraft.trim()}
+                    className={`px-3 py-2 rounded-lg text-sm border ${isDark ? "border-white/10 text-gray-300 hover:bg-white/5" : "border-gray-300 text-gray-700 hover:bg-gray-50"} disabled:opacity-50`}
+                  >
+                    Добавить
+                  </button>
+                </div>
+                <p className={`text-xs mt-1 ${sub}`}>
+                  Для того что не входит в Ваши услуги: солнце, сауна, спорт, алкоголь, скрабы и т.п. AI учтёт эти ограничения при записи.
+                </p>
+              </div>
               <div>
                 <label className={`block text-sm mb-1 ${text}`}>{t("packages.cooldownDays") || "Период (дней)"}</label>
                 <input
@@ -632,13 +728,14 @@ export default function PackagesPage() {
               </button>
               <button
                 onClick={saveInc}
-                disabled={savingInc || !incForm.serviceAId || incForm.serviceBIds.length === 0}
+                disabled={savingInc || !incForm.serviceAId || (incForm.serviceBIds.length === 0 && incForm.serviceBTexts.length === 0)}
                 className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2"
               >
                 {savingInc && <Loader2 className="w-4 h-4 animate-spin" />}
-                {incForm.serviceBIds.length > 1
-                  ? `Сохранить ${incForm.serviceBIds.length} правила`
-                  : (t("packages.save") || "Сохранить")}
+                {(() => {
+                  const total = incForm.serviceBIds.length + incForm.serviceBTexts.length;
+                  return total > 1 ? `Сохранить ${total} правил` : (t("packages.save") || "Сохранить");
+                })()}
               </button>
             </div>
           </div>

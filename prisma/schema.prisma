@@ -320,9 +320,12 @@ model ServiceIncompatibility {
   serviceAId      String
   serviceA        Service   @relation("ServiceA", fields: [serviceAId], references: [id], onDelete: Cascade)
 
-  // Несовместимая услуга
-  serviceBId      String
-  serviceB        Service   @relation("ServiceB", fields: [serviceBId], references: [id], onDelete: Cascade)
+  // Несовместимая услуга (one of serviceBId / serviceBText must be set)
+  serviceBId      String?
+  serviceB        Service?  @relation("ServiceB", fields: [serviceBId], references: [id], onDelete: Cascade)
+
+  // Внешнее ограничение свободным текстом (солнце, баня, алкоголь и т.п.)
+  serviceBText    String?
 
   // Период несовместимости в днях после серии A
   cooldownDays    Int       @default(7)

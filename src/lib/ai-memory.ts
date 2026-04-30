@@ -276,9 +276,12 @@ export async function buildBusinessContext(
           serviceB: { select: { name: true } },
         },
       });
-      serviceIncompatibilities = incs.map((i) => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      serviceIncompatibilities = incs.map((i: any) => ({
         serviceA: i.serviceA.name,
-        serviceB: i.serviceB.name,
+        // Use linked service name if present, otherwise free-form text
+        // (e.g. "солнце", "баня", "алкоголь")
+        serviceB: i.serviceB?.name || i.serviceBText || "—",
         cooldownDays: i.cooldownDays,
         bidirectional: i.bidirectional,
         reason: i.reason,

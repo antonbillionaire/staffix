@@ -1,7 +1,9 @@
 /**
  * GET /api/incompatibilities — list service incompatibilities
  * POST /api/incompatibilities — create new incompatibility rule
- *   Body: { serviceAId, serviceBId, cooldownDays?, bidirectional?, reason? }
+ *   Body: { serviceAId, serviceBId?, serviceBText?, cooldownDays?, bidirectional?, reason? }
+ *   Either serviceBId (link to another service) OR serviceBText (free-form
+ *   external restriction like "солнце", "баня", "алкоголь") must be set.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -44,29 +46,39 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { serviceAId, serviceBId, cooldownDays, bidirectional, reason } = body;
+    const { serviceAId, serviceBId, serviceBText, cooldownDays, bidirectional, reason } = body;
+    const cleanText = typeof serviceBText === "string" ? serviceBText.trim() : "";
 
-    if (!serviceAId || !serviceBId) {
-      return NextResponse.json({ error: "serviceAId and serviceBId required" }, { status: 400 });
+    if (!serviceAId) {
+      return NextResponse.json({ error: "serviceAId required" }, { status: 400 });
     }
 
-    if (serviceAId === serviceBId) {
+    if (!serviceBId && !cleanText) {
+      return NextResponse.json(
+        { error: "Either serviceBId or serviceBText must be provided" },
+        { status: 400 }
+      );
+    }
+
+    if (serviceBId && serviceAId === serviceBId) {
       return NextResponse.json({ error: "Services must be different" }, { status: 400 });
     }
 
-    // Verify both services belong to this business
+    // Verify A (and B if provided) belong to this business
+    const idsToCheck = serviceBId ? [serviceAId, serviceBId] : [serviceAId];
     const services = await prisma.service.findMany({
-      where: { id: { in: [serviceAId, serviceBId] }, businessId },
+      where: { id: { in: idsToCheck }, businessId },
       select: { id: true },
     });
-    if (services.length !== 2) {
+    if (services.length !== idsToCheck.length) {
       return NextResponse.json({ error: "Some services not found" }, { status: 400 });
     }
 
     const inc = await prisma.serviceIncompatibility.create({
       data: {
         serviceAId,
-        serviceBId,
+        serviceBId: serviceBId || null,
+        serviceBText: !serviceBId && cleanText ? cleanText : null,
         cooldownDays: cooldownDays !== undefined ? Math.max(1, Math.round(Number(cooldownDays))) : 7,
         bidirectional: bidirectional !== false,
         reason: reason?.trim() || null,
