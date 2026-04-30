@@ -672,6 +672,7 @@ async function generateAIResponse(
           categories,
           totalProducts,
           documents,
+          faqs: businessContext.faqs,
         },
         salesClientCtx
       );
