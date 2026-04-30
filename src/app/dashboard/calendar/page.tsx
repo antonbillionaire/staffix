@@ -62,6 +62,14 @@ const STAFF_COLORS = [
   { bg: "bg-cyan-500", border: "border-cyan-400", light: "bg-cyan-500/20 text-cyan-300" },
   { bg: "bg-yellow-500", border: "border-yellow-400", light: "bg-yellow-500/20 text-yellow-300" },
   { bg: "bg-red-500", border: "border-red-400", light: "bg-red-500/20 text-red-300" },
+  { bg: "bg-indigo-500", border: "border-indigo-400", light: "bg-indigo-500/20 text-indigo-300" },
+  { bg: "bg-teal-500", border: "border-teal-400", light: "bg-teal-500/20 text-teal-300" },
+  { bg: "bg-rose-500", border: "border-rose-400", light: "bg-rose-500/20 text-rose-300" },
+  { bg: "bg-amber-500", border: "border-amber-400", light: "bg-amber-500/20 text-amber-300" },
+  { bg: "bg-lime-500", border: "border-lime-400", light: "bg-lime-500/20 text-lime-300" },
+  { bg: "bg-fuchsia-500", border: "border-fuchsia-400", light: "bg-fuchsia-500/20 text-fuchsia-300" },
+  { bg: "bg-sky-500", border: "border-sky-400", light: "bg-sky-500/20 text-sky-300" },
+  { bg: "bg-emerald-500", border: "border-emerald-400", light: "bg-emerald-500/20 text-emerald-300" },
 ];
 
 const STAFF_COLORS_LIGHT = [
@@ -73,6 +81,14 @@ const STAFF_COLORS_LIGHT = [
   { bg: "bg-cyan-500", border: "border-cyan-300", light: "bg-cyan-100 text-cyan-700" },
   { bg: "bg-yellow-500", border: "border-yellow-300", light: "bg-yellow-100 text-yellow-700" },
   { bg: "bg-red-500", border: "border-red-300", light: "bg-red-100 text-red-700" },
+  { bg: "bg-indigo-500", border: "border-indigo-300", light: "bg-indigo-100 text-indigo-700" },
+  { bg: "bg-teal-500", border: "border-teal-300", light: "bg-teal-100 text-teal-700" },
+  { bg: "bg-rose-500", border: "border-rose-300", light: "bg-rose-100 text-rose-700" },
+  { bg: "bg-amber-500", border: "border-amber-300", light: "bg-amber-100 text-amber-800" },
+  { bg: "bg-lime-500", border: "border-lime-300", light: "bg-lime-100 text-lime-700" },
+  { bg: "bg-fuchsia-500", border: "border-fuchsia-300", light: "bg-fuchsia-100 text-fuchsia-700" },
+  { bg: "bg-sky-500", border: "border-sky-300", light: "bg-sky-100 text-sky-700" },
+  { bg: "bg-emerald-500", border: "border-emerald-300", light: "bg-emerald-100 text-emerald-700" },
 ];
 
 const NO_STAFF_COLOR = { bg: "bg-gray-500", border: "border-gray-400", light: "bg-gray-500/20 text-gray-300" };
@@ -117,12 +133,24 @@ export default function CalendarPage() {
   const monthNames = MONTH_KEYS.map((k) => t(k));
   const weekDates = getWeekDates(currentDate);
 
-  const getStaffColor = (staffId: string | null) => {
-    if (!staffId) return isDark ? NO_STAFF_COLOR : NO_STAFF_COLOR_LIGHT;
-    const idx = staffList.findIndex((s) => s.id === staffId);
-    if (idx < 0) return isDark ? NO_STAFF_COLOR : NO_STAFF_COLOR_LIGHT;
+  // Stable hash from a string — same input always returns same number.
+  // We use it instead of array index so a staff member keeps the same colour
+  // even when the team is reordered or a new member is hired.
+  const stringHash = (s: string): number => {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+      h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    }
+    return Math.abs(h);
+  };
+
+  const getStaffColor = (staffId: string | null, staffName?: string | null) => {
     const colors = isDark ? STAFF_COLORS : STAFF_COLORS_LIGHT;
-    return colors[idx % colors.length];
+    // Resolve a stable key: prefer real staffId, fall back to staffName
+    // (legacy bookings sometimes have only the name string).
+    const key = staffId || staffName || "";
+    if (!key) return isDark ? NO_STAFF_COLOR : NO_STAFF_COLOR_LIGHT;
+    return colors[stringHash(key) % colors.length];
   };
 
   const fetchData = useCallback(async () => {
@@ -295,9 +323,8 @@ export default function CalendarPage() {
       {/* Staff legend */}
       {staffList.length > 0 && (
         <div className="flex flex-wrap gap-3 mb-4">
-          {staffList.map((s, i) => {
-            const colors = isDark ? STAFF_COLORS : STAFF_COLORS_LIGHT;
-            const color = colors[i % colors.length];
+          {staffList.map((s) => {
+            const color = getStaffColor(s.id, s.name);
             return (
               <span key={s.id} className="flex items-center gap-1.5 text-xs">
                 <span className={`w-3 h-3 rounded-full ${color.bg}`} />
@@ -308,9 +335,9 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* Week View */}
+      {/* Week View — desktop grid (lg and up only — the time grid is too wide for phones) */}
       {view === "week" && (
-        <div className={`${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border overflow-hidden`}>
+        <div className={`hidden lg:block ${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border overflow-hidden`}>
          <div className="overflow-x-auto">
           {/* Day headers */}
           <div className="grid grid-cols-8 border-b border-white/5 min-w-[700px]">
@@ -353,7 +380,7 @@ export default function CalendarPage() {
                       {dayBookings.map((b) => {
                         const dur = b.serviceDuration || 60;
                         const heightSlots = Math.max(1, Math.ceil(dur / 30));
-                        const color = getStaffColor(b.staffId);
+                        const color = getStaffColor(b.staffId, b.staffName);
                         return (
                           <button
                             key={b.id}
@@ -380,9 +407,86 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {/* Month View */}
+      {/* Week View — mobile list (under lg) */}
+      {view === "week" && (
+        <div className="lg:hidden space-y-3">
+          {weekDates.map((date) => {
+            const dateKey = formatDateKey(date);
+            const isToday = dateKey === formatDateKey(new Date());
+            const dayBookings = (bookingsByDate[dateKey] || []).slice().sort((a, b) =>
+              new Date(a.date).getTime() - new Date(b.date).getTime()
+            );
+            return (
+              <div
+                key={dateKey}
+                className={`${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border overflow-hidden`}
+              >
+                <div className={`flex items-center justify-between px-4 py-2 ${isDark ? "bg-white/5" : "bg-gray-50"}`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm font-medium ${isDark ? "text-white" : "text-gray-900"}`}>
+                      {dayNames[(date.getDay() + 6) % 7]}
+                    </span>
+                    <span className={`text-xs ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                      {date.getDate()} {monthNames[date.getMonth()]}
+                    </span>
+                    {isToday && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500 text-white">сегодня</span>
+                    )}
+                  </div>
+                  <span className={`text-xs ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                    {dayBookings.length === 0 ? "нет записей" : `записей: ${dayBookings.length}`}
+                  </span>
+                </div>
+                {dayBookings.length === 0 ? (
+                  <div className={`px-4 py-3 text-xs ${isDark ? "text-gray-600" : "text-gray-400"}`}>
+                    Свободный день
+                  </div>
+                ) : (
+                  <div className="divide-y divide-white/5">
+                    {dayBookings.map((b) => {
+                      const color = getStaffColor(b.staffId, b.staffName);
+                      const timeStr = formatBusinessTime(b.date, businessTimezone);
+                      return (
+                        <button
+                          key={b.id}
+                          onClick={() => setSelectedBooking(b)}
+                          className={`w-full text-left flex items-start gap-3 px-4 py-3 ${isDark ? "hover:bg-white/5" : "hover:bg-gray-50"}`}
+                        >
+                          <span className={`mt-1 w-2.5 h-2.5 rounded-full shrink-0 ${color.bg}`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-medium ${isDark ? "text-white" : "text-gray-900"}`}>
+                                {timeStr}
+                              </span>
+                              <span className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"} truncate`}>
+                                {b.clientName}
+                              </span>
+                            </div>
+                            {b.serviceName && (
+                              <div className={`text-xs mt-0.5 truncate ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                                {b.serviceName}
+                              </div>
+                            )}
+                            {b.staffName && (
+                              <div className={`text-xs mt-0.5 truncate ${isDark ? "text-gray-600" : "text-gray-400"}`}>
+                                {b.staffName}
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Month View — desktop grid */}
       {view === "month" && (
-        <div className={`${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border overflow-hidden`}>
+        <div className={`hidden lg:block ${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border overflow-hidden`}>
           {/* Day headers */}
           <div className="grid grid-cols-7">
             {dayNames.map((day) => (
@@ -415,7 +519,7 @@ export default function CalendarPage() {
                     {date.getDate()}
                   </div>
                   {dayBookings.slice(0, 3).map((b) => {
-                    const color = getStaffColor(b.staffId);
+                    const color = getStaffColor(b.staffId, b.staffName);
                     const timeStr = formatBusinessTime(b.date, businessTimezone);
                     return (
                       <div key={b.id} className={`${color.bg} text-white text-[9px] rounded px-1 py-0.5 mb-0.5 truncate`}>
@@ -432,6 +536,93 @@ export default function CalendarPage() {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Month View — mobile list (under lg) */}
+      {view === "month" && (
+        <div className="lg:hidden space-y-3">
+          {(() => {
+            const grid = getMonthGrid();
+            const daysWithBookings = grid
+              .filter((d): d is Date => d !== null)
+              .map((d) => ({ date: d, key: formatDateKey(d), bookings: bookingsByDate[formatDateKey(d)] || [] }))
+              .filter((x) => x.bookings.length > 0);
+            if (daysWithBookings.length === 0) {
+              return (
+                <div className={`${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border p-6 text-center`}>
+                  <p className={`text-sm ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                    В этом месяце записей нет
+                  </p>
+                </div>
+              );
+            }
+            const todayKey = formatDateKey(new Date());
+            return daysWithBookings.map(({ date, key, bookings }) => {
+              const isToday = key === todayKey;
+              const sorted = bookings.slice().sort((a, b) =>
+                new Date(a.date).getTime() - new Date(b.date).getTime()
+              );
+              return (
+                <div
+                  key={key}
+                  className={`${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border overflow-hidden`}
+                >
+                  <div className={`flex items-center justify-between px-4 py-2 ${isDark ? "bg-white/5" : "bg-gray-50"}`}>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-medium ${isDark ? "text-white" : "text-gray-900"}`}>
+                        {dayNames[(date.getDay() + 6) % 7]}
+                      </span>
+                      <span className={`text-xs ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                        {date.getDate()} {monthNames[date.getMonth()]}
+                      </span>
+                      {isToday && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500 text-white">сегодня</span>
+                      )}
+                    </div>
+                    <span className={`text-xs ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                      записей: {sorted.length}
+                    </span>
+                  </div>
+                  <div className="divide-y divide-white/5">
+                    {sorted.map((b) => {
+                      const color = getStaffColor(b.staffId, b.staffName);
+                      const timeStr = formatBusinessTime(b.date, businessTimezone);
+                      return (
+                        <button
+                          key={b.id}
+                          onClick={() => setSelectedBooking(b)}
+                          className={`w-full text-left flex items-start gap-3 px-4 py-3 ${isDark ? "hover:bg-white/5" : "hover:bg-gray-50"}`}
+                        >
+                          <span className={`mt-1 w-2.5 h-2.5 rounded-full shrink-0 ${color.bg}`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-medium ${isDark ? "text-white" : "text-gray-900"}`}>
+                                {timeStr}
+                              </span>
+                              <span className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"} truncate`}>
+                                {b.clientName}
+                              </span>
+                            </div>
+                            {b.serviceName && (
+                              <div className={`text-xs mt-0.5 truncate ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                                {b.serviceName}
+                              </div>
+                            )}
+                            {b.staffName && (
+                              <div className={`text-xs mt-0.5 truncate ${isDark ? "text-gray-600" : "text-gray-400"}`}>
+                                {b.staffName}
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            });
+          })()}
         </div>
       )}
 
@@ -472,7 +663,7 @@ export default function CalendarPage() {
                     {selectedBooking.staffName}
                   </span>
                   {selectedBooking.staffId && (
-                    <span className={`w-2.5 h-2.5 rounded-full ${getStaffColor(selectedBooking.staffId).bg}`} />
+                    <span className={`w-2.5 h-2.5 rounded-full ${getStaffColor(selectedBooking.staffId, selectedBooking.staffName).bg}`} />
                   )}
                 </div>
               )}
