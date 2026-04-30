@@ -771,7 +771,19 @@ async function generateAIResponse(
 
       for (const block of toolUseBlocks) {
         if (block.type === "tool_use") {
-          console.log(`[Webhook] Tool call: ${block.name}`);
+          // Подробный лог для трейсинга — особенно важно для notify_manager
+          // чтобы видеть реально ли Claude вызвал tool, а не просто наобещал клиенту.
+          const inputPreview = (() => {
+            try {
+              return JSON.stringify(block.input).slice(0, 200);
+            } catch {
+              return "(unstringifiable)";
+            }
+          })();
+          console.log(
+            `[Webhook] Tool call: ${block.name} mode=${salesMode ? "sales" : "service"} input=${inputPreview}`
+          );
+
           // Роутим к нужному диспетчеру в зависимости от режима
           const result = salesMode
             ? await executeSalesTool(
@@ -786,6 +798,10 @@ async function generateAIResponse(
                 businessId,
                 telegramId
               );
+
+          // Сжато логируем результат — нужно знать success / fail без дампа всего
+          const resultPreview = typeof result === "string" ? result.slice(0, 200) : "(non-string)";
+          console.log(`[Webhook] Tool result: ${block.name} -> ${resultPreview}`);
 
           toolResults.push({
             type: "tool_result",

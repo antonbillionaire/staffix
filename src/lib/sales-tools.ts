@@ -955,6 +955,10 @@ export async function notifyManagerByTelegram(
   clientName?: string,
   urgency?: string
 ): Promise<SalesToolResult> {
+  // Один маркер для трейсинга всего цикла эскалации в Vercel-логах.
+  const tag = `[notify_manager][${businessId}]`;
+  console.log(`${tag} START reason="${reason?.slice(0, 80)}…" client=${clientName || "?"} urgency=${urgency || "normal"}`);
+
   try {
     const business = await prisma.business.findUnique({
       where: { id: businessId },
@@ -962,17 +966,19 @@ export async function notifyManagerByTelegram(
     });
 
     if (!business) {
+      console.error(`${tag} FAIL: business not found`);
       return { success: false, error: "Бизнес не найден" };
     }
 
     const isUrgent = urgency === "urgent";
     const urgencyLabel = isUrgent ? "🚨 СРОЧНО" : "📩 Новый запрос";
-    const clientLabel = clientName ? `👤 *${clientName}*` : `👤 Клиент (ID: ${clientTelegramId})`;
+    const clientLabel = clientName ? `👤 ${clientName}` : `👤 Клиент (ID: ${clientTelegramId})`;
 
     // 1) Всегда оставляем запись в дашборде, даже если Telegram владельца не настроен —
     //    иначе эскалация превращается в ложь боту ("я передал" → никто не получил).
-    await prisma.notification
-      .create({
+    let dashboardCreated = false;
+    try {
+      await prisma.notification.create({
         data: {
           businessId,
           type: "manager_escalation",
@@ -986,21 +992,33 @@ export async function notifyManagerByTelegram(
             urgency: urgency || "normal",
           },
         },
-      })
-      .catch((e) => {
-        console.error("notifyManagerByTelegram: failed to create dashboard notification:", e);
       });
+      dashboardCreated = true;
+      console.log(`${tag} dashboard notification CREATED`);
+    } catch (e) {
+      console.error(`${tag} dashboard notification FAILED:`, e);
+    }
 
     // 2) Если у владельца настроен личный Telegram — пушим уведомление туда.
+    //    Внимательно: parse_mode НЕ ИСПОЛЬЗУЕМ — любой "_" или "*" в reason
+    //    раньше ломал Markdown, Telegram возвращал 400, и владелец не получал ничего.
     let telegramDelivered = false;
-    if (business.botToken && business.ownerTelegramChatId) {
+    let telegramReason = "";
+    if (!business.botToken) {
+      telegramReason = "no botToken";
+      console.warn(`${tag} TG skip: no botToken`);
+    } else if (!business.ownerTelegramChatId) {
+      telegramReason = "no ownerTelegramChatId — owner did not /start the bot from their personal account";
+      console.warn(`${tag} TG skip: ${telegramReason}`);
+    } else {
       try {
         const text =
           `${urgencyLabel} — требуется помощь менеджера\n\n` +
           `${clientLabel}\n` +
-          `💬 *Вопрос:* ${reason}\n\n` +
-          `_Клиент ждёт ответа в Telegram_`;
+          `Вопрос: ${reason}\n\n` +
+          `Клиент ждёт ответа в Telegram.`;
 
+        console.log(`${tag} TG sending to chat=${business.ownerTelegramChatId}`);
         const tgResponse = await fetch(
           `https://api.telegram.org/bot${business.botToken}/sendMessage`,
           {
@@ -1009,35 +1027,41 @@ export async function notifyManagerByTelegram(
             body: JSON.stringify({
               chat_id: business.ownerTelegramChatId.toString(),
               text,
-              parse_mode: "Markdown",
+              // НЕ передаём parse_mode — plain text всегда доходит без эскейпа.
             }),
           }
         );
-        telegramDelivered = tgResponse.ok;
-        if (!tgResponse.ok) {
+
+        if (tgResponse.ok) {
+          telegramDelivered = true;
+          console.log(`${tag} TG DELIVERED`);
+        } else {
           const body = await tgResponse.text().catch(() => "");
-          console.error(`notifyManagerByTelegram: Telegram returned ${tgResponse.status}: ${body}`);
+          telegramReason = `TG API ${tgResponse.status}: ${body.slice(0, 200)}`;
+          console.error(`${tag} TG FAILED: ${telegramReason}`);
         }
       } catch (e) {
-        console.error("notifyManagerByTelegram: Telegram send failed:", e);
+        telegramReason = e instanceof Error ? e.message : String(e);
+        console.error(`${tag} TG fetch error:`, e);
       }
-    } else {
-      console.log(
-        `notifyManagerByTelegram: business ${businessId} has no ownerTelegramChatId — dashboard notification only`
-      );
     }
+
+    console.log(
+      `${tag} DONE dashboard=${dashboardCreated} telegram=${telegramDelivered} reason="${telegramReason}"`
+    );
 
     // Запрос всегда сохранён (в дашборде), даже если Telegram-канал владельца не настроен.
     return {
       success: true,
-      notified: true,
+      notified: dashboardCreated || telegramDelivered,
       telegramDelivered,
+      dashboardCreated,
       message: telegramDelivered
-        ? "Менеджер уведомлён. Он свяжется с клиентом в ближайшее время."
+        ? "Менеджер уведомлён в Telegram. Он свяжется с клиентом в ближайшее время."
         : "Запрос передан в дашборд менеджера. Он свяжется с клиентом, как только увидит уведомление.",
     };
   } catch (error) {
-    console.error("notifyManagerByTelegram error:", error);
+    console.error(`${tag} fatal:`, error);
     return { success: false, error: "Ошибка при уведомлении менеджера" };
   }
 }
