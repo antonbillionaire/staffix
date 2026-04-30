@@ -266,6 +266,83 @@ export async function sendSupportTicketNotification(
   }
 }
 
+// Уведомление владельцу бизнеса: AI-бот эскалировал запрос клиента,
+// который требует участия человека. Отправляется ВСЕГДА (важная транзакция),
+// независимо от того, настроен ли у владельца Telegram.
+export async function sendManagerEscalationEmail(params: {
+  ownerEmail: string;
+  ownerName: string;
+  businessName: string;
+  clientName?: string | null;
+  reason: string;
+  urgency?: string | null;
+  channel?: string | null;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    if (!resend) {
+      console.log(
+        `[DEV] Manager escalation email for ${params.ownerEmail} — ${params.businessName}: ${params.reason}`
+      );
+      return { success: true };
+    }
+
+    const isUrgent = params.urgency === "urgent";
+    const urgencyLabel = isUrgent ? "🚨 СРОЧНЫЙ запрос" : "📩 Новый запрос";
+    const channelLabel = params.channel
+      ? params.channel.charAt(0).toUpperCase() + params.channel.slice(1)
+      : "Telegram";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
+
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: params.ownerEmail,
+      subject: `${isUrgent ? "🚨 " : ""}${params.businessName}: запрос от клиента требует вашего внимания`,
+      html: `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f4f5f7; margin: 0; padding: 32px 20px; color: #1a1a2e;">
+  <div style="max-width: 560px; margin: 0 auto; background: #fff; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden;">
+    <div style="padding: 24px 28px; background: ${isUrgent ? "#fef2f2" : "#eff6ff"}; border-bottom: 1px solid #e5e7eb;">
+      <div style="font-size: 14px; color: ${isUrgent ? "#991b1b" : "#1e40af"}; font-weight: 600; margin-bottom: 4px;">${urgencyLabel}</div>
+      <h1 style="margin: 0; font-size: 18px; color: #1a1a2e;">Клиент ждёт ответа в ${channelLabel}</h1>
+    </div>
+    <div style="padding: 24px 28px;">
+      <p style="margin: 0 0 12px; color: #4b5563;">Здравствуйте, ${params.ownerName}!</p>
+      <p style="margin: 0 0 18px; color: #4b5563; line-height: 1.5;">
+        AI-сотрудник в <strong>${params.businessName}</strong> пометил запрос клиента как требующий вашего участия.
+      </p>
+      <div style="background: #f9fafb; border-left: 3px solid ${isUrgent ? "#ef4444" : "#3b82f6"}; padding: 14px 16px; border-radius: 6px; margin-bottom: 18px;">
+        ${params.clientName ? `<div style="font-weight: 600; margin-bottom: 6px; color: #1a1a2e;">Клиент: ${params.clientName}</div>` : ""}
+        <div style="color: #374151; line-height: 1.5; white-space: pre-wrap;">${params.reason}</div>
+      </div>
+      <p style="margin: 0 0 18px; color: #4b5563; font-size: 14px;">
+        Откройте сообщение клиента в ${channelLabel} и продолжите общение.
+      </p>
+      <a href="${appUrl}/dashboard/notifications" style="display: inline-block; padding: 10px 18px; background: #2563eb; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px;">Все уведомления</a>
+    </div>
+    <div style="padding: 16px 28px; background: #f9fafb; color: #6b7280; font-size: 12px; border-top: 1px solid #e5e7eb;">
+      Чтобы получать такие уведомления в Telegram — подключите свой аккаунт в <a href="${appUrl}/dashboard/settings" style="color: #2563eb;">настройках</a> и отправьте /start вашему боту.
+    </div>
+  </div>
+</body>
+</html>`,
+    });
+
+    if (error) {
+      console.error("Manager escalation email error:", error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (error) {
+    console.error("sendManagerEscalationEmail error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Ошибка отправки",
+    };
+  }
+}
+
 // Send welcome onboarding email after email verification
 export async function sendWelcomeEmail(
   email: string,

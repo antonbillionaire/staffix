@@ -394,24 +394,23 @@ async function handleChannelToolCall(
       }
 
       case "notify_manager": {
-        // Send notification to business owner about client needing human help
-        const business = await prisma.business.findUnique({
-          where: { id: businessId },
-          select: { ownerTelegramChatId: true, botToken: true, name: true },
-        });
-        if (business?.ownerTelegramChatId && business?.botToken) {
-          const urgencyLabel = toolInput.urgency === "urgent" ? "🔴 СРОЧНО" : "📩";
-          const message = `${urgencyLabel} Запрос от клиента\n\nКлиент: ${toolInput.client_name || "Неизвестен"}\nКанал: ${channel}\nПричина: ${toolInput.reason}`;
-          fetch(`https://api.telegram.org/bot${business.botToken}/sendMessage`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chat_id: business.ownerTelegramChatId.toString(),
-              text: message,
-            }),
-          }).catch((e) => console.error("[Channel AI] notify_manager error:", e));
-        }
-        return JSON.stringify({ success: true, message: "Менеджер уведомлён" });
+        // Используем единую функцию из sales-tools — она:
+        //   - всегда создаёт Notification в дашборде (не теряется при отсутствии TG)
+        //   - дополнительно пушит в Telegram владельца, если настроен
+        // Раньше здесь была inline-реализация, которая молча падала без
+        // ownerTelegramChatId и не оставляла никакого следа.
+        const { notifyManagerByTelegram } = await import("@/lib/sales-tools");
+        // Для канальных клиентов (WA/IG/FB) у нас нет bigint telegramId, передаём 0n —
+        // в дашборде видно clientName + channel; внутри функция использует поле только
+        // как fallback для подписи "Клиент (ID: ...)".
+        const result = await notifyManagerByTelegram(
+          businessId,
+          BigInt(0),
+          toolInput.reason,
+          toolInput.client_name,
+          toolInput.urgency
+        );
+        return JSON.stringify(result);
       }
 
       case "save_client_note": {
