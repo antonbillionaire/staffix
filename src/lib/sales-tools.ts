@@ -961,44 +961,80 @@ export async function notifyManagerByTelegram(
       select: { botToken: true, ownerTelegramChatId: true, name: true },
     });
 
-    if (!business?.botToken) {
-      return { success: false, error: "Бот не настроен" };
+    if (!business) {
+      return { success: false, error: "Бизнес не найден" };
     }
 
-    if (!business.ownerTelegramChatId) {
-      return {
-        success: true,
-        notified: false,
-        message: "Менеджер будет уведомлён при первой возможности",
-      };
-    }
-
-    const urgencyLabel = urgency === "urgent" ? "🚨 СРОЧНО" : "📩 Новый запрос";
+    const isUrgent = urgency === "urgent";
+    const urgencyLabel = isUrgent ? "🚨 СРОЧНО" : "📩 Новый запрос";
     const clientLabel = clientName ? `👤 *${clientName}*` : `👤 Клиент (ID: ${clientTelegramId})`;
 
-    const text =
-      `${urgencyLabel} — требуется помощь менеджера\n\n` +
-      `${clientLabel}\n` +
-      `💬 *Вопрос:* ${reason}\n\n` +
-      `_Клиент ждёт ответа в Telegram_`;
+    // 1) Всегда оставляем запись в дашборде, даже если Telegram владельца не настроен —
+    //    иначе эскалация превращается в ложь боту ("я передал" → никто не получил).
+    await prisma.notification
+      .create({
+        data: {
+          businessId,
+          type: "manager_escalation",
+          title: isUrgent
+            ? `🚨 Срочный запрос от клиента${clientName ? ` — ${clientName}` : ""}`
+            : `📩 Запрос требует менеджера${clientName ? ` — ${clientName}` : ""}`,
+          message: reason,
+          metadata: {
+            clientTelegramId: clientTelegramId.toString(),
+            clientName: clientName || null,
+            urgency: urgency || "normal",
+          },
+        },
+      })
+      .catch((e) => {
+        console.error("notifyManagerByTelegram: failed to create dashboard notification:", e);
+      });
 
-    await fetch(
-      `https://api.telegram.org/bot${business.botToken}/sendMessage`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: business.ownerTelegramChatId.toString(),
-          text,
-          parse_mode: "Markdown",
-        }),
+    // 2) Если у владельца настроен личный Telegram — пушим уведомление туда.
+    let telegramDelivered = false;
+    if (business.botToken && business.ownerTelegramChatId) {
+      try {
+        const text =
+          `${urgencyLabel} — требуется помощь менеджера\n\n` +
+          `${clientLabel}\n` +
+          `💬 *Вопрос:* ${reason}\n\n` +
+          `_Клиент ждёт ответа в Telegram_`;
+
+        const tgResponse = await fetch(
+          `https://api.telegram.org/bot${business.botToken}/sendMessage`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: business.ownerTelegramChatId.toString(),
+              text,
+              parse_mode: "Markdown",
+            }),
+          }
+        );
+        telegramDelivered = tgResponse.ok;
+        if (!tgResponse.ok) {
+          const body = await tgResponse.text().catch(() => "");
+          console.error(`notifyManagerByTelegram: Telegram returned ${tgResponse.status}: ${body}`);
+        }
+      } catch (e) {
+        console.error("notifyManagerByTelegram: Telegram send failed:", e);
       }
-    );
+    } else {
+      console.log(
+        `notifyManagerByTelegram: business ${businessId} has no ownerTelegramChatId — dashboard notification only`
+      );
+    }
 
+    // Запрос всегда сохранён (в дашборде), даже если Telegram-канал владельца не настроен.
     return {
       success: true,
       notified: true,
-      message: "Менеджер уведомлён. Он свяжется с клиентом в ближайшее время.",
+      telegramDelivered,
+      message: telegramDelivered
+        ? "Менеджер уведомлён. Он свяжется с клиентом в ближайшее время."
+        : "Запрос передан в дашборд менеджера. Он свяжется с клиентом, как только увидит уведомление.",
     };
   } catch (error) {
     console.error("notifyManagerByTelegram error:", error);
