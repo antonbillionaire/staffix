@@ -20,6 +20,7 @@ interface CalendarBooking {
 interface StaffMember {
   id: string;
   name: string;
+  role?: string | null;
 }
 
 // UTC offsets in minutes (must match server-side automation.ts)
@@ -126,6 +127,7 @@ export default function CalendarPage() {
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<CalendarBooking | null>(null);
+  const [assignBusy, setAssignBusy] = useState(false);
   const [staffFilter, setStaffFilter] = useState<string | null>(null);
   const [businessTimezone, setBusinessTimezone] = useState("Asia/Tashkent");
 
@@ -656,15 +658,53 @@ export default function CalendarPage() {
                   </span>
                 </div>
               )}
-              {selectedBooking.staffName && (
+              {selectedBooking.staffName ? (
                 <div className="flex items-center gap-2">
                   <User className={`h-4 w-4 ${isDark ? "text-gray-500" : "text-gray-400"}`} />
                   <span className={`text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
                     {selectedBooking.staffName}
                   </span>
-                  {selectedBooking.staffId && (
-                    <span className={`w-2.5 h-2.5 rounded-full ${getStaffColor(selectedBooking.staffId, selectedBooking.staffName).bg}`} />
-                  )}
+                  <span className={`w-2.5 h-2.5 rounded-full ${getStaffColor(selectedBooking.staffId, selectedBooking.staffName).bg}`} />
+                </div>
+              ) : (
+                <div>
+                  <div className={`flex items-center gap-2 text-sm ${isDark ? "text-amber-400" : "text-amber-600"}`}>
+                    <User className="h-4 w-4" />
+                    <span>Мастер не назначен</span>
+                  </div>
+                  <select
+                    value=""
+                    disabled={assignBusy}
+                    onChange={async (e) => {
+                      const newStaffId = e.target.value;
+                      if (!newStaffId) return;
+                      setAssignBusy(true);
+                      try {
+                        const res = await fetch(`/api/bookings/${selectedBooking.id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ staffId: newStaffId }),
+                        });
+                        if (res.ok) {
+                          await fetchData();
+                          const newStaff = staffList.find((s) => s.id === newStaffId);
+                          setSelectedBooking({
+                            ...selectedBooking,
+                            staffId: newStaffId,
+                            staffName: newStaff?.name || null,
+                          });
+                        }
+                      } finally {
+                        setAssignBusy(false);
+                      }
+                    }}
+                    className={`mt-2 w-full px-3 py-2 rounded-lg border text-sm ${isDark ? "bg-[#0c0c1f] border-white/10 text-white" : "bg-white border-gray-300 text-gray-900"} disabled:opacity-50`}
+                  >
+                    <option value="">Назначить мастера…</option>
+                    {staffList.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}{s.role ? ` — ${s.role}` : ""}</option>
+                    ))}
+                  </select>
                 </div>
               )}
               <div className="flex items-center gap-2">

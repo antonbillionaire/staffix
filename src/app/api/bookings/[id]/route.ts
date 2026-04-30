@@ -1,0 +1,89 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+
+/**
+ * PATCH /api/bookings/[id]
+ * Body: { staffId?: string | null, status?: string }
+ *
+ * Used by the calendar UI to fix orphan bookings (created without a master)
+ * by manually picking a staff member after the fact.
+ */
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      include: { businesses: true },
+    });
+    if (!user?.businesses[0]) {
+      return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
+    }
+    const businessId = user.businesses[0].id;
+
+    const { id } = await context.params;
+    const body = await request.json();
+
+    const booking = await prisma.booking.findFirst({
+      where: { id, businessId },
+      select: { id: true },
+    });
+    if (!booking) {
+      return NextResponse.json({ error: "Запись не найдена" }, { status: 404 });
+    }
+
+    const data: { staffId?: string | null; status?: string } = {};
+
+    if (body.staffId !== undefined) {
+      if (body.staffId === null || body.staffId === "") {
+        data.staffId = null;
+      } else {
+        // Verify the staff member belongs to this business
+        const staff = await prisma.staff.findFirst({
+          where: { id: body.staffId, businessId },
+          select: { id: true },
+        });
+        if (!staff) {
+          return NextResponse.json({ error: "Мастер не найден" }, { status: 400 });
+        }
+        data.staffId = body.staffId;
+      }
+    }
+
+    if (typeof body.status === "string") {
+      const allowed = ["pending", "confirmed", "completed", "cancelled", "no_show"];
+      if (!allowed.includes(body.status)) {
+        return NextResponse.json({ error: "Недопустимый статус" }, { status: 400 });
+      }
+      data.status = body.status;
+    }
+
+    const updated = await prisma.booking.update({
+      where: { id },
+      data,
+      include: {
+        service: { select: { name: true, price: true, duration: true } },
+        staff: { select: { id: true, name: true } },
+      },
+    });
+
+    return NextResponse.json({
+      booking: {
+        id: updated.id,
+        status: updated.status,
+        staffId: updated.staff?.id || null,
+        staffName: updated.staff?.name || null,
+      },
+    });
+  } catch (error) {
+    console.error("PATCH /api/bookings/[id]:", error);
+    return NextResponse.json({ error: "Ошибка сервера" }, { status: 500 });
+  }
+}

@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
         services: { select: { name: true, description: true, price: true, duration: true }, take: 50 },
         products: { select: { name: true, description: true, price: true, category: true, stock: true }, take: 50 },
         faqs: { select: { question: true, answer: true }, take: 20 },
-        staff: { select: { name: true, role: true }, take: 10 },
+        staff: { select: { id: true, name: true, role: true }, take: 10 },
         documents: { where: { parsed: true }, select: { name: true, extractedText: true }, take: 5 },
       },
     });

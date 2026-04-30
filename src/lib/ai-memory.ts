@@ -80,7 +80,7 @@ interface BusinessContext {
     bidirectional: boolean;
     reason: string | null;
   }>;
-  staff: Array<{ name: string; role: string | null }>;
+  staff: Array<{ id: string; name: string; role: string | null }>;
   faqs: Array<{ question: string; answer: string }>;
   documents: Array<{ name: string; extractedText: string | null }>;
   country: string;
@@ -204,7 +204,7 @@ export async function buildBusinessContext(
         where: { id: businessId },
         include: {
           services: { select: { name: true, price: true, duration: true } },
-          staff: { select: { name: true, role: true } },
+          staff: { select: { id: true, name: true, role: true } },
           faqs: { select: { question: true, answer: true } },
           documents: {
             where: { parsed: true },
@@ -223,7 +223,7 @@ export async function buildBusinessContext(
         where: { id: businessId },
         include: {
           services: { select: { name: true, price: true, duration: true } },
-          staff: { select: { name: true, role: true } },
+          staff: { select: { id: true, name: true, role: true } },
           faqs: { select: { question: true, answer: true } },
           documents: {
             where: { parsed: true },
@@ -422,10 +422,17 @@ ${business.serviceIncompatibilities.map((i) => {
 ${
   business.staff.length > 0
     ? business.staff
-        .map((s) => `- ${s.name}${s.role ? ` (${s.role})` : ""}`)
+        .map((s) => `- ID: ${s.id} | Имя: ${s.name}${s.role ? ` | Специализация: ${s.role}` : ""}`)
         .join("\n")
     : "Сотрудники пока не добавлены"
 }
+
+ВАЖНО про мастеров и записи: когда вызываешь create_booking, ВСЕГДА передавай staff_id если в бизнесе больше одного мастера. Определи нужного мастера по контексту:
+1. Клиент назвал имя мастера ("к Хасановой", "к Дилфузе") — найди его ID в списке выше
+2. Клиент назвал специализацию ("к терапевту", "к кардиологу", "к парикмахеру") — найди мастера с подходящей специализацией
+3. Услуга очевидно подразумевает конкретного специалиста (услуга "Терапевт первичный приём" — нужен мастер со специализацией "Терапевт"; услуга "ЭКГ" — кардиолог) — выбери его автоматически
+4. Если несколько мастеров подходят и клиент не выбрал — спроси клиента "К кому записать: <имя1> или <имя2>?"
+5. Только если клиент явно сказал "к любому свободному" или в бизнесе один мастер — можно не передавать staff_id
 
 ## Частые вопросы (FAQ):
 ${

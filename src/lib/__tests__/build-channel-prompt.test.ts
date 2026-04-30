@@ -26,7 +26,7 @@ function makeBiz(overrides: Record<string, unknown> = {}) {
       { question: "Где вы находитесь?", answer: "На улице Тестовой, 1" },
     ],
     staff: [
-      { name: "Алия", role: "Мастер" },
+      { id: "staff-1", name: "Алия", role: "Мастер" },
     ],
     documents: [] as Array<{ name: string; extractedText: string | null }>,
     ...overrides,

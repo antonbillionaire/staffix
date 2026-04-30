@@ -119,7 +119,7 @@ async function loadBusinessProfile(businessId: string) {
       services: { select: { name: true, description: true, price: true, duration: true }, take: 50 },
       products: { select: { name: true, description: true, price: true, category: true, stock: true }, take: 300 },
       faqs: { select: { question: true, answer: true }, take: 20 },
-      staff: { select: { name: true, role: true }, take: 10 },
+      staff: { select: { id: true, name: true, role: true }, take: 10 },
       documents: { where: { parsed: true }, select: { name: true, extractedText: true }, take: 10 },
     },
   });
@@ -168,7 +168,7 @@ export function buildChannelSystemPrompt(
     : "";
 
   const staffList = biz.staff.length > 0
-    ? biz.staff.map((s) => `- ${s.name}${s.role ? ` (${s.role})` : ""}`).join("\n")
+    ? biz.staff.map((s) => `- ID: ${s.id} | Имя: ${s.name}${s.role ? ` | Специализация: ${s.role}` : ""}`).join("\n")
     : "";
 
   const faqList = biz.faqs.length > 0
@@ -198,7 +198,10 @@ export function buildChannelSystemPrompt(
 
   if (productsList) prompt += `\n\nТовары:\n${productsList}`;
 
-  if (staffList) prompt += `\n\nСпециалисты:\n${staffList}`;
+  if (staffList) {
+    prompt += `\n\nСпециалисты:\n${staffList}`;
+    prompt += `\n\nВАЖНО про мастеров: при create_booking ВСЕГДА передавай staff_id если в бизнесе больше одного мастера. Определи нужного мастера: (1) клиент назвал имя — найди ID; (2) клиент назвал специализацию — найди мастера с подходящей ролью; (3) услуга подразумевает специалиста (например "Терапевт первичный приём" → мастер с ролью "Терапевт") — выбери его; (4) если несколько подходят — спроси клиента; (5) только если клиент сказал "к любому" — можно не передавать.`;
+  }
 
   if (faqList) prompt += `\n\nЧасто задаваемые вопросы:\n${faqList}`;
 
