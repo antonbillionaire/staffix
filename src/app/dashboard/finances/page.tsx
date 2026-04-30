@@ -42,7 +42,7 @@ interface Totals {
 type Period = "month" | "week" | "custom";
 
 function formatMoney(n: number): string {
-  return n.toLocaleString("ru-RU");
+  return n.toLocaleString("ru-RU") + " сум";
 }
 
 function formatDate(d: Date): string {

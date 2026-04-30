@@ -103,6 +103,7 @@ export async function GET(
         totalVisits: client.totalVisits,
         lastVisitDate: client.lastVisitDate,
         isBlocked: client.isBlocked,
+        importantNotes: client.importantNotes,
         createdAt: client.createdAt,
         // Computed
         isActive,
@@ -187,12 +188,23 @@ export async function PATCH(
       return NextResponse.json({ error: "Phone too long (max 20)" }, { status: 400 });
     }
 
+    // importantNotes — может прийти как пустая строка (очистить) или null (не менять)
+    const importantNotesUpdate: { importantNotes?: string | null } = {};
+    if (body.importantNotes !== undefined) {
+      const notes = typeof body.importantNotes === "string" ? body.importantNotes.trim() : "";
+      if (notes.length > 2000) {
+        return NextResponse.json({ error: "Important notes too long (max 2000)" }, { status: 400 });
+      }
+      importantNotesUpdate.importantNotes = notes || null;
+    }
+
     const updatedClient = await prisma.client.update({
       where: { id },
       data: {
         isBlocked: body.isBlocked ?? client.isBlocked,
         name,
         phone,
+        ...importantNotesUpdate,
       },
     });
 

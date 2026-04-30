@@ -29,6 +29,7 @@ interface CustomerDetail {
     totalVisits: number;
     lastVisitDate: string | null;
     isBlocked: boolean;
+    importantNotes: string | null;
     createdAt: string;
     isActive: boolean;
     isVip: boolean;
@@ -77,6 +78,9 @@ export default function CustomerDetailPage({
   const [actionLoading, setActionLoading] = useState(false);
   const [botUsername, setBotUsername] = useState<string>("");
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [notesEditing, setNotesEditing] = useState(false);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [notesSaving, setNotesSaving] = useState(false);
   const initialTab = searchParams.get("tab");
   const bookingsRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -264,7 +268,7 @@ export default function CustomerDetailPage({
                 <DollarSign className="h-4 w-4 text-green-500" />
                 <span className={`text-xs ${textSecondary}`}>Потрачено</span>
               </div>
-              <p className={`text-2xl font-bold ${textPrimary}`}>{customer.totalSpent.toLocaleString()}₸</p>
+              <p className={`text-2xl font-bold ${textPrimary}`}>{customer.totalSpent.toLocaleString("ru-RU")} сум</p>
             </div>
             <div className={`${cardBg} border ${borderColor} rounded-xl p-4`}>
               <div className="flex items-center gap-2 mb-2">
@@ -307,7 +311,7 @@ export default function CustomerDetailPage({
                         <span>{formatShortDate(booking.date)}</span>
                         {booking.staffName && <span>• {booking.staffName}</span>}
                         {booking.servicePrice && (
-                          <span>• {booking.servicePrice.toLocaleString()}₸</span>
+                          <span>• {booking.servicePrice.toLocaleString("ru-RU")} сум</span>
                         )}
                       </div>
                     </div>
@@ -392,6 +396,78 @@ export default function CustomerDetailPage({
               )}
             </div>
           )}
+
+          {/* Important Notes */}
+          <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className={`text-lg font-semibold ${textPrimary}`}>Важные заметки</h2>
+              {!notesEditing && (
+                <button
+                  onClick={() => {
+                    setNotesDraft(customer.importantNotes || "");
+                    setNotesEditing(true);
+                  }}
+                  className={`text-xs px-2 py-1 rounded-md ${isDark ? "bg-white/5 text-gray-300 hover:bg-white/10" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                >
+                  {customer.importantNotes ? "Изменить" : "Добавить"}
+                </button>
+              )}
+            </div>
+            {notesEditing ? (
+              <div className="space-y-2">
+                <textarea
+                  value={notesDraft}
+                  onChange={(e) => setNotesDraft(e.target.value)}
+                  rows={5}
+                  maxLength={2000}
+                  placeholder="Аллергии, противопоказания, предпочтения, предупреждения для AI и команды. Например: «Аллергия на лидокаин — использовать артикаин. Беременность — нельзя ретиноловые пилинги»"
+                  className={`w-full px-3 py-2 rounded-lg border ${isDark ? "bg-[#0c0c1f] border-white/10 text-white placeholder-gray-500" : "bg-white border-gray-300 text-gray-900"} outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      setNotesSaving(true);
+                      try {
+                        const res = await fetch(`/api/customers/${id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ importantNotes: notesDraft }),
+                        });
+                        if (res.ok) {
+                          setNotesEditing(false);
+                          await fetchCustomer();
+                        }
+                      } finally {
+                        setNotesSaving(false);
+                      }
+                    }}
+                    disabled={notesSaving}
+                    className="flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                  >
+                    {notesSaving ? "Сохраняю..." : "Сохранить"}
+                  </button>
+                  <button
+                    onClick={() => { setNotesEditing(false); setNotesDraft(""); }}
+                    disabled={notesSaving}
+                    className={`px-3 py-1.5 rounded-lg text-sm ${isDark ? "bg-white/5 text-gray-300 hover:bg-white/10" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                  >
+                    Отмена
+                  </button>
+                </div>
+                <p className={`text-xs ${textTertiary}`}>
+                  AI и команда увидят эти заметки в карточке. AI учитывает их при общении с клиентом.
+                </p>
+              </div>
+            ) : customer.importantNotes ? (
+              <div className={`text-sm ${textPrimary} whitespace-pre-wrap p-3 rounded-lg ${isDark ? "bg-amber-500/5 border border-amber-500/20" : "bg-amber-50 border border-amber-200"}`}>
+                {customer.importantNotes}
+              </div>
+            ) : (
+              <p className={`text-sm ${textSecondary}`}>
+                Нет заметок. Добавьте важную информацию о клиенте — аллергии, противопоказания, предпочтения. AI учтёт это в общении.
+              </p>
+            )}
+          </div>
 
           {/* Customer Info */}
           <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>

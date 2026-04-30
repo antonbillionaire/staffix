@@ -176,7 +176,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "common.price": "Цена",
     "common.duration": "Длительность",
     "common.minutes": "мин",
-    "common.currency": "тг",
+    "common.currency": "сум",
 
     // Warnings
     "warning.lowMessages": "Осталось мало сообщений",
@@ -5530,7 +5530,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "common.price": "Бағасы",
     "common.duration": "Ұзақтығы",
     "common.minutes": "мин",
-    "common.currency": "тг",
+    "common.currency": "сум",
 
     // Warnings
     "warning.lowMessages": "Хабарлар аз қалды",

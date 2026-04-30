@@ -190,9 +190,8 @@ export default function ServicesPage() {
   };
 
   const formatPrice = (price: number) => {
-    const locale = language === "ru" ? "ru-RU" : language === "kz" ? "kk-KZ" : language === "uz" ? "uz-UZ" : "en-US";
-    const currency = language === "en" ? "$" : language === "kz" ? " тг" : language === "uz" ? " so'm" : " сум";
-    return price.toLocaleString(locale) + currency;
+    // Staffix sold only in Uzbekistan for now — display сум everywhere.
+    return price.toLocaleString("ru-RU") + " сум";
   };
 
   return (

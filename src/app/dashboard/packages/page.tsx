@@ -45,7 +45,7 @@ interface Incompatibility {
 }
 
 function formatMoney(n: number): string {
-  return n.toLocaleString("ru-RU");
+  return n.toLocaleString("ru-RU") + " сум";
 }
 
 export default function PackagesPage() {

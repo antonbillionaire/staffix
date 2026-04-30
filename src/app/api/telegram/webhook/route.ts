@@ -501,6 +501,16 @@ async function handleToolCall(
         return JSON.stringify(result);
       }
 
+      case "save_client_note": {
+        const { appendClientImportantNote } = await import("@/lib/booking-tools");
+        const result = await appendClientImportantNote(
+          businessId,
+          telegramId,
+          toolInput.note
+        );
+        return JSON.stringify(result);
+      }
+
       default:
         return JSON.stringify({ error: `Unknown tool: ${toolName}` });
     }
@@ -520,7 +530,7 @@ function buildFallbackFromToolResults(toolResults: any[], salesMode: boolean): s
       // Order confirmation (sales mode)
       if (parsed.orderNumber && parsed.totalPrice !== undefined) {
         const items = parsed.summary || parsed.items?.map((i: { name: string; quantity: number }) => `${i.name} × ${i.quantity}`).join(", ") || "";
-        return `Заказ ${parsed.orderNumber} оформлен! 🎉\n\n${items}\nИтого: ${parsed.totalPrice.toLocaleString()} ₸\n\nСпасибо за покупку! Мы скоро свяжемся с вами.`;
+        return `Заказ ${parsed.orderNumber} оформлен! 🎉\n\n${items}\nИтого: ${parsed.totalPrice.toLocaleString("ru-RU")} сум\n\nСпасибо за покупку! Мы скоро свяжемся с вами.`;
       }
 
       // Booking confirmation (service mode)

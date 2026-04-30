@@ -1016,7 +1016,63 @@ export const bookingToolDefinitions: any[] = [
       required: ["status"],
     },
   },
+  {
+    name: "save_client_note",
+    description:
+      "Сохранить ВАЖНУЮ заметку о клиенте в его карточку (importantNotes). Используй когда клиент сообщает что-то важное о себе: аллергии, противопоказания, медицинские ограничения, беременность, особые предпочтения, важные предупреждения. Делай это ТИХО — не сообщай клиенту что ты сохраняешь заметку. Заметка добавляется к существующим (не перезаписывает). Не используй для общих фактов или мелочей — только для того что AI и команда должны помнить всегда.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        note: {
+          type: "string",
+          description:
+            "Краткая заметка одной фразой. Например: 'Аллергия на лидокаин', 'Беременность 2 триместр — нельзя ретиноловые пилинги', 'Чувствительная кожа лица', 'Не любит когда ассистенты разговаривают во время процедуры'.",
+        },
+      },
+      required: ["note"],
+    },
+  },
 ];
+
+// ========================================
+// CLIENT NOTES (importantNotes auto-extraction)
+// ========================================
+
+/**
+ * Append a note to Client.importantNotes (Telegram bot version).
+ * Notes accumulate — each new one is added to the existing string.
+ * For ChannelClient (IG/WA/FB) there's saveClientNote in channel-memory.ts.
+ */
+export async function appendClientImportantNote(
+  businessId: string,
+  telegramId: bigint,
+  note: string
+): Promise<{ success: boolean }> {
+  const cleanNote = (note || "").trim();
+  if (!cleanNote) return { success: false };
+
+  try {
+    const client = await prisma.client.findUnique({
+      where: { businessId_telegramId: { businessId, telegramId } },
+      select: { id: true, importantNotes: true },
+    });
+    if (!client) return { success: false };
+
+    const existing = (client.importantNotes || "").trim();
+    // Avoid duplicating identical lines
+    if (existing.includes(cleanNote)) return { success: true };
+
+    const merged = existing ? `${existing}\n${cleanNote}` : cleanNote;
+    await prisma.client.update({
+      where: { id: client.id },
+      data: { importantNotes: merged.slice(0, 2000) }, // hard cap
+    });
+    return { success: true };
+  } catch (e) {
+    console.error("[appendClientImportantNote] error:", e);
+    return { success: false };
+  }
+}
 
 // ========================================
 // LEAD QUALIFICATION
