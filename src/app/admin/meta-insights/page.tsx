@@ -301,9 +301,10 @@ export default function AdminMetaInsightsPage() {
         <div className="mt-8 text-xs text-zinc-500 flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
           <p>
-            Daily digest шлётся в Telegram при настроенных <code className="bg-zinc-800 px-1 rounded">ADMIN_TELEGRAM_CHAT_ID</code> и{" "}
-            <code className="bg-zinc-800 px-1 rounded">STAFFIX_SUPPORT_BOT_TOKEN</code> (или{" "}
-            <code className="bg-zinc-800 px-1 rounded">ADMIN_TELEGRAM_BOT_TOKEN</code>). Можно указывать несколько chat_id через запятую.
+            Daily digest идёт в Telegram через <code className="bg-zinc-800 px-1 rounded">SUPPORT_BOT_TOKEN</code> →{" "}
+            <code className="bg-zinc-800 px-1 rounded">SUPPORT_CHAT_ID</code> (тот же бот и чат, где приходят support-тикеты).
+            Если хочешь отправлять в отдельный чат — поставь{" "}
+            <code className="bg-zinc-800 px-1 rounded">ADMIN_TELEGRAM_CHAT_ID</code> (имеет приоритет, можно несколько через запятую).
           </p>
         </div>
       </div>

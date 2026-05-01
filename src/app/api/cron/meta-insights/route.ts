@@ -24,10 +24,14 @@ async function sendAdminDigest(stats: {
   newCount: number;
   byType: Record<string, number>;
 }) {
-  const botToken = process.env.STAFFIX_SUPPORT_BOT_TOKEN || process.env.ADMIN_TELEGRAM_BOT_TOKEN;
-  const chatIdEnv = process.env.ADMIN_TELEGRAM_CHAT_ID;
+  // Используем существующие переменные платформы:
+  //   SUPPORT_BOT_TOKEN — токен поддерживающего бота (уже работает для тикетов)
+  //   SUPPORT_CHAT_ID   — chat_id админа куда летят support-тикеты
+  //   ADMIN_TELEGRAM_CHAT_ID — необязательный override (если хочется разделить)
+  const botToken = process.env.SUPPORT_BOT_TOKEN;
+  const chatIdEnv = process.env.ADMIN_TELEGRAM_CHAT_ID || process.env.SUPPORT_CHAT_ID;
   if (!botToken || !chatIdEnv) {
-    console.log("[meta-insights-cron] no ADMIN_TELEGRAM_CHAT_ID/BOT_TOKEN — digest skipped");
+    console.log("[meta-insights-cron] no SUPPORT_BOT_TOKEN/SUPPORT_CHAT_ID — digest skipped");
     return;
   }
 
