@@ -30,6 +30,7 @@ const adminNav = [
   { name: "Лиды", href: "/admin/sales-leads", icon: Target },
   { name: "Сообщения (Виктор)", href: "/admin/messages", icon: MessageSquare },
   { name: "Переписки клиентов", href: "/admin/conversations", icon: MessageSquare },
+  { name: "Meta Insights", href: "/admin/meta-insights", icon: TrendingUp },
   { name: "Кампании", href: "/admin/outreach", icon: Megaphone },
   { name: "Рассылки", href: "/admin/broadcasts", icon: Mail },
   { name: "Автоматизации", href: "/admin/automations", icon: Zap },

@@ -205,6 +205,7 @@ model Business {
   // AI Learning
   botCorrections     BotCorrection[]
   aiInsightRecords   AiInsight[]
+  metaInsights       MetaInsight[] @relation("MetaInsightBusiness")
 
   // Программы лояльности (может быть несколько типов)
   loyaltyPrograms    LoyaltyProgram[]
@@ -1322,6 +1323,37 @@ model AiInsight {
   updatedAt         DateTime  @updatedAt
 
   @@index([businessId, status])
+}
+
+// Мета-инсайты для платформы Staffix — daily digest для админа.
+// Не привязаны к одному бизнесу: они показывают системные проблемы
+// (баги промпта, тренды эскалаций, тарифные алерты, language-issues
+// и т.п.). businessId nullable — некоторые типы агрегатные.
+model MetaInsight {
+  id                String    @id @default(cuid())
+
+  type              String    // stuck_conversation, faq_ignored, dont_know_frequency,
+                              // quota_pressure, tool_failure, language_gap, system_health
+  severity          String    @default("info")  // info, warn, critical
+  title             String
+  description       String    @db.Text
+  data              Json?     // структурированный контекст: { businessId, count, examples, ... }
+
+  // Опционально привязан к конкретному бизнесу — для drill-down
+  businessId        String?
+  business          Business? @relation("MetaInsightBusiness", fields: [businessId], references: [id], onDelete: SetNull)
+
+  status            String    @default("new")  // new, resolved, dismissed
+  resolvedAt        DateTime?
+  resolvedBy        String?   // email админа
+  notes             String?   @db.Text
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status, severity])
+  @@index([type, createdAt])
+  @@index([businessId])
 }
 
 // ========================================
