@@ -1484,50 +1484,55 @@ export async function POST(request: NextRequest) {
 
       const senderUsername = message.from.username?.toLowerCase().replace("@", "") || "";
 
-      // Проверяем: это мастер подключается к уведомлениям?
+      // Проверяем кем именно подключается отправитель: владельцем, мастером,
+      // или одновременно тем и другим (часто в малом бизнесе владелец сам
+      // себя добавляет в Staff). Раньше тут был early-return после staff-матча,
+      // и если владелец совпадал с staff по username, owner-блок никогда не
+      // отрабатывал → Business.ownerTelegramChatId оставался NULL → уведомления
+      // от notify_manager никуда не шли.
       if (senderUsername) {
-        // Ищем среди всех мастеров этого бизнеса
-        const allStaff = await prisma.staff.findMany({
-          where: { businessId: business.id, telegramUsername: { not: null } },
-          select: { id: true, name: true, telegramUsername: true },
-        });
-
-        const matchedStaff = allStaff.find(
-          (s) => s.telegramUsername?.toLowerCase().replace("@", "") === senderUsername
-        );
-
-        if (matchedStaff) {
-          await prisma.staff.update({
-            where: { id: matchedStaff.id },
-            data: { telegramChatId: BigInt(chatId) },
-          });
-
-          await sendTelegramMessage(
-            botToken,
-            chatId,
-            `✅ ${matchedStaff.name}, вы подключены к уведомлениям!\n\nТеперь вы будете получать новые записи клиентов сюда.`
-          );
-          return NextResponse.json({ ok: true });
-        }
-
-        // Проверяем: это владелец подключается?
         const businessData = await prisma.business.findUnique({
           where: { id: business.id },
           select: { ownerTelegramUsername: true, name: true, welcomeMessage: true, language: true },
         });
 
+        const allStaff = await prisma.staff.findMany({
+          where: { businessId: business.id, telegramUsername: { not: null } },
+          select: { id: true, name: true, telegramUsername: true },
+        });
+        const matchedStaff = allStaff.find(
+          (s) => s.telegramUsername?.toLowerCase().replace("@", "") === senderUsername
+        );
+
         const ownerUsername = businessData?.ownerTelegramUsername?.toLowerCase().replace("@", "") || "";
-        if (ownerUsername && ownerUsername === senderUsername) {
+        const isOwner = !!ownerUsername && ownerUsername === senderUsername;
+
+        // Ставим chatId на КАЖДУЮ роль, под которой найден отправитель —
+        // никаких early-return'ов между ними.
+        if (matchedStaff) {
+          await prisma.staff.update({
+            where: { id: matchedStaff.id },
+            data: { telegramChatId: BigInt(chatId) },
+          });
+        }
+        if (isOwner) {
           await prisma.business.update({
             where: { id: business.id },
             data: { ownerTelegramChatId: BigInt(chatId) },
           });
+        }
 
-          await sendTelegramMessage(
-            botToken,
-            chatId,
-            `✅ Вы подключены как администратор!\n\nВсе уведомления о записях, отменах и новых клиентах будут приходить сюда.`
-          );
+        if (matchedStaff || isOwner) {
+          // Подбираем подходящий текст
+          let confirmText: string;
+          if (matchedStaff && isOwner) {
+            confirmText = `✅ ${matchedStaff.name}, вы подключены как администратор и как мастер.\n\nВсе уведомления о записях, отменах, новых клиентах и эскалациях будут приходить сюда.`;
+          } else if (isOwner) {
+            confirmText = `✅ Вы подключены как администратор!\n\nВсе уведомления о записях, отменах и новых клиентах будут приходить сюда.`;
+          } else {
+            confirmText = `✅ ${matchedStaff!.name}, вы подключены к уведомлениям!\n\nТеперь вы будете получать новые записи клиентов сюда.`;
+          }
+          await sendTelegramMessage(botToken, chatId, confirmText);
           return NextResponse.json({ ok: true });
         }
 
