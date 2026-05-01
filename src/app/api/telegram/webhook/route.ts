@@ -35,6 +35,7 @@ import { dispatchCrmEvent } from "@/lib/crm-integrations";
 import { salesToolDefinitions, executeSalesTool, notifyManagerByTelegram } from "@/lib/sales-tools";
 import { buildSalesSystemPrompt, isSalesMode } from "@/lib/sales-prompt";
 import { markWebhookProcessed } from "@/lib/webhook-dedup";
+import { stripMarkdown } from "@/lib/strip-markdown";
 
 // ========================================
 // HELPERS
@@ -117,8 +118,14 @@ async function sendTelegramMessage(
   text: string
 ): Promise<boolean> {
   try {
-    // Telegram limit is 4096 chars — split if needed
-    const chunks = text.length > 4096 ? splitTelegramMessage(text) : [text];
+    // 1) Strip Markdown — клиенты видят разметку буквально (Claude часто
+    //    отдаёт **жирный**, ## заголовки и т.п.). Убираем чтоб человеку.
+    // 2) parse_mode НЕ передаём — иначе спецсимволы могут сломать отправку
+    //    (тот же урок что с notify_manager Markdown-багом).
+    const cleanText = stripMarkdown(text);
+    if (!cleanText) return true; // нечего отправлять
+
+    const chunks = cleanText.length > 4096 ? splitTelegramMessage(cleanText) : [cleanText];
     let ok = true;
     for (const chunk of chunks) {
       const response = await fetch(
@@ -129,7 +136,6 @@ async function sendTelegramMessage(
           body: JSON.stringify({
             chat_id: chatId,
             text: chunk,
-            parse_mode: "HTML",
           }),
         }
       );

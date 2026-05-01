@@ -135,8 +135,9 @@ describe("buildChannelSystemPrompt", () => {
     const prompt = buildChannelSystemPrompt(biz, "whatsapp");
     expect(prompt).toContain("long.pdf");
     expect(prompt).toContain("...");
-    // Should not contain the full 60000 chars — capped at 50000
-    expect(prompt.length).toBeLessThan(55000);
+    // Should not contain the full 60000 chars — document body capped at 50000.
+    // Headroom for non-document prompt sections (services, FAQ, format/language rules) ~6000 chars.
+    expect(prompt.length).toBeLessThan(56500);
   });
 
   it("includes multiple documents within total limit", () => {

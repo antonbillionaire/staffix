@@ -180,6 +180,50 @@ export default function ProductsPage() {
     }
   };
 
+  // ──── AI-обогащение каталога: переводит описания, добавляет русские теги ────
+  const [enriching, setEnriching] = useState(false);
+  const [enrichProgress, setEnrichProgress] = useState<string>("");
+  const handleEnrichCatalog = async () => {
+    if (
+      !confirm(
+        "Запустить AI-обогащение каталога?\n\nДля каждого товара без тегов:\n- описание переведётся на русский\n- сгенерируются 5-10 поисковых тегов\n- название и бренд останутся как есть\n\nЭто помогает боту находить товары когда клиент пишет на русском."
+      )
+    ) {
+      return;
+    }
+    setEnriching(true);
+    setEnrichProgress("");
+    let totalEnriched = 0;
+    try {
+      // Цикл вызывает endpoint пока remaining > 0
+      while (true) {
+        const res = await fetch("/api/products/enrich-batch?limit=30", { method: "POST" });
+        if (!res.ok) {
+          alert("Ошибка обогащения. Попробуйте позже.");
+          break;
+        }
+        const data = await res.json();
+        totalEnriched += data.enriched || 0;
+        setEnrichProgress(
+          `Обработано: ${totalEnriched}, осталось: ${data.remaining || 0}`
+        );
+        if (!data.enriched || data.remaining === 0) break;
+      }
+      await fetchProducts();
+      setEnrichProgress(
+        totalEnriched > 0
+          ? `✓ Готово. Обогащено товаров: ${totalEnriched}`
+          : "Все товары уже обогащены"
+      );
+    } catch (e) {
+      console.error(e);
+      alert("Ошибка при обогащении каталога");
+    } finally {
+      setEnriching(false);
+      setTimeout(() => setEnrichProgress(""), 5000);
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -333,16 +377,27 @@ export default function ProductsPage() {
               {t("products.subtitle")}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {products.length > 0 && (
-              <button
-                onClick={handleDeleteAll}
-                disabled={deletingAll}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border ${isDark ? "border-red-500/30 text-red-400 hover:bg-red-500/10" : "border-red-300 text-red-600 hover:bg-red-50"} disabled:opacity-50`}
-              >
-                {deletingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                {t("products.deleteAll")}
-              </button>
+              <>
+                <button
+                  onClick={handleEnrichCatalog}
+                  disabled={enriching}
+                  title="Перевести описания на русский и добавить поисковые теги через AI"
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border ${isDark ? "border-purple-500/30 text-purple-400 hover:bg-purple-500/10" : "border-purple-300 text-purple-700 hover:bg-purple-50"} disabled:opacity-50`}
+                >
+                  {enriching ? <Loader2 className="w-4 h-4 animate-spin" /> : <span className="text-base leading-none">✨</span>}
+                  {enriching ? (enrichProgress || "Обогащаю...") : "AI-обогащение каталога"}
+                </button>
+                <button
+                  onClick={handleDeleteAll}
+                  disabled={deletingAll}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border ${isDark ? "border-red-500/30 text-red-400 hover:bg-red-500/10" : "border-red-300 text-red-600 hover:bg-red-50"} disabled:opacity-50`}
+                >
+                  {deletingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  {t("products.deleteAll")}
+                </button>
+              </>
             )}
             <button
               onClick={() => { setIsImportOpen(true); setImportResult(null); setImportCsv(""); setPreviewData(null); }}

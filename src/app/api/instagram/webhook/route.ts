@@ -20,6 +20,7 @@ import { getPageAccessToken } from "@/lib/facebook-utils";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { markWebhookProcessed } from "@/lib/webhook-dedup";
 import { checkSubscriptionLimit, incrementMessageCount } from "@/lib/subscription-check";
+import { stripMarkdown } from "@/lib/strip-markdown";
 
 const META_API_BASE = "https://graph.facebook.com/v21.0";
 
@@ -402,7 +403,10 @@ async function sendIGMessage(
   recipientId: string,
   text: string
 ): Promise<boolean> {
-  const chunks = splitIGMessage(text, 1000);
+  // Strip Markdown — Instagram DM показывает **звёзды** буквально
+  const cleanText = stripMarkdown(text);
+  if (!cleanText) return true;
+  const chunks = splitIGMessage(cleanText, 1000);
   try {
     for (const chunk of chunks) {
       const res = await fetch(`${META_API_BASE}/${igAccountId}/messages`, {

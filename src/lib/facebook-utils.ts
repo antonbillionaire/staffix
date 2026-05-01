@@ -3,6 +3,8 @@
  * Docs: https://developers.facebook.com/docs/messenger-platform
  */
 
+import { stripMarkdown } from "@/lib/strip-markdown";
+
 const FB_API_VERSION = "v21.0";
 const FB_API_BASE = `https://graph.facebook.com/${FB_API_VERSION}`;
 
@@ -51,7 +53,10 @@ export async function sendFBMessage(
   pageId?: string
 ): Promise<boolean> {
   try {
-    const chunks = splitMessage(text, 2000); // FB limit 2000 chars
+    // Strip Markdown — FB Messenger / Instagram DM показывают **звёзды** буквально
+    const cleanText = stripMarkdown(text);
+    if (!cleanText) return true;
+    const chunks = splitMessage(cleanText, 2000); // FB limit 2000 chars
     // Resolve page access token if we have pageId (System User tokens need this)
     const token = pageId ? await getPageAccessToken(pageId, pageAccessToken) : pageAccessToken;
     const endpoint = pageId ? `${FB_API_BASE}/${pageId}/messages` : `${FB_API_BASE}/me/messages`;

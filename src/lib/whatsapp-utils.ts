@@ -3,6 +3,8 @@
  * Docs: https://developers.facebook.com/docs/whatsapp/cloud-api
  */
 
+import { stripMarkdown } from "@/lib/strip-markdown";
+
 const WA_API_VERSION = "v21.0";
 const WA_API_BASE = `https://graph.facebook.com/${WA_API_VERSION}`;
 
@@ -16,8 +18,12 @@ export async function sendWAMessage(
   text: string
 ): Promise<boolean> {
   try {
+    // Strip Markdown — WhatsApp интерпретирует одиночные * как жирный,
+    // а звёздочек у Claude в ответах хватает. Клиенту лучше plain-text.
+    const cleanText = stripMarkdown(text);
+    if (!cleanText) return true;
     // WA has 4096 char limit per message
-    const chunks = splitMessage(text, 4096);
+    const chunks = splitMessage(cleanText, 4096);
     for (const chunk of chunks) {
       const res = await fetch(`${WA_API_BASE}/${phoneNumberId}/messages`, {
         method: "POST",

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
+import { enrichProduct } from "@/lib/catalog-enricher";
 
 async function getUserBusiness(request: NextRequest): Promise<string | null> {
   const session = await auth();
@@ -64,17 +65,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "price должен быть положительным числом" }, { status: 400 });
     }
 
+    // Auto-enrich: добавляем русские теги, переводим описание/категорию
+    // если каталог пришёл на английском. Не блокируем при ошибке —
+    // в крайнем случае товар сохранится без обогащения.
+    const businessForLang = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { language: true },
+    });
+    const targetLang = businessForLang?.language || "ru";
+    const enriched = await enrichProduct(
+      {
+        name,
+        description,
+        category,
+        existingTags: tags || [],
+      },
+      targetLang
+    );
+
     const product = await prisma.product.create({
       data: {
         businessId,
         name,
-        description: description || null,
+        description: enriched.description,
         price: Math.round(price),
         oldPrice: oldPrice ? Math.round(oldPrice) : null,
         stock: stock !== undefined ? stock : null,
         sku: sku || null,
-        category: category || null,
-        tags: tags || [],
+        category: enriched.category,
+        tags: enriched.tags,
         imageUrl: imageUrl || null,
         productUrl: productUrl || null,
         isActive: true,
