@@ -1484,31 +1484,55 @@ export async function POST(request: NextRequest) {
 
       const senderUsername = message.from.username?.toLowerCase().replace("@", "") || "";
 
-      // Проверяем кем именно подключается отправитель: владельцем, мастером,
-      // или одновременно тем и другим (часто в малом бизнесе владелец сам
-      // себя добавляет в Staff). Раньше тут был early-return после staff-матча,
-      // и если владелец совпадал с staff по username, owner-блок никогда не
-      // отрабатывал → Business.ownerTelegramChatId оставался NULL → уведомления
-      // от notify_manager никуда не шли.
+      // Определяем кем подключается /start: владельцем, мастером, или обоими
+      // одновременно. В малом бизнесе владелец часто сам в Staff-листе.
+      //
+      // Owner-detection использует НЕСКОЛЬКО сигналов (от сильного к слабому):
+      //   1. ownerTelegramUsername совпадает с senderUsername (явная настройка)
+      //   2. Staff.role содержит "владелец/админ/директор/owner/admin/director"
+      //   3. Fallback: Business.ownerTelegramChatId ещё не установлен,
+      //      и Staff в бизнесе ровно один — тогда этот Staff и есть владелец.
+      //
+      // Эта логика автоматически восстанавливает Right Flight-кейс: владелец
+      // никогда не заходил в /dashboard/settings прописать ownerTelegramUsername,
+      // но он единственный сотрудник → следующее /start ставит ownerTelegramChatId.
       if (senderUsername) {
         const businessData = await prisma.business.findUnique({
           where: { id: business.id },
-          select: { ownerTelegramUsername: true, name: true, welcomeMessage: true, language: true },
+          select: {
+            ownerTelegramUsername: true,
+            ownerTelegramChatId: true,
+            name: true,
+            welcomeMessage: true,
+            language: true,
+          },
         });
 
         const allStaff = await prisma.staff.findMany({
           where: { businessId: business.id, telegramUsername: { not: null } },
-          select: { id: true, name: true, telegramUsername: true },
+          select: { id: true, name: true, role: true, telegramUsername: true },
         });
         const matchedStaff = allStaff.find(
           (s) => s.telegramUsername?.toLowerCase().replace("@", "") === senderUsername
         );
 
         const ownerUsername = businessData?.ownerTelegramUsername?.toLowerCase().replace("@", "") || "";
-        const isOwner = !!ownerUsername && ownerUsername === senderUsername;
+        const explicitOwner = !!ownerUsername && ownerUsername === senderUsername;
 
-        // Ставим chatId на КАЖДУЮ роль, под которой найден отправитель —
-        // никаких early-return'ов между ними.
+        // Признак "роль владельца" — для случая когда owner добавлен в Staff
+        // но ownerTelegramUsername не заполнен.
+        const ownerRoleRegex = /владел|админ|директор|owner|admin|director/i;
+        const staffHasOwnerRole = !!matchedStaff?.role && ownerRoleRegex.test(matchedStaff.role);
+
+        // Sole-staff fallback — если в бизнесе ровно один Staff с username
+        // и owner ещё не подключён, считаем этого Staff владельцем.
+        const totalStaffCount = await prisma.staff.count({ where: { businessId: business.id } });
+        const ownerNotYetSet = !businessData?.ownerTelegramChatId;
+        const soleStaffFallback =
+          !!matchedStaff && totalStaffCount === 1 && ownerNotYetSet;
+
+        const isOwner = explicitOwner || staffHasOwnerRole || soleStaffFallback;
+
         if (matchedStaff) {
           await prisma.staff.update({
             where: { id: matchedStaff.id },
@@ -1520,13 +1544,17 @@ export async function POST(request: NextRequest) {
             where: { id: business.id },
             data: { ownerTelegramChatId: BigInt(chatId) },
           });
+          console.log(
+            `[Webhook] Owner connected business=${business.id} via ${
+              explicitOwner ? "explicit username" : staffHasOwnerRole ? "staff role" : "sole-staff fallback"
+            }`
+          );
         }
 
         if (matchedStaff || isOwner) {
-          // Подбираем подходящий текст
           let confirmText: string;
           if (matchedStaff && isOwner) {
-            confirmText = `✅ ${matchedStaff.name}, вы подключены как администратор и как мастер.\n\nВсе уведомления о записях, отменах, новых клиентах и эскалациях будут приходить сюда.`;
+            confirmText = `✅ ${matchedStaff.name}, вы подключены как администратор и как мастер.\n\nВсе уведомления о записях, эскалациях и срочных запросах от клиентов будут приходить сюда.`;
           } else if (isOwner) {
             confirmText = `✅ Вы подключены как администратор!\n\nВсе уведомления о записях, отменах и новых клиентах будут приходить сюда.`;
           } else {

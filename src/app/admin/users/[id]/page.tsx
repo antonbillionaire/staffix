@@ -349,6 +349,9 @@ export default function AdminUserDetailPage({
                     </span>
                   </div>
                 </div>
+
+                {/* Test notification — проверяет owner-уведомления + авто-фикс если ownerTelegramChatId не установлен */}
+                <TestNotifyButton businessId={business.id} botActive={business.botActive} />
               </div>
             </div>
           )}
@@ -559,6 +562,71 @@ export default function AdminUserDetailPage({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TestNotifyButton({ businessId, botActive }: { businessId: string; botActive: boolean }) {
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<string>("");
+  const [resultKind, setResultKind] = useState<"ok" | "warn" | "err">("ok");
+
+  const handleClick = async () => {
+    setSending(true);
+    setResult("");
+    try {
+      const res = await fetch(`/api/admin/businesses/${businessId}/test-notify`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.delivered) {
+        setResult(data.message || "Тестовое сообщение отправлено владельцу");
+        setResultKind(data.autoFixed ? "warn" : "ok");
+      } else if (data.error) {
+        setResult(data.error);
+        setResultKind("err");
+      } else if (data.telegramError) {
+        setResult(`Telegram отверг отправку: ${data.telegramError}`);
+        setResultKind("err");
+      } else {
+        setResult("Не удалось отправить тестовое сообщение");
+        setResultKind("err");
+      }
+    } catch (e) {
+      console.error(e);
+      setResult("Ошибка сети");
+      setResultKind("err");
+    } finally {
+      setSending(false);
+      setTimeout(() => setResult(""), 12_000);
+    }
+  };
+
+  if (!botActive) return null;
+
+  return (
+    <div className="pt-3 mt-3 border-t border-white/5 space-y-2">
+      <button
+        onClick={handleClick}
+        disabled={sending}
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 disabled:opacity-50"
+      >
+        {sending ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>🧪</span>}
+        Отправить тестовое уведомление владельцу
+      </button>
+      {result && (
+        <p
+          className={`text-xs ${
+            resultKind === "ok"
+              ? "text-emerald-400"
+              : resultKind === "warn"
+              ? "text-amber-400"
+              : "text-red-400"
+          }`}
+        >
+          {result}
+        </p>
+      )}
     </div>
   );
 }
