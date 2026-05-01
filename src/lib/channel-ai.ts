@@ -584,6 +584,8 @@ export async function generateChannelAIResponse(
     // Tool loop — process tool_use responses (max 5 iterations)
     let iterations = 0;
     const maxIterations = 5;
+    // Все tool-names вызванные за оборот — нужно для safety-net (см. ниже)
+    const calledToolNames: string[] = [];
 
     while (response.stop_reason === "tool_use" && iterations < maxIterations) {
       iterations++;
@@ -591,6 +593,9 @@ export async function generateChannelAIResponse(
       const toolUseBlocks = response.content.filter(
         (block) => block.type === "tool_use"
       );
+      for (const b of toolUseBlocks) {
+        if (b.type === "tool_use") calledToolNames.push(b.name);
+      }
 
       // Add assistant response to messages
       messages.push({
@@ -658,6 +663,35 @@ export async function generateChannelAIResponse(
     let replyText = textBlocks.length > 0 && textBlocks[0].type === "text"
       ? textBlocks[0].text
       : "Извините, не удалось сформировать ответ. Пожалуйста, попробуйте ещё раз.";
+
+    // SAFETY NET: если бот в тексте обещал «передал менеджеру» но
+    // notify_manager в этом обороте не вызывался — зовём его сами с
+    // последним сообщением клиента в качестве reason. Защита от
+    // галлюцинаций модели (Claude иногда забывает вызвать tool, хотя
+    // в тексте уверенно говорит что вызвал). Зеркалит логику в Telegram
+    // webhook — должно работать на ВСЕХ каналах одинаково.
+    const promisedForwardingRegex =
+      /\b(передал|передаю|передам|сообщил|сообщаю)\b|менеджер.{0,30}(свяжет|увид|получит|перезвонит)|forward.{0,30}manager|notify.{0,15}manager/i;
+    if (
+      !calledToolNames.includes("notify_manager") &&
+      promisedForwardingRegex.test(replyText)
+    ) {
+      console.warn(
+        `[Channel AI] SAFETY NET: bot promised forwarding without calling notify_manager — invoking automatically. business=${businessId} channel=${channel}`
+      );
+      try {
+        const { notifyManagerByTelegram } = await import("@/lib/sales-tools");
+        await notifyManagerByTelegram(
+          businessId,
+          BigInt(0),
+          `[авто-эскалация после обещания бота, канал ${channel}] ${userMessage.slice(0, 400)}`,
+          clientName,
+          "normal"
+        );
+      } catch (e) {
+        console.error("[Channel AI] SAFETY NET notify_manager failed:", e);
+      }
+    }
 
     // Add "Powered by Staffix" signature for free/starter plans
     if (biz) {
