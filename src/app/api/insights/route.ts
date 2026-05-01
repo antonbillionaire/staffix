@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 
-// GET - List insights for user's business
+async function getCurrentBusinessId(email: string): Promise<string | null> {
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: { businesses: { select: { id: true } } },
+  });
+  return user?.businesses[0]?.id ?? null;
+}
+
+// GET - List insights for user's business + counts by status
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
@@ -10,37 +19,59 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: true },
-    });
-
-    if (!user || user.businesses.length === 0) {
-      return NextResponse.json({ insights: [] });
+    const businessId = await getCurrentBusinessId(session.user.email);
+    if (!businessId) {
+      return NextResponse.json({ insights: [], counts: { new: 0, accepted: 0, dismissed: 0 } });
     }
 
-    const businessId = user.businesses[0].id;
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status"); // new, accepted, dismissed
-    const type = searchParams.get("type"); // faq_suggestion, popular_question, etc.
+    const status = searchParams.get("status"); // new, accepted, dismissed, или пусто = все
+    const type = searchParams.get("type");
 
     const where: Record<string, unknown> = { businessId };
     if (status) where.status = status;
     if (type) where.type = type;
 
-    const insights = await prisma.aiInsight.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-    });
+    const [insights, counts] = await Promise.all([
+      prisma.aiInsight.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      }),
+      prisma.aiInsight.groupBy({
+        by: ["status"],
+        where: { businessId },
+        _count: true,
+      }),
+    ]);
 
-    return NextResponse.json({ insights });
+    const countsMap = counts.reduce(
+      (acc, c) => ({ ...acc, [c.status]: c._count }),
+      {} as Record<string, number>
+    );
+
+    return NextResponse.json({
+      insights,
+      counts: {
+        new: countsMap.new || 0,
+        accepted: countsMap.accepted || 0,
+        dismissed: countsMap.dismissed || 0,
+      },
+    });
   } catch (error) {
     console.error("Insights fetch error:", error);
     return NextResponse.json({ error: "Ошибка сервера" }, { status: 500 });
   }
 }
 
-// PATCH - Accept or dismiss insight
+/**
+ * PATCH - Меняет статус инсайта или принимает как FAQ.
+ *
+ * Тело запроса:
+ *   { id, status: "dismissed" }                        — просто отклонить
+ *   { id, status: "accepted" }                         — принять (со встроенными данными если есть)
+ *   { id, status: "accepted", question, answer }       — принять и создать FAQ из заполненной владельцем формы
+ */
 export async function PATCH(request: NextRequest) {
   try {
     const session = await auth();
@@ -48,17 +79,17 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: true },
-    });
-
-    if (!user || user.businesses.length === 0) {
+    const businessId = await getCurrentBusinessId(session.user.email);
+    if (!businessId) {
       return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
     }
 
-    const businessId = user.businesses[0].id;
-    const { id, status } = await request.json();
+    const { id, status, question, answer } = (await request.json()) as {
+      id?: string;
+      status?: string;
+      question?: string;
+      answer?: string;
+    };
 
     if (!id || !status) {
       return NextResponse.json(
@@ -74,35 +105,66 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Verify insight belongs to user's business
     const existing = await prisma.aiInsight.findFirst({
       where: { id, businessId },
     });
-
     if (!existing) {
       return NextResponse.json({ error: "Инсайт не найден" }, { status: 404 });
     }
 
-    const insight = await prisma.aiInsight.update({
-      where: { id },
-      data: { status },
-    });
-
-    // If accepted and type is faq_suggestion — auto-create FAQ from insight data
-    if (status === "accepted" && existing.type === "faq_suggestion" && existing.data) {
-      const data = existing.data as Record<string, string>;
-      if (data.question && data.answer) {
-        await prisma.fAQ.create({
-          data: {
-            question: data.question,
-            answer: data.answer,
-            businessId,
-          },
-        });
-      }
+    // Простой dismiss — без побочных эффектов
+    if (status === "dismissed") {
+      const insight = await prisma.aiInsight.update({
+        where: { id },
+        data: { status: "dismissed" },
+      });
+      return NextResponse.json({ insight });
     }
 
-    return NextResponse.json({ insight });
+    // accepted — для faq_suggestion создаём FAQ
+    let faqId: string | null = null;
+    if (existing.type === "faq_suggestion") {
+      // Берём данные либо из формы (приоритет), либо из data самого инсайта
+      const insightData = (existing.data as { question?: string; answer?: string } | null) || {};
+      const finalQuestion = (question ?? insightData.question ?? "").trim();
+      const finalAnswer = (answer ?? insightData.answer ?? "").trim();
+
+      if (!finalQuestion || !finalAnswer) {
+        return NextResponse.json(
+          {
+            error:
+              "Чтобы принять подсказку как FAQ — заполните ответ. Вопрос можно отредактировать.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const [faq] = await prisma.$transaction([
+        prisma.fAQ.create({
+          data: {
+            businessId,
+            question: finalQuestion,
+            answer: finalAnswer,
+          },
+        }),
+        prisma.aiInsight.update({
+          where: { id },
+          data: { status: "accepted" },
+        }),
+      ]);
+      faqId = faq.id;
+
+      // Триггерим refresh контекста бота — он сразу узнает про новый FAQ
+      await markBusinessConversationsForRefresh(businessId);
+    } else {
+      // Любой другой тип — просто меняем статус
+      await prisma.aiInsight.update({
+        where: { id },
+        data: { status: "accepted" },
+      });
+    }
+
+    return NextResponse.json({ success: true, faqId });
   } catch (error) {
     console.error("Insight update error:", error);
     return NextResponse.json({ error: "Ошибка сервера" }, { status: 500 });

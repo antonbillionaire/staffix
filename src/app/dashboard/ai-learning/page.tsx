@@ -29,6 +29,12 @@ interface AiInsight {
   title: string;
   description: string;
   status: string;
+  data?: {
+    question?: string;
+    answer?: string;
+    examples?: string[];
+    frequency?: number;
+  } | null;
 }
 
 type Tab = "corrections" | "insights" | "profiles";
@@ -39,11 +45,16 @@ export default function AiLearningPage() {
   const { t } = useLanguage();
   const isDark = theme === "dark";
 
-  const [activeTab, setActiveTab] = useState<Tab>("corrections");
+  const [activeTab, setActiveTab] = useState<Tab>("insights");
   const [corrections, setCorrections] = useState<BotCorrection[]>([]);
   const [insights, setInsights] = useState<AiInsight[]>([]);
   const [loading, setLoading] = useState(true);
   const [insightFilter, setInsightFilter] = useState<InsightStatus>("new");
+  // Состояние формы для принятия инсайта как FAQ:
+  // ключ — id инсайта, значение — { question, answer, saving }
+  const [editingInsights, setEditingInsights] = useState<
+    Record<string, { question: string; answer: string; saving: boolean }>
+  >({});
 
   // Theme classes
   const bgCard = isDark ? "bg-[#12122a]" : "bg-white";
@@ -117,18 +128,79 @@ export default function AiLearningPage() {
     }
   };
 
-  const updateInsightStatus = async (id: string, status: "accepted" | "dismissed") => {
+  const dismissInsight = async (id: string) => {
     try {
-      const res = await fetch(`/api/insights/${id}`, {
+      const res = await fetch(`/api/insights`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ id, status: "dismissed" }),
       });
       if (res.ok) {
         setInsights(insights.filter((i) => i.id !== id));
       }
     } catch (error) {
-      console.error("Error updating insight:", error);
+      console.error("Error dismissing insight:", error);
+    }
+  };
+
+  const startEditingInsight = (insight: AiInsight) => {
+    setEditingInsights((prev) => ({
+      ...prev,
+      [insight.id]: {
+        question: insight.data?.question || "",
+        answer: insight.data?.answer || "",
+        saving: false,
+      },
+    }));
+  };
+
+  const cancelEditingInsight = (id: string) => {
+    setEditingInsights((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  const acceptInsightAsFaq = async (id: string) => {
+    const form = editingInsights[id];
+    if (!form) return;
+    if (!form.question.trim() || !form.answer.trim()) {
+      alert("Заполните вопрос и ответ перед сохранением");
+      return;
+    }
+    setEditingInsights((prev) => ({
+      ...prev,
+      [id]: { ...form, saving: true },
+    }));
+    try {
+      const res = await fetch(`/api/insights`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          status: "accepted",
+          question: form.question,
+          answer: form.answer,
+        }),
+      });
+      if (res.ok) {
+        setInsights(insights.filter((i) => i.id !== id));
+        cancelEditingInsight(id);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Не удалось сохранить FAQ");
+        setEditingInsights((prev) => ({
+          ...prev,
+          [id]: { ...form, saving: false },
+        }));
+      }
+    } catch (error) {
+      console.error("Error accepting insight:", error);
+      setEditingInsights((prev) => ({
+        ...prev,
+        [id]: { ...form, saving: false },
+      }));
     }
   };
 
@@ -143,10 +215,11 @@ export default function AiLearningPage() {
     }
   };
 
-  // Insights tab is hidden — generator not implemented yet (model + API + UI ready,
-  // missing piece is the analysis job that writes to AiInsight). Re-enable when
-  // src/lib/ai-insights.ts is implemented and called from cron/ai-learning.
+  // Insights tab включён — генератор работает через cron /api/cron/insights-weekly
+  // (раз в неделю, понедельник 9:00 UTC). При создании новых инсайтов владелец
+  // получает уведомление в Telegram + бейдж в дашборде.
   const tabs: { key: Tab; labelKey: string; icon: typeof Brain }[] = [
+    { key: "insights", labelKey: "aiLearning.insights", icon: Lightbulb },
     { key: "corrections", labelKey: "aiLearning.corrections", icon: ThumbsDown },
     { key: "profiles", labelKey: "aiLearning.clientProfiles", icon: Users },
   ];
@@ -293,46 +366,119 @@ export default function AiLearningPage() {
               </div>
             ) : (
               <div className="divide-y divide-white/5">
-                {insights.map((insight) => (
-                  <div
-                    key={insight.id}
-                    className="p-4 hover:bg-white/5 transition-colors"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3 flex-1">
-                        <div className="mt-0.5">
-                          {getInsightIcon(insight.type)}
+                {insights.map((insight) => {
+                  const editing = editingInsights[insight.id];
+                  const isFaqType = insight.type === "faq_suggestion";
+                  const examples = insight.data?.examples || [];
+                  return (
+                    <div
+                      key={insight.id}
+                      className="p-4 hover:bg-white/5 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <div className="mt-0.5 flex-shrink-0">
+                            {getInsightIcon(insight.type)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-medium ${textPrimary}`}>
+                              {insight.title}
+                            </p>
+                            <p className={`text-sm ${textSecondary} mt-1`}>
+                              {insight.description}
+                            </p>
+                            {examples.length > 0 && !editing && (
+                              <div className={`mt-2 text-xs ${textSecondary}`}>
+                                <div className="font-medium mb-1">Примеры из переписки:</div>
+                                <ul className="space-y-1 pl-3">
+                                  {examples.slice(0, 3).map((ex, i) => (
+                                    <li key={i} className="italic">
+                                      «{ex}»
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <p className={`font-medium ${textPrimary}`}>
-                            {insight.title}
-                          </p>
-                          <p className={`text-sm ${textSecondary} mt-1`}>
-                            {insight.description}
-                          </p>
-                        </div>
+                        {insightFilter === "new" && !editing && (
+                          <div className="flex gap-1 flex-shrink-0">
+                            {isFaqType && (
+                              <button
+                                onClick={() => startEditingInsight(insight)}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/10 text-green-500 hover:bg-green-500/20 transition-colors"
+                              >
+                                Заполнить и принять
+                              </button>
+                            )}
+                            <button
+                              onClick={() => dismissInsight(insight.id)}
+                              className="p-2 rounded-lg text-red-500 hover:bg-red-500/10 transition-colors"
+                              title="Не актуально"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      {insightFilter === "new" && (
-                        <div className="flex gap-1 ml-4">
-                          <button
-                            onClick={() => updateInsightStatus(insight.id, "accepted")}
-                            className="p-2 rounded-lg text-green-500 hover:bg-green-500/10 transition-colors"
-                            title={t("aiLearning.accept")}
-                          >
-                            <Check className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => updateInsightStatus(insight.id, "dismissed")}
-                            className="p-2 rounded-lg text-red-500 hover:bg-red-500/10 transition-colors"
-                            title={t("aiLearning.dismiss")}
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
+
+                      {/* Inline-форма для создания FAQ из инсайта */}
+                      {editing && (
+                        <div className="mt-4 ml-8 space-y-3 p-4 rounded-lg border border-white/10 bg-white/5">
+                          <div>
+                            <label className={`text-xs font-medium ${textSecondary} block mb-1`}>
+                              Вопрос (можете отредактировать)
+                            </label>
+                            <input
+                              type="text"
+                              value={editing.question}
+                              onChange={(e) =>
+                                setEditingInsights((prev) => ({
+                                  ...prev,
+                                  [insight.id]: { ...editing, question: e.target.value },
+                                }))
+                              }
+                              className={`w-full px-3 py-2 rounded-lg ${bgCard} border ${borderColor} ${textPrimary} text-sm`}
+                            />
+                          </div>
+                          <div>
+                            <label className={`text-xs font-medium ${textSecondary} block mb-1`}>
+                              Ответ (заполните что бот должен отвечать)
+                            </label>
+                            <textarea
+                              value={editing.answer}
+                              onChange={(e) =>
+                                setEditingInsights((prev) => ({
+                                  ...prev,
+                                  [insight.id]: { ...editing, answer: e.target.value },
+                                }))
+                              }
+                              rows={3}
+                              placeholder="Напишите ответ который бот будет давать клиентам на этот вопрос…"
+                              className={`w-full px-3 py-2 rounded-lg ${bgCard} border ${borderColor} ${textPrimary} text-sm`}
+                            />
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => cancelEditingInsight(insight.id)}
+                              disabled={editing.saving}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${textSecondary} hover:bg-white/5`}
+                            >
+                              Отмена
+                            </button>
+                            <button
+                              onClick={() => acceptInsightAsFaq(insight.id)}
+                              disabled={editing.saving}
+                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:opacity-90 disabled:opacity-50"
+                            >
+                              {editing.saving ? "Сохраняем…" : "Сохранить как FAQ"}
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
