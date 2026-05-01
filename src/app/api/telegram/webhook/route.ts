@@ -756,6 +756,9 @@ async function generateAIResponse(
     const maxIterations = 5;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let lastToolResults: any[] = [];
+    // Все tool-names вызванные за весь оборот — нужно для safety-net проверки
+    // что бот реально дёрнул notify_manager если в тексте обещал менеджеру.
+    const calledToolNames: string[] = [];
 
     while (response.stop_reason === "tool_use" && iterations < maxIterations) {
       iterations++;
@@ -764,6 +767,9 @@ async function generateAIResponse(
       const toolUseBlocks = response.content.filter(
         (block) => block.type === "tool_use"
       );
+      for (const b of toolUseBlocks) {
+        if (b.type === "tool_use") calledToolNames.push(b.name);
+      }
 
       // Добавляем ответ ассистента в messages
       recentMessages.push({
@@ -852,6 +858,34 @@ async function generateAIResponse(
       assistantMessage = buildFallbackFromToolResults(lastToolResults, salesMode);
     } else {
       assistantMessage = "Чем ещё могу помочь?";
+    }
+
+    // 8.5 SAFETY NET: Claude иногда обещает «передал менеджеру» в тексте, не
+    // вызывая tool. Если в финальном ответе клиенту есть такая фраза, а
+    // notify_manager в этом обороте не вызывался — зовём его сами с
+    // последним сообщением клиента в качестве reason. Это страховка от
+    // галлюцинаций модели поверх anti-lying правила в промпте.
+    const promisedForwardingRegex =
+      /(передал|передам|передаю|сообщил|свяж[ёе]т.{0,15}менеджер|forward.{0,30}manager|escalat|notify.{0,15}manager|менеджер.{0,30}свяжет.{0,15}с\s*вами)/i;
+    const calledNotifyManager = calledToolNames.includes("notify_manager");
+    if (!calledNotifyManager && promisedForwardingRegex.test(assistantMessage)) {
+      console.warn(
+        `[Webhook] SAFETY NET: bot promised forwarding without calling notify_manager — invoking automatically. business=${businessId}`
+      );
+      try {
+        const { notifyManagerByTelegram } = await import("@/lib/sales-tools");
+        const reason = `[авто-эскалация после обещания бота] ${userMessage.slice(0, 400)}`;
+        await notifyManagerByTelegram(
+          businessId,
+          telegramId,
+          reason,
+          userName,
+          "normal"
+        );
+        console.log(`[Webhook] SAFETY NET: notify_manager fired for business=${businessId}`);
+      } catch (e) {
+        console.error("[Webhook] SAFETY NET notify_manager failed:", e);
+      }
     }
 
     // 9. Сохраняем сообщения в базу
