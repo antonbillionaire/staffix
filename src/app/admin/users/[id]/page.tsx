@@ -616,6 +616,7 @@ function TestNotifyButton({ businessId, botActive }: { businessId: string; botAc
           Отправить тестовое уведомление владельцу
         </button>
         <DiagnosticButton businessId={businessId} />
+        <RedeliverButton businessId={businessId} />
       </div>
       {result && (
         <p
@@ -631,6 +632,67 @@ function TestNotifyButton({ businessId, botActive }: { businessId: string; botAc
         </p>
       )}
     </div>
+  );
+}
+
+function RedeliverButton({ businessId }: { businessId: string }) {
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<string>("");
+  const [resultKind, setResultKind] = useState<"ok" | "warn" | "err">("ok");
+
+  const handleClick = async () => {
+    if (!confirm("Доставить непрочитанные эскалации (manager_escalation) в Telegram владельцу? Они придут с пометкой 'отложенная доставка'.")) return;
+    setSending(true);
+    setResult("");
+    try {
+      const res = await fetch(`/api/admin/businesses/${businessId}/redeliver-escalations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ limit: 20 }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setResult(data.message || "Готово");
+        setResultKind(data.failed > 0 ? "warn" : "ok");
+      } else {
+        setResult(data.error || "Ошибка переотправки");
+        setResultKind("err");
+      }
+    } catch (e) {
+      console.error(e);
+      setResult("Ошибка сети");
+      setResultKind("err");
+    } finally {
+      setSending(false);
+      setTimeout(() => setResult(""), 15_000);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={handleClick}
+        disabled={sending}
+        title="Отправить непрочитанные manager_escalation в Telegram владельцу (с пометкой 'отложенная доставка')"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 disabled:opacity-50"
+      >
+        {sending ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>📤</span>}
+        Доставить потерянные эскалации
+      </button>
+      {result && (
+        <p
+          className={`text-xs w-full mt-1 ${
+            resultKind === "ok"
+              ? "text-emerald-400"
+              : resultKind === "warn"
+              ? "text-amber-400"
+              : "text-red-400"
+          }`}
+        >
+          {result}
+        </p>
+      )}
+    </>
   );
 }
 
