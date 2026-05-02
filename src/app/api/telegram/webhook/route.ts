@@ -1417,20 +1417,36 @@ export async function POST(request: NextRequest) {
     // Обработка геолокации (клиент отправил местоположение для доставки)
     if (message.location) {
       const { latitude, longitude } = message.location;
-      const mapsLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
+      const googleLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
+      // У Яндекса в pt= обратный порядок: сначала долгота, потом широта.
+      const yandexLink = `https://yandex.com/maps/?pt=${longitude},${latitude}&z=16&l=map`;
       const clientName = userName || "Клиент";
+
+      const mapButtons = [[
+        { text: "🗺 Google Maps", url: googleLink },
+        { text: "🗺 Яндекс Карты", url: yandexLink },
+      ]];
+
+      const sendMapMessage = async (notifyBot: string, toChatId: number, text: string) => {
+        await fetch(`https://api.telegram.org/bot${notifyBot}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: toChatId,
+            text,
+            reply_markup: { inline_keyboard: mapButtons },
+          }),
+        }).catch((e) => console.error("[Webhook] location notify error:", e));
+      };
 
       // Уведомить владельца/менеджеров
       const ownerChatId = business.ownerTelegramChatId;
-      if (ownerChatId) {
-        const notifyBot = business.botToken;
-        if (notifyBot) {
-          await sendTelegramMessage(
-            notifyBot,
-            Number(ownerChatId),
-            `📍 ${clientName} отправил геолокацию:\n${mapsLink}\n\nTelegram ID: ${message.from.id}`
-          );
-        }
+      if (ownerChatId && business.botToken) {
+        await sendMapMessage(
+          business.botToken,
+          Number(ownerChatId),
+          `📍 ${clientName} отправил геолокацию\n\nTelegram ID: ${message.from.id}`
+        );
       }
 
       // Уведомить сотрудников с включёнными уведомлениями
@@ -1440,10 +1456,10 @@ export async function POST(request: NextRequest) {
       });
       for (const s of staffWithNotify) {
         if (s.telegramChatId) {
-          await sendTelegramMessage(
+          await sendMapMessage(
             botToken,
             Number(s.telegramChatId),
-            `📍 ${clientName} отправил геолокацию:\n${mapsLink}`
+            `📍 ${clientName} отправил геолокацию`
           );
         }
       }

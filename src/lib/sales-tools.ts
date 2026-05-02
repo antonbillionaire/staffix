@@ -869,30 +869,39 @@ async function notifyNewOrder(
       }
     }
 
-    // Уведомляем сотрудников: если назначен продавец — только его, иначе всех admin/operator
-    const staffWhere = assignedStaffId
-      ? { id: assignedStaffId, businessId, telegramChatId: { not: null } as const }
-      : { businessId, telegramChatId: { not: null } as const, notificationsEnabled: true, role: { in: ["admin", "operator"] } };
+    // Уведомляем сотрудников:
+    // 1) Назначенному продавцу (если есть) — он отвечает за заказ.
+    // 2) Всем admin/operator (для контроля), исключая самого продавца чтоб не дублировать.
     const staffMembers = await prisma.staff.findMany({
-      where: staffWhere,
-      select: { telegramChatId: true, name: true },
+      where: {
+        businessId,
+        telegramChatId: { not: null },
+        OR: [
+          ...(assignedStaffId ? [{ id: assignedStaffId }] : []),
+          { notificationsEnabled: true, role: { in: ["admin", "operator"] } },
+        ],
+      },
+      select: { id: true, telegramChatId: true, name: true },
     });
+    const sentChatIds = new Set<string>();
     for (const staff of staffMembers) {
-      if (staff.telegramChatId) {
-        console.log(`[Notify] Sending order #${order.orderNumber} to staff ${staff.name} chatId=${staff.telegramChatId}`);
-        await fetch(
-          `https://api.telegram.org/bot${business.botToken}/sendMessage`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chat_id: staff.telegramChatId.toString(),
-              text: message,
-              parse_mode: "HTML",
-            }),
-          }
-        ).catch((e) => console.error(`[Notify] Staff notify error:`, e));
-      }
+      if (!staff.telegramChatId) continue;
+      const chatIdStr = staff.telegramChatId.toString();
+      if (sentChatIds.has(chatIdStr)) continue; // на случай если один человек и admin, и assigned seller
+      sentChatIds.add(chatIdStr);
+      console.log(`[Notify] Sending order #${order.orderNumber} to staff ${staff.name} chatId=${chatIdStr}`);
+      await fetch(
+        `https://api.telegram.org/bot${business.botToken}/sendMessage`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatIdStr,
+            text: message,
+            parse_mode: "HTML",
+          }),
+        }
+      ).catch((e) => console.error(`[Notify] Staff notify error:`, e));
     }
 
     // Отправить кнопки оплаты клиенту (если есть платёжные методы)
