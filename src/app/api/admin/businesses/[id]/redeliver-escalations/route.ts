@@ -35,7 +35,7 @@ export async function POST(
 
     const business = await prisma.business.findUnique({
       where: { id: businessId },
-      select: { name: true, botToken: true, ownerTelegramChatId: true },
+      select: { name: true, botToken: true, ownerTelegramChatId: true, timezone: true },
     });
 
     if (!business) {
@@ -88,6 +88,7 @@ export async function POST(
         month: "long",
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: business.timezone || "Asia/Tashkent",
       });
 
       const text =
