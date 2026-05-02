@@ -36,6 +36,7 @@ import { salesToolDefinitions, executeSalesTool, notifyManagerByTelegram } from 
 import { buildSalesSystemPrompt, isSalesMode } from "@/lib/sales-prompt";
 import { markWebhookProcessed } from "@/lib/webhook-dedup";
 import { stripMarkdown } from "@/lib/strip-markdown";
+import { botPromisedHandoffRegex } from "@/lib/handoff-detector";
 
 // ========================================
 // HELPERS
@@ -865,8 +866,10 @@ async function generateAIResponse(
     // notify_manager в этом обороте не вызывался — зовём его сами с
     // последним сообщением клиента в качестве reason. Это страховка от
     // галлюцинаций модели поверх anti-lying правила в промпте.
-    const promisedForwardingRegex =
-      /(передал|передам|передаю|сообщил|свяж[ёе]т.{0,15}менеджер|forward.{0,30}manager|escalat|notify.{0,15}manager|менеджер.{0,30}свяжет.{0,15}с\s*вами)/i;
+    //
+    // Regex намеренно широкий: false positive (лишнее уведомление с текстом
+    // запроса клиента) дешевле чем false negative (молчаливая потеря эскалации).
+    const promisedForwardingRegex = botPromisedHandoffRegex();
     const calledNotifyManager = calledToolNames.includes("notify_manager");
     if (!calledNotifyManager && promisedForwardingRegex.test(assistantMessage)) {
       console.warn(

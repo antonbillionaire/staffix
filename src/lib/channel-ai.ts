@@ -665,13 +665,10 @@ export async function generateChannelAIResponse(
       : "Извините, не удалось сформировать ответ. Пожалуйста, попробуйте ещё раз.";
 
     // SAFETY NET: если бот в тексте обещал «передал менеджеру» но
-    // notify_manager в этом обороте не вызывался — зовём его сами с
-    // последним сообщением клиента в качестве reason. Защита от
-    // галлюцинаций модели (Claude иногда забывает вызвать tool, хотя
-    // в тексте уверенно говорит что вызвал). Зеркалит логику в Telegram
-    // webhook — должно работать на ВСЕХ каналах одинаково.
-    const promisedForwardingRegex =
-      /\b(передал|передаю|передам|сообщил|сообщаю)\b|менеджер.{0,30}(свяжет|увид|получит|перезвонит)|forward.{0,30}manager|notify.{0,15}manager/i;
+    // notify_manager в этом обороте не вызывался — зовём его сами.
+    // Зеркалит логику Telegram webhook через единый detector.
+    const { botPromisedHandoffRegex } = await import("@/lib/handoff-detector");
+    const promisedForwardingRegex = botPromisedHandoffRegex();
     if (
       !calledToolNames.includes("notify_manager") &&
       promisedForwardingRegex.test(replyText)

@@ -146,7 +146,6 @@ function buildNavConfig(isSales: boolean): NavEntry[] {
         { nameKey: "nav.myBroadcasts", href: "/dashboard/broadcasts", icon: Send },
         { nameKey: "nav.myAutomation", href: "/dashboard/automation", icon: Zap },
         { nameKey: "nav.myLoyalty", href: "/dashboard/loyalty", icon: Gift },
-        { nameKey: "nav.myFinances", href: "/dashboard/finances", icon: Wallet },
         { nameKey: "nav.payments", href: "/dashboard/payments", icon: CreditCard },
       ],
     },
