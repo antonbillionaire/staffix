@@ -606,14 +606,17 @@ function TestNotifyButton({ businessId, botActive }: { businessId: string; botAc
 
   return (
     <div className="pt-3 mt-3 border-t border-white/5 space-y-2">
-      <button
-        onClick={handleClick}
-        disabled={sending}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 disabled:opacity-50"
-      >
-        {sending ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>🧪</span>}
-        Отправить тестовое уведомление владельцу
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={handleClick}
+          disabled={sending}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 disabled:opacity-50"
+        >
+          {sending ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>🧪</span>}
+          Отправить тестовое уведомление владельцу
+        </button>
+        <DiagnosticButton businessId={businessId} />
+      </div>
       {result && (
         <p
           className={`text-xs ${
@@ -628,5 +631,126 @@ function TestNotifyButton({ businessId, botActive }: { businessId: string; botAc
         </p>
       )}
     </div>
+  );
+}
+
+function DiagnosticButton({ businessId }: { businessId: string }) {
+  const [loading, setLoading] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [data, setData] = useState<any | null>(null);
+  const [error, setError] = useState<string>("");
+
+  const handleClick = async () => {
+    setLoading(true);
+    setError("");
+    setData(null);
+    try {
+      const res = await fetch(`/api/admin/businesses/${businessId}/diagnostic`);
+      const body = await res.json();
+      if (!res.ok) {
+        setError(body.error || "Ошибка диагностики");
+        return;
+      }
+      setData(body);
+    } catch (e) {
+      console.error(e);
+      setError("Ошибка сети");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={handleClick}
+        disabled={loading}
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-50"
+      >
+        {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>🩺</span>}
+        Полная диагностика уведомлений
+      </button>
+      {error && <p className="text-xs text-red-400 w-full mt-1">{error}</p>}
+      {data && (
+        <div className="w-full mt-3 space-y-3 text-xs">
+          {/* Вердикты — самая важная часть */}
+          {data.verdicts && data.verdicts.length > 0 && (
+            <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-3 space-y-1">
+              <div className="text-zinc-400 font-medium mb-1">Диагноз:</div>
+              {data.verdicts.map((v: string, i: number) => (
+                <div key={i} className="text-zinc-200">{v}</div>
+              ))}
+            </div>
+          )}
+
+          {/* Краткие 24ч-метрики */}
+          <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3">
+            <div className="text-zinc-400 font-medium mb-2">Статистика за 24ч:</div>
+            <div className="grid grid-cols-2 gap-2 text-zinc-300">
+              <div>Notifications всего: <b>{data.stats_24h?.notifications_total ?? 0}</b></div>
+              <div>Из них manager_escalation: <b>{data.stats_24h?.manager_escalations ?? 0}</b></div>
+              <div>Бот обещал передать менеджеру: <b>{data.stats_24h?.bot_promised_handoff_count ?? 0}</b></div>
+              <div>Recent диалогов: <b>{data.stats_24h?.recent_conversations ?? 0}</b></div>
+            </div>
+          </div>
+
+          {/* Telegram probe */}
+          <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3">
+            <div className="text-zinc-400 font-medium mb-1">Telegram probe:</div>
+            <div className="text-zinc-300">
+              Bot getMe: {data.telegram_probe?.botMe?.ok ? "✅ OK" : `❌ ${data.telegram_probe?.botMe?.error}`}
+              {data.telegram_probe?.botMe?.result?.username && ` → @${data.telegram_probe.botMe.result.username}`}
+            </div>
+            {data.telegram_probe?.ownerChat && (
+              <div className="text-zinc-300 mt-1">
+                Bot getChat(owner): {data.telegram_probe.ownerChat.ok ? "✅ OK" : `❌ ${data.telegram_probe.ownerChat.error}`}
+                {data.telegram_probe.ownerChat.result && ` → ${data.telegram_probe.ownerChat.result.first_name || ""} @${data.telegram_probe.ownerChat.result.username || "?"}`}
+              </div>
+            )}
+          </div>
+
+          {/* Эскалации за 72ч */}
+          {data.escalations_72h && data.escalations_72h.length > 0 && (
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3">
+              <div className="text-zinc-400 font-medium mb-2">Эскалации за 72ч ({data.escalations_72h.length}):</div>
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {data.escalations_72h.slice(0, 5).map((e: any) => (
+                <div key={e.id} className="text-zinc-300 mb-1.5 pb-1.5 border-b border-zinc-800/50 last:border-0">
+                  <div>{e.title}</div>
+                  <div className="text-zinc-500 text-[10px]">{new Date(e.createdAt).toLocaleString("ru-RU")}</div>
+                  <div className="text-zinc-400 text-[11px] mt-0.5">{e.message?.slice(0, 200)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Случаи обещаний без эскалации */}
+          {data.promiseDetails && data.promiseDetails.length > 0 && (
+            <div className="bg-amber-500/5 border border-amber-500/30 rounded-lg p-3">
+              <div className="text-amber-400 font-medium mb-2">
+                Бот обещал передать (за 24ч): {data.promiseDetails.length} случаев
+              </div>
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {data.promiseDetails.map((p: any, i: number) => (
+                <div key={i} className="text-zinc-300 mb-2 pb-2 border-b border-amber-500/10 last:border-0">
+                  <div className="text-zinc-500 text-[10px]">{new Date(p.createdAt).toLocaleString("ru-RU")} — клиент: {p.clientName || "?"}</div>
+                  <div className="text-zinc-400 text-[11px] italic mt-0.5">«{p.preview}»</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Raw JSON для скопировать-показать мне */}
+          <details className="bg-zinc-900/30 border border-zinc-800 rounded-lg">
+            <summary className="cursor-pointer p-3 text-zinc-400 hover:text-zinc-200">
+              Полный JSON (для отчёта)
+            </summary>
+            <pre className="p-3 pt-0 text-[10px] overflow-x-auto text-zinc-300 whitespace-pre-wrap break-all">
+              {JSON.stringify(data, null, 2)}
+            </pre>
+          </details>
+        </div>
+      )}
+    </>
   );
 }
