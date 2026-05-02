@@ -62,16 +62,27 @@ export async function POST(request: Request) {
     }
 
     const data = await request.json();
-    const { name, role, photo, telegramUsername, notificationsEnabled, baseRate, commissionPercent } = data;
+    const { name, role, specialization, photo, telegramUsername, notificationsEnabled, baseRate, commissionPercent } = data;
 
     if (!name) {
       return NextResponse.json({ error: "Имя обязательно" }, { status: 400 });
     }
 
+    // Роль обязательна — без неё Staff не получает уведомлений (фильтры по role: { in: [...] }).
+    const VALID_ROLES = ["admin", "manager", "master", "doctor", "operator", "warehouse", "custom"];
+    const normalizedRole = typeof role === "string" ? role.trim() : "";
+    if (!normalizedRole || !VALID_ROLES.includes(normalizedRole)) {
+      return NextResponse.json(
+        { error: "Роль обязательна. Выберите одну из: admin, manager, master, doctor, operator, warehouse, custom" },
+        { status: 400 }
+      );
+    }
+
     const person = await prisma.staff.create({
       data: {
         name,
-        role: role || null,
+        role: normalizedRole,
+        specialization: typeof specialization === "string" && specialization.trim() ? specialization.trim() : null,
         photo: photo || null,
         telegramUsername: telegramUsername || null,
         notificationsEnabled: notificationsEnabled !== undefined ? notificationsEnabled : true,

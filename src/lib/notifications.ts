@@ -126,12 +126,14 @@ export async function notifyWarehouseOrderConfirmed(
     });
     if (!business?.botToken) return;
 
+    // operator + warehouse + admin: оператор обрабатывает подтверждённые заказы,
+    // склад собирает (если роль есть в команде), админ контролирует.
     const warehouseStaff = await prisma.staff.findMany({
       where: {
         businessId,
         telegramChatId: { not: null },
         notificationsEnabled: true,
-        role: { in: ["warehouse", "admin"] },
+        role: { in: ["operator", "warehouse", "admin"] },
       },
       select: { telegramChatId: true, name: true },
     });

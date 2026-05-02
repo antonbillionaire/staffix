@@ -9,6 +9,7 @@ interface Staff {
   id: string;
   name: string;
   role: string;
+  specialization: string | null;
   photo: string | null;
   telegramUsername: string | null;
   telegramChatId: string | null;
@@ -75,9 +76,7 @@ export default function StaffPage() {
   const SALES_ROLES = [
     { value: "admin", label: t("staffPage.roleAdmin") },
     { value: "manager", label: t("staffPage.roleManager") },
-    { value: "sales_manager", label: t("staffPage.roleSalesManager") },
     { value: "operator", label: t("staffPage.roleOperator") },
-    { value: "warehouse", label: t("staffPage.roleWarehouse") },
     { value: "custom", label: t("staffPage.roleCustom") },
   ];
   const SERVICE_ROLES = [
@@ -98,9 +97,8 @@ export default function StaffPage() {
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [formData, setFormData] = useState({
     name: "",
-    role: "",
-    roleCategory: "" as string,        // ID категории для dropdown (admin/manager/master/doctor/barber/custom)
-    roleSpecialization: "" as string,  // Свободный текст уточнения ("Терапевт", "Барбер-стилист")
+    role: "manager",                   // канонизированная роль из dropdown (admin/manager/master/doctor/operator/custom)
+    specialization: "" as string,      // свободный текст ("Терапевт", "Барбер-стилист") — для отображения
     photo: "",
     telegramUsername: "",
     notificationsEnabled: true,
@@ -159,21 +157,39 @@ export default function StaffPage() {
 
   const isSales = dashboardMode === "sales";
   const roleOptions = isSales ? SALES_ROLES : SERVICE_ROLES;
-  const knownRoleValues = roleOptions.filter(r => r.value !== "custom").map(r => r.value);
+  const knownRoleValues = roleOptions.map(r => r.value);
+
+  // Backward-compat: старые Staff могли иметь role = свободный текст («Барбер-стилист»).
+  // При открытии формы — нормализуем: если role не входит в dropdown, переносим в specialization.
+  const splitLegacyRole = (rawRole: string, rawSpec: string | null): { role: string; specialization: string } => {
+    const trimmedRole = (rawRole || "").trim();
+    const trimmedSpec = (rawSpec || "").trim();
+    if (knownRoleValues.includes(trimmedRole)) {
+      return { role: trimmedRole, specialization: trimmedSpec };
+    }
+    // role был свободным текстом — переносим в specialization, ставим custom как категорию
+    return { role: "custom", specialization: trimmedSpec || trimmedRole };
+  };
+
+  const defaultFormData = {
+    name: "",
+    role: "manager" as string,
+    specialization: "",
+    photo: "",
+    telegramUsername: "",
+    notificationsEnabled: true,
+    baseRate: "" as string | number,
+    commissionPercent: "" as string | number,
+  };
 
   const openModal = (person?: Staff) => {
     if (person) {
       setEditingStaff(person);
-      // Try to split existing role into category + specialization.
-      // If role matches a known dropdown value (admin/doctor/master/...)
-      // we put it in category and keep specialization empty.
-      // Otherwise it's free-form text → custom + specialization.
-      const isKnownEnum = roleOptions.some(r => r.value === person.role && r.value !== "custom");
+      const split = splitLegacyRole(person.role, person.specialization);
       setFormData({
         name: person.name,
-        role: person.role,
-        roleCategory: isKnownEnum ? person.role : "custom",
-        roleSpecialization: isKnownEnum ? "" : (person.role || ""),
+        role: split.role,
+        specialization: split.specialization,
         photo: person.photo || "",
         telegramUsername: person.telegramUsername || "",
         notificationsEnabled: person.notificationsEnabled,
@@ -182,7 +198,7 @@ export default function StaffPage() {
       });
     } else {
       setEditingStaff(null);
-      setFormData({ name: "", role: "", roleCategory: "", roleSpecialization: "", photo: "", telegramUsername: "", notificationsEnabled: true, baseRate: "", commissionPercent: "" });
+      setFormData({ ...defaultFormData });
     }
     setIsModalOpen(true);
   };
@@ -190,7 +206,7 @@ export default function StaffPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingStaff(null);
-    setFormData({ name: "", role: "", roleCategory: "", roleSpecialization: "", photo: "", telegramUsername: "", notificationsEnabled: true, baseRate: "", commissionPercent: "" });
+    setFormData({ ...defaultFormData });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -415,7 +431,13 @@ export default function StaffPage() {
                   )}
                   <div>
                     <h3 className={`font-medium ${isDark ? "text-white" : "text-gray-900"}`}>{person.name}</h3>
-                    <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>{person.role}</p>
+                    <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                      {(() => {
+                        const roleOpt = roleOptions.find(r => r.value === person.role);
+                        const roleLabel = roleOpt ? roleOpt.label : person.role;
+                        return person.specialization ? `${roleLabel} · ${person.specialization}` : roleLabel;
+                      })()}
+                    </p>
                   </div>
                 </div>
                 <div className="flex gap-1">
@@ -531,16 +553,9 @@ export default function StaffPage() {
                   {t("staffPage.role")}
                 </label>
                 <select
-                  value={formData.roleCategory || "custom"}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setFormData({
-                      ...formData,
-                      roleCategory: val,
-                      // role itself recomputed on submit; here keep specialization for UX
-                      role: formData.roleSpecialization || (val !== "custom" ? val : ""),
-                    });
-                  }}
+                  value={formData.role || "manager"}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  required
                   className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white" : "border-gray-300"}`}
                 >
                   {roleOptions.map((r) => (
@@ -549,21 +564,13 @@ export default function StaffPage() {
                 </select>
                 <input
                   type="text"
-                  value={formData.roleSpecialization}
-                  onChange={(e) => {
-                    const spec = e.target.value;
-                    setFormData({
-                      ...formData,
-                      roleSpecialization: spec,
-                      // role в БД = текст уточнения если он есть, иначе категория
-                      role: spec || (formData.roleCategory && formData.roleCategory !== "custom" ? formData.roleCategory : ""),
-                    });
-                  }}
+                  value={formData.specialization}
+                  onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
                   placeholder={t("staffPage.specializationPlaceholder") || "Уточнение (например: Терапевт, Стилист)"}
                   className={`w-full mt-2 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
                 />
                 <p className={`text-xs mt-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
-                  {t("staffPage.specializationHint") || "Категория для группировки + конкретная специализация. AI и клиенты увидят уточнение если оно заполнено."}
+                  {t("staffPage.specializationHint") || "Роль определяет какие уведомления получает сотрудник. Специализация — пояснение для отображения."}
                 </p>
               </div>
 

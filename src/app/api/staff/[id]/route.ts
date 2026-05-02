@@ -28,7 +28,7 @@ export async function PUT(
 
     const { id } = await params;
     const data = await request.json();
-    const { name, role, photo, telegramUsername, notificationsEnabled, baseRate, commissionPercent } = data;
+    const { name, role, specialization, photo, telegramUsername, notificationsEnabled, baseRate, commissionPercent } = data;
 
     const person = await prisma.staff.findUnique({
       where: { id },
@@ -39,11 +39,28 @@ export async function PUT(
       return NextResponse.json({ error: "Сотрудник не найден" }, { status: 404 });
     }
 
+    // Если роль приходит — валидируем (только канонизированные значения)
+    const VALID_ROLES = ["admin", "manager", "master", "doctor", "operator", "warehouse", "custom"];
+    let normalizedRole: string | undefined = undefined;
+    if (role !== undefined) {
+      const trimmed = typeof role === "string" ? role.trim() : "";
+      if (!trimmed || !VALID_ROLES.includes(trimmed)) {
+        return NextResponse.json(
+          { error: "Роль обязательна. Выберите одну из: admin, manager, master, doctor, operator, warehouse, custom" },
+          { status: 400 }
+        );
+      }
+      normalizedRole = trimmed;
+    }
+
     const updated = await prisma.staff.update({
       where: { id },
       data: {
         name: name || undefined,
-        role: role !== undefined ? role : undefined,
+        role: normalizedRole,
+        specialization: specialization !== undefined
+          ? (typeof specialization === "string" && specialization.trim() ? specialization.trim() : null)
+          : undefined,
         photo: photo !== undefined ? (photo || null) : undefined,
         telegramUsername: telegramUsername !== undefined ? (telegramUsername || null) : undefined,
         notificationsEnabled: notificationsEnabled !== undefined ? notificationsEnabled : undefined,

@@ -351,7 +351,8 @@ model ServiceIncompatibility {
 model Staff {
   id            String    @id @default(cuid())
   name          String
-  role          String?
+  role          String?   // канонизированное значение из dropdown: admin, manager, master, doctor, operator, custom
+  specialization String?  // свободный текст ("Барбер-стилист", "Терапевт") — только для отображения, фильтры идут по role
   photo         String?   // base64 data URL или URL к фото
 
   // Telegram уведомления
