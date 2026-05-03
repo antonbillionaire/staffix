@@ -119,7 +119,8 @@ export async function POST(request: NextRequest) {
           expiresAt.setMonth(expiresAt.getMonth() + 1);
         }
 
-        // Activate subscription
+        // Activate subscription. Reminder flags reset so the next cycle's
+        // 7d/3d/1d reminders fire correctly if the user later cancels.
         await prisma.subscription.upsert({
           where: { businessId: business.id },
           update: {
@@ -132,6 +133,10 @@ export async function POST(request: NextRequest) {
             payproOrderId: ipn.orderId,
             payproSubscriptionId: ipn.subscriptionId || null,
             payproCustomerId: ipn.customerId || null,
+            reminder7dSent: false,
+            reminder3dSent: false,
+            reminder1dSent: false,
+            limitWarning80Sent: false,
           },
           create: {
             businessId: business.id,
@@ -189,6 +194,10 @@ export async function POST(request: NextRequest) {
             messagesLimit: planConfig.features.messagesLimit,
             expiresAt,
             status: "active",
+            reminder7dSent: false,
+            reminder3dSent: false,
+            reminder1dSent: false,
+            limitWarning80Sent: false,
           },
         });
 
@@ -337,6 +346,10 @@ export async function POST(request: NextRequest) {
             payproOrderId: ipn.orderId,
             payproSubscriptionId: ipn.subscriptionId || null,
             payproCustomerId: ipn.customerId || null,
+            reminder7dSent: false,
+            reminder3dSent: false,
+            reminder1dSent: false,
+            limitWarning80Sent: false,
           },
           create: {
             businessId: business.id,
