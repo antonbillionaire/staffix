@@ -540,6 +540,16 @@ async function handleToolCall(
           toolInput.client_name,
           toolInput.urgency
         );
+        // Also drop a Task into the dashboard so the manager has a persistent
+        // record, not just a Telegram ping. Best-effort — errors only logged.
+        const { createEscalationTask } = await import("@/lib/tasks");
+        createEscalationTask({
+          businessId,
+          clientTelegramId: telegramId,
+          clientName: toolInput.client_name,
+          reason: toolInput.reason || "AI попросил человека",
+          urgency: toolInput.urgency,
+        }).catch(() => {});
         return JSON.stringify(result);
       }
 

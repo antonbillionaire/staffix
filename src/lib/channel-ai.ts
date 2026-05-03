@@ -440,6 +440,18 @@ async function handleChannelToolCall(
           toolInput.client_name,
           toolInput.urgency
         );
+        // Persist the escalation as a Task too — same rationale as in
+        // src/app/api/telegram/webhook/route.ts: don't lose the lead if
+        // the owner misses the Telegram ping. Channel clients have no
+        // bigint telegramId so the task lands without a clientId; the
+        // title still includes the client name from the AI's tool input.
+        const { createEscalationTask } = await import("@/lib/tasks");
+        createEscalationTask({
+          businessId,
+          clientName: toolInput.client_name,
+          reason: toolInput.reason || "AI попросил человека",
+          urgency: toolInput.urgency,
+        }).catch(() => {});
         return JSON.stringify(result);
       }
 

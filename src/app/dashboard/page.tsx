@@ -21,6 +21,8 @@ import {
   Globe,
   Send,
   BarChart3,
+  ListTodo,
+  AlertCircle,
 } from "lucide-react";
 
 type Period = "day" | "week" | "month" | "all";
@@ -68,6 +70,44 @@ export default function DashboardPage() {
   const [statsData, setStatsData] = useState<StatsData | null>(null);
   const [period, setPeriod] = useState<Period>("week");
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+  const [tasks, setTasks] = useState<Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    priority: string;
+    status: string;
+    dueAt: string | null;
+    createdBy: string | null;
+    client: { id: string; name: string | null; phone: string | null } | null;
+  }>>([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
+
+  const refreshTasks = async () => {
+    try {
+      const res = await fetch("/api/tasks?status=pending&limit=10");
+      if (res.ok) {
+        const data = await res.json();
+        setTasks(data.tasks || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch tasks:", err);
+    } finally {
+      setTasksLoading(false);
+    }
+  };
+
+  const completeTask = async (id: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    try {
+      await fetch(`/api/tasks/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "done" }),
+      });
+    } catch {
+      refreshTasks();
+    }
+  };
 
   const isDark = theme === "dark";
   const cardBg = isDark ? "bg-[#12122a]" : "bg-white";
@@ -105,6 +145,7 @@ export default function DashboardPage() {
       finally { setLoading(false); }
     };
     fetchBiz();
+    refreshTasks();
   }, []);
 
   useEffect(() => {
@@ -319,6 +360,86 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* ── MY TASKS ── */}
+      <div className={`${cardBg} border ${borderColor} rounded-xl p-5`}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <ListTodo className="h-5 w-5 text-blue-400" />
+            <h2 className={`font-semibold ${textPrimary}`}>{t("dashboard.myTasks")}</h2>
+            {tasks.length > 0 && (
+              <span className={`text-xs px-2 py-0.5 rounded-full ${isDark ? "bg-blue-500/20 text-blue-300" : "bg-blue-100 text-blue-700"}`}>
+                {tasks.length}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {tasksLoading ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+          </div>
+        ) : tasks.length === 0 ? (
+          <p className={`text-sm ${textMuted} text-center py-4`}>{t("dashboard.noTasks")}</p>
+        ) : (
+          <div className="space-y-2">
+            {tasks.map((task) => {
+              const isOverdue = task.dueAt && new Date(task.dueAt) < new Date();
+              const dueLabel = task.dueAt
+                ? new Date(task.dueAt).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+                : null;
+              return (
+                <div
+                  key={task.id}
+                  className={`flex items-start gap-3 p-3 rounded-lg border ${
+                    task.priority === "high" ? "border-red-500/30 bg-red-500/5" :
+                    isOverdue ? (isDark ? "border-orange-500/30 bg-orange-500/5" : "border-orange-200 bg-orange-50") :
+                    (isDark ? "border-white/5 bg-white/5" : "border-gray-100 bg-gray-50")
+                  }`}
+                >
+                  <button
+                    onClick={() => completeTask(task.id)}
+                    className={`flex-shrink-0 w-5 h-5 rounded-full border-2 ${
+                      task.priority === "high" ? "border-red-400" : isDark ? "border-white/30" : "border-gray-400"
+                    } hover:bg-green-500/20 hover:border-green-500 transition-colors mt-0.5`}
+                    title={t("dashboard.markDone")}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-2 flex-wrap">
+                      {task.priority === "high" && (
+                        <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
+                      )}
+                      <p className={`text-sm font-medium ${textPrimary} flex-1 min-w-0`}>{task.title}</p>
+                      {task.createdBy === "ai" && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${isDark ? "bg-purple-500/20 text-purple-300" : "bg-purple-100 text-purple-700"}`}>AI</span>
+                      )}
+                    </div>
+                    {task.description && (
+                      <p className={`text-xs ${textSecondary} mt-1 line-clamp-2`}>{task.description}</p>
+                    )}
+                    <div className="flex items-center gap-3 mt-1 text-xs">
+                      {task.client && (
+                        <Link
+                          href={`/dashboard/customers/${task.client.id}`}
+                          className={`${textMuted} hover:text-blue-400 truncate`}
+                        >
+                          {task.client.name || task.client.phone || "клиент"}
+                        </Link>
+                      )}
+                      {dueLabel && (
+                        <span className={isOverdue ? "text-orange-400" : textMuted}>
+                          <Clock className="h-3 w-3 inline mr-1" />
+                          {dueLabel}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ── READINESS CHECKLIST ── */}

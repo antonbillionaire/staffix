@@ -195,6 +195,9 @@ model Business {
   // CRM интеграции
   crmIntegrations    CrmIntegration[]
 
+  // Задачи менеджеров
+  tasks              Task[]
+
   // Финансы (зарплаты сотрудников)
   financeTransactions FinanceTransaction[]
   servicePackages     ServicePackage[]
@@ -781,6 +784,51 @@ model Client {
   @@index([businessId, lastVisitDate])
   @@index([businessId, lastMessageAt])
   @@index([businessId, dealStage])
+}
+
+// ========================================
+// TASKS — задачи для менеджеров (ручные + авто-создаваемые AI)
+// ========================================
+// Главная боль малого бизнеса по фидбэку amoCRM: менеджеры теряют лидов
+// потому что забывают перезвонить. Этот стол — "мои задачи на сегодня"
+// в дашборде. AI создаёт задачу когда передаёт диалог человеку (notify_manager),
+// менеджер может создать руками для любого клиента.
+model Task {
+  id              String    @id @default(cuid())
+
+  businessId      String
+  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  // Кому назначена. null = "любой свободный менеджер".
+  assignedStaffId String?
+
+  // С каким клиентом связана (опционально — общая задача без клиента тоже бывает).
+  clientId        String?
+
+  title           String    // "Перезвонить Ивану", "Подготовить КП"
+  description     String?   @db.Text
+
+  // Когда нужно сделать. null = когда успеется (без дедлайна).
+  dueAt           DateTime?
+
+  // low | normal | high. Срочные эскалации от AI = high.
+  priority        String    @default("normal")
+
+  // pending | done | cancelled
+  status          String    @default("pending")
+
+  // Кто создал. user.id для ручных, "ai" для авто-созданных.
+  createdBy       String?
+
+  completedAt     DateTime?
+  completedBy     String?   // userId кто закрыл
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([businessId, status, dueAt])
+  @@index([businessId, assignedStaffId, status])
+  @@index([clientId])
 }
 
 // ========================================

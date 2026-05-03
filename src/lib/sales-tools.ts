@@ -1155,6 +1155,16 @@ export async function executeSalesTool(
           toolInput.client_name as string | undefined,
           toolInput.urgency as string | undefined
         );
+        // Сохраняем эскалацию в Task — чтобы менеджер видел в дашборде
+        // персистентный список, а не только Telegram-уведомление.
+        const { createEscalationTask } = await import("@/lib/tasks");
+        createEscalationTask({
+          businessId,
+          clientTelegramId: telegramId > BigInt(0) ? telegramId : undefined,
+          clientName: toolInput.client_name as string | undefined,
+          reason: (toolInput.reason as string) || "AI попросил человека",
+          urgency: toolInput.urgency as string | undefined,
+        }).catch(() => {});
         return JSON.stringify(result);
       }
 
