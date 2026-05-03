@@ -32,6 +32,7 @@ import {
   ShoppingCart,
   LayoutGrid,
   List,
+  Download,
 } from "lucide-react";
 
 interface Customer {
@@ -403,7 +404,7 @@ export default function CustomersPage() {
             {stats.total} {t("customers.customersInDatabase")}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={() => setShowImportModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-xl hover:opacity-90 transition-opacity"
@@ -411,6 +412,14 @@ export default function CustomersPage() {
             <Upload className="h-4 w-4" />
             {t("customers.importCustomers")}
           </button>
+          <a
+            href={`/api/customers/export?segment=${encodeURIComponent(segment)}&search=${encodeURIComponent(search)}`}
+            className={`flex items-center gap-2 px-4 py-2 ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} rounded-xl ${textSecondary} transition-colors`}
+            title={t("customers.exportCsvHint")}
+          >
+            <Download className="h-4 w-4" />
+            {t("customers.exportCsv")}
+          </a>
           <button
             onClick={fetchCustomers}
             className={`flex items-center gap-2 px-4 py-2 ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} rounded-xl ${textSecondary} transition-colors`}

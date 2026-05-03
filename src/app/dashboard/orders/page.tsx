@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, ShoppingBag, Phone, MapPin, ChevronDown, ChevronUp, Check, Truck, X, Clock, AlertCircle } from "lucide-react";
+import { Loader2, ShoppingBag, Phone, MapPin, ChevronDown, ChevronUp, Check, Truck, X, Clock, AlertCircle, Download } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -138,11 +138,20 @@ export default function OrdersPage() {
     <div className={`${bg} min-h-screen p-6`}>
       <div className="max-w-5xl mx-auto">
         {/* Заголовок */}
-        <div className="mb-6">
-          <h1 className={`text-2xl font-bold ${text}`}>{t("orders.title")}</h1>
-          <p className={`mt-1 text-sm ${sub}`}>
-            {t("orders.subtitle")}
-          </p>
+        <div className="mb-6 flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className={`text-2xl font-bold ${text}`}>{t("orders.title")}</h1>
+            <p className={`mt-1 text-sm ${sub}`}>
+              {t("orders.subtitle")}
+            </p>
+          </div>
+          <a
+            href={`/api/orders/export${filterStatus ? `?status=${encodeURIComponent(filterStatus)}` : ""}`}
+            className={`flex items-center gap-2 px-4 py-2 ${isDark ? "bg-gray-800 border border-gray-700 hover:bg-gray-700" : "bg-white border border-gray-200 hover:bg-gray-50"} rounded-xl text-sm ${sub} transition-colors`}
+          >
+            <Download className="h-4 w-4" />
+            {t("orders.exportCsv")}
+          </a>
         </div>
 
         {/* Статистика */}
