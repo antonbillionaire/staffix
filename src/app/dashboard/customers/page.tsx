@@ -30,6 +30,8 @@ import {
   Plus,
   Minus,
   ShoppingCart,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 
 interface Customer {
@@ -120,6 +122,8 @@ export default function CustomersPage() {
   const [search, setSearch] = useState("");
   const [segment, setSegment] = useState("all");
   const [dashboardMode, setDashboardMode] = useState("service");
+  const [viewMode, setViewMode] = useState<"table" | "kanban">("table");
+  const [draggedId, setDraggedId] = useState<string | null>(null);
 
   // Import state
   const [showImportModal, setShowImportModal] = useState(false);
@@ -476,10 +480,10 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {/* Search */}
+      {/* Search + view toggle */}
       <div className={`${cardBg} border ${borderColor} rounded-xl p-4`}>
-        <form onSubmit={handleSearch} className="flex gap-4">
-          <div className="relative flex-1">
+        <form onSubmit={handleSearch} className="flex gap-3 items-stretch flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 ${textTertiary}`} />
             <input
               type="text"
@@ -495,20 +499,125 @@ export default function CustomersPage() {
           >
             {t("customers.find")}
           </button>
+          <div className={`flex rounded-xl border ${inputBorder} overflow-hidden`}>
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`flex items-center gap-2 px-4 py-2.5 transition-colors ${
+                viewMode === "table"
+                  ? "bg-blue-600 text-white"
+                  : `${inputBg} ${textSecondary} hover:opacity-80`
+              }`}
+              title={t("customers.viewTable")}
+            >
+              <List className="h-4 w-4" />
+              <span className="hidden sm:inline text-sm">{t("customers.viewTable")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("kanban")}
+              className={`flex items-center gap-2 px-4 py-2.5 transition-colors ${
+                viewMode === "kanban"
+                  ? "bg-blue-600 text-white"
+                  : `${inputBg} ${textSecondary} hover:opacity-80`
+              }`}
+              title={t("customers.viewKanban")}
+            >
+              <LayoutGrid className="h-4 w-4" />
+              <span className="hidden sm:inline text-sm">{t("customers.viewKanban")}</span>
+            </button>
+          </div>
         </form>
       </div>
 
       {/* Customers list */}
-      <div className={`${cardBg} border ${borderColor} rounded-xl overflow-hidden`}>
+      <div className={`${viewMode === "kanban" ? "" : `${cardBg} border ${borderColor} rounded-xl overflow-hidden`}`}>
         {loading ? (
-          <div className="flex items-center justify-center py-12">
+          <div className={`${viewMode === "kanban" ? `${cardBg} border ${borderColor} rounded-xl ` : ""}flex items-center justify-center py-12`}>
             <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
           </div>
         ) : customers.length === 0 ? (
-          <div className={`text-center py-12 ${textSecondary}`}>
+          <div className={`${viewMode === "kanban" ? `${cardBg} border ${borderColor} rounded-xl ` : ""}text-center py-12 ${textSecondary}`}>
             <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p>{t("customers.notFound")}</p>
             <p className="text-sm mt-1">{t("customers.willAppearAfterBot")}</p>
+          </div>
+        ) : viewMode === "kanban" ? (
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {(Object.keys(DEAL_STAGE_LABEL) as DealStage[]).map((stage) => {
+              const inStage = customers.filter((c) => c.dealStage === stage);
+              const isDropTarget = draggedId !== null;
+              return (
+                <div
+                  key={stage}
+                  onDragOver={(e) => {
+                    if (draggedId) e.preventDefault();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (!draggedId) return;
+                    const dragged = customers.find((c) => c.id === draggedId);
+                    setDraggedId(null);
+                    if (!dragged || dragged.dealStage === stage) return;
+                    handleDealStageChange(dragged, stage);
+                  }}
+                  className={`flex-shrink-0 w-72 ${cardBg} border ${borderColor} rounded-xl flex flex-col ${
+                    isDropTarget ? "ring-2 ring-blue-500/40" : ""
+                  }`}
+                >
+                  <div className={`px-4 py-3 border-b ${borderColor} flex items-center justify-between`}>
+                    <span className={`text-xs px-2 py-0.5 rounded ${DEAL_STAGE_COLOR[stage]}`}>
+                      {DEAL_STAGE_LABEL[stage]}
+                    </span>
+                    <span className={`text-xs ${textTertiary}`}>{inStage.length}</span>
+                  </div>
+                  <div className="flex-1 p-2 space-y-2 max-h-[600px] overflow-y-auto">
+                    {inStage.length === 0 ? (
+                      <p className={`text-xs ${textTertiary} text-center py-6`}>—</p>
+                    ) : (
+                      inStage.map((customer) => {
+                        const draggable = !customer.channel || customer.channel === "telegram";
+                        return (
+                          <div
+                            key={customer.id}
+                            draggable={draggable}
+                            onDragStart={() => draggable && setDraggedId(customer.id)}
+                            onDragEnd={() => setDraggedId(null)}
+                            className={`p-3 rounded-lg border ${borderColor} ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-50 hover:bg-gray-100"} transition-colors ${
+                              draggable ? "cursor-grab active:cursor-grabbing" : "cursor-default opacity-70"
+                            }`}
+                          >
+                            <Link href={`/dashboard/customers/${customer.id}`} className="block">
+                              <div className="flex items-start justify-between gap-2 mb-1">
+                                <p className={`${textPrimary} font-medium text-sm truncate`}>{customer.name}</p>
+                                {customer.channel && customer.channel !== "telegram" && (
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${
+                                    customer.channel === "whatsapp" ? "bg-green-500/20 text-green-400" :
+                                    customer.channel === "instagram" ? "bg-pink-500/20 text-pink-400" :
+                                    "bg-blue-500/20 text-blue-400"
+                                  }`}>
+                                    {customer.channel === "whatsapp" ? "WA" : customer.channel === "instagram" ? "IG" : "FB"}
+                                  </span>
+                                )}
+                              </div>
+                              {customer.phone && (
+                                <p className={`text-xs ${textTertiary} truncate`}>{customer.phone}</p>
+                              )}
+                              <div className="flex items-center justify-between mt-2 text-xs">
+                                {customer.dealValue ? (
+                                  <span className="text-green-500 font-medium">{customer.dealValue.toLocaleString()}</span>
+                                ) : <span />}
+                                <span className={textTertiary}>{formatDate(customer.lastVisitDate)}</span>
+                              </div>
+                            </Link>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="overflow-x-auto">
