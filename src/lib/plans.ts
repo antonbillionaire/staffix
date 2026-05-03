@@ -194,6 +194,45 @@ export function isUnlimited(planId: string): boolean {
   return getMessagesLimit(planId) >= 999999;
 }
 
+// Daily price for pro-rata calculations. Approximates monthly = 30 days
+// and yearly = 365 days, matching how the webhook sets expiresAt.
+export function planDailyPrice(planId: string, billingPeriod: "monthly" | "yearly"): number {
+  const plan = getPlan(planId);
+  if (billingPeriod === "yearly") return plan.yearlyPrice / 365;
+  return plan.monthlyPrice / 30;
+}
+
+// Pro-rata credit: dollars worth of unused service from the current
+// subscription, plus how many days of the *target* plan that credit buys.
+//
+// Used both when downgrading (apply credit as extra days, no extra charge)
+// and when upgrading (full new-plan charge + bonus days from credit on top).
+export function calculateProRataCredit(params: {
+  currentPlanId: string;
+  currentBillingPeriod: "monthly" | "yearly";
+  expiresAt: Date;
+  targetPlanId: string;
+  targetBillingPeriod: "monthly" | "yearly";
+  now?: Date;
+}): {
+  daysRemaining: number;
+  creditDollars: number;
+  creditDaysAtTarget: number;
+} {
+  const now = params.now ?? new Date();
+  const msRemaining = params.expiresAt.getTime() - now.getTime();
+  const daysRemaining = Math.max(0, msRemaining / (24 * 60 * 60 * 1000));
+  const currentDaily = planDailyPrice(params.currentPlanId, params.currentBillingPeriod);
+  const targetDaily = planDailyPrice(params.targetPlanId, params.targetBillingPeriod);
+  const creditDollars = daysRemaining * currentDaily;
+  const creditDaysAtTarget = targetDaily > 0 ? creditDollars / targetDaily : 0;
+  return {
+    daysRemaining: Math.round(daysRemaining * 100) / 100,
+    creditDollars: Math.round(creditDollars * 100) / 100,
+    creditDaysAtTarget: Math.round(creditDaysAtTarget * 100) / 100,
+  };
+}
+
 // All plans have the same features, only difference is message limits
 export function hasMenuAccess(_userPlan: PlanId, _requiredPlan?: PlanId): boolean {
   // All plans have access to all features

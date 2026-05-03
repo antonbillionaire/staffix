@@ -113,6 +113,9 @@ export function buildCheckoutUrl(params: {
   language?: string;
   currency?: string;
   successUrl?: string;
+  // Pro-rata credit days from a previous subscription, transferred onto the
+  // new one (read by the webhook to extend expiresAt). Optional.
+  creditDays?: number;
 }): string {
   const url = new URL(PAYPRO_CHECKOUT_BASE_URL);
 
@@ -145,6 +148,10 @@ export function buildCheckoutUrl(params: {
   url.searchParams.set("x-userId", params.userId);
   url.searchParams.set("x-planId", params.planId);
   url.searchParams.set("x-billingPeriod", params.billingPeriod);
+  if (params.creditDays && params.creditDays > 0) {
+    // Round to integer days. Webhook adds these on top of the new period.
+    url.searchParams.set("x-creditDays", String(Math.round(params.creditDays)));
+  }
 
   // Success/cancel URLs
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
@@ -205,6 +212,7 @@ export interface PayProIPN {
   planId: string;
   billingPeriod: string;
   packId: string;
+  creditDays: number;
 }
 
 // Parse IPN form data into typed object
@@ -242,6 +250,7 @@ export function parseIPN(formData: URLSearchParams): PayProIPN {
     planId: customMap.get("planId") || "",
     billingPeriod: customMap.get("billingPeriod") || "",
     packId: customMap.get("packId") || "",
+    creditDays: parseInt(customMap.get("creditDays") || "0", 10) || 0,
   };
 }
 

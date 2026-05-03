@@ -7,6 +7,7 @@ import {
   verifySignature,
   verifyIP,
   IPN_TYPES,
+  cancelSubscription,
 } from "@/lib/paypro";
 import { notifyNewPayment } from "@/lib/admin-notify";
 import { rateLimit } from "@/lib/rate-limit";
@@ -117,6 +118,28 @@ export async function POST(request: NextRequest) {
           expiresAt.setFullYear(expiresAt.getFullYear() + 1);
         } else {
           expiresAt.setMonth(expiresAt.getMonth() + 1);
+        }
+        // Pro-rata: change-plan flow forwards leftover days from the previous
+        // subscription as x-creditDays on the checkout URL. Add them on top of
+        // the regular new period so the user doesn't lose the credit.
+        if (ipn.creditDays > 0) {
+          expiresAt.setDate(expiresAt.getDate() + ipn.creditDays);
+        }
+
+        // Plan-change cleanup: if the user already had a different PayPro
+        // subscription, terminate it now so we don't double-bill them. The
+        // SUBSCRIPTION_TERMINATED webhook coming back is harmless — it'll be
+        // a no-op against the new subscription.
+        const previousSubId = business.subscription?.payproSubscriptionId;
+        if (
+          previousSubId &&
+          ipn.subscriptionId &&
+          previousSubId !== ipn.subscriptionId
+        ) {
+          cancelSubscription(previousSubId).catch((err) =>
+            console.error(`PayPro: failed to terminate previous sub ${previousSubId}:`, err)
+          );
+          console.log(`PayPro: terminated previous subscription ${previousSubId} after plan change`);
         }
 
         // Activate subscription. Reminder flags reset so the next cycle's

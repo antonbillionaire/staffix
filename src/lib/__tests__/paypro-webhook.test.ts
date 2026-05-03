@@ -73,6 +73,7 @@ vi.mock("@/lib/paypro", async (importOriginal) => {
         planId: customMap.get("planId") || "",
         billingPeriod: customMap.get("billingPeriod") || "",
         packId: customMap.get("packId") || "",
+        creditDays: parseInt(customMap.get("creditDays") || "0", 10) || 0,
       };
     }),
   };
@@ -462,6 +463,37 @@ describe("PayPro Webhook POST", () => {
         orderId: "order-123",
       })
     );
+  });
+
+  // ── Plan change with credit days: x-creditDays extends expiresAt ─────────
+
+  it("ORDER_CHARGED with x-creditDays adds bonus days to expiresAt", async () => {
+    vi.mocked(prisma.business.findFirst).mockResolvedValue(baseBusiness as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: "user-1",
+      name: "Test",
+      email: "buyer@example.com",
+    } as never);
+
+    const POST = await importHandler();
+    const body = buildIPNBody({
+      ...baseIPNFields,
+      ORDER_CUSTOM_FIELDS:
+        "x-userId=user-1,x-planId=pro,x-billingPeriod=monthly,x-creditDays=12",
+    });
+    const req = makePayProRequest(body);
+    const res = await POST(req as never);
+
+    expect(res.status).toBe(200);
+
+    // Expect expiresAt to be roughly 30 + 12 = 42 days from now (monthly + bonus)
+    const call = vi.mocked(prisma.subscription.upsert).mock.calls[0][0] as {
+      update: { expiresAt: Date };
+    };
+    const expiresAt = call.update.expiresAt;
+    const diffDays = (expiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000);
+    expect(diffDays).toBeGreaterThan(41);
+    expect(diffDays).toBeLessThan(43);
   });
 
   // ── Yearly billing period ─────────────────────────────────────────────────
