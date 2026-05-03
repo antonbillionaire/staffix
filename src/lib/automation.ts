@@ -348,15 +348,27 @@ export async function processReviewRequests() {
   const now = new Date();
   const results = { sent: 0, failed: 0, errors: [] as string[] };
 
-  // Auto-complete past confirmed bookings (appointment time has passed)
+  // Auto-complete past confirmed bookings (appointment time has passed).
+  // Read first so we know which clients to advance in the deal pipeline,
+  // then update + promote. Pipeline promotion never demotes, so this is
+  // safe for clients already at "client" stage.
   try {
-    await prisma.booking.updateMany({
-      where: {
-        status: "confirmed",
-        date: { lt: now },
-      },
-      data: { status: "completed" },
+    const toComplete = await prisma.booking.findMany({
+      where: { status: "confirmed", date: { lt: now } },
+      select: { id: true, businessId: true, clientTelegramId: true },
     });
+    if (toComplete.length > 0) {
+      await prisma.booking.updateMany({
+        where: { id: { in: toComplete.map((b) => b.id) } },
+        data: { status: "completed" },
+      });
+      const { promoteDealStageByTelegram } = await import("./deal-pipeline");
+      for (const b of toComplete) {
+        if (b.clientTelegramId) {
+          promoteDealStageByTelegram(b.businessId, b.clientTelegramId, "consultation_done").catch(() => {});
+        }
+      }
+    }
   } catch {
     // Non-critical, continue
   }

@@ -98,6 +98,11 @@ export default function SettingsPage() {
   const [deliverySaving, setDeliverySaving] = useState(false);
   const [deliverySaved, setDeliverySaved] = useState(false);
 
+  // Sales-mode + consultations toggle (видим/изменяем только в sales-режиме)
+  const [businessMode, setBusinessMode] = useState<"service" | "sales">("service");
+  const [consultationsEnabled, setConsultationsEnabled] = useState(false);
+  const [consultationsSaving, setConsultationsSaving] = useState(false);
+
   // Theme-based classes
   const isDark = theme === "dark";
   const bgCard = isDark ? "bg-[#12122a]" : "bg-white";
@@ -159,6 +164,8 @@ export default function SettingsPage() {
               freeFrom: data.business.deliveryFreeFrom?.toString() || "",
               zones: data.business.deliveryZones || "",
             });
+            setBusinessMode(data.business.dashboardMode === "sales" ? "sales" : "service");
+            setConsultationsEnabled(Boolean(data.business.consultationsEnabled));
           }
         }
       } catch (err) {
@@ -860,6 +867,50 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
+
+          {/* Sales mode: разрешить запись на бесплатные консультации */}
+          {businessMode === "sales" && (
+            <div className={`rounded-xl border p-5 ${isDark ? "bg-white/5 border-white/10" : "bg-white border-gray-200"}`}>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <h3 className={`font-medium ${textPrimary} mb-1`}>{t("settings.consultationsTitle")}</h3>
+                  <p className={`text-sm ${textSecondary}`}>{t("settings.consultationsDescription")}</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={consultationsEnabled}
+                  disabled={consultationsSaving}
+                  onClick={async () => {
+                    const next = !consultationsEnabled;
+                    setConsultationsEnabled(next);
+                    setConsultationsSaving(true);
+                    try {
+                      const res = await fetch("/api/business", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ consultationsEnabled: next }),
+                      });
+                      if (!res.ok) throw new Error("save failed");
+                    } catch {
+                      setConsultationsEnabled(!next); // revert
+                    } finally {
+                      setConsultationsSaving(false);
+                    }
+                  }}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 disabled:opacity-50 ${
+                    consultationsEnabled ? "bg-blue-600" : isDark ? "bg-white/10" : "bg-gray-300"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition duration-200 ${
+                      consultationsEnabled ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

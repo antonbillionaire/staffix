@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
         name: true,
         businessType: true,
         dashboardMode: true,
+        consultationsEnabled: true,
         phone: true,
         address: true,
         workingHours: true,

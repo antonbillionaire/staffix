@@ -85,6 +85,7 @@ interface BusinessContext {
   documents: Array<{ name: string; extractedText: string | null }>;
   country: string;
   dashboardMode: string;
+  consultationsEnabled: boolean;
   loyalty: {
     enabled: boolean;
     type: string;
@@ -317,6 +318,7 @@ export async function buildBusinessContext(
       documents: business.documents,
       country: (business as Record<string, unknown>).country as string || "UZ",
       dashboardMode: (business as Record<string, unknown>).dashboardMode as string || "service",
+      consultationsEnabled: Boolean((business as Record<string, unknown>).consultationsEnabled ?? false),
       loyalty: firstProgram ? {
         enabled: firstProgram.enabled,
         type: firstProgram.type,

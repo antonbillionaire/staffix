@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { promoteDealStageByTelegram } from "@/lib/deal-pipeline";
 
 /**
  * PATCH /api/bookings/[id]
@@ -33,7 +34,7 @@ export async function PATCH(
 
     const booking = await prisma.booking.findFirst({
       where: { id, businessId },
-      select: { id: true },
+      select: { id: true, status: true, clientTelegramId: true },
     });
     if (!booking) {
       return NextResponse.json({ error: "Запись не найдена" }, { status: 404 });
@@ -73,6 +74,21 @@ export async function PATCH(
         staff: { select: { id: true, name: true } },
       },
     });
+
+    // Auto-promote deal pipeline when a booking transitions to "completed"
+    // (= встреча состоялась). Only when the status actually changed to avoid
+    // re-promotion on incidental PATCHes, and only if we have a client identity.
+    if (
+      data.status === "completed" &&
+      booking.status !== "completed" &&
+      booking.clientTelegramId
+    ) {
+      promoteDealStageByTelegram(
+        businessId,
+        booking.clientTelegramId,
+        "consultation_done"
+      ).catch(() => {});
+    }
 
     return NextResponse.json({
       booking: {

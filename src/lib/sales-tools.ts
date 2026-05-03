@@ -10,6 +10,7 @@ import { prisma } from "./prisma";
 import { dispatchCrmEvent } from "./crm-integrations";
 import { getPaymentButtons } from "./payment-links";
 import { sendOwnerNotification } from "./notifications";
+import { promoteDealStageByTelegram } from "./deal-pipeline";
 
 const LOW_STOCK_THRESHOLD = 5;
 
@@ -587,6 +588,14 @@ export async function createOrder(
       },
       include: { items: true },
     });
+
+    // Auto-promote in deal pipeline: order created = paid client.
+    // dealValue picks up the order total (only if higher than what's already
+    // there — won't shrink a manually-entered figure). Skipped for clients
+    // without a Telegram identity (channel orders are handled via Lead).
+    if (telegramId > BigInt(0)) {
+      promoteDealStageByTelegram(businessId, telegramId, "client", finalPrice).catch(() => {});
+    }
 
     // Уменьшаем stock для товаров с ограниченным наличием + уведомляем о низком остатке
     for (const item of order.items) {

@@ -76,6 +76,22 @@ const channelSalesTools: any[] = [
   saveClientNoteTool,
 ];
 
+// Sales + consultations: store/online-school hybrid where AI both takes orders
+// AND books free meetings/consultations (онлайн-школы, консалтинг, коучи).
+// Used when Business.consultationsEnabled = true.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const channelSalesPlusBookingTools: any[] = [
+  ...salesToolDefinitions.filter(
+    (t: { name: string }) =>
+      ["search_products", "get_product_details", "get_categories", "create_order", "get_client_orders", "get_upsell_suggestions"].includes(t.name)
+  ),
+  ...bookingToolDefinitions.filter(
+    (t: { name: string }) =>
+      ["check_availability", "create_booking", "get_services", "get_staff", "update_lead_status", "get_my_bookings", "cancel_booking", "notify_manager"].includes(t.name)
+  ),
+  saveClientNoteTool,
+];
+
 /**
  * Get or create a ChannelConversation record for this client
  */
@@ -106,6 +122,7 @@ async function loadBusinessProfile(businessId: string) {
       name: true,
       businessType: true,
       dashboardMode: true,
+      consultationsEnabled: true,
       phone: true,
       address: true,
       workingHours: true,
@@ -567,10 +584,16 @@ export async function generateChannelAIResponse(
       { role: "user", content: userMessage },
     ];
 
-    // Select tools based on business type
+    // Select tools based on business type and consultation flag.
+    // - Service mode → bookings only (records appointments).
+    // - Sales mode → orders only (sells goods).
+    // - Sales mode + consultationsEnabled → both: orders for purchases AND
+    //   bookings for free consultations / demos (онлайн-школы, консалтинг).
     const storeTypes = ["store", "shop", "sales", "delivery", "restaurant", "cafe", "flowers", "bakery", "pharmacy"];
     const isStoreBusiness = storeTypes.includes(biz.businessType || "") || (biz.dashboardMode === "sales");
-    const tools = isStoreBusiness ? channelSalesTools : channelBookingTools;
+    const tools = isStoreBusiness
+      ? (biz.consultationsEnabled ? channelSalesPlusBookingTools : channelSalesTools)
+      : channelBookingTools;
 
     // Call Claude with appropriate tools (with retry on overload)
     let response = await callClaudeWithRetry({

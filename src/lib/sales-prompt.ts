@@ -19,6 +19,9 @@ interface SalesBusinessContext {
   totalProducts?: number;
   documents?: { name: string; extractedText: string | null }[];
   faqs?: { question: string; answer: string }[];
+  consultationsEnabled?: boolean;
+  services?: { name: string; price: number; duration: number }[];
+  staff?: { id: string; name: string; role: string | null }[];
 }
 
 interface SalesClientContext {
@@ -71,7 +74,20 @@ ${business.categories && business.categories.length > 0
 - **get_categories** — используй в начале если клиент не знает что хочет
 - **create_order** — ТОЛЬКО когда клиент явно согласился купить и дал своё имя + телефон. Не создавай заказ без явного согласия.
 - **get_client_orders** — когда клиент спрашивает о своих прошлых заказах или статусе
-- **get_upsell_suggestions** — ровно ОДИН РАЗ после успешного create_order
+- **get_upsell_suggestions** — ровно ОДИН РАЗ после успешного create_order${
+    business.consultationsEnabled
+      ? `
+
+## БЕСПЛАТНЫЕ КОНСУЛЬТАЦИИ / ВСТРЕЧИ (включено владельцем):
+В этом бизнесе кроме оформления заказов ты можешь записывать клиентов на бесплатную консультацию / демо / звонок. Это типично для онлайн-школ, консалтинга и коучинга — клиент сначала встречается, потом покупает курс/услугу.
+
+- **check_availability** + **create_booking** — используй когда клиент просит "записаться на консультацию", "встретиться", "созвониться", "обсудить лично", "хочу узнать подробнее"
+- Для записи на КОНСУЛЬТАЦИЮ нужна услуга в каталоге (бесплатная или с символической ценой) — показывай через get_services
+- НЕ путай с заказом курса: заказ курса = create_order, бесплатная встреча = create_booking
+- Если клиент сразу хочет купить курс — иди через create_order, не предлагай встречу
+- Если клиент сомневается / просит больше информации — предложи встречу через create_booking`
+      : ""
+  }
 
 ## ПРОДАЮЩИЕ ТЕХНИКИ (применяй естественно):
 

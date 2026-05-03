@@ -680,6 +680,9 @@ async function generateAIResponse(
           totalProducts,
           documents,
           faqs: businessContext.faqs,
+          consultationsEnabled: businessContext.consultationsEnabled,
+          services: businessContext.services,
+          staff: businessContext.staff,
         },
         salesClientCtx
       );
@@ -707,8 +710,14 @@ async function generateAIResponse(
 
     // 6. Вызываем Claude API с tools (with retry on overload)
 
-    // Выбираем tools в зависимости от режима
-    const activeTools = salesMode ? salesToolDefinitions : bookingToolDefinitions;
+    // Выбираем tools в зависимости от режима. В sales-режиме при включённом
+    // consultationsEnabled даём ОБА набора — для онлайн-школ / консалтинга,
+    // которые принимают и заказы, и записи на бесплатные консультации.
+    const activeTools = salesMode
+      ? (businessContext.consultationsEnabled
+          ? [...salesToolDefinitions, ...bookingToolDefinitions]
+          : salesToolDefinitions)
+      : bookingToolDefinitions;
 
     // Сегодняшняя дата для контекста
     const today = new Date().toISOString().split("T")[0];
@@ -797,8 +806,19 @@ async function generateAIResponse(
             `[Webhook] Tool call: ${block.name} mode=${salesMode ? "sales" : "service"} input=${inputPreview}`
           );
 
-          // Роутим к нужному диспетчеру в зависимости от режима
-          const result = salesMode
+          // Роутим к нужному диспетчеру по имени инструмента, а не по режиму.
+          // В sales+consultations режиме AI может вызвать и sales-tool, и
+          // booking-tool в одном диалоге — каждый идёт к своему обработчику.
+          const SALES_TOOL_NAMES = new Set([
+            "search_products",
+            "get_product_details",
+            "get_categories",
+            "create_order",
+            "get_client_orders",
+            "get_upsell_suggestions",
+          ]);
+          const isSalesTool = SALES_TOOL_NAMES.has(block.name);
+          const result = isSalesTool
             ? await executeSalesTool(
                 block.name,
                 block.input as Record<string, unknown>,

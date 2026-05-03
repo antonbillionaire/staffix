@@ -7,6 +7,7 @@ import { prisma } from "./prisma";
 import { localToUTC } from "./automation";
 import { sendBookingNotification } from "./notifications";
 import { dispatchCrmEvent } from "./crm-integrations";
+import { promoteDealStageByTelegram } from "./deal-pipeline";
 
 // ========================================
 // TYPES
@@ -567,6 +568,11 @@ export async function createBooking(
           totalVisits: { increment: 1 },
         },
       });
+
+      // Auto-promote in deal pipeline: lead → consultation_booked.
+      // No-op if client is already further along (e.g. "client") — promotion
+      // never moves backwards.
+      promoteDealStageByTelegram(businessId, clientTelegramId, "consultation_booked").catch(() => {});
     }
 
     // Send notification to business owner and staff via Telegram + Dashboard (non-blocking)
