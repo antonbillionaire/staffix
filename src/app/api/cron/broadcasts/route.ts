@@ -11,8 +11,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendAutomationMessage } from "@/lib/automation";
+import { sendClientBroadcastEmail } from "@/lib/email";
+import { randomBytes } from "crypto";
 
 const MAX_BROADCASTS_PER_RUN = 10;
+
+function getOrCreateUnsubscribeToken(existing: string | null): string {
+  if (existing) return existing;
+  return randomBytes(24).toString("base64url");
+}
 
 export async function POST(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -46,10 +53,13 @@ export async function POST(request: Request) {
 
         const business = await prisma.business.findUnique({
           where: { id: broadcast.businessId },
-          select: { botToken: true },
+          select: { botToken: true, name: true },
         });
 
-        if (!business?.botToken) {
+        // For pure-Telegram broadcasts, missing botToken is a hard fail.
+        // For email-only / mixed, it's not — we can still send email.
+        const tgChannelInUse = broadcast.channel === "telegram" || broadcast.channel === "both";
+        if (tgChannelInUse && !business?.botToken && broadcast.channel === "telegram") {
           await prisma.clientBroadcast.update({
             where: { id: broadcast.id },
             data: { status: "failed" },
@@ -61,45 +71,123 @@ export async function POST(request: Request) {
           where: { broadcastId: broadcast.id, status: "pending" },
         });
 
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
         let sent = 0;
         let failed = 0;
 
         for (const delivery of deliveries) {
-          // Skip placeholder telegramIds (imported clients)
-          if (!delivery.telegramId || delivery.telegramId <= BigInt(0)) {
+          // Personalise: replace {{имя}} / {{name}} with client.name
+          const client = await prisma.client.findUnique({
+            where: { id: delivery.clientId },
+            select: { name: true, email: true, isBlocked: true, marketingUnsubscribed: true, unsubscribeToken: true },
+          });
+          if (!client) {
             await prisma.clientBroadcastDelivery.update({
               where: { id: delivery.id },
-              data: { status: "failed" },
+              data: { status: "failed", error: "client not found" },
             });
             failed++;
             continue;
           }
 
-          // Personalise: replace {{имя}} / {{name}} with client.name
-          const client = await prisma.client.findUnique({
-            where: { id: delivery.clientId },
-            select: { name: true },
-          });
-          const personalised = broadcast.content
-            .replace(/\{\{\s*имя\s*\}\}/gi, client?.name || "")
-            .replace(/\{\{\s*name\s*\}\}/gi, client?.name || "");
-
-          const result = await sendAutomationMessage(
-            business.botToken,
-            delivery.telegramId,
-            personalised
-          );
-
-          if (result.success) {
+          // Honour blocks and unsubscribes per channel.
+          if (client.isBlocked) {
             await prisma.clientBroadcastDelivery.update({
               where: { id: delivery.id },
-              data: { status: "sent", sentAt: new Date() },
+              data: { status: "failed", error: "client blocked" },
             });
-            sent++;
+            failed++;
+            continue;
+          }
+          if (delivery.channel === "email" && client.marketingUnsubscribed) {
+            await prisma.clientBroadcastDelivery.update({
+              where: { id: delivery.id },
+              data: { status: "failed", error: "unsubscribed" },
+            });
+            failed++;
+            continue;
+          }
+
+          const personalised = broadcast.content
+            .replace(/\{\{\s*имя\s*\}\}/gi, client.name || "")
+            .replace(/\{\{\s*name\s*\}\}/gi, client.name || "");
+
+          if (delivery.channel === "telegram") {
+            // Skip placeholder telegramIds (imported clients without TG link).
+            if (!delivery.telegramId || delivery.telegramId <= BigInt(0)) {
+              await prisma.clientBroadcastDelivery.update({
+                where: { id: delivery.id },
+                data: { status: "failed", error: "no telegram id" },
+              });
+              failed++;
+              continue;
+            }
+            if (!business?.botToken) {
+              await prisma.clientBroadcastDelivery.update({
+                where: { id: delivery.id },
+                data: { status: "failed", error: "no bot token" },
+              });
+              failed++;
+              continue;
+            }
+            const result = await sendAutomationMessage(business.botToken, delivery.telegramId, personalised);
+            if (result.success) {
+              await prisma.clientBroadcastDelivery.update({
+                where: { id: delivery.id },
+                data: { status: "sent", sentAt: new Date() },
+              });
+              sent++;
+            } else {
+              await prisma.clientBroadcastDelivery.update({
+                where: { id: delivery.id },
+                data: { status: "failed", error: result.error || "telegram send failed" },
+              });
+              failed++;
+            }
+          } else if (delivery.channel === "email") {
+            const recipientEmail = delivery.email || client.email;
+            if (!recipientEmail) {
+              await prisma.clientBroadcastDelivery.update({
+                where: { id: delivery.id },
+                data: { status: "failed", error: "no email" },
+              });
+              failed++;
+              continue;
+            }
+            // Ensure the client has an unsubscribe token (lazily backfill).
+            const token = getOrCreateUnsubscribeToken(client.unsubscribeToken);
+            if (!client.unsubscribeToken) {
+              await prisma.client.update({
+                where: { id: delivery.clientId },
+                data: { unsubscribeToken: token },
+              }).catch(() => {});
+            }
+            const unsubscribeUrl = `${appUrl}/api/broadcasts/unsubscribe?token=${token}`;
+            const result = await sendClientBroadcastEmail({
+              email: recipientEmail,
+              clientName: client.name || "клиент",
+              businessName: business?.name || "Staffix",
+              subject: broadcast.title,
+              textContent: personalised,
+              unsubscribeUrl,
+            });
+            if (result.success) {
+              await prisma.clientBroadcastDelivery.update({
+                where: { id: delivery.id },
+                data: { status: "sent", sentAt: new Date() },
+              });
+              sent++;
+            } else {
+              await prisma.clientBroadcastDelivery.update({
+                where: { id: delivery.id },
+                data: { status: "failed", error: result.error || "email send failed" },
+              });
+              failed++;
+            }
           } else {
             await prisma.clientBroadcastDelivery.update({
               where: { id: delivery.id },
-              data: { status: "failed" },
+              data: { status: "failed", error: `unknown channel ${delivery.channel}` },
             });
             failed++;
           }

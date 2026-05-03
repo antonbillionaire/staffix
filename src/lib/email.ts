@@ -489,6 +489,81 @@ export async function sendWelcomeEmail(
   }
 }
 
+/**
+ * Send a CLIENT broadcast — message from the business owner to their own
+ * customers (different from sendBroadcastEmail above which is admin → users).
+ *
+ * Important contract:
+ * - The sender persona is the business name (so customers see e.g. "Mango Spa"
+ *   in their inbox, not "Staffix"). The actual From header still uses our
+ *   verified Resend domain — that's all Resend allows without per-tenant
+ *   domain verification.
+ * - Includes a mandatory "Отписаться" link with a per-client token.
+ *   This is required by Resend's policies and CAN-SPAM-style local laws.
+ *   The link points to /api/broadcasts/unsubscribe?token=... which flips
+ *   Client.marketingUnsubscribed to true for that client.
+ * - Content is plain text — wrapped in a minimal HTML scaffold. No tracking
+ *   pixels or wrapped links yet (would require open/click-rate plumbing).
+ */
+export async function sendClientBroadcastEmail(params: {
+  email: string;
+  clientName: string;
+  businessName: string;
+  subject: string;
+  textContent: string;
+  unsubscribeUrl: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    if (!resend) {
+      console.log(`[DEV] Client broadcast email for ${params.email} from ${params.businessName}`);
+      return { success: true };
+    }
+
+    // Wrap plain-text content into preformatted HTML. Replace newlines with
+    // <br> so paragraph structure survives — keeps it readable in Gmail/Apple.
+    const safeContent = params.textContent
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\n/g, "<br>");
+
+    const fromName = params.businessName.replace(/[<>"]/g, "").slice(0, 60) || "Staffix";
+    const fromAddress = process.env.FROM_EMAIL || "noreply@staffix.io";
+    const fromHeader = `${fromName} <${fromAddress.replace(/^.*<|>$/g, "")}>`;
+
+    const { error } = await resend.emails.send({
+      from: fromHeader,
+      to: params.email,
+      replyTo: "noreply@staffix.io",
+      subject: params.subject,
+      // Required by RFC 8058 — lets Gmail render a one-click unsubscribe.
+      headers: {
+        "List-Unsubscribe": `<${params.unsubscribeUrl}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
+      html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f5f7;margin:0;padding:32px 20px;color:#1a1a2e;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+    <div style="padding:18px 24px;border-bottom:1px solid #f3f4f6;">
+      <strong style="color:#1a1a2e;">${fromName.replace(/[<>]/g, "")}</strong>
+    </div>
+    <div style="padding:24px;color:#374151;line-height:1.65;font-size:15px;">${safeContent}</div>
+    <div style="padding:14px 24px;background:#f9fafb;color:#9ca3af;font-size:12px;border-top:1px solid #e5e7eb;text-align:center;">
+      Не хотите получать рассылки от ${fromName}? <a href="${params.unsubscribeUrl}" style="color:#6b7280;">Отписаться</a>.
+    </div>
+  </div>
+</body></html>`,
+    });
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Send error" };
+  }
+}
+
 // Send broadcast email to a user
 export async function sendBroadcastEmail(
   email: string,

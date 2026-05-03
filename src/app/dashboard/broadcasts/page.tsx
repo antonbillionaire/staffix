@@ -32,6 +32,7 @@ interface Broadcast {
   content: string;
   status: string;
   targetSegment: string;
+  channel?: "telegram" | "email" | "both";
   scheduledAt: string | null;
   sentAt: string | null;
   createdAt: string;
@@ -50,6 +51,7 @@ export default function BroadcastsPage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [targetSegment, setTargetSegment] = useState("all");
+  const [channel, setChannel] = useState<"telegram" | "email" | "both">("telegram");
   const [sendNow, setSendNow] = useState(true);
   const [scheduledAt, setScheduledAt] = useState("");
   const [creating, setCreating] = useState(false);
@@ -126,6 +128,7 @@ export default function BroadcastsPage() {
           title,
           content,
           targetSegment,
+          channel,
           sendNow: sendNow && !scheduledAt,
           scheduledAt: !sendNow && scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
         }),
@@ -136,6 +139,7 @@ export default function BroadcastsPage() {
         setTitle("");
         setContent("");
         setTargetSegment("all");
+        setChannel("telegram");
         setSendNow(true);
         fetchBroadcasts();
       } else {
@@ -368,6 +372,32 @@ export default function BroadcastsPage() {
                   rows={4}
                   className={`w-full px-4 py-3 ${inputBg} border ${inputBorder} rounded-xl ${textPrimary} placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none`}
                 />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
+                  {t("broadcasts.channel")}
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["telegram", "email", "both"] as const).map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setChannel(c)}
+                      className={`px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                        channel === c
+                          ? "bg-blue-600 text-white"
+                          : `${isDark ? "bg-white/5 hover:bg-white/10" : "bg-gray-100 hover:bg-gray-200"} ${textSecondary}`
+                      }`}
+                    >
+                      {t(`broadcasts.channel${c.charAt(0).toUpperCase() + c.slice(1)}`)}
+                    </button>
+                  ))}
+                </div>
+                {channel !== "telegram" && (
+                  <p className={`mt-2 text-xs ${textTertiary}`}>
+                    {t("broadcasts.channelEmailHint")}
+                  </p>
+                )}
               </div>
 
               <div>

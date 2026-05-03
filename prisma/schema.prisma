@@ -786,6 +786,11 @@ model Client {
   // отображаться в UI. Можно вернуть, восстановив определение.
   customFields      Json      @default("{}")
 
+  // Email-маркетинг: клиент жмёт "отписаться" в письме → ставится true.
+  // isBlocked продолжает блокировать ВСЕ каналы, а это поле — только email-рассылки.
+  marketingUnsubscribed Boolean @default(false)
+  unsubscribeToken      String? @unique // токен для unsubscribe-ссылки
+
   // ========================================
   // DEAL PIPELINE (для всех бизнесов)
   // ========================================
@@ -1188,6 +1193,10 @@ model ClientBroadcast {
   // Сегментация
   targetSegment   String    @default("all") // all, vip, active, inactive
 
+  // Канал доставки: telegram | email | both. Default telegram —
+  // обратная совместимость со старыми рассылками.
+  channel         String    @default("telegram")
+
   // Статус
   status          String    @default("draft") // draft, scheduled, sending, sent, cancelled
   scheduledAt     DateTime?
@@ -1217,6 +1226,12 @@ model ClientBroadcastDelivery {
   // Получатель
   clientId        String
   telegramId      BigInt
+  // Email — заполняется только для email-доставок. Snapshot на момент рассылки
+  // (если клиент потом сменит email, в логе остаётся куда реально ушло).
+  email           String?
+  // Конкретный канал именно этой доставки (telegram | email). Нужен когда
+  // у broadcast.channel = "both" — каждой подписке свой канал.
+  channel         String    @default("telegram")
 
   // Статус
   status          String    @default("pending") // pending, sent, delivered, failed
