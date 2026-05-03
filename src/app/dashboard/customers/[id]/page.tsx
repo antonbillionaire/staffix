@@ -38,7 +38,9 @@ interface CustomerDetail {
     avgRating: number | null;
     totalSpent: number;
     customFields?: Record<string, string | number>;
+    assignedStaffId?: string | null;
   };
+  staffList?: Array<{ id: string; name: string; role: string | null }>;
   conversation: {
     id: string;
     messagesCount: number;
@@ -507,6 +509,37 @@ export default function CustomerDetailPage({
                   {customer.isActive ? "Активный" : "Неактивный"}
                 </span>
               </div>
+              {/* Кому назначен — менеджер из staff. Виден всегда, можно перевыбрать. */}
+              {data?.staffList && data.staffList.length > 0 && (
+                <div className="flex items-center justify-between gap-3">
+                  <span className={textSecondary}>Менеджер</span>
+                  <select
+                    value={customer.assignedStaffId || ""}
+                    onChange={async (e) => {
+                      const next = e.target.value || null;
+                      try {
+                        const res = await fetch(`/api/customers/${customer.id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ assignedStaffId: next }),
+                        });
+                        if (!res.ok) throw new Error();
+                        await fetchCustomer();
+                      } catch {
+                        alert("Не удалось переназначить. Обновите страницу.");
+                      }
+                    }}
+                    className={`text-sm rounded-lg border px-2 py-1 ${isDark ? "bg-white/5 border-white/10 text-white" : "bg-white border-gray-300 text-gray-900"} max-w-[60%]`}
+                  >
+                    <option value="">— не назначен</option>
+                    {data.staffList.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}{s.role ? ` (${s.role})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 

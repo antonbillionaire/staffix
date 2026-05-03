@@ -564,7 +564,11 @@ export default function StaffPage() {
                 </div>
               )}
               {/* Ссылка продавца для клиентов */}
-              {botUsername && dashboardMode === "sales" && (
+              {/* Реферальная ссылка для клиентов — раньше показывали только в
+                  sales-режиме. Открыли и для service: в стоматологиях/клиниках/
+                  юрфирмах с несколькими менеджерами тоже нужна привязка
+                  лида к конкретному человеку. */}
+              {botUsername && (
                 <div className={`mt-2 pt-2 ${person.telegramUsername ? "" : "mt-3 pt-3"} border-t ${isDark ? "border-white/5" : "border-gray-100"}`}>
                   <div className="flex items-center gap-2">
                     <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>

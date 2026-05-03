@@ -94,6 +94,13 @@ export async function GET(
       0
     );
 
+    // Список сотрудников этого бизнеса — для дропдауна "Кому назначен".
+    const staffList = await prisma.staff.findMany({
+      where: { businessId },
+      select: { id: true, name: true, role: true },
+      orderBy: { name: "asc" },
+    });
+
     return NextResponse.json({
       customer: {
         id: client.id,
@@ -105,6 +112,7 @@ export async function GET(
         isBlocked: client.isBlocked,
         importantNotes: client.importantNotes,
         createdAt: client.createdAt,
+        assignedStaffId: client.assignedStaffId,
         // Computed
         isActive,
         isVip,
@@ -113,6 +121,7 @@ export async function GET(
         totalSpent,
         customFields: (client.customFields as Record<string, string | number>) || {},
       },
+      staffList,
       conversation: conversation
         ? {
             id: conversation.id,
@@ -247,6 +256,24 @@ export async function PATCH(
       customFieldsUpdate.customFields = merged;
     }
 
+    // assignedStaffId — ручное переназначение клиента менеджеру.
+    // null/"" → отвязать. Для непустого id проверяем что staff из этого бизнеса.
+    const assignedStaffUpdate: { assignedStaffId?: string | null } = {};
+    if (body.assignedStaffId !== undefined) {
+      if (body.assignedStaffId === null || body.assignedStaffId === "") {
+        assignedStaffUpdate.assignedStaffId = null;
+      } else {
+        const staff = await prisma.staff.findFirst({
+          where: { id: body.assignedStaffId, businessId },
+          select: { id: true },
+        });
+        if (!staff) {
+          return NextResponse.json({ error: "Сотрудник не найден" }, { status: 400 });
+        }
+        assignedStaffUpdate.assignedStaffId = staff.id;
+      }
+    }
+
     const updatedClient = await prisma.client.update({
       where: { id },
       data: {
@@ -254,6 +281,7 @@ export async function PATCH(
         name,
         phone,
         ...importantNotesUpdate,
+        ...assignedStaffUpdate,
         // Prisma JsonValue типизация не дружит с Record<string, unknown> —
         // прокидываем через unknown.
         ...(customFieldsUpdate.customFields !== undefined
