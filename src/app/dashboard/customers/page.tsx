@@ -57,7 +57,29 @@ interface Customer {
   loyaltyProgramIds: string[];
   loyaltyCashbackPercent: number | null;
   loyaltyTier: string | null;
+  dealStage: "lead" | "consultation_booked" | "consultation_done" | "client" | "lost";
+  dealValue: number | null;
+  dealClosedAt: string | null;
+  dealNote: string | null;
 }
+
+type DealStage = Customer["dealStage"];
+
+const DEAL_STAGE_LABEL: Record<DealStage, string> = {
+  lead: "Лид",
+  consultation_booked: "Записан",
+  consultation_done: "Встреча прошла",
+  client: "Клиент",
+  lost: "Не купил",
+};
+
+const DEAL_STAGE_COLOR: Record<DealStage, string> = {
+  lead: "bg-gray-500/15 text-gray-300",
+  consultation_booked: "bg-blue-500/15 text-blue-400",
+  consultation_done: "bg-indigo-500/15 text-indigo-400",
+  client: "bg-green-500/15 text-green-400",
+  lost: "bg-red-500/15 text-red-400",
+};
 
 interface Stats {
   total: number;
@@ -110,6 +132,71 @@ export default function CustomersPage() {
   const [loyaltyCustomer, setLoyaltyCustomer] = useState<Customer | null>(null);
   const [loyaltyAmount, setLoyaltyAmount] = useState("");
   const [loyaltySaving, setLoyaltySaving] = useState(false);
+
+  // Deal pipeline: optimistic update, server-side persist
+  const handleDealStageChange = async (
+    customer: Customer,
+    newStage: DealStage
+  ) => {
+    // Channel leads (WA/IG/FB) live in Lead table, not Client — skip for now.
+    // (UI shows their stage based on lead.status, but our deal endpoint targets Client.)
+    if (customer.channel && customer.channel !== "telegram") return;
+
+    let dealValueUpdate: number | null | undefined = undefined;
+    let dealNoteUpdate: string | null | undefined = undefined;
+
+    // When marking as paying client — ask for the deal amount inline.
+    if (newStage === "client") {
+      const raw = window.prompt("Сумма сделки (можно оставить пустым):", customer.dealValue ? String(customer.dealValue) : "");
+      if (raw === null) return; // user cancelled
+      const trimmed = raw.trim();
+      if (trimmed === "") {
+        dealValueUpdate = null;
+      } else {
+        const num = Number(trimmed);
+        if (!Number.isFinite(num) || num < 0) {
+          alert("Введите корректную сумму");
+          return;
+        }
+        dealValueUpdate = Math.round(num);
+      }
+    } else if (newStage === "lost") {
+      const reason = window.prompt("Причина (необязательно):", customer.dealNote || "");
+      if (reason === null) return;
+      dealNoteUpdate = reason.trim() || null;
+    }
+
+    // Optimistic update
+    setCustomers((prev) =>
+      prev.map((c) =>
+        c.id === customer.id
+          ? {
+              ...c,
+              dealStage: newStage,
+              dealClosedAt: newStage === "client" || newStage === "lost" ? new Date().toISOString() : null,
+              ...(dealValueUpdate !== undefined ? { dealValue: dealValueUpdate } : {}),
+              ...(dealNoteUpdate !== undefined ? { dealNote: dealNoteUpdate } : {}),
+            }
+          : c
+      )
+    );
+
+    try {
+      const res = await fetch(`/api/customers/${customer.id}/deal`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stage: newStage,
+          ...(dealValueUpdate !== undefined ? { value: dealValueUpdate } : {}),
+          ...(dealNoteUpdate !== undefined ? { note: dealNoteUpdate } : {}),
+        }),
+      });
+      if (!res.ok) throw new Error("update failed");
+    } catch {
+      alert("Не удалось обновить статус. Обновите страницу и попробуйте ещё раз.");
+      fetchCustomers();
+    }
+  };
 
   // Theme-aware styles
   const isDark = theme === "dark";
@@ -471,7 +558,30 @@ export default function CustomersPage() {
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      {getSegmentBadge(customer)}
+                      <div className="flex flex-col items-start gap-1.5">
+                        {getSegmentBadge(customer)}
+                        {customer.channel && customer.channel !== "telegram" ? (
+                          <span className={`text-xs px-2 py-0.5 rounded ${DEAL_STAGE_COLOR[customer.dealStage]}`}>
+                            {DEAL_STAGE_LABEL[customer.dealStage]}
+                          </span>
+                        ) : (
+                          <select
+                            value={customer.dealStage}
+                            onChange={(e) => handleDealStageChange(customer, e.target.value as DealStage)}
+                            className={`text-xs px-2 py-0.5 rounded border-0 cursor-pointer ${DEAL_STAGE_COLOR[customer.dealStage]} ${isDark ? "bg-opacity-20" : ""}`}
+                            title="Стадия сделки"
+                          >
+                            {(Object.keys(DEAL_STAGE_LABEL) as DealStage[]).map((s) => (
+                              <option key={s} value={s} className={isDark ? "bg-[#12122a] text-white" : "bg-white text-gray-900"}>
+                                {DEAL_STAGE_LABEL[s]}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        {customer.dealValue ? (
+                          <span className={`text-xs ${textTertiary}`}>{customer.dealValue.toLocaleString()}</span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="py-3 px-4 hidden md:table-cell">
                       {isSalesMode ? (

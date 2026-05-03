@@ -755,6 +755,17 @@ model Client {
   // Привязка к продавцу (через ссылку t.me/bot?start=s_staffId)
   assignedStaffId   String?
 
+  // ========================================
+  // DEAL PIPELINE (для всех бизнесов)
+  // ========================================
+  // dealStage: lead | consultation_booked | consultation_done | client | lost
+  // По умолчанию все новые клиенты — "lead". Менеджер двигает руками
+  // (или AI поднимает stage когда видит что клиент записался / купил).
+  dealStage         String    @default("lead")
+  dealValue         Int?      // сумма сделки в условных единицах (рублях/долларах — что бизнес выбрал)
+  dealClosedAt      DateTime? // когда клиент стал client или lost
+  dealNote          String?   // короткая заметка менеджера про сделку
+
   businessId        String
   business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
@@ -764,6 +775,7 @@ model Client {
   @@unique([businessId, telegramId])
   @@index([businessId, lastVisitDate])
   @@index([businessId, lastMessageAt])
+  @@index([businessId, dealStage])
 }
 
 // ========================================

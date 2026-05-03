@@ -169,6 +169,10 @@ export async function GET(request: NextRequest) {
         loyaltyProgramIds: client.loyaltyProgramIds,
         loyaltyCashbackPercent: client.loyaltyCashbackPercent,
         loyaltyTier: client.loyaltyTier,
+        dealStage: client.dealStage,
+        dealValue: client.dealValue,
+        dealClosedAt: client.dealClosedAt,
+        dealNote: client.dealNote,
       };
     });
 
@@ -213,6 +217,12 @@ export async function GET(request: NextRequest) {
       loyaltyProgramIds: [],
       loyaltyCashbackPercent: null,
       loyaltyTier: null,
+      // Channel leads (WA/IG/FB) живут в Lead, у них нет deal-pipeline полей
+      // в схеме. Маппим Lead.status в dealStage для совместимости с UI.
+      dealStage: lead.status === "client" ? "client" : "lead",
+      dealValue: null as number | null,
+      dealClosedAt: null as Date | null,
+      dealNote: null as string | null,
     }));
 
     // Merge: Telegram clients + channel leads
