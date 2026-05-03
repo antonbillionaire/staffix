@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { cancelSubscription, resumeSubscription } from "@/lib/paypro";
+import { cancelSubscription, resumeSubscription, getCustomerPortalUrl } from "@/lib/paypro";
 import { sendSubscriptionCancelledEmail } from "@/lib/email";
 import { getPlan, type PlanId } from "@/lib/plans";
 
@@ -26,6 +26,11 @@ export async function GET() {
     const now = new Date();
     const daysLeft = Math.max(0, Math.ceil((sub.expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
 
+    // billingPortalUrl is provided whenever the user has an active PayPro
+    // payment relationship — they can log in there to update card or
+    // download invoices. Without payproCustomerId there is nothing to manage.
+    const billingPortalUrl = sub.payproCustomerId ? getCustomerPortalUrl() : null;
+
     return NextResponse.json({
       subscription: {
         plan: sub.plan,
@@ -36,6 +41,8 @@ export async function GET() {
         expiresAt: sub.expiresAt.toISOString(),
         billingPeriod: sub.billingPeriod,
         payproSubscriptionId: sub.payproSubscriptionId,
+        payproCustomerId: sub.payproCustomerId,
+        billingPortalUrl,
       },
     });
   } catch (error) {

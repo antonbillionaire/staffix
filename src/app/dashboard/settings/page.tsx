@@ -72,6 +72,7 @@ export default function SettingsPage() {
     daysLeft: 14,
     expiresAt: "",
     payproSubscriptionId: null as string | null,
+    billingPortalUrl: null as string | null,
   });
   const [subscriptionAction, setSubscriptionAction] = useState<"cancel" | "resume" | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
@@ -179,6 +180,7 @@ export default function SettingsPage() {
               daysLeft: sub.daysLeft,
               expiresAt: sub.expiresAt,
               payproSubscriptionId: sub.payproSubscriptionId,
+              billingPortalUrl: sub.billingPortalUrl ?? null,
             });
           }
         }
@@ -745,7 +747,7 @@ export default function SettingsPage() {
 
             {/* Subscription management buttons */}
             {subscription.payproSubscriptionId && subscription.plan !== 'trial' && (
-              <div className="mt-4 pt-4 border-t border-white/10">
+              <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap gap-x-6 gap-y-3">
                 {subscription.status === 'active' && (
                   <button
                     onClick={handleCancelSubscription}
@@ -773,6 +775,17 @@ export default function SettingsPage() {
                     )}
                     {t("settings.resumeSubscription")}
                   </button>
+                )}
+                {subscription.billingPortalUrl && (
+                  <a
+                    href={subscription.billingPortalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`flex items-center gap-2 text-sm ${textSecondary} hover:text-blue-400 transition-colors`}
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    {t("settings.managePaymentMethod")}
+                  </a>
                 )}
               </div>
             )}
