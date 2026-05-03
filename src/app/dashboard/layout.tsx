@@ -58,6 +58,7 @@ import {
 } from "lucide-react";
 const ChatWidget = dynamic(() => import("@/components/ChatWidget"), { ssr: false });
 const OnboardingWizard = dynamic(() => import("@/components/OnboardingWizard"), { ssr: false });
+const OnboardingChecklist = dynamic(() => import("@/components/OnboardingChecklist"), { ssr: false });
 import TrialExpiredBanner from "@/components/TrialExpiredBanner";
 import { type PlanId, hasMenuAccess } from "@/lib/plans";
 
@@ -859,7 +860,10 @@ export default function DashboardLayout({
         )}
 
         {/* Page content */}
-        <main className="p-4 md:p-8">{children}</main>
+        <main className="p-4 md:p-8">
+          <OnboardingChecklist />
+          {children}
+        </main>
 
         {/* Chat Widget */}
         <ChatWidget />
