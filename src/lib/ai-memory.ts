@@ -765,6 +765,167 @@ ${messagesText}
 /**
  * Обновляет AI-саммари клиента на основе всех разговоров
  */
+/**
+ * AI-извлечение custom fields из истории диалогов клиента.
+ *
+ * Берёт определения полей из Business.clientFieldsConfig, последние summaries
+ * разговоров и сообщения, и просит Claude вытащить структурированные значения.
+ * Обновляет ТОЛЬКО те поля где AI уверен и существующее значение пустое —
+ * не перезаписывает то что менеджер заполнил руками.
+ *
+ * No-op если у бизнеса нет custom fields в конфиге, или нет API-ключа,
+ * или клиент новый и истории недостаточно.
+ */
+export async function extractCustomFieldsFromConversation(
+  businessId: string,
+  telegramId: bigint
+): Promise<{ updated: number } | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { clientFieldsConfig: true },
+    });
+    const config = (business?.clientFieldsConfig as Array<{
+      key: string;
+      label: string;
+      type: "text" | "number" | "date" | "select";
+      options?: string[];
+    }>) || [];
+    if (config.length === 0) return null;
+
+    const client = await prisma.client.findUnique({
+      where: { businessId_telegramId: { businessId, telegramId } },
+      select: { id: true, customFields: true },
+    });
+    if (!client) return null;
+
+    const existing = (client.customFields as Record<string, unknown>) || {};
+    // Только поля которые ещё не заполнены — не перетираем ручной ввод.
+    const fieldsToExtract = config.filter(
+      (f) => existing[f.key] === undefined || existing[f.key] === null || existing[f.key] === ""
+    );
+    if (fieldsToExtract.length === 0) return { updated: 0 };
+
+    // Берём последние сообщения и summary разговоров.
+    const conversations = await prisma.conversation.findMany({
+      where: { businessId, clientTelegramId: telegramId },
+      select: { summary: true, extractedInfo: true },
+      orderBy: { updatedAt: "desc" },
+      take: 5,
+    });
+    const messages = await prisma.message.findMany({
+      where: {
+        conversation: { businessId, clientTelegramId: telegramId },
+        role: "user",
+      },
+      select: { content: true },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+    });
+    if (conversations.length === 0 && messages.length === 0) return null;
+
+    const fieldsDescription = fieldsToExtract
+      .map((f) => {
+        if (f.type === "select" && f.options?.length) {
+          return `- ${f.key} (${f.label}, выбор из: ${f.options.join(", ")})`;
+        }
+        return `- ${f.key} (${f.label}, тип: ${f.type})`;
+      })
+      .join("\n");
+
+    const summariesText = conversations
+      .map((c) => c.summary)
+      .filter(Boolean)
+      .join("\n");
+    const messagesText = messages.map((m) => m.content).reverse().join("\n");
+
+    const anthropic = new Anthropic({ apiKey });
+    const response = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 400,
+      messages: [
+        {
+          role: "user",
+          content: `Извлеки значения полей из истории общения с клиентом.
+
+Поля для извлечения:
+${fieldsDescription}
+
+ПРАВИЛА:
+- Возвращай ТОЛЬКО JSON-объект, без пояснений и markdown.
+- Включай только те поля где значение явно упомянуто в тексте.
+- НЕ ДОГАДЫВАЙСЯ. Если поле не упомянуто — пропусти его.
+- Для типа "date" — формат YYYY-MM-DD.
+- Для "number" — только число без единиц.
+- Для "select" — точно одно из перечисленных значений.
+- Для "text" — короткая строка (до 100 символов).
+
+Резюме разговоров:
+${summariesText || "(нет резюме)"}
+
+Сообщения клиента:
+${messagesText.slice(0, 6000)}
+
+JSON:`,
+        },
+      ],
+    });
+
+    const raw = response.content[0].type === "text" ? response.content[0].text.trim() : "";
+    if (!raw) return { updated: 0 };
+
+    // Стрипнуть markdown-код-блок если AI добавил
+    const jsonText = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    let parsed: Record<string, unknown> = {};
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch {
+      console.warn(`extractCustomFields: не смог распарсить JSON от AI: ${raw.slice(0, 200)}`);
+      return { updated: 0 };
+    }
+
+    // Валидация и фильтр — только разрешённые ключи + существующее не перезаписываем.
+    const configByKey = new Map(fieldsToExtract.map((f) => [f.key, f]));
+    const merged: Record<string, unknown> = { ...existing };
+    let updatedCount = 0;
+    for (const [k, v] of Object.entries(parsed)) {
+      const def = configByKey.get(k);
+      if (!def) continue;
+      if (v === null || v === undefined || v === "") continue;
+      if (def.type === "number") {
+        const n = Number(v);
+        if (!Number.isFinite(n)) continue;
+        merged[k] = n;
+      } else if (def.type === "date") {
+        const d = new Date(String(v));
+        if (Number.isNaN(d.getTime())) continue;
+        merged[k] = d.toISOString().slice(0, 10);
+      } else if (def.type === "select") {
+        const str = String(v);
+        if (def.options && !def.options.includes(str)) continue;
+        merged[k] = str;
+      } else {
+        merged[k] = String(v).slice(0, 200);
+      }
+      updatedCount++;
+    }
+
+    if (updatedCount > 0) {
+      await prisma.client.update({
+        where: { id: client.id },
+        data: { customFields: merged as unknown as object },
+      });
+    }
+    return { updated: updatedCount };
+  } catch (error) {
+    console.warn(`extractCustomFieldsFromConversation(${businessId}, ${telegramId}) failed:`, error);
+    return null;
+  }
+}
+
 export async function updateClientSummary(
   businessId: string,
   telegramId: bigint

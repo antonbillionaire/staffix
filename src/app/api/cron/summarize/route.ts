@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import {
   generateConversationSummary,
   updateClientSummary,
+  extractCustomFieldsFromConversation,
 } from "@/lib/ai-memory";
 
 // Максимум обработок за один запуск (чтобы не превысить timeout)
@@ -27,6 +28,7 @@ export async function GET(request: Request) {
     const results = {
       conversationsSummarized: 0,
       clientsUpdated: 0,
+      customFieldsFilled: 0,
       errors: [] as string[],
     };
 
@@ -88,7 +90,9 @@ export async function GET(request: Request) {
 
     console.log(`Found ${clientsNeedingUpdate.length} clients needing summary update`);
 
-    // 4. Обновляем summaries клиентов
+    // 4. Обновляем summaries клиентов + извлекаем custom fields из истории.
+    // Custom fields заполняются ТОЛЬКО где они не заполнены вручную и AI
+    // нашёл значение в диалогах. No-op если у бизнеса нет полей в конфиге.
     for (const client of clientsNeedingUpdate) {
       try {
         const summary = await updateClientSummary(
@@ -98,6 +102,13 @@ export async function GET(request: Request) {
         if (summary) {
           results.clientsUpdated++;
           console.log(`Updated client ${client.id}: ${summary}`);
+        }
+        const cfResult = await extractCustomFieldsFromConversation(
+          client.businessId,
+          client.telegramId
+        );
+        if (cfResult && cfResult.updated > 0) {
+          results.customFieldsFilled += cfResult.updated;
         }
       } catch (error) {
         results.errors.push(`Client ${client.id}: ${error}`);
