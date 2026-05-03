@@ -303,7 +303,20 @@ export async function generateStaffixSalesResponse(
       { role: "user", content: userMessage },
     ];
 
+    // Текущая дата — критично для Виктора, иначе он выдумывает ("записываю на 15 мая" когда сегодня 3 мая).
+    // Tashkent — основной рынок, Антон работает в этой таймзоне.
+    const todayStr = new Date().toLocaleDateString("ru-RU", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "Asia/Tashkent",
+    });
+
     const systemPrompt = getSalesSystemPrompt() +
+      `\n\n## ТЕКУЩИЙ КОНТЕКСТ\n` +
+      `Сегодня: ${todayStr} (Asia/Tashkent). Это РЕАЛЬНАЯ сегодняшняя дата — НИКОГДА не выдумывай и не путай дни. ` +
+      `Если упоминаешь даты/время — отталкивайся ровно от этой даты.` +
       `\n\nКанал: ${channel}. ID собеседника: ${channelId}` +
       `\nТекущий статус лида: ${lead.stage}` +
       (lead.name ? `\nИмя лида: ${lead.name}` : "") +
