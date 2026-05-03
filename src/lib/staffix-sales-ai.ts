@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { getSalesSystemPrompt } from "@/lib/sales-bot/system-prompt";
 import { getInstagramUserProfile } from "@/lib/sales-bot/meta-api";
 import { notifyAdmin } from "@/lib/admin-notify";
+import { ONBOARDING_STEPS, formatOnboardingContextForVictor, getOnboardingStep } from "@/lib/onboarding-steps";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -101,6 +102,29 @@ const salesBotTools: Anthropic.Tool[] = [
         },
       },
       required: ["stage"],
+    },
+  },
+  {
+    name: "update_onboarding_step",
+    description:
+      "Зафиксировать шаг настройки Staffix на котором сейчас находится лид. ОБЯЗАТЕЛЬНО вызывай каждый раз когда лид подтверждает что выполнил очередной шаг (зарегистрировался, заполнил профиль, подключил TG-бота и т.д.). Это сохраняет состояние между сессиями — даже если лид пропадёт на 1-2 дня, ты вернёшься к разговору и продолжишь с правильного места.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        step: {
+          type: "integer",
+          description:
+            "Номер шага. 0=ещё не начал, 1=зарегистрировался на staffix.io, 2=заполнил профиль бизнеса, 3=подключил Telegram-бота, 4=подключил доп. каналы (WA/IG/FB), 5=добавил команду, 6=наполнил каталог (услуги/товары), 7=загрузил базу знаний, 8=настроил AI (тон/приветствие), 9=включил автоматизации, 10=протестировал, 11=запущено в реальных условиях",
+          minimum: 0,
+          maximum: 11,
+        },
+        notes: {
+          type: "string",
+          description:
+            "Опциональные заметки о текущем контексте — что важно помнить когда лид вернётся. Например: 'email подсказан, ждёт что Антон поможет с Staff завтра' или 'застрял на BotFather, объяснил пошагово'.",
+        },
+      },
+      required: ["step"],
     },
   },
 ];
@@ -201,9 +225,93 @@ async function executeTool(
       return JSON.stringify({ success: true, stage: newStage });
     }
 
+    case "update_onboarding_step": {
+      const stepNum = Number(toolInput.step);
+      if (!Number.isInteger(stepNum) || stepNum < 0 || stepNum > 11) {
+        return JSON.stringify({ success: false, error: "step must be integer 0-11" });
+      }
+      const stepInfo = getOnboardingStep(stepNum);
+      const notes = typeof toolInput.notes === "string" ? toolInput.notes.slice(0, 500) : null;
+
+      await prisma.salesLead.update({
+        where: { id: leadId },
+        data: {
+          onboardingStep: stepNum,
+          onboardingNotes: notes,
+        },
+      });
+
+      console.log(`[Victor] onboardingStep updated for lead ${leadId}: step=${stepNum} (${stepInfo?.key}) notes="${notes?.slice(0, 80) || ""}"`);
+
+      return JSON.stringify({
+        success: true,
+        step: stepNum,
+        step_key: stepInfo?.key,
+        next_step_hint: stepInfo
+          ? ONBOARDING_STEPS.find((s) => s.num === stepNum + 1)?.title || "Все шаги пройдены"
+          : null,
+      });
+    }
+
     default:
       return JSON.stringify({ error: `Unknown tool: ${toolName}` });
   }
+}
+
+// ========================================
+// SAFETY-NET: politeness post-processor
+// ========================================
+
+/**
+ * Виктор иногда забывает правила и здоровается на «Привет!» или переходит на «ты».
+ * Промпт это запрещает, но Claude не всегда следует промпту 100%. Защищаемся в коде.
+ *
+ * Стратегия:
+ *   1. «Привет/Приветствую» в начале сообщения → меняем на «Здравствуйте» (безопасная замена).
+ *   2. «ты/тебя/твой/etc.» → перегенерируем ответ с явной инструкцией. Замена напрямую сломала
+ *      бы глаголы (ты делаешь → Вы делаешь? нужно «делаете»).
+ */
+
+const FORBIDDEN_TY_REGEX = /\b(ты|тебя|тебе|тобой|твой|твоя|твоё|твои|твоих|твоего|твоему|твоей|твоих|твоим|твоими)\b/i;
+
+function detectFamiliarAddress(text: string): boolean {
+  return FORBIDDEN_TY_REGEX.test(text);
+}
+
+function fixGreeting(text: string): { fixed: string; changed: boolean } {
+  // «Привет!»/«Привет,»/«Привет» в начале (с возможным эмодзи перед) → «Здравствуйте»
+  const original = text;
+  const fixed = text
+    .replace(/^(\s*[\p{Emoji}\s]*)Приветствую([!,.])/u, "$1Здравствуйте$2")
+    .replace(/^(\s*[\p{Emoji}\s]*)Привет([!,.])/u, "$1Здравствуйте$2")
+    .replace(/^(\s*[\p{Emoji}\s]*)Хай([!,.])/u, "$1Здравствуйте$2");
+  return { fixed, changed: fixed !== original };
+}
+
+async function regeneratePoliteResponse(
+  systemPrompt: string,
+  allMessages: Anthropic.MessageParam[],
+  rudeText: string
+): Promise<string> {
+  const correctionMessage: Anthropic.MessageParam = {
+    role: "user",
+    content:
+      `[Системная коррекция] В твоём предыдущем ответе ты использовал обращение на "ты" — это нарушение правила вежливости. ` +
+      `Правило: ВСЕГДА на "Вы". Перепиши свой последний ответ полностью на "Вы", сохраняя смысл. ` +
+      `Не извиняйся, не объясняй коррекцию — просто выдай переписанный ответ.\n\n` +
+      `Твой предыдущий текст:\n"""${rudeText}"""`,
+  };
+
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-5-20250929",
+    max_tokens: 1024,
+    system: systemPrompt,
+    messages: [...allMessages, correctionMessage],
+    tools: salesBotTools,
+  });
+
+  const newText = response.content.find((b) => b.type === "text")?.text;
+  return newText || rudeText;
 }
 
 // ========================================
@@ -313,6 +421,11 @@ export async function generateStaffixSalesResponse(
       timeZone: "Asia/Tashkent",
     });
 
+    const onboardingContext = formatOnboardingContextForVictor(
+      lead.onboardingStep,
+      lead.onboardingNotes
+    );
+
     const systemPrompt = getSalesSystemPrompt() +
       `\n\n## ТЕКУЩИЙ КОНТЕКСТ\n` +
       `Сегодня: ${todayStr} (Asia/Tashkent). Это РЕАЛЬНАЯ сегодняшняя дата — НИКОГДА не выдумывай и не путай дни. ` +
@@ -321,7 +434,8 @@ export async function generateStaffixSalesResponse(
       `\nТекущий статус лида: ${lead.stage}` +
       (lead.name ? `\nИмя лида: ${lead.name}` : "") +
       (lead.businessName ? `\nБизнес: ${lead.businessName}` : "") +
-      (lead.businessType ? `\nТип: ${lead.businessType}` : "");
+      (lead.businessType ? `\nТип: ${lead.businessType}` : "") +
+      `\n\n### ТЕКУЩИЙ ЭТАП НАСТРОЙКИ\n${onboardingContext}`;
 
     // Call Claude with tools
     let response = await anthropic.messages.create({
@@ -376,9 +490,26 @@ export async function generateStaffixSalesResponse(
     }
 
     // Extract final text response
-    const replyText =
+    let replyText =
       response.content.find((b) => b.type === "text")?.text ||
-      "Привет! Я AI-консультант Staffix. Расскажите о вашем бизнесе — помогу понять как Staffix может вам помочь!";
+      "Здравствуйте! Я AI-консультант Staffix. Расскажите о Вашем бизнесе — помогу понять как Staffix может Вам помочь!";
+
+    // Politeness safety-net: «Привет» → «Здравствуйте», «ты» → перегенерация на «Вы».
+    const greetingFix = fixGreeting(replyText);
+    if (greetingFix.changed) {
+      console.log(`[Victor] SAFETY NET: replaced "Привет/Приветствую/Хай" greeting with "Здравствуйте"`);
+      replyText = greetingFix.fixed;
+    }
+    if (detectFamiliarAddress(replyText)) {
+      console.log(`[Victor] SAFETY NET: detected informal "ты" — regenerating response`);
+      const regenerated = await regeneratePoliteResponse(systemPrompt, allMessages, replyText);
+      const regeneratedFix = fixGreeting(regenerated);
+      replyText = regeneratedFix.fixed;
+      if (detectFamiliarAddress(replyText)) {
+        // Если даже после регенерации остался "ты" — логируем, но не зацикливаемся.
+        console.warn(`[Victor] SAFETY NET: regenerated text STILL contains "ты" — passing through with warning`);
+      }
+    }
 
     // Update history and lead info
     const updatedHistory = ([

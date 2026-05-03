@@ -1197,6 +1197,13 @@ model SalesLead {
   recommendedPlan   String?
   notes             String?
 
+  // Онбординг — структурированное состояние шага настройки Staffix
+  // 0=not_started, 1=registered, 2=business_profile, 3=telegram_bot,
+  // 4=extra_channels, 5=team, 6=catalog, 7=knowledge_base, 8=ai_settings,
+  // 9=automations, 10=tested, 11=launched
+  onboardingStep    Int?
+  onboardingNotes   String?
+
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
