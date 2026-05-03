@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { cancelSubscription, resumeSubscription } from "@/lib/paypro";
+import { sendSubscriptionCancelledEmail } from "@/lib/email";
+import { getPlan, type PlanId } from "@/lib/plans";
 
 // GET - Fetch subscription with management info
 export async function GET() {
@@ -87,6 +89,17 @@ export async function POST(request: NextRequest) {
         where: { id: sub.id },
         data: { status: "cancelled" },
       });
+
+      const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+      if (user) {
+        const planConfig = getPlan(sub.plan as PlanId);
+        sendSubscriptionCancelledEmail({
+          email: user.email,
+          name: user.name || "пользователь",
+          planName: planConfig.name,
+          expiresAt: sub.expiresAt,
+        }).catch((err) => console.error("Cancellation email failed:", err));
+      }
 
       return NextResponse.json({
         message: "Подписка отменена. Вы можете пользоваться услугами до конца оплаченного периода.",

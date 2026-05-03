@@ -10,6 +10,8 @@ import {
 } from "@/lib/paypro";
 import { notifyNewPayment } from "@/lib/admin-notify";
 import { rateLimit } from "@/lib/rate-limit";
+import { markWebhookProcessed } from "@/lib/webhook-dedup";
+import { sendPaymentSuccessEmail, sendSubscriptionCancelledEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,6 +49,19 @@ export async function POST(request: NextRequest) {
     if (!verifySignature(ipn)) {
       console.error("PayPro webhook: invalid SIGNATURE");
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+    }
+
+    // Deduplication: PayPro sometimes redelivers the same IPN. Each
+    // (orderId, ipnTypeId) pair represents a unique billing event — same pair
+    // arriving twice is a duplicate that must not double-activate / double-extend.
+    // Renewals get fresh orderIds so this does not block legitimate recurring charges.
+    if (ipn.orderId && ipn.ipnTypeId) {
+      const dedupKey = `paypro:${ipn.orderId}:${ipn.ipnTypeId}`;
+      const isNew = await markWebhookProcessed(dedupKey);
+      if (!isNew) {
+        console.log(`PayPro webhook: duplicate event ${dedupKey} — ignored`);
+        return new NextResponse("OK", { status: 200 });
+      }
     }
 
     // Find user's business by userId from custom params
@@ -93,7 +108,7 @@ export async function POST(request: NextRequest) {
 
         // Subscription purchase
         const planId = (ipn.planId || "pro") as PlanId;
-        const billingPeriod = ipn.billingPeriod || "monthly";
+        const billingPeriod: "monthly" | "yearly" = ipn.billingPeriod === "yearly" ? "yearly" : "monthly";
         const planConfig = getPlan(planId);
 
         // Calculate expiration date
@@ -139,6 +154,16 @@ export async function POST(request: NextRequest) {
         if (user) {
           const price = billingPeriod === "yearly" ? planConfig.yearlyPrice : planConfig.monthlyPrice;
           notifyNewPayment(user.name, user.email, planConfig.name, price).catch(() => {});
+          sendPaymentSuccessEmail({
+            email: user.email,
+            name: user.name || "пользователь",
+            planName: planConfig.name,
+            amount: price,
+            billingPeriod,
+            expiresAt,
+            messagesLimit: planConfig.features.messagesLimit,
+            orderId: ipn.orderId,
+          }).catch((err) => console.error("Payment success email failed:", err));
         }
         break;
       }
@@ -168,6 +193,23 @@ export async function POST(request: NextRequest) {
         });
 
         console.log(`PayPro: Renewed subscription for business ${business.id}`);
+
+        const renewedUser = await prisma.user.findUnique({ where: { id: ipn.userId! } });
+        if (renewedUser) {
+          const renewedPrice = business.subscription.billingPeriod === "yearly"
+            ? planConfig.yearlyPrice
+            : planConfig.monthlyPrice;
+          sendPaymentSuccessEmail({
+            email: renewedUser.email,
+            name: renewedUser.name || "пользователь",
+            planName: planConfig.name,
+            amount: renewedPrice,
+            billingPeriod: (business.subscription.billingPeriod === "yearly" ? "yearly" : "monthly"),
+            expiresAt,
+            messagesLimit: planConfig.features.messagesLimit,
+            orderId: ipn.orderId,
+          }).catch((err) => console.error("Renewal email failed:", err));
+        }
         break;
       }
 
@@ -273,7 +315,7 @@ export async function POST(request: NextRequest) {
       // Trial charge — trial converted to paid, same as ORDER_CHARGED
       case IPN_TYPES.TRIAL_CHARGE: {
         const planId = (ipn.planId || "pro") as PlanId;
-        const billingPeriod = ipn.billingPeriod || "monthly";
+        const billingPeriod: "monthly" | "yearly" = ipn.billingPeriod === "yearly" ? "yearly" : "monthly";
         const planConfig = getPlan(planId);
 
         const expiresAt = new Date();
@@ -316,6 +358,16 @@ export async function POST(request: NextRequest) {
         if (trialUser) {
           const price = billingPeriod === "yearly" ? planConfig.yearlyPrice : planConfig.monthlyPrice;
           notifyNewPayment(trialUser.name, trialUser.email, planConfig.name, price).catch(() => {});
+          sendPaymentSuccessEmail({
+            email: trialUser.email,
+            name: trialUser.name || "пользователь",
+            planName: planConfig.name,
+            amount: price,
+            billingPeriod,
+            expiresAt,
+            messagesLimit: planConfig.features.messagesLimit,
+            orderId: ipn.orderId,
+          }).catch((err) => console.error("Trial-charge email failed:", err));
         }
         break;
       }

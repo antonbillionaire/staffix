@@ -358,9 +358,13 @@ export async function sendWelcomeEmail(
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
 
     const { error } = await resend.emails.send({
-      from: "Staffix Support <support@staffix.io>",
+      // Используем noreply, чтобы прямой "Reply" из почтового клиента не падал
+      // на support — если пользователю нужна помощь, есть кнопки в письме.
+      // Раньше from был "Staffix Support <support@staffix.io>" + replyTo: support —
+      // это приводило к потоку "ответов на welcome" в support inbox.
+      from: FROM_EMAIL,
       to: email,
-      replyTo: "support@staffix.io",
+      replyTo: "noreply@staffix.io",
       subject: `Добро пожаловать в Staffix, ${name}! Ваш AI-сотрудник готов к настройке`,
       html: `
         <!DOCTYPE html>
@@ -730,6 +734,135 @@ export async function sendTelegramNotification(
 
   console.error("Telegram notification failed after all retries");
   return { success: false, error: lastError };
+}
+
+// ========================================
+// PAYMENT & SUBSCRIPTION EMAILS
+// ========================================
+
+/**
+ * Уведомление пользователю об успешной оплате подписки.
+ * Шлётся из PayPro webhook сразу после ORDER_CHARGED / TRIAL_CHARGE.
+ */
+export async function sendPaymentSuccessEmail(params: {
+  email: string;
+  name: string;
+  planName: string;
+  amount: number;            // в долларах
+  billingPeriod: "monthly" | "yearly";
+  expiresAt: Date;
+  messagesLimit: number;     // или Number.POSITIVE_INFINITY для unlimited
+  orderId: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    if (!resend) {
+      console.log(`[DEV] Payment success email for ${params.email} — ${params.planName} $${params.amount}`);
+      return { success: true };
+    }
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
+    const periodLabel = params.billingPeriod === "yearly" ? "год" : "месяц";
+    const renewLabel = params.expiresAt.toLocaleDateString("ru-RU", {
+      day: "numeric", month: "long", year: "numeric",
+    });
+    const messagesLabel = params.messagesLimit >= 999999
+      ? "Безлимит сообщений"
+      : `${params.messagesLimit.toLocaleString("ru-RU")} сообщений в месяц`;
+
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: params.email,
+      replyTo: "noreply@staffix.io",
+      subject: `Оплата прошла — план ${params.planName} активирован`,
+      html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f5f7;margin:0;padding:32px 20px;color:#1a1a2e;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+    <div style="padding:24px 28px;background:#ecfdf5;border-bottom:1px solid #e5e7eb;">
+      <div style="font-size:14px;color:#047857;font-weight:600;margin-bottom:4px;">Оплата прошла успешно</div>
+      <h1 style="margin:0;font-size:20px;color:#1a1a2e;">План ${params.planName} активирован</h1>
+    </div>
+    <div style="padding:24px 28px;">
+      <p style="margin:0 0 18px;color:#4b5563;">Здравствуйте, ${params.name}!</p>
+      <p style="margin:0 0 20px;color:#4b5563;line-height:1.6;">Спасибо за оплату — подписка Staffix активирована, AI-сотрудник продолжает работать без перерыва.</p>
+      <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:18px 20px;margin-bottom:20px;">
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          <tr><td style="padding:4px 0;color:#6b7280;">План</td><td style="padding:4px 0;text-align:right;color:#1a1a2e;font-weight:600;">${params.planName}</td></tr>
+          <tr><td style="padding:4px 0;color:#6b7280;">Период</td><td style="padding:4px 0;text-align:right;color:#1a1a2e;">$${params.amount} / ${periodLabel}</td></tr>
+          <tr><td style="padding:4px 0;color:#6b7280;">Лимит</td><td style="padding:4px 0;text-align:right;color:#1a1a2e;">${messagesLabel}</td></tr>
+          <tr><td style="padding:4px 0;color:#6b7280;">Активно до</td><td style="padding:4px 0;text-align:right;color:#1a1a2e;">${renewLabel}</td></tr>
+          <tr><td style="padding:4px 0;color:#6b7280;">Номер заказа</td><td style="padding:4px 0;text-align:right;color:#9ca3af;font-family:monospace;font-size:12px;">${params.orderId}</td></tr>
+        </table>
+      </div>
+      <a href="${appUrl}/dashboard" style="display:inline-block;padding:12px 22px;background:#1a1a2e;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">Открыть дашборд</a>
+    </div>
+    <div style="padding:16px 28px;background:#f9fafb;color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb;line-height:1.5;">
+      Подписка продлевается автоматически ${params.billingPeriod === "yearly" ? "ежегодно" : "ежемесячно"}. Управление и отмена — в дашборде в разделе «Настройки → Подписка».
+      <br>Вопросы по оплате — <a href="mailto:support@staffix.io" style="color:#2563eb;">support@staffix.io</a>.
+    </div>
+  </div>
+</body></html>`,
+    });
+    if (error) {
+      console.error("Payment success email error:", error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (error) {
+    console.error("sendPaymentSuccessEmail error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Ошибка отправки" };
+  }
+}
+
+/**
+ * Уведомление об отмене подписки. Подписка работает до конца оплаченного периода.
+ */
+export async function sendSubscriptionCancelledEmail(params: {
+  email: string;
+  name: string;
+  planName: string;
+  expiresAt: Date;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    if (!resend) {
+      console.log(`[DEV] Subscription cancelled email for ${params.email}`);
+      return { success: true };
+    }
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
+    const lastDay = params.expiresAt.toLocaleDateString("ru-RU", {
+      day: "numeric", month: "long", year: "numeric",
+    });
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: params.email,
+      replyTo: "noreply@staffix.io",
+      subject: `Подписка Staffix отменена — доступ до ${lastDay}`,
+      html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f5f7;margin:0;padding:32px 20px;color:#1a1a2e;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+    <div style="padding:24px 28px;background:#fef3c7;border-bottom:1px solid #e5e7eb;">
+      <div style="font-size:14px;color:#92400e;font-weight:600;margin-bottom:4px;">Подписка отменена</div>
+      <h1 style="margin:0;font-size:20px;color:#1a1a2e;">Доступ сохраняется до ${lastDay}</h1>
+    </div>
+    <div style="padding:24px 28px;">
+      <p style="margin:0 0 16px;color:#4b5563;">Здравствуйте, ${params.name}!</p>
+      <p style="margin:0 0 18px;color:#4b5563;line-height:1.6;">Подписка <strong>${params.planName}</strong> отменена, дальнейших списаний не будет. AI-сотрудник продолжит работать до <strong>${lastDay}</strong> — это последний оплаченный день.</p>
+      <p style="margin:0 0 20px;color:#4b5563;line-height:1.6;">Передумаете — можно возобновить подписку до этой даты, не теряя данные. После — диалоги, клиенты и настройки сохраняются ещё 30 дней.</p>
+      <a href="${appUrl}/pricing" style="display:inline-block;padding:12px 22px;background:#1a1a2e;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">Возобновить подписку</a>
+    </div>
+    <div style="padding:16px 28px;background:#f9fafb;color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb;">
+      Если отмена случайная или есть вопросы — напишите <a href="mailto:support@staffix.io" style="color:#2563eb;">support@staffix.io</a>, разберёмся.
+    </div>
+  </div>
+</body></html>`,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Ошибка отправки" };
+  }
 }
 
 // ========================================

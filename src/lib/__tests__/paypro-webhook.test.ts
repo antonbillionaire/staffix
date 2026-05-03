@@ -22,6 +22,15 @@ vi.mock("@/lib/admin-notify", () => ({
   notifyNewPayment: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("@/lib/webhook-dedup", () => ({
+  markWebhookProcessed: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock("@/lib/email", () => ({
+  sendPaymentSuccessEmail: vi.fn().mockResolvedValue({ success: true }),
+  sendSubscriptionCancelledEmail: vi.fn().mockResolvedValue({ success: true }),
+}));
+
 // We need to mock the paypro module's verifyIP, verifyHash, verifySignature
 // but the route imports them, so we mock the whole module
 vi.mock("@/lib/paypro", async (importOriginal) => {
@@ -72,6 +81,8 @@ vi.mock("@/lib/paypro", async (importOriginal) => {
 import { prisma } from "@/lib/prisma";
 import { verifyIP, verifyHash, verifySignature } from "@/lib/paypro";
 import { notifyNewPayment } from "@/lib/admin-notify";
+import { markWebhookProcessed } from "@/lib/webhook-dedup";
+import { sendPaymentSuccessEmail } from "@/lib/email";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -142,6 +153,7 @@ beforeEach(() => {
   vi.mocked(verifyIP).mockReturnValue(true);
   vi.mocked(verifyHash).mockReturnValue(true);
   vi.mocked(verifySignature).mockReturnValue(true);
+  vi.mocked(markWebhookProcessed).mockResolvedValue(true);
 });
 
 afterEach(() => {
@@ -406,6 +418,48 @@ describe("PayPro Webhook POST", () => {
           plan: "trial",
           messagesLimit: 200,
         }),
+      })
+    );
+  });
+
+  // ── Deduplication: duplicate IPN must not double-activate ────────────────
+
+  it("duplicate IPN -> 200 with no DB write", async () => {
+    vi.mocked(markWebhookProcessed).mockResolvedValueOnce(false);
+
+    const POST = await importHandler();
+    const body = buildIPNBody(baseIPNFields);
+    const req = makePayProRequest(body);
+    const res = await POST(req as never);
+
+    expect(res.status).toBe(200);
+    expect(prisma.business.findFirst).not.toHaveBeenCalled();
+    expect(prisma.subscription.upsert).not.toHaveBeenCalled();
+    expect(notifyNewPayment).not.toHaveBeenCalled();
+    expect(sendPaymentSuccessEmail).not.toHaveBeenCalled();
+  });
+
+  // ── Email клиенту: ORDER_CHARGED шлёт sendPaymentSuccessEmail ────────────
+
+  it("ORDER_CHARGED -> sendPaymentSuccessEmail called", async () => {
+    vi.mocked(prisma.business.findFirst).mockResolvedValue(baseBusiness as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: "user-1",
+      name: "Test",
+      email: "buyer@example.com",
+    } as never);
+
+    const POST = await importHandler();
+    const body = buildIPNBody(baseIPNFields);
+    const req = makePayProRequest(body);
+    const res = await POST(req as never);
+
+    expect(res.status).toBe(200);
+    expect(sendPaymentSuccessEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: "buyer@example.com",
+        billingPeriod: "monthly",
+        orderId: "order-123",
       })
     );
   });

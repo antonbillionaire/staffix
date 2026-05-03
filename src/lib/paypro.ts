@@ -290,10 +290,12 @@ export function verifyIP(ip: string): boolean {
   return PAYPRO_IPS.includes(cleanIp);
 }
 
-// PayPro API: Cancel subscription
+// PayPro API: Cancel subscription permanently. Использует /Subscriptions/Terminate
+// (не Suspend), чтобы PayPro гарантированно перестал пытаться списывать.
+// Suspend — это пауза с автоматическими retry, что для отмены клиентом неверно.
 export async function cancelSubscription(subscriptionId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await fetch(`${PAYPRO_API_BASE_URL}/Subscriptions/Suspend`, {
+    const res = await fetch(`${PAYPRO_API_BASE_URL}/Subscriptions/Terminate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -310,30 +312,13 @@ export async function cancelSubscription(subscriptionId: string): Promise<{ succ
   }
 }
 
-// PayPro API: Resume subscription
+// PayPro API: Resume subscription. Работает только для подписок в статусе Suspended.
+// После cancelSubscription (Terminate) подписка уже не возобновляется — нужна новая
+// покупка через checkout. UI скрывает кнопку Resume когда payproSubscriptionId
+// очищается webhook'ом SUBSCRIPTION_TERMINATED.
 export async function resumeSubscription(subscriptionId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const res = await fetch(`${PAYPRO_API_BASE_URL}/Subscriptions/Renew`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        subscriptionId: parseInt(subscriptionId),
-        vendorAccountId: parseInt(PAYPRO_VENDOR_ACCOUNT_ID),
-        apiSecretKey: PAYPRO_API_SECRET_KEY,
-      }),
-    });
-
-    const data = await res.json();
-    return { success: data.isSuccess === true };
-  } catch (error) {
-    return { success: false, error: String(error) };
-  }
-}
-
-// PayPro API: Terminate subscription permanently
-export async function terminateSubscription(subscriptionId: string): Promise<{ success: boolean; error?: string }> {
-  try {
-    const res = await fetch(`${PAYPRO_API_BASE_URL}/Subscriptions/Terminate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
