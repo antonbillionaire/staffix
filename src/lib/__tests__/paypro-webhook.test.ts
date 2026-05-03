@@ -29,6 +29,8 @@ vi.mock("@/lib/webhook-dedup", () => ({
 vi.mock("@/lib/email", () => ({
   sendPaymentSuccessEmail: vi.fn().mockResolvedValue({ success: true }),
   sendSubscriptionCancelledEmail: vi.fn().mockResolvedValue({ success: true }),
+  sendPaymentFailedEmail: vi.fn().mockResolvedValue({ success: true }),
+  sendSubscriptionSuspendedEmail: vi.fn().mockResolvedValue({ success: true }),
 }));
 
 // We need to mock the paypro module's verifyIP, verifyHash, verifySignature

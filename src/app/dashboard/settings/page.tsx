@@ -804,6 +804,30 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {/* Suspended subscription banner — payment failed multiple times */}
+          {subscription.status === 'suspended' && (
+            <div className="bg-red-500/10 rounded-xl border border-red-500/20 p-4 flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-red-500">{t("settings.subscriptionSuspendedTitle")}</p>
+                <p className="text-sm text-red-500/80 mt-1">
+                  {t("settings.subscriptionSuspendedNotice")}
+                </p>
+                {subscription.billingPortalUrl && (
+                  <a
+                    href={subscription.billingPortalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-red-400 hover:text-red-300 mt-2"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    {t("settings.managePaymentMethod")}
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Cancelled subscription notice */}
           {subscription.status === 'cancelled' && (
             <div className="bg-yellow-500/10 rounded-xl border border-yellow-500/20 p-4 flex items-start gap-3">

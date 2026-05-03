@@ -50,6 +50,18 @@ export async function GET(request: NextRequest) {
       take: 100,
     });
 
+    // Stuck-suspended: PayPro suspended the subscription (failed retries),
+    // paid period ended, but our status is still 'suspended' instead of
+    // 'expired'. Auto-fix is safe — user clearly didn't update the card,
+    // and PayPro normally fires SUBSCRIPTION_TERMINATED next anyway.
+    const stuckSuspended = await prisma.subscription.findMany({
+      where: {
+        status: "suspended",
+        expiresAt: { lt: cutoff },
+      },
+      take: 100,
+    });
+
     // Auto-fix the stuck-cancelled (safe — user explicitly cancelled, period over).
     let cancelledFixed = 0;
     for (const sub of stuckCancelled) {
@@ -58,6 +70,16 @@ export async function GET(request: NextRequest) {
         data: { status: "expired", payproSubscriptionId: null },
       });
       cancelledFixed++;
+    }
+
+    // Auto-fix stuck-suspended.
+    let suspendedFixed = 0;
+    for (const sub of stuckSuspended) {
+      await prisma.subscription.update({
+        where: { id: sub.id },
+        data: { status: "expired", payproSubscriptionId: null },
+      });
+      suspendedFixed++;
     }
 
     // For stuck-active: alert admin. Not safe to auto-expire.
@@ -77,6 +99,7 @@ export async function GET(request: NextRequest) {
       ok: true,
       stuckActive: stuckActive.length,
       stuckCancelledFixed: cancelledFixed,
+      stuckSuspendedFixed: suspendedFixed,
     });
   } catch (error) {
     console.error("PayPro reconciliation cron error:", error);

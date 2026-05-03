@@ -865,6 +865,112 @@ export async function sendSubscriptionCancelledEmail(params: {
   }
 }
 
+/**
+ * Списание оплаты не прошло (SUBSCRIPTION_CHARGE_FAILED). PayPro будет
+ * пытаться повторить — сообщаем клиенту и просим обновить карту в портале
+ * PayPro, чтобы сервис не приостановили.
+ */
+export async function sendPaymentFailedEmail(params: {
+  email: string;
+  name: string;
+  planName: string;
+  expiresAt: Date;
+  customerPortalUrl: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    if (!resend) {
+      console.log(`[DEV] Payment failed email for ${params.email}`);
+      return { success: true };
+    }
+    const lastDay = params.expiresAt.toLocaleDateString("ru-RU", {
+      day: "numeric", month: "long", year: "numeric",
+    });
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: params.email,
+      replyTo: "noreply@staffix.io",
+      subject: `Не получилось списать оплату — обновите карту, чтобы сервис не остановился`,
+      html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f5f7;margin:0;padding:32px 20px;color:#1a1a2e;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+    <div style="padding:24px 28px;background:#fef3c7;border-bottom:1px solid #e5e7eb;">
+      <div style="font-size:14px;color:#92400e;font-weight:600;margin-bottom:4px;">Оплата не прошла</div>
+      <h1 style="margin:0;font-size:20px;color:#1a1a2e;">Обновите карту до ${lastDay}</h1>
+    </div>
+    <div style="padding:24px 28px;">
+      <p style="margin:0 0 16px;color:#4b5563;">Здравствуйте, ${params.name}!</p>
+      <p style="margin:0 0 18px;color:#4b5563;line-height:1.6;">Не получилось списать оплату по вашей подписке <strong>${params.planName}</strong>. PayPro попытается ещё несколько раз — если карта не сработает, подписка временно приостановится после <strong>${lastDay}</strong>.</p>
+      <p style="margin:0 0 20px;color:#4b5563;line-height:1.6;">Чаще всего причина — истёк срок карты, недостаточно средств или банк заблокировал автоплатёж. Откройте личный кабинет PayPro, чтобы обновить карту:</p>
+      <a href="${params.customerPortalUrl}" style="display:inline-block;padding:12px 22px;background:#1a1a2e;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">Обновить карту в PayPro</a>
+    </div>
+    <div style="padding:16px 28px;background:#f9fafb;color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb;">
+      Если карта в порядке, но письмо всё равно пришло — напишите <a href="mailto:support@staffix.io" style="color:#2563eb;">support@staffix.io</a>, разберёмся.
+    </div>
+  </div>
+</body></html>`,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Ошибка отправки" };
+  }
+}
+
+/**
+ * Подписка приостановлена после нескольких неудачных списаний
+ * (SUBSCRIPTION_SUSPENDED). Клиент потерял авто-возобновление; чтобы вернуть
+ * сервис — нужно обновить карту в PayPro либо подписаться заново.
+ */
+export async function sendSubscriptionSuspendedEmail(params: {
+  email: string;
+  name: string;
+  planName: string;
+  customerPortalUrl: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    if (!resend) {
+      console.log(`[DEV] Subscription suspended email for ${params.email}`);
+      return { success: true };
+    }
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: params.email,
+      replyTo: "noreply@staffix.io",
+      subject: `Подписка Staffix приостановлена — нужна рабочая карта чтобы возобновить`,
+      html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f5f7;margin:0;padding:32px 20px;color:#1a1a2e;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+    <div style="padding:24px 28px;background:#fee2e2;border-bottom:1px solid #e5e7eb;">
+      <div style="font-size:14px;color:#991b1b;font-weight:600;margin-bottom:4px;">Подписка приостановлена</div>
+      <h1 style="margin:0;font-size:20px;color:#1a1a2e;">AI-сотрудник на паузе — оплата не прошла</h1>
+    </div>
+    <div style="padding:24px 28px;">
+      <p style="margin:0 0 16px;color:#4b5563;">Здравствуйте, ${params.name}!</p>
+      <p style="margin:0 0 18px;color:#4b5563;line-height:1.6;">PayPro несколько раз пытался списать оплату по подписке <strong>${params.planName}</strong>, но карта не сработала. Подписка переведена в статус «приостановлена», авто-продление не будет повторяться.</p>
+      <p style="margin:0 0 18px;color:#4b5563;line-height:1.6;">Чтобы вернуть сервис — обновите карту в PayPro или оформите подписку заново на странице тарифов:</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <a href="${params.customerPortalUrl}" style="display:inline-block;padding:12px 22px;background:#1a1a2e;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">Обновить карту в PayPro</a>
+        <a href="${appUrl}/pricing" style="display:inline-block;padding:12px 22px;background:#fff;color:#1a1a2e;border:1px solid #1a1a2e;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">Оформить заново</a>
+      </div>
+    </div>
+    <div style="padding:16px 28px;background:#f9fafb;color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb;">
+      Данные подписки (диалоги, клиенты, настройки) сохраняются — после возобновления всё на месте. Вопросы — <a href="mailto:support@staffix.io" style="color:#2563eb;">support@staffix.io</a>.
+    </div>
+  </div>
+</body></html>`,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Ошибка отправки" };
+  }
+}
+
 // ========================================
 // ONBOARDING DRIP EMAILS
 // ========================================

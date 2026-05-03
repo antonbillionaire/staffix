@@ -8,11 +8,17 @@ import {
   verifyIP,
   IPN_TYPES,
   cancelSubscription,
+  getCustomerPortalUrl,
 } from "@/lib/paypro";
 import { notifyNewPayment } from "@/lib/admin-notify";
 import { rateLimit } from "@/lib/rate-limit";
 import { markWebhookProcessed } from "@/lib/webhook-dedup";
-import { sendPaymentSuccessEmail, sendSubscriptionCancelledEmail } from "@/lib/email";
+import {
+  sendPaymentSuccessEmail,
+  sendSubscriptionCancelledEmail,
+  sendPaymentFailedEmail,
+  sendSubscriptionSuspendedEmail,
+} from "@/lib/email";
 
 export async function POST(request: NextRequest) {
   try {
@@ -255,6 +261,19 @@ export async function POST(request: NextRequest) {
         });
 
         console.log(`PayPro: Payment failed for business ${business.id}, PayPro will retry`);
+
+        // Email клиенту: «обнови карту, иначе подписка приостановится».
+        const failedUser = await prisma.user.findUnique({ where: { id: ipn.userId! } });
+        if (failedUser) {
+          const failedPlan = getPlan(business.subscription.plan as PlanId);
+          sendPaymentFailedEmail({
+            email: failedUser.email,
+            name: failedUser.name || "пользователь",
+            planName: failedPlan.name,
+            expiresAt: business.subscription.expiresAt,
+            customerPortalUrl: getCustomerPortalUrl(),
+          }).catch((err) => console.error("Payment-failed email failed:", err));
+        }
         break;
       }
 
@@ -268,6 +287,18 @@ export async function POST(request: NextRequest) {
         });
 
         console.log(`PayPro: Subscription suspended for business ${business.id}`);
+
+        // Email клиенту: «AI-сотрудник на паузе, обнови карту чтобы продолжить».
+        const suspendedUser = await prisma.user.findUnique({ where: { id: ipn.userId! } });
+        if (suspendedUser) {
+          const suspendedPlan = getPlan(business.subscription.plan as PlanId);
+          sendSubscriptionSuspendedEmail({
+            email: suspendedUser.email,
+            name: suspendedUser.name || "пользователь",
+            planName: suspendedPlan.name,
+            customerPortalUrl: getCustomerPortalUrl(),
+          }).catch((err) => console.error("Suspended email failed:", err));
+        }
         break;
       }
 
