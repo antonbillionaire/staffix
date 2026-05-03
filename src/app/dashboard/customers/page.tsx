@@ -64,6 +64,13 @@ interface Customer {
   dealValue: number | null;
   dealClosedAt: string | null;
   dealNote: string | null;
+  assignedStaffId?: string | null;
+}
+
+interface StaffMini {
+  id: string;
+  name: string;
+  role: string | null;
 }
 
 type DealStage = Customer["dealStage"];
@@ -113,6 +120,7 @@ export default function CustomersPage() {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [staffList, setStaffList] = useState<StaffMini[]>([]);
   const [stats, setStats] = useState<Stats>({ total: 0, active: 0, inactive: 0, vip: 0, blocked: 0 });
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -139,6 +147,26 @@ export default function CustomersPage() {
   const [loyaltySaving, setLoyaltySaving] = useState(false);
 
   // Deal pipeline: optimistic update, server-side persist
+  // Inline reassignment from the customer table — the simplest path for
+  // owners running the "Manual" lead-distribution mode.
+  const handleAssignStaff = async (customer: Customer, staffId: string | null) => {
+    if (customer.channel && customer.channel !== "telegram") return; // channel-leads live in Lead, not Client
+    setCustomers((prev) =>
+      prev.map((c) => (c.id === customer.id ? { ...c, assignedStaffId: staffId } : c))
+    );
+    try {
+      const res = await fetch(`/api/customers/${customer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignedStaffId: staffId }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      alert("Не удалось переназначить. Обновите страницу и попробуйте ещё раз.");
+      fetchCustomers();
+    }
+  };
+
   const handleDealStageChange = async (
     customer: Customer,
     newStage: DealStage
@@ -230,6 +258,7 @@ export default function CustomersPage() {
       if (res.ok) {
         const data = await res.json();
         setCustomers(data.customers);
+        setStaffList(data.staffList || []);
         setStats(data.stats);
         setPagination(data.pagination);
         if (data.dashboardMode) setDashboardMode(data.dashboardMode);
@@ -643,6 +672,11 @@ export default function CustomersPage() {
                   </th>
                   <th className={`text-left py-3 px-4 text-xs font-medium hidden lg:table-cell ${textTertiary} uppercase`}>{t("customers.thRating")}</th>
                   <th className={`text-left py-3 px-4 text-xs font-medium hidden md:table-cell ${textTertiary} uppercase`}>{t("customers.thPoints")}</th>
+                  {staffList.length > 0 && (
+                    <th className={`text-left py-3 px-4 text-xs font-medium hidden lg:table-cell ${textTertiary} uppercase`}>
+                      {t("customers.thManager")}
+                    </th>
+                  )}
                   <th className={`text-left py-3 px-4 text-xs font-medium hidden lg:table-cell ${textTertiary} uppercase`}>
                     {isSalesMode ? t("customers.thLastOrder") : t("customers.thLastVisit")}
                   </th>
@@ -686,8 +720,14 @@ export default function CustomersPage() {
                           <select
                             value={customer.dealStage}
                             onChange={(e) => handleDealStageChange(customer, e.target.value as DealStage)}
-                            className={`text-xs px-2 py-0.5 rounded border-0 cursor-pointer ${DEAL_STAGE_COLOR[customer.dealStage]} ${isDark ? "bg-opacity-20" : ""}`}
-                            title="Стадия сделки"
+                            // Yellower visual: explicit border + caret arrow + cursor так что
+                            // менеджер сразу видит — это интерактивный контрол, а не
+                            // просто статичный бейдж.
+                            className={`text-xs font-medium px-2 py-1 pr-6 rounded border cursor-pointer ${DEAL_STAGE_COLOR[customer.dealStage]} ${isDark ? "border-white/20 hover:border-white/40" : "border-gray-300 hover:border-gray-400"} appearance-none bg-no-repeat bg-[right_4px_center]`}
+                            style={{
+                              backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e")`,
+                            }}
+                            title="Стадия сделки — кликни чтобы поменять"
                           >
                             {(Object.keys(DEAL_STAGE_LABEL) as DealStage[]).map((s) => (
                               <option key={s} value={s} className={isDark ? "bg-[#12122a] text-white" : "bg-white text-gray-900"}>
@@ -776,6 +816,36 @@ export default function CustomersPage() {
                         {customer.loyaltyPoints > 0 ? customer.loyaltyPoints : "—"}
                       </button>
                     </td>
+                    {staffList.length > 0 && (
+                      <td className="py-3 px-4 hidden lg:table-cell">
+                        {customer.channel && customer.channel !== "telegram" ? (
+                          <span className={`text-xs ${textTertiary}`}>—</span>
+                        ) : (
+                          <select
+                            value={customer.assignedStaffId || ""}
+                            onChange={(e) => handleAssignStaff(customer, e.target.value || null)}
+                            className={`text-xs px-2 py-1 pr-6 rounded border cursor-pointer ${
+                              customer.assignedStaffId
+                                ? (isDark ? "bg-blue-500/10 border-blue-500/30 text-blue-300" : "bg-blue-50 border-blue-200 text-blue-700")
+                                : (isDark ? "bg-white/5 border-white/10 text-gray-400" : "bg-gray-50 border-gray-200 text-gray-500")
+                            } appearance-none bg-no-repeat bg-[right_4px_center] max-w-[140px]`}
+                            style={{
+                              backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e")`,
+                            }}
+                            title="Менеджер клиента"
+                          >
+                            <option value="" className={isDark ? "bg-[#12122a] text-white" : "bg-white text-gray-900"}>
+                              — не назначен
+                            </option>
+                            {staffList.map((s) => (
+                              <option key={s.id} value={s.id} className={isDark ? "bg-[#12122a] text-white" : "bg-white text-gray-900"}>
+                                {s.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
+                    )}
                     <td className="py-3 px-4 hidden lg:table-cell">
                       <div className={`flex items-center gap-2 ${textSecondary}`}>
                         <Clock className="h-4 w-4" />

@@ -760,10 +760,13 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Subscription management buttons */}
-            {subscription.payproSubscriptionId && subscription.plan !== 'trial' && (
+            {/* Subscription management buttons — visible on any paid plan.
+                Если payproSubscriptionId нет (подписка активирована вручную /
+                admin-grant), Cancel и Resume не сработают через PayPro API,
+                но Manage payment method всё равно ведёт на портал PayPro. */}
+            {subscription.plan !== 'trial' && (
               <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap gap-x-6 gap-y-3">
-                {subscription.status === 'active' && (
+                {subscription.status === 'active' && subscription.payproSubscriptionId && (
                   <button
                     onClick={handleCancelSubscription}
                     disabled={subscriptionLoading}
@@ -777,7 +780,7 @@ export default function SettingsPage() {
                     {t("settings.cancelSubscription")}
                   </button>
                 )}
-                {subscription.status === 'cancelled' && (
+                {subscription.status === 'cancelled' && subscription.payproSubscriptionId && (
                   <button
                     onClick={handleResumeSubscription}
                     disabled={subscriptionLoading}
@@ -791,16 +794,19 @@ export default function SettingsPage() {
                     {t("settings.resumeSubscription")}
                   </button>
                 )}
-                {subscription.billingPortalUrl && (
-                  <a
-                    href={subscription.billingPortalUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`flex items-center gap-2 text-sm ${textSecondary} hover:text-blue-400 transition-colors`}
-                  >
-                    <CreditCard className="h-4 w-4" />
-                    {t("settings.managePaymentMethod")}
-                  </a>
+                <a
+                  href={subscription.billingPortalUrl || "https://cc.payproglobal.com/customer/Account/Login"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex items-center gap-2 text-sm ${textSecondary} hover:text-blue-400 transition-colors`}
+                >
+                  <CreditCard className="h-4 w-4" />
+                  {t("settings.managePaymentMethod")}
+                </a>
+                {!subscription.payproSubscriptionId && (
+                  <span className={`text-xs ${textSecondary} italic flex-1 min-w-[200px]`}>
+                    {t("settings.subscriptionManualNotice")}
+                  </span>
                 )}
               </div>
             )}

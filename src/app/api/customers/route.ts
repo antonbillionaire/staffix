@@ -173,7 +173,15 @@ export async function GET(request: NextRequest) {
         dealValue: client.dealValue,
         dealClosedAt: client.dealClosedAt,
         dealNote: client.dealNote,
+        assignedStaffId: client.assignedStaffId,
       };
+    });
+
+    // Список сотрудников бизнеса — для inline-переназначения в таблице.
+    const staffList = await prisma.staff.findMany({
+      where: { businessId },
+      select: { id: true, name: true, role: true },
+      orderBy: { name: "asc" },
     });
 
     // Load channel leads (WA/IG/FB) that are NOT already in Client table
@@ -255,6 +263,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       dashboardMode,
       customers: allCustomers,
+      staffList,
       stats,
       pagination: {
         page,

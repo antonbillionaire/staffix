@@ -529,11 +529,20 @@ export default function CustomerDetailPage({
                         alert("Не удалось переназначить. Обновите страницу.");
                       }
                     }}
-                    className={`text-sm rounded-lg border px-2 py-1 ${isDark ? "bg-white/5 border-white/10 text-white" : "bg-white border-gray-300 text-gray-900"} max-w-[60%]`}
+                    className={`text-sm font-medium rounded-lg border px-3 py-1.5 pr-8 cursor-pointer transition-colors ${
+                      customer.assignedStaffId
+                        ? (isDark ? "bg-blue-500/15 border-blue-500/40 text-blue-300 hover:border-blue-400/60" : "bg-blue-50 border-blue-300 text-blue-700 hover:border-blue-400")
+                        : (isDark ? "bg-white/5 border-white/15 text-gray-300 hover:border-white/30" : "bg-white border-gray-300 text-gray-700 hover:border-gray-400")
+                    } appearance-none bg-no-repeat bg-[right_8px_center] max-w-[60%]`}
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e")`,
+                    }}
                   >
-                    <option value="">— не назначен</option>
+                    <option value="" className={isDark ? "bg-[#12122a] text-white" : "bg-white text-gray-900"}>
+                      — не назначен
+                    </option>
                     {data.staffList.map((s) => (
-                      <option key={s.id} value={s.id}>
+                      <option key={s.id} value={s.id} className={isDark ? "bg-[#12122a] text-white" : "bg-white text-gray-900"}>
                         {s.name}{s.role ? ` (${s.role})` : ""}
                       </option>
                     ))}
