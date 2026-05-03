@@ -4,6 +4,7 @@ import { useState, useEffect, use, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
+import CustomFieldsBlock from "./CustomFieldsBlock";
 import {
   ArrowLeft,
   Loader2,
@@ -36,6 +37,7 @@ interface CustomerDetail {
     segment: string;
     avgRating: number | null;
     totalSpent: number;
+    customFields?: Record<string, string | number>;
   };
   conversation: {
     id: string;
@@ -468,6 +470,14 @@ export default function CustomerDetailPage({
               </p>
             )}
           </div>
+
+          {/* Custom fields — owner-defined fields */}
+          <CustomFieldsBlock
+            customerId={customer.id}
+            initialValues={customer.customFields || {}}
+            isDark={isDark}
+            onUpdated={fetchCustomer}
+          />
 
           {/* Customer Info */}
           <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>

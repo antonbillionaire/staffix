@@ -72,6 +72,11 @@ model Business {
   // lastAssignedStaffId хранит указатель для round-robin между запусками.
   leadAssignmentMode    String  @default("manual")
   lastAssignedStaffId   String?
+
+  // Кастомные поля карточки клиента — определяются владельцем бизнеса.
+  // Формат: [{ key: string, label: string, type: "text"|"number"|"date"|"select", options?: string[] }]
+  // Лимит мягкий (валидируется в API): 20 полей. Значения хранятся в Client.customFields.
+  clientFieldsConfig    Json    @default("[]")
   staffCount    Int?      // количество сотрудников
   language      String    @default("ru") // ru, uz, kz, kg, tj, am, ge
   onboardingCompleted Boolean @default(false)
@@ -775,6 +780,11 @@ model Client {
 
   // Привязка к продавцу (через ссылку t.me/bot?start=s_staffId)
   assignedStaffId   String?
+
+  // Кастомные поля клиента — словарь { [key]: value } по схеме из Business.clientFieldsConfig.
+  // Если бизнес удалит определение поля, данные тут не пропадают — просто перестают
+  // отображаться в UI. Можно вернуть, восстановив определение.
+  customFields      Json      @default("{}")
 
   // ========================================
   // DEAL PIPELINE (для всех бизнесов)

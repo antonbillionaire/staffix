@@ -111,6 +111,7 @@ export async function GET(
         segment: isVip ? "vip" : isActive ? "active" : "inactive",
         avgRating,
         totalSpent,
+        customFields: (client.customFields as Record<string, string | number>) || {},
       },
       conversation: conversation
         ? {
@@ -198,6 +199,54 @@ export async function PATCH(
       importantNotesUpdate.importantNotes = notes || null;
     }
 
+    // customFields — мердж новых значений с существующими по конфигу.
+    // Если клиент шлёт null/"" по конкретному ключу — поле очищается.
+    const customFieldsUpdate: { customFields?: Record<string, unknown> } = {};
+    if (body.customFields !== undefined && typeof body.customFields === "object" && body.customFields !== null) {
+      // Подгружаем конфиг полей бизнеса, чтобы валидировать ключи и типы.
+      const businessConfig = await prisma.business.findUnique({
+        where: { id: businessId },
+        select: { clientFieldsConfig: true },
+      });
+      const config = (businessConfig?.clientFieldsConfig as Array<{ key: string; type: string; options?: string[] }>) || [];
+      const configByKey = new Map(config.map((f) => [f.key, f]));
+      const existing = (client.customFields as Record<string, unknown>) || {};
+      const merged: Record<string, unknown> = { ...existing };
+
+      for (const [k, v] of Object.entries(body.customFields as Record<string, unknown>)) {
+        const def = configByKey.get(k);
+        if (!def) continue; // ключ не описан в конфиге — игнорируем
+        if (v === null || v === "") {
+          delete merged[k];
+          continue;
+        }
+        if (def.type === "number") {
+          const n = Number(v);
+          if (!Number.isFinite(n)) {
+            return NextResponse.json({ error: `Поле "${def.key}": ожидается число` }, { status: 400 });
+          }
+          merged[k] = n;
+        } else if (def.type === "date") {
+          const d = new Date(String(v));
+          if (Number.isNaN(d.getTime())) {
+            return NextResponse.json({ error: `Поле "${def.key}": неверная дата` }, { status: 400 });
+          }
+          merged[k] = d.toISOString().slice(0, 10); // храним как YYYY-MM-DD
+        } else if (def.type === "select") {
+          const str = String(v);
+          if (def.options && !def.options.includes(str)) {
+            return NextResponse.json({ error: `Поле "${def.key}": значение не из списка` }, { status: 400 });
+          }
+          merged[k] = str;
+        } else {
+          // text
+          const str = String(v).slice(0, 1000);
+          merged[k] = str;
+        }
+      }
+      customFieldsUpdate.customFields = merged;
+    }
+
     const updatedClient = await prisma.client.update({
       where: { id },
       data: {
@@ -205,6 +254,11 @@ export async function PATCH(
         name,
         phone,
         ...importantNotesUpdate,
+        // Prisma JsonValue типизация не дружит с Record<string, unknown> —
+        // прокидываем через unknown.
+        ...(customFieldsUpdate.customFields !== undefined
+          ? { customFields: customFieldsUpdate.customFields as unknown as object }
+          : {}),
       },
     });
 

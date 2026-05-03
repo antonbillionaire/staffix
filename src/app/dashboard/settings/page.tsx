@@ -25,6 +25,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { TIMEZONES } from "@/lib/timezones";
+import ClientFieldsManager from "./ClientFieldsManager";
 
 export default function SettingsPage() {
   const { data: session } = useSession();
@@ -514,6 +515,13 @@ export default function SettingsPage() {
               )}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Custom client fields manager — Profile tab */}
+      {activeTab === "profile" && (
+        <div className="mt-4">
+          <ClientFieldsManager isDark={isDark} />
         </div>
       )}
 
