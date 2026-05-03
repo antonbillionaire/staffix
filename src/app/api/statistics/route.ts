@@ -307,6 +307,61 @@ export async function GET(request: NextRequest) {
       ).length,
     };
 
+    // Deal pipeline funnel — group clients by dealStage. Period filter is
+    // applied via createdAt for the same window as the rest of statistics so
+    // numbers line up; "all" shows lifetime totals.
+    const stageGroups = await prisma.client.groupBy({
+      by: ["dealStage"],
+      where: {
+        businessId: business.id,
+        ...(period !== "all" ? { createdAt: { gte: startDate } } : {}),
+      },
+      _count: { _all: true },
+    });
+    const stageCounts: Record<string, number> = {
+      lead: 0,
+      consultation_booked: 0,
+      consultation_done: 0,
+      client: 0,
+      lost: 0,
+    };
+    for (const g of stageGroups) {
+      if (g.dealStage in stageCounts) {
+        stageCounts[g.dealStage] = g._count._all;
+      }
+    }
+    // Sum of revenue closed in the period (only "client" stage with dealValue).
+    const closedDealsAgg = await prisma.client.aggregate({
+      where: {
+        businessId: business.id,
+        dealStage: "client",
+        dealValue: { not: null },
+        ...(period !== "all" ? { dealClosedAt: { gte: startDate } } : {}),
+      },
+      _sum: { dealValue: true },
+      _count: { _all: true },
+    });
+    // Total at the top of the funnel = anyone who entered (sum of all stages).
+    const funnelTotal = Object.values(stageCounts).reduce((a, b) => a + b, 0);
+    // Reaching at least stage X = sum of that stage AND every stage that
+    // comes after it (excluding "lost" which is a fallout terminal state).
+    const reachedConsultationBooked = stageCounts.consultation_booked + stageCounts.consultation_done + stageCounts.client;
+    const reachedConsultationDone = stageCounts.consultation_done + stageCounts.client;
+    const reachedClient = stageCounts.client;
+    const pct = (n: number, of: number) => (of > 0 ? Math.round((n / of) * 1000) / 10 : 0);
+    const dealFunnel = {
+      counts: stageCounts,
+      total: funnelTotal,
+      revenue: closedDealsAgg._sum.dealValue ?? 0,
+      closedDeals: closedDealsAgg._count._all,
+      conversion: {
+        leadToBooked: pct(reachedConsultationBooked, funnelTotal),
+        bookedToDone: pct(reachedConsultationDone, reachedConsultationBooked),
+        doneToClient: pct(reachedClient, reachedConsultationDone),
+        leadToClient: pct(reachedClient, funnelTotal),
+      },
+    };
+
     // Bookings by status
     const bookingsByStatus = {
       pending: 0,
@@ -427,6 +482,8 @@ export async function GET(request: NextRequest) {
       avgOrderValue,
       ordersByDay,
       popularProducts,
+      // Deal pipeline funnel
+      dealFunnel,
     });
   } catch (error) {
     console.error("Statistics error:", error);

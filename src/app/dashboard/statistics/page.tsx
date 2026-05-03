@@ -51,6 +51,13 @@ interface Stats {
   avgOrderValue?: number;
   ordersByDay?: { date: string; count: number }[];
   popularProducts?: { name: string; count: number; revenue: number }[];
+  dealFunnel?: {
+    counts: { lead: number; consultation_booked: number; consultation_done: number; client: number; lost: number };
+    total: number;
+    revenue: number;
+    closedDeals: number;
+    conversion: { leadToBooked: number; bookedToDone: number; doneToClient: number; leadToClient: number };
+  };
 }
 
 export default function StatisticsPage() {
@@ -432,6 +439,74 @@ export default function StatisticsPage() {
               <p className={textSecondary}>{t("statistics.noProductsData")}</p>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Deal Funnel */}
+      {stats.dealFunnel && stats.dealFunnel.total > 0 && (
+        <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 className={`text-lg font-semibold ${textPrimary}`}>{t("statistics.dealFunnel")}</h3>
+            {stats.dealFunnel.revenue > 0 && (
+              <div className={`text-sm ${textSecondary}`}>
+                {t("statistics.dealFunnelRevenue").replace("{value}", stats.dealFunnel.revenue.toLocaleString()).replace("{count}", String(stats.dealFunnel.closedDeals))}
+              </div>
+            )}
+          </div>
+          {(() => {
+            const stages: Array<{ key: keyof typeof stats.dealFunnel.counts; label: string; color: string }> = [
+              { key: "lead", label: t("statistics.stageLead"), color: "bg-gray-400" },
+              { key: "consultation_booked", label: t("statistics.stageBooked"), color: "bg-blue-500" },
+              { key: "consultation_done", label: t("statistics.stageDone"), color: "bg-indigo-500" },
+              { key: "client", label: t("statistics.stageClient"), color: "bg-green-500" },
+            ];
+            // For the bar widths, we anchor on funnelTotal so the lead stage is full-width.
+            const total = stats.dealFunnel!.total;
+            const lostCount = stats.dealFunnel!.counts.lost;
+            return (
+              <div className="space-y-3">
+                {stages.map((s, i) => {
+                  // "Reached this stage" = sum of this stage and everything past it.
+                  const counts = stats.dealFunnel!.counts;
+                  const reached =
+                    s.key === "lead" ? total - lostCount :
+                    s.key === "consultation_booked" ? counts.consultation_booked + counts.consultation_done + counts.client :
+                    s.key === "consultation_done" ? counts.consultation_done + counts.client :
+                    counts.client;
+                  const width = total > 0 ? (reached / total) * 100 : 0;
+                  // Conversion from previous stage to this one — for the right-side label.
+                  const conv = stats.dealFunnel!.conversion;
+                  const fromPrev = i === 0 ? null : i === 1 ? conv.leadToBooked : i === 2 ? conv.bookedToDone : conv.doneToClient;
+                  return (
+                    <div key={s.key}>
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <span className={textSecondary}>{s.label}</span>
+                        <span className={textPrimary}>
+                          {reached}
+                          {fromPrev !== null && (
+                            <span className={`ml-2 text-xs ${textSecondary}`}>({fromPrev}%)</span>
+                          )}
+                        </span>
+                      </div>
+                      <div className={`h-3 ${isDark ? "bg-white/5" : "bg-gray-100"} rounded-full overflow-hidden`}>
+                        <div className={`h-full ${s.color} transition-all`} style={{ width: `${width}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                {lostCount > 0 && (
+                  <div className={`flex items-center justify-between text-xs ${textSecondary} pt-2 border-t ${borderColor}`}>
+                    <span>{t("statistics.stageLost")}</span>
+                    <span>{lostCount}</span>
+                  </div>
+                )}
+                <div className={`flex items-center justify-between pt-3 mt-3 border-t ${borderColor}`}>
+                  <span className={`text-sm font-medium ${textPrimary}`}>{t("statistics.overallConversion")}</span>
+                  <span className={`text-lg font-bold text-green-400`}>{stats.dealFunnel!.conversion.leadToClient}%</span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
