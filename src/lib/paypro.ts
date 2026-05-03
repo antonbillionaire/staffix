@@ -299,16 +299,18 @@ export function verifyIP(ip: string): boolean {
   return PAYPRO_IPS.includes(cleanIp);
 }
 
-// PayPro hosts a customer portal where users can view their subscriptions,
-// update payment methods, and cancel without us calling any API. They log in
-// with the email they used at checkout.
+// Public-facing PayPro shopper-support portal. Customers come here to look
+// up their order by email, manage their subscription, update card or
+// download invoices. PayPro routes them to their account via email magic-link
+// after the lookup.
 //
-// Correct URL: cc.payproglobal.com/Customer/Account/Login. The earlier
-// guess at store.payproglobal.com/customer-portal/customer/login was a 404
-// (verified manually). This is PayPro's universal customer login — buyers
-// of any vendor reach their account from here, no vendor-id param needed.
+// Two earlier wrong guesses (kept as a footnote so future-me doesn't repeat):
+//   - store.payproglobal.com/customer-portal/customer/login → 404
+//   - cc.payproglobal.com/Customer/Account/Login → that is the VENDOR login
+//     (Anton's admin panel for the Staffix product on PayPro), not for
+//     end customers.
 export function getCustomerPortalUrl(): string {
-  return "https://cc.payproglobal.com/Customer/Account/Login";
+  return "https://payproglobal.com/customer-support/";
 }
 
 // PayPro API: Cancel subscription permanently. Использует /Subscriptions/Terminate
