@@ -303,14 +303,16 @@ export function verifyIP(ip: string): boolean {
 // they used at checkout to view subscriptions, update card, download
 // invoices, cancel.
 //
-// Important: cc.payproglobal.com hosts BOTH portals on different paths:
+// Important: cc.payproglobal.com hosts BOTH portals on different paths and
+// the customer side is case-sensitive — lowercase /customer/ only.
 //   - /Account/Login          → VENDOR admin (Anton's Staffix-product panel)
-//   - /Customer/Account/Login → CUSTOMER portal — what we want here
+//   - /customer/Account/Login → CUSTOMER login (what we want here)
+//   - /customer/              → already-logged-in customer dashboard
 //
 // (One earlier guess at store.payproglobal.com/customer-portal/customer/login
 // was a 404 — kept as a footnote so future-me doesn't repeat.)
 export function getCustomerPortalUrl(): string {
-  return "https://cc.payproglobal.com/Customer/Account/Login";
+  return "https://cc.payproglobal.com/customer/Account/Login";
 }
 
 // PayPro API: Cancel subscription permanently. Использует /Subscriptions/Terminate
