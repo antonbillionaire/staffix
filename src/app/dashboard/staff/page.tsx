@@ -16,6 +16,7 @@ interface Staff {
   notificationsEnabled: boolean;
   baseRate: number | null;
   commissionPercent: number | null;
+  acceptsLeads?: boolean;
 }
 
 interface ScheduleDay {
@@ -143,6 +144,10 @@ export default function StaffPage() {
     }
   }, []);
 
+  // Lead distribution mode (manual / round_robin / by_load) and per-staff toggle.
+  const [leadMode, setLeadMode] = useState<"manual" | "round_robin" | "by_load">("manual");
+  const [leadModeSaving, setLeadModeSaving] = useState(false);
+
   useEffect(() => {
     fetchStaff();
     // Fetch dashboard mode for role options
@@ -151,9 +156,40 @@ export default function StaffPage() {
       .then((data) => {
         if (data.business?.dashboardMode) setDashboardMode(data.business.dashboardMode);
         if (data.business?.botUsername) setBotUsername(data.business.botUsername);
+        if (data.business?.leadAssignmentMode) setLeadMode(data.business.leadAssignmentMode);
       })
       .catch(() => {});
   }, [fetchStaff]);
+
+  const handleLeadModeChange = async (next: "manual" | "round_robin" | "by_load") => {
+    setLeadMode(next);
+    setLeadModeSaving(true);
+    try {
+      await fetch("/api/business", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadAssignmentMode: next }),
+      });
+    } catch (e) {
+      console.error("Failed to save lead mode:", e);
+    } finally {
+      setLeadModeSaving(false);
+    }
+  };
+
+  const handleAcceptsLeadsToggle = async (staffId: string, next: boolean) => {
+    setStaff((prev) => prev.map((s) => (s.id === staffId ? { ...s, acceptsLeads: next } : s)));
+    try {
+      await fetch(`/api/staff/${staffId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acceptsLeads: next }),
+      });
+    } catch (e) {
+      console.error("Failed to toggle acceptsLeads:", e);
+      setStaff((prev) => prev.map((s) => (s.id === staffId ? { ...s, acceptsLeads: !next } : s)));
+    }
+  };
 
   const isSales = dashboardMode === "sales";
   const roleOptions = isSales ? SALES_ROLES : SERVICE_ROLES;
@@ -395,6 +431,37 @@ export default function StaffPage() {
         </button>
       </div>
 
+      {/* Lead-distribution settings (visible only when there's more than 1 staff) */}
+      {staff.length > 1 && (
+        <div className={`${isDark ? "bg-[#12122a] border-white/5" : "bg-white border-gray-200"} rounded-lg border p-4 mb-4`}>
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+            <div>
+              <h3 className={`font-medium ${isDark ? "text-white" : "text-gray-900"}`}>{t("staffPage.leadDistTitle")}</h3>
+              <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>{t("staffPage.leadDistDescription")}</p>
+            </div>
+            {leadModeSaving && <Loader2 className={`h-4 w-4 animate-spin ${isDark ? "text-gray-400" : "text-gray-500"}`} />}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
+            {(["manual", "round_robin", "by_load"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => handleLeadModeChange(m)}
+                className={`text-left p-3 rounded-lg border transition-colors ${
+                  leadMode === m
+                    ? "border-blue-500 bg-blue-500/10"
+                    : isDark
+                      ? "border-white/10 hover:border-white/20"
+                      : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <p className={`text-sm font-medium ${isDark ? "text-white" : "text-gray-900"}`}>{t(`staffPage.leadMode.${m}`)}</p>
+                <p className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>{t(`staffPage.leadMode.${m}Hint`)}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Staff list */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? (
@@ -469,6 +536,20 @@ export default function StaffPage() {
                   </button>
                 </div>
               </div>
+              {/* AcceptsLeads toggle — visible only when auto-distribution is on */}
+              {leadMode !== "manual" && (
+                <label className={`flex items-center gap-2 mt-3 pt-3 border-t ${isDark ? "border-white/5" : "border-gray-100"} cursor-pointer`}>
+                  <input
+                    type="checkbox"
+                    checked={person.acceptsLeads !== false}
+                    onChange={(e) => handleAcceptsLeadsToggle(person.id, e.target.checked)}
+                    className="rounded"
+                  />
+                  <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                    {t("staffPage.acceptsLeads")}
+                  </span>
+                </label>
+              )}
               {/* Telegram status */}
               {person.telegramUsername && (
                 <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/5">

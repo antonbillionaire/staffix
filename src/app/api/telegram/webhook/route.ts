@@ -1417,6 +1417,17 @@ export async function POST(request: NextRequest) {
     // Обработка контакта (если пользователь поделился номером)
     if (message.contact) {
       const phone = message.contact.phone_number;
+      // Brand-new lead via shared contact → auto-assign to a staff per the
+      // business's lead-distribution mode. Existing client keeps current owner.
+      const existing = await prisma.client.findUnique({
+        where: { businessId_telegramId: { businessId: business.id, telegramId } },
+        select: { id: true },
+      });
+      let autoAssign: string | null = null;
+      if (!existing) {
+        const { pickStaffForNewLead } = await import("@/lib/lead-assignment");
+        autoAssign = await pickStaffForNewLead(business.id);
+      }
       await prisma.client.upsert({
         where: {
           businessId_telegramId: {
@@ -1429,6 +1440,7 @@ export async function POST(request: NextRequest) {
           telegramId,
           phone,
           name: message.contact.first_name,
+          assignedStaffId: autoAssign,
         },
         update: {
           phone,

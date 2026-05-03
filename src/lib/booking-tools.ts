@@ -8,6 +8,7 @@ import { localToUTC } from "./automation";
 import { sendBookingNotification } from "./notifications";
 import { dispatchCrmEvent } from "./crm-integrations";
 import { promoteDealStageByTelegram } from "./deal-pipeline";
+import { pickStaffForNewLead } from "./lead-assignment";
 
 // ========================================
 // TYPES
@@ -546,6 +547,17 @@ export async function createBooking(
 
     // Update client record (only if we have a telegramId-compatible identifier)
     if (clientTelegramId) {
+      // Check first so we know whether this is a brand-new lead — if yes,
+      // auto-assign to a staff member per the business's lead-distribution
+      // mode. Existing clients keep their current assignedStaffId.
+      const existing = await prisma.client.findUnique({
+        where: {
+          businessId_telegramId: { businessId, telegramId: clientTelegramId },
+        },
+        select: { id: true },
+      });
+      const autoAssign = existing ? null : await pickStaffForNewLead(businessId);
+
       await prisma.client.upsert({
         where: {
           businessId_telegramId: {
@@ -560,6 +572,7 @@ export async function createBooking(
           phone: clientPhone || null,
           lastVisitDate: bookingDate,
           totalVisits: 1,
+          assignedStaffId: autoAssign,
         },
         update: {
           name: clientName || undefined,

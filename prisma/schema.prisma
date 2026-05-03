@@ -64,6 +64,14 @@ model Business {
   // записать клиента на встречу. Этот флаг разрешает в sales mode подключать
   // booking-инструменты дополнительно к sales-tools.
   consultationsEnabled Boolean @default(false)
+
+  // Распределение новых лидов между менеджерами:
+  //   manual       — никого не назначаем автоматически (текущее поведение)
+  //   round_robin  — по очереди следующему сотруднику с acceptsLeads=true
+  //   by_load      — кому меньше открытых задач + клиентов в активных стадиях
+  // lastAssignedStaffId хранит указатель для round-robin между запусками.
+  leadAssignmentMode    String  @default("manual")
+  lastAssignedStaffId   String?
   staffCount    Int?      // количество сотрудников
   language      String    @default("ru") // ru, uz, kz, kg, tj, am, ge
   onboardingCompleted Boolean @default(false)
@@ -374,6 +382,11 @@ model Staff {
   // Зарплата
   baseRate          Int?     // Фиксированная ставка (за месяц)
   commissionPercent Float?   // % с услуги/продажи (например 30%)
+
+  // Включён ли в авто-распределение лидов (round-robin / by-load).
+  // Default true — новые сотрудники сразу попадают в ротацию. Владелец
+  // может выключить если сотрудник в отпуске / на стажировке / не работает с клиентами.
+  acceptsLeads      Boolean   @default(true)
 
   bookings      Booking[]
   orders        Order[]

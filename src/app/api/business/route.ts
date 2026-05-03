@@ -151,7 +151,7 @@ export async function PUT(request: Request) {
     }
 
     const data = await request.json();
-    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, botLogo, timezone, ownerTelegramUsername, paymeId, clickServiceId, clickMerchantId, kaspiPayLink, waPhoneNumberId, waAccessToken, waVerifyToken, waActive, fbPageId, fbPageAccessToken, fbVerifyToken, fbActive, businessTypes, language, deliveryEnabled, deliveryTimeFrom, deliveryTimeTo, deliveryFee, deliveryFreeFrom, deliveryZones, consultationsEnabled } = data;
+    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, botLogo, timezone, ownerTelegramUsername, paymeId, clickServiceId, clickMerchantId, kaspiPayLink, waPhoneNumberId, waAccessToken, waVerifyToken, waActive, fbPageId, fbPageAccessToken, fbVerifyToken, fbActive, businessTypes, language, deliveryEnabled, deliveryTimeFrom, deliveryTimeTo, deliveryFee, deliveryFreeFrom, deliveryZones, consultationsEnabled, leadAssignmentMode } = data;
 
     // Найти бизнес пользователя
     const existingBusiness = await prisma.business.findFirst({
@@ -187,6 +187,13 @@ export async function PUT(request: Request) {
     if (businessTypes !== undefined) updateData.businessTypes = businessTypes;
     if (language !== undefined) updateData.language = language;
     if (consultationsEnabled !== undefined) updateData.consultationsEnabled = Boolean(consultationsEnabled);
+    if (leadAssignmentMode !== undefined) {
+      const valid = ["manual", "round_robin", "by_load"];
+      if (!valid.includes(leadAssignmentMode)) {
+        return NextResponse.json({ error: "Недопустимый режим распределения лидов" }, { status: 400 });
+      }
+      updateData.leadAssignmentMode = leadAssignmentMode;
+    }
     if (deliveryEnabled !== undefined) updateData.deliveryEnabled = Boolean(deliveryEnabled);
     if (deliveryTimeFrom !== undefined) updateData.deliveryTimeFrom = deliveryTimeFrom ? (parseInt(deliveryTimeFrom, 10) || null) : null;
     if (deliveryTimeTo !== undefined) updateData.deliveryTimeTo = deliveryTimeTo ? (parseInt(deliveryTimeTo, 10) || null) : null;
