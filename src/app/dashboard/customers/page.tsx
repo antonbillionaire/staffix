@@ -83,12 +83,25 @@ const DEAL_STAGE_LABEL: Record<DealStage, string> = {
   lost: "Не купил",
 };
 
+// Subtle palette — для kanban-карточек и read-only бейджей. Нюансы оттенков
+// помогают глазу быстро различать стадии без визуального шума.
 const DEAL_STAGE_COLOR: Record<DealStage, string> = {
   lead: "bg-gray-500/15 text-gray-300",
   consultation_booked: "bg-blue-500/15 text-blue-400",
   consultation_done: "bg-indigo-500/15 text-indigo-400",
   client: "bg-green-500/15 text-green-400",
   lost: "bg-red-500/15 text-red-400",
+};
+
+// Stronger palette — для интерактивных контролов (dropdown в таблице и в
+// карточке). Использует более насыщенный фон + белый текст так что dropdown
+// выглядит явным interactive control, а не disabled бейджем.
+const DEAL_STAGE_DROPDOWN_COLOR: Record<DealStage, string> = {
+  lead: "bg-slate-500/40 text-white border-slate-400/50",
+  consultation_booked: "bg-blue-500/50 text-white border-blue-400/60",
+  consultation_done: "bg-indigo-500/50 text-white border-indigo-400/60",
+  client: "bg-green-500/50 text-white border-green-400/60",
+  lost: "bg-red-500/50 text-white border-red-400/60",
 };
 
 interface Stats {
@@ -720,10 +733,10 @@ export default function CustomersPage() {
                           <select
                             value={customer.dealStage}
                             onChange={(e) => handleDealStageChange(customer, e.target.value as DealStage)}
-                            // Yellower visual: explicit border + caret arrow + cursor так что
-                            // менеджер сразу видит — это интерактивный контрол, а не
-                            // просто статичный бейдж.
-                            className={`text-xs font-medium px-2 py-1 pr-6 rounded border cursor-pointer ${DEAL_STAGE_COLOR[customer.dealStage]} ${isDark ? "border-white/20 hover:border-white/40" : "border-gray-300 hover:border-gray-400"} appearance-none bg-no-repeat bg-[right_4px_center]`}
+                            // Используем DEAL_STAGE_DROPDOWN_COLOR — насыщенные
+                            // оттенки + белый текст, так что dropdown не
+                            // воспринимается как disabled. Caret-стрелка поверх.
+                            className={`text-xs font-semibold px-2 py-1 pr-6 rounded border cursor-pointer hover:opacity-80 transition-opacity ${DEAL_STAGE_DROPDOWN_COLOR[customer.dealStage]} appearance-none bg-no-repeat bg-[right_4px_center]`}
                             style={{
                               backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e")`,
                             }}
