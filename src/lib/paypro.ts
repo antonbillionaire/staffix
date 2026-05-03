@@ -301,19 +301,14 @@ export function verifyIP(ip: string): boolean {
 
 // PayPro hosts a customer portal where users can view their subscriptions,
 // update payment methods, and cancel without us calling any API. They log in
-// with the email they used at checkout (PayPro sends a magic-link).
+// with the email they used at checkout.
 //
-// We expose this URL to the dashboard so users can manage their card without
-// needing us to proxy add/remove-card calls — the latter requires PayPro
-// sandbox testing we haven't done yet (see project memory: B is partial).
+// Correct URL: cc.payproglobal.com/Customer/Account/Login. The earlier
+// guess at store.payproglobal.com/customer-portal/customer/login was a 404
+// (verified manually). This is PayPro's universal customer login — buyers
+// of any vendor reach their account from here, no vendor-id param needed.
 export function getCustomerPortalUrl(): string {
-  const base = "https://store.payproglobal.com/customer-portal/customer/login";
-  // Some PayPro Global tenants accept vendorAccountId as a hint so the portal
-  // shows the right vendor branding. Harmless if ignored by their UI.
-  if (PAYPRO_VENDOR_ACCOUNT_ID) {
-    return `${base}?vendorAccountId=${PAYPRO_VENDOR_ACCOUNT_ID}`;
-  }
-  return base;
+  return "https://cc.payproglobal.com/Customer/Account/Login";
 }
 
 // PayPro API: Cancel subscription permanently. Использует /Subscriptions/Terminate
