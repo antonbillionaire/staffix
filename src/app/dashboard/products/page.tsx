@@ -195,13 +195,32 @@ export default function ProductsPage() {
     setEnrichProgress("");
     let totalEnriched = 0;
     try {
-      // Цикл вызывает endpoint пока remaining > 0
+      // Цикл вызывает endpoint пока remaining > 0. При сбое одного батча — 1 retry через 3 секунды.
+      let consecutiveFailures = 0;
       while (true) {
-        const res = await fetch("/api/products/enrich-batch?limit=30", { method: "POST" });
+        const res = await fetch("/api/products/enrich-batch?limit=12", { method: "POST" });
         if (!res.ok) {
-          alert("Ошибка обогащения. Попробуйте позже.");
+          consecutiveFailures++;
+          let serverMessage = "";
+          try {
+            const errBody = await res.json();
+            serverMessage = errBody?.error || "";
+          } catch {}
+          if (consecutiveFailures < 2) {
+            setEnrichProgress(
+              `Сбой батча (${serverMessage || res.status}). Повтор через 3 сек...`
+            );
+            await new Promise((r) => setTimeout(r, 3000));
+            continue;
+          }
+          const reason = serverMessage ? `\n\nПричина: ${serverMessage}` : "";
+          alert(
+            `Обогащение прервано после ${totalEnriched} товаров.${reason}\n\n` +
+              `Каталог большой — это нормально. Нажмите кнопку ещё раз — продолжит с того места где остановилось.`
+          );
           break;
         }
+        consecutiveFailures = 0;
         const data = await res.json();
         totalEnriched += data.enriched || 0;
         setEnrichProgress(

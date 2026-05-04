@@ -38,7 +38,9 @@ export async function POST(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "30", 10), 1), 100);
+    // Дефолт 12: при ~3с/товар укладывается в Vercel timeout 60с с запасом.
+    // Раньше было 30 — большие каталоги (4000+ товаров) ловили timeout.
+    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "12", 10), 1), 30);
 
     // Кандидаты — товары без тегов (ключевой признак необогащения).
     // Дополнительно: tags пуст ИЛИ имеет меньше 3 элементов.
@@ -85,6 +87,13 @@ export async function POST(request: NextRequest) {
           },
           targetLang
         );
+        // Признак реального обогащения: в out.tags есть хотя бы 3 элемента.
+        // Если ANTHROPIC_API_KEY не задан или Claude упал — enrichProduct тихо
+        // вернёт исходные tags, и обновлять запись с теми же данными бессмысленно
+        // (это создавало бы бесконечный цикл — фронт думал бы что прогресс есть).
+        const reallyEnriched = (out.tags?.length || 0) >= 3;
+        if (!reallyEnriched) continue;
+
         await prisma.product.update({
           where: { id: p.id },
           data: {
@@ -100,9 +109,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Если что-то реально обогатили — освежаем контекст бота
     if (enrichedCount > 0) {
       await markBusinessConversationsForRefresh(business.id);
+    }
+
+    // Если в этом батче не обогатили НИ одного товара (хотя кандидаты были) —
+    // это сигнал что Claude/ключ сломан. Возвращаем 502, фронт покажет причину
+    // и не будет крутиться в бесконечном цикле.
+    if (batch.length > 0 && enrichedCount === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "AI не вернул обогащённые данные ни для одного товара. " +
+            "Проверьте ANTHROPIC_API_KEY в Vercel Environment Variables, " +
+            "или подождите — возможно сработал rate limit.",
+        },
+        { status: 502 }
+      );
     }
 
     const remaining = needEnrich.length - batch.length;
@@ -113,6 +136,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("POST /api/products/enrich-batch:", error);
-    return NextResponse.json({ error: "Ошибка обогащения" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Неизвестная ошибка";
+    return NextResponse.json({ error: `Ошибка обогащения: ${message}` }, { status: 500 });
   }
 }
