@@ -789,6 +789,33 @@ export async function createOrder(
       client = candidates[0] || null;
     }
 
+    // Канальный fallback: клиент пришёл из WhatsApp/Instagram через ChannelClient,
+    // в чате не дал телефон, но в его профиле канала есть whatsappPhone (для WA),
+    // или общий phone. Пробуем смэтчить с импортированной записью Client по этому
+    // номеру. Без этого WA/IG-клиенты с присвоенным уровнем не получали скидку.
+    if (!client && channelClientId) {
+      try {
+        const channelClient = await prisma.channelClient.findUnique({
+          where: { id: channelClientId },
+          select: { whatsappPhone: true, phone: true },
+        });
+        const channelPhone = channelClient?.whatsappPhone || channelClient?.phone || null;
+        if (channelPhone) {
+          const normalized = channelPhone.replace(/\D/g, "");
+          if (normalized.length >= 7) {
+            const candidates = await prisma.client.findMany({
+              where: { businessId, phone: { contains: normalized.slice(-9) } },
+              select: loyaltySelect,
+              take: 1,
+            });
+            client = candidates[0] || null;
+          }
+        }
+      } catch (e) {
+        console.warn("[create_order] channel-client loyalty lookup failed:", e);
+      }
+    }
+
     // Авто-привязка: если нашли импортированную/ручную запись, у которой ещё
     // нет telegramId, а заказ создаётся из Telegram — связываем навсегда.
     // Все будущие заказы этого клиента пойдут по telegramId без поиска.
@@ -1323,16 +1350,46 @@ export async function notifyManagerByTelegram(
       console.error(`${tag} dashboard notification FAILED:`, e);
     }
 
-    // 2) Если у владельца настроен личный Telegram — пушим уведомление туда.
-    //    Внимательно: parse_mode НЕ ИСПОЛЬЗУЕМ — любой "_" или "*" в reason
-    //    раньше ломал Markdown, Telegram возвращал 400, и владелец не получал ничего.
+    // 2) Если у клиента есть привязанный менеджер — эскалируем именно ему.
+    //    Если нет (или менеджер не настроил телеграм) — fallback на владельца.
+    //    Это правильнее чем дёргать владельца по каждому диалогу: владелец
+    //    хочет видеть только то, что менеджер не закрыл сам.
+    let assignedManagerChatId: bigint | null = null;
+    let assignedManagerName: string | null = null;
+    if (clientTelegramId > BigInt(0)) {
+      try {
+        const client = await prisma.client.findUnique({
+          where: { businessId_telegramId: { businessId, telegramId: clientTelegramId } },
+          select: { assignedStaffId: true },
+        });
+        if (client?.assignedStaffId) {
+          const staff = await prisma.staff.findUnique({
+            where: { id: client.assignedStaffId },
+            select: { telegramChatId: true, name: true, notificationsEnabled: true },
+          });
+          if (staff?.telegramChatId && staff.notificationsEnabled !== false) {
+            assignedManagerChatId = staff.telegramChatId;
+            assignedManagerName = staff.name;
+          }
+        }
+      } catch (e) {
+        console.warn(`${tag} assignedStaff lookup failed:`, e);
+      }
+    }
+
+    // Целевой получатель: привязанный менеджер > владелец
+    const targetChatId = assignedManagerChatId ?? business.ownerTelegramChatId;
+    const targetLabel = assignedManagerChatId
+      ? `assigned manager "${assignedManagerName || "?"}"`
+      : "owner";
+
     let telegramDelivered = false;
     let telegramReason = "";
     if (!business.botToken) {
       telegramReason = "no botToken";
       console.warn(`${tag} TG skip: no botToken`);
-    } else if (!business.ownerTelegramChatId) {
-      telegramReason = "no ownerTelegramChatId — owner did not /start the bot from their personal account";
+    } else if (!targetChatId) {
+      telegramReason = "no chatId — neither assigned manager nor owner has /start'ed the bot";
       console.warn(`${tag} TG skip: ${telegramReason}`);
     } else {
       try {
@@ -1342,14 +1399,14 @@ export async function notifyManagerByTelegram(
           `Вопрос: ${reason}\n\n` +
           `Клиент ждёт ответа в Telegram.`;
 
-        console.log(`${tag} TG sending to chat=${business.ownerTelegramChatId}`);
+        console.log(`${tag} TG sending to ${targetLabel} chat=${targetChatId}`);
         const tgResponse = await fetch(
           `https://api.telegram.org/bot${business.botToken}/sendMessage`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              chat_id: business.ownerTelegramChatId.toString(),
+              chat_id: targetChatId.toString(),
               text,
               // НЕ передаём parse_mode — plain text всегда доходит без эскейпа.
             }),
@@ -1358,7 +1415,7 @@ export async function notifyManagerByTelegram(
 
         if (tgResponse.ok) {
           telegramDelivered = true;
-          console.log(`${tag} TG DELIVERED`);
+          console.log(`${tag} TG DELIVERED to ${targetLabel}`);
         } else {
           const body = await tgResponse.text().catch(() => "");
           telegramReason = `TG API ${tgResponse.status}: ${body.slice(0, 200)}`;
