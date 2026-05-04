@@ -628,6 +628,50 @@ model SupportMessage {
   createdAt     DateTime  @default(now())
 }
 
+// Диалоги пользователей с support-ботом @staffix_support_bot. Раньше история
+// хранилась в Map в памяти процесса — на холодных стартах Vercel она терялась
+// и бот забывал контекст. Теперь сохраняем в БД, чтобы:
+//   1. Бот помнил всё между перезапусками контейнеров
+//   2. Можно было смотреть лог обращений (для аудита и обучения промптов)
+model SupportBotConversation {
+  id              String    @id @default(cuid())
+
+  // Telegram chat id пользователя — natural key
+  telegramChatId  BigInt    @unique
+  telegramUserId  BigInt?
+  username        String?   // @username если есть
+  firstName       String?
+  lastName        String?
+  language        String?   // ru / en / uz / kz — язык первого сообщения
+
+  // Связан ли с зарегистрированным пользователем Staffix (если он залогинен)
+  userId          String?
+
+  messages        SupportBotMessage[]
+
+  // Последняя активность для UI и cleanup'а старых диалогов
+  lastMessageAt   DateTime  @default(now())
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([lastMessageAt])
+  @@index([userId])
+}
+
+model SupportBotMessage {
+  id              String    @id @default(cuid())
+  role            String    // "user" | "assistant"
+  content         String    @db.Text
+
+  conversationId  String
+  conversation    SupportBotConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime  @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
 // ========================================
 // АВТОМАТИЗАЦИИ
 // ========================================

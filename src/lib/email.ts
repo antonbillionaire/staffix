@@ -1060,6 +1060,71 @@ const DRIP_FOOTER = `
 `;
 
 // Day 2: Remind to add services
+/**
+ * Уведомление пользователю о новом ответе администратора на его support-тикет.
+ * Шлём из support-webhook (handleAdminReply) сразу после того как админ
+ * напишет /reply TICKET_ID ... в @staffix_support_bot. До этого ответ
+ * сохранялся только в БД и пользователь его не получал — клиент ждал
+ * ответа неделями, не зная что он есть.
+ */
+export async function sendSupportReplyToUserEmail(params: {
+  email: string;
+  name: string;
+  ticketSubject: string;
+  ticketIdShort: string;
+  replyMessage: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    if (!resend) {
+      console.log(`[DEV] Support reply email for ${params.email} — ticket ${params.ticketIdShort}`);
+      return { success: true };
+    }
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
+    // Экранируем text → HTML
+    const safeReply = params.replyMessage
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\n/g, "<br>");
+
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: params.email,
+      replyTo: "support@staffix.io",
+      subject: `Ответ поддержки по тикету ${params.ticketIdShort}: ${params.ticketSubject}`,
+      html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f5f7;margin:0;padding:32px 20px;color:#1a1a2e;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+    <div style="padding:20px 28px;background:#eff6ff;border-bottom:1px solid #e5e7eb;">
+      <div style="font-size:13px;color:#1e40af;font-weight:600;margin-bottom:2px;">Ответ службы поддержки</div>
+      <h1 style="margin:0;font-size:18px;color:#1a1a2e;">Тикет #${params.ticketIdShort}</h1>
+    </div>
+    <div style="padding:24px 28px;">
+      <p style="margin:0 0 12px;color:#4b5563;">Здравствуйте, ${params.name}!</p>
+      <p style="margin:0 0 16px;color:#4b5563;line-height:1.6;">Получили ответ от службы поддержки на Ваше обращение «${params.ticketSubject}»:</p>
+      <div style="background:#f9fafb;border-left:3px solid #2563eb;padding:14px 18px;border-radius:6px;margin-bottom:18px;color:#1a1a2e;line-height:1.6;font-size:14px;">${safeReply}</div>
+      <p style="margin:0 0 18px;color:#4b5563;font-size:14px;">Если у Вас остались вопросы — продолжите диалог в дашборде или ответьте на это письмо.</p>
+      <a href="${appUrl}/dashboard/support" style="display:inline-block;padding:12px 22px;background:#1a1a2e;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">Открыть тикет в дашборде</a>
+    </div>
+    <div style="padding:14px 28px;background:#f9fafb;color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb;">
+      Команда поддержки Staffix · <a href="mailto:support@staffix.io" style="color:#2563eb;">support@staffix.io</a>
+    </div>
+  </div>
+</body></html>`,
+    });
+    if (error) {
+      console.error("Support reply email error:", error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (error) {
+    console.error("sendSupportReplyToUserEmail error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Ошибка отправки" };
+  }
+}
+
 export async function sendDripServicesReminder(
   email: string,
   name: string

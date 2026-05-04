@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
+import { sendSupportReplyToUserEmail } from "@/lib/email";
 
-// Telegram types
+// Telegram update type — only fields we use
 interface TelegramUpdate {
   update_id: number;
   message?: {
@@ -12,6 +13,7 @@ interface TelegramUpdate {
       first_name: string;
       last_name?: string;
       username?: string;
+      language_code?: string;
     };
     chat: {
       id: number;
@@ -24,138 +26,239 @@ interface TelegramUpdate {
   };
 }
 
-// Store conversation history (in production, use Redis or database)
-const conversationHistory: Map<number, Array<{ role: "user" | "assistant"; content: string }>> = new Map();
-
-// System prompt for support bot
-const SYSTEM_PROMPT = `Ты — AI-помощник службы поддержки Staffix. Staffix — это SaaS платформа для создания AI-сотрудников для бизнеса.
-
-Твоя задача — помогать пользователям с вопросами о платформе Staffix.
+// System prompt — обновлён до состояния продукта на 4 мая 2026.
+// Включает все 28 коммитов спринта 3-4 мая (CRM, AI продуктивность, платежи).
+const SYSTEM_PROMPT = `Ты — AI-помощник службы поддержки Staffix. Staffix — SaaS-платформа AI-сотрудников для бизнеса в Telegram / WhatsApp / Instagram / Facebook.
 
 ## ПРАВИЛА ОБЩЕНИЯ (КРИТИЧНО)
-- ВСЕГДА обращайся к собеседнику на "Вы". НИКОГДА не переходи на "ты", даже если собеседник пишет тебе на "ты".
-- ВСЕГДА начинай первое сообщение с "Здравствуйте" или "Добрый день/вечер". НИКОГДА не используй "Привет", "Эй", "Хай", "Здорово", "Слушай" в качестве приветствия — это слишком фамильярно.
-- Тон — вежливый, профессиональный, тёплый. Краткие сообщения по делу.
-- Допускаются вежливые разговорные обороты: "честно говоря", "на самом деле", "если позволите", "кстати" — но без фамильярности.
-- Можно использовать вежливые эмоциональные реакции (одну на сообщение): "Понимаю Вас.", "Хороший вопрос.", "Конечно.", "Безусловно.", "Рад был помочь."
-- ЗАПРЕЩЕНО: "Прикольно", "Круто", "Топ", "Жиза", "Ооо", ")" вместо эмодзи.
-- Эмодзи — умеренно, 0–1 на сообщение.
+- ВСЕГДА на «Вы». НИКОГДА не переходи на «ты» даже если собеседник пишет на «ты».
+- Первое приветствие — «Здравствуйте» / «Добрый день / вечер». ЗАПРЕЩЕНО: Привет, Эй, Хай, Здорово, Слушай.
+- Тон вежливый, профессиональный, тёплый. Кратко по делу.
+- Допустимо: «честно говоря», «на самом деле», «если позволите», «кстати».
+- Допустимо одно тёплое выражение на сообщение: «Понимаю Вас», «Хороший вопрос», «Конечно», «Безусловно», «Рад был помочь».
+- ЗАПРЕЩЕНО: Прикольно, Круто, Топ, Жиза, Ооо, ")" вместо эмодзи.
+- Эмодзи 0–1 на сообщение.
 - Отвечай на языке пользователя (русский / английский / узбекский / казахский).
 
-## О Staffix:
-- Staffix позволяет бизнесам создавать AI-сотрудников в Telegram, WhatsApp, Instagram, Facebook
-- AI-сотрудник отвечает клиентам, записывает на услуги, принимает заказы, отвечает на FAQ
-- Тарифы: Trial (14 дней, 100 сообщений), Starter $20 (200), Pro $45 (1000), Business $95 (3000), Enterprise $180 (безлимит)
+## ЧТО УМЕЕТ STAFFIX (актуально на май 2026)
 
-## Возможности платформы:
-- Настройка AI-сотрудника (характер, стиль общения, имя)
-- Подключение Telegram, WhatsApp, Instagram, Facebook Messenger
-- Услуги/товары, цены, импорт из Excel
-- Команда/мастера, расписание, отгулы
-- База знаний (FAQ и документы — PDF, Word, Excel)
-- Онлайн-запись клиентов с напоминаниями за 24ч и 2ч
-- CRM, сегменты клиентов, рассылки
-- Статистика и аналитика
-- Программа лояльности (кэшбэк, тиры)
-- Финансы команды (ставки + комиссии + премии/штрафы)
+### Каналы общения AI-сотрудника
+- Telegram (через @BotFather + токен в дашборде → Каналы)
+- WhatsApp Business (Embedded Signup, 5 минут)
+- Instagram DM (через Meta OAuth, бизнес-аккаунт)
+- Facebook Messenger (Page нужна — НЕ личный профиль, это требование Meta)
+- **Голосовые сообщения** распознаются на 4 языках (Groq Whisper)
 
-## Как помочь с настройкой:
-1. AI-сотрудник: Дашборд → AI-сотрудник → База знаний (имя бота, характер, документы)
-2. Telegram бот: Создать через @BotFather, получить токен, вставить в Каналы
-3. Услуги: Раздел "Мои услуги" → добавить название, цену, длительность (или импорт CSV)
-4. База знаний: Раздел "База знаний" → загрузить документы или добавить FAQ
+### AI и его обучение
+- AI обучается на вашей **базе знаний**: FAQ, документы (PDF / Word / Excel), услуги, товары
+- **AI Learning** — кнопка «Исправить ответ» в /dashboard/messages: исправляете один раз, AI больше не повторяет ошибку
+- **AI-память клиента** — каждые 2 часа cron обновляет резюме и предпочтения каждого клиента из истории диалогов
+- **AI заполняет custom fields сам** — если в /dashboard/settings → Профиль завести «Дата свадьбы» (тип Дата), AI заполнит её когда клиент упомянет в чате
 
-## Как работает кэш базы знаний (частый вопрос):
-- **Кэша нет.** На каждое сообщение клиента бот заново читает FAQ, документы, услуги и товары из базы. Любое изменение через дашборд вступает в силу мгновенно для нового запроса.
-- **Документы парсятся при загрузке.** Пока парсинг идёт — документ в промпт не попадает (статус "обрабатывается"). После парсинга — доступен сразу.
-- **Если бот после правки FAQ/документа повторяет старую информацию в продолжающемся диалоге** — это не кэш, а эффект "история перетягивает промпт". Claude (модель AI) видит свои предыдущие ответы в текущем диалоге и старается быть последовательным с ними, даже если в новом промпте есть свежие данные.
-- **Что Staffix делает автоматически.** При любом изменении FAQ / документов / услуг / товаров на всех активных диалогах ставится флаг обновления. На следующем сообщении бизнес-бот:
-  - **Если диалог "остыл" (последнее сообщение более 10 минут назад)** — полностью обнуляет историю и отвечает только по свежему промпту.
-  - **Если диалог активный (последнее сообщение менее 10 минут назад)** — историю сохраняет (чтобы не потерять контекст текущего разговора), но в системный промпт добавляется напоминание боту: "база знаний обновлена, не повторяй свои прошлые ответы автоматически, сверяй цены и факты со свежими данными". Это помогает боту дать обновлённый ответ без потери того, о чём только что говорили.
-- **Долгосрочная память клиента сохраняется в любом случае** — имя, предпочтения, история визитов, AI-summary (всё это лежит отдельно в карточке клиента, не в истории диалога).
-- **Если клиент очень хочет сразу проверить новые данные** — пусть просто напишет боту любое сообщение по теме, которая поменялась. Бот ответит уже из обновлённой базы.
+### Что AI делает сам без команды менеджера
+- Записывает клиентов на услуги (с проверкой расписания мастеров и специализации)
+- Оформляет заказы (для магазинов)
+- Шлёт напоминания за 24ч и 2ч до визита (no-show падает с 30% до 8%)
+- Запрашивает отзыв после визита (4-5 баллов → на 2gis, 1-3 → в дашборд)
+- Реактивирует ушедших клиентов со скидкой
+- Делает допродажу после заказа (один товар)
+- Передаёт диалог человеку (notify_manager) → создаётся задача менеджеру
 
-## Правила работы:
-- Отвечай кратко и по делу
-- Если не знаешь ответ — честно скажи и предложи связаться со специалистом
-- Не выдумывай информацию о функциях которых нет
-- При технических проблемах с аккаунтом — эскалируй
+### CRM — управление клиентами
+- **База клиентов** с историей, AI-резюме, предпочтениями, тегами
+- **Кастомные поля** — до 20 своих полей под бизнес (текст / число / дата / выбор), AI заполняет автоматом
+- **Воронка продаж** — 5 этапов: лид → записан → встреча прошла → клиент / не купил
+- **Kanban-вид** в /dashboard/customers — drag&drop карточек между этапами
+- **Funnel-аналитика** в /dashboard/statistics — конверсии стадия→стадия в %
+- **Программа лояльности** — cashback / каждый N-ный визит / уровни (бронзовый/серебряный/золотой/платиновый)
+- **CSV-импорт и экспорт** клиентов и заказов (UTF-8 BOM, Excel сразу читает кириллицу)
+- **Сегменты** клиентов (VIP / Активные / Неактивные) — для рассылок
 
-## Эскалация:
-Если вопрос сложный или требует доступа к аккаунту пользователя, скажи:
-"Для решения этого вопроса мне нужно передать Ваше обращение нашему специалисту. Он свяжется с Вами в ближайшее время."
+### Команда
+- Сотрудники, расписание, отгулы, специализация
+- **Реферальные ссылки** \`t.me/ВашБот?start=s_<staffId>\` — клиент по ссылке привязан к менеджеру (работает в обоих режимах: продажи и услуги)
+- **Распределение лидов** — 3 режима: Вручную / По очереди / По нагрузке
+- **Ручное переназначение** — колонка «Менеджер» в /dashboard/customers, dropdown в строке клиента
+- **Задачи менеджера** — виджет «Мои задачи» в /dashboard, AI авто-создаёт задачу при эскалации (срочные → +30 минут, обычные → +4 часа)
 
-Всегда старайся помочь сам, эскалируй только когда действительно необходимо.`;
+### Маркетинг
+- **Рассылки в Telegram + Email** одновременно (тоggle при создании)
+- Сегментация рассылок (все / VIP / активные / неактивные)
+- Запланированные рассылки (cron каждые 5 мин обрабатывает очередь)
+- Обязательная ссылка «Отписаться» в каждом email (Gmail one-click Unsubscribe)
+- Транзакционные email (оплата, отмена) не блокируются отпиской
 
-// Send message to Telegram
-async function sendTelegramMessage(chatId: number, text: string): Promise<boolean> {
+### Интеграции
+- Outbound webhooks в Bitrix24 / amoCRM / Google Sheets / любой URL
+- 6 типов событий: создание брони, подтверждение, отмена, новый клиент, отзыв, сообщение
+
+### Sales+Booking гибрид (для онлайн-школ, консалтинга, коучей)
+- Toggle «Запись на бесплатные консультации» в /dashboard/settings → Подписка (только в sales-режиме)
+- AI получает оба набора инструментов — оформляет заказы И записывает на встречи
+
+### Подписка Staffix (тарифы и платежи)
+- Тарифы: Trial 14 дней (100 сообщений), Starter $20 (200), Pro $45 (1000), Business $95 (3000), Enterprise $180 (безлимит)
+- Платежи через PayPro Global
+- **Pro-rata смена тарифа**: при апгрейде неиспользованные дни старого плана становятся бонус-днями нового. При даунгрейде можно без оплаты — кредит конвертируется в дни.
+- **Управление картой**: кнопка в /dashboard/settings → Подписка → открывается \`cc.payproglobal.com/customer/Account/Login\`. Первый раз? Пароля нет — нужно нажать «Forgot password», получить ссылку на email, задать пароль.
+- **Отмена подписки**: PayPro Terminate → сервис до конца оплаченного периода → email «доступ до X числа» → напоминания за 7/3/1 день
+- **При неудачном списании**: email клиенту с инструкцией обновить карту, после нескольких попыток — статус «Приостановлена», красный баннер в дашборде
+
+## ЧАСТО ЗАДАВАЕМЫЕ ВОПРОСЫ
+
+### «Бот не отвечает после изменения базы знаний / FAQ»
+- Кэша нет — на каждое сообщение бот заново читает FAQ, документы, услуги, товары из БД. Изменения вступают в силу мгновенно.
+- Документы парсятся при загрузке (несколько секунд для PDF) — пока статус «обрабатывается», документ в промпт не попадает.
+- Если бот в продолжающемся диалоге повторяет старое — это «история перетягивает промпт». Решение: при изменении FAQ/документов на активных диалогах ставится флаг обновления, на следующем сообщении промпт включает напоминание сверять факты.
+
+### «Не подключается Facebook / Instagram, ошибка No Pages»
+Это значит подключили личный профиль FB. Meta разрешает API только бизнес-страницам (Facebook Page). Решение:
+1. Создать Page на facebook.com/pages/create
+2. Instagram переключить на Business + связать с Page
+3. Опционально: «Convert profile to Page» в настройках Meta — переносит подписчиков
+4. Вернуться в Staffix → Каналы → Подключить заново
+
+### «Хочу добавить мастеров / расписание»
+Дашборд → Моя команда → Добавить → имя, должность, фото, Telegram-username + кнопка «Расписание» для смен и «Отгулы» для отпусков.
+
+### «Куда вводить токен Telegram бота»
+Дашборд → AI-сотрудник → Канал Telegram → вставить токен от @BotFather.
+
+### «Как работает реферальная ссылка менеджера»
+В карточке сотрудника на /dashboard/staff кнопка «Копировать ссылку». Формат \`t.me/ВашБот?start=s_<staffId>\`. Клиент по ссылке привязывается к менеджеру навсегда.
+
+### «У меня 2+ менеджеров — как распределять лидов»
+/dashboard/staff → блок «Распределение новых лидов» (виден если 2+ сотрудников). Три режима — Вручную, По очереди, По нагрузке. На карточке сотрудника галочка «Принимает лидов» — снимите для отпускника.
+
+### «Где увидеть свои тикеты в поддержку»
+/dashboard/support — там история обращений и ответов администратора.
+
+## ПРАВИЛА РАБОТЫ
+
+- Отвечай кратко и по делу. Не пиши простыни — пользователь хочет конкретный шаг.
+- Если знаешь точный ответ — давай ссылку на конкретный раздел дашборда.
+- Если не знаешь точно — честно скажи и предложи передать вопрос специалисту.
+- НЕ выдумывай функций которых нет (см. список выше — это исчерпывающий).
+- ЗАПРЕЩЕНО упоминать «Финансы команды» / «Мои финансы» — этот раздел был удалён.
+- При технических проблемах с аккаунтом — эскалируй.
+
+## ЭСКАЛАЦИЯ
+Если вопрос требует доступа к аккаунту, биллингу, или это явно баг — скажи:
+«Для решения этого вопроса передам Ваше обращение специалисту. Он свяжется с Вами в ближайшее время.»
+
+После этой фразы тебя автоматически эскалируют — Антон получит уведомление.`;
+
+// ---------------------------------------------------------------------------
+// Telegram helpers
+// ---------------------------------------------------------------------------
+
+async function sendTelegramMessage(chatId: number | bigint, text: string): Promise<boolean> {
   const botToken = process.env.SUPPORT_BOT_TOKEN;
   if (!botToken) return false;
-
   try {
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        chat_id: chatId,
+        chat_id: typeof chatId === "bigint" ? chatId.toString() : chatId,
         text,
         parse_mode: "HTML",
       }),
     });
     return response.ok;
   } catch (error) {
-    console.error("Error sending Telegram message:", error);
+    console.error("[support-bot] sendTelegramMessage failed:", error);
     return false;
   }
 }
 
-// Send typing action
 async function sendTypingAction(chatId: number): Promise<void> {
   const botToken = process.env.SUPPORT_BOT_TOKEN;
   if (!botToken) return;
-
   try {
     await fetch(`https://api.telegram.org/bot${botToken}/sendChatAction`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        action: "typing",
-      }),
+      body: JSON.stringify({ chat_id: chatId, action: "typing" }),
     });
   } catch {
-    // Ignore errors
+    // ignore
   }
 }
 
-// Handle admin reply to ticket
-async function handleAdminReply(
-  ticketIdShort: string,
-  replyMessage: string,
-  adminChatId: string
-): Promise<string> {
-  try {
-    // Find ticket by short ID (last 8 chars)
-    const tickets = await prisma.supportTicket.findMany({
-      where: {
-        id: { endsWith: ticketIdShort },
+// ---------------------------------------------------------------------------
+// DB persistence — replaces the old in-memory Map.
+// ---------------------------------------------------------------------------
+
+async function getOrCreateConversation(
+  chatId: number,
+  from: { id: number; first_name: string; last_name?: string; username?: string; language_code?: string }
+): Promise<{ id: string; messages: Array<{ role: string; content: string }> }> {
+  const chatBig = BigInt(chatId);
+
+  let conv = await prisma.supportBotConversation.findUnique({
+    where: { telegramChatId: chatBig },
+    include: {
+      messages: { orderBy: { createdAt: "desc" }, take: 20 },
+    },
+  });
+
+  if (!conv) {
+    conv = await prisma.supportBotConversation.create({
+      data: {
+        telegramChatId: chatBig,
+        telegramUserId: BigInt(from.id),
+        username: from.username || null,
+        firstName: from.first_name,
+        lastName: from.last_name || null,
+        language: from.language_code || null,
       },
       include: {
-        user: { select: { email: true, name: true } },
+        messages: { orderBy: { createdAt: "desc" }, take: 20 },
       },
+    });
+  }
+
+  // Возвращаем хронологически — старые сначала
+  const messagesAsc = conv.messages.slice().reverse().map((m) => ({ role: m.role, content: m.content }));
+  return { id: conv.id, messages: messagesAsc };
+}
+
+async function appendMessage(conversationId: string, role: "user" | "assistant", content: string): Promise<void> {
+  await prisma.supportBotMessage.create({
+    data: { conversationId, role, content },
+  });
+  await prisma.supportBotConversation.update({
+    where: { id: conversationId },
+    data: { lastMessageAt: new Date() },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin reply (от админа в боте — /reply <ticketId> <message>)
+// Сохраняет в БД, ОБНОВЛЯЕТ статус тикета, ШЛЁТ EMAIL пользователю.
+// Это и было главным разрывом — раньше ответ висел только в БД.
+// ---------------------------------------------------------------------------
+
+async function handleAdminReply(
+  ticketIdShort: string,
+  replyMessage: string
+): Promise<string> {
+  try {
+    const tickets = await prisma.supportTicket.findMany({
+      where: { id: { endsWith: ticketIdShort } },
+      include: { user: { select: { email: true, name: true } } },
     });
 
     if (tickets.length === 0) {
       return `❌ Тикет с ID "${ticketIdShort}" не найден.`;
     }
-
     if (tickets.length > 1) {
       return `⚠️ Найдено несколько тикетов. Используйте полный ID.`;
     }
 
     const ticket = tickets[0];
 
-    // Save the reply message
     await prisma.supportMessage.create({
       data: {
         content: replyMessage,
@@ -164,7 +267,6 @@ async function handleAdminReply(
       },
     });
 
-    // Update ticket status to in_progress if it was open
     if (ticket.status === "open") {
       await prisma.supportTicket.update({
         where: { id: ticket.id },
@@ -172,29 +274,50 @@ async function handleAdminReply(
       });
     }
 
-    return `✅ Ответ отправлен!\n\n<b>Тикет:</b> ${ticketIdShort}\n<b>Клиент:</b> ${ticket.user.name || ticket.user.email}\n<b>Ваш ответ:</b>\n${replyMessage}`;
+    // 🔔 Уведомление пользователю — это и есть фикс главной баги.
+    let emailStatus = "✉️ email не отправлен (нет адреса)";
+    if (ticket.user.email) {
+      try {
+        const result = await sendSupportReplyToUserEmail({
+          email: ticket.user.email,
+          name: ticket.user.name || "пользователь",
+          ticketSubject: ticket.subject,
+          ticketIdShort,
+          replyMessage,
+        });
+        emailStatus = result.success
+          ? `✉️ email отправлен на ${ticket.user.email}`
+          : `⚠️ email НЕ отправлен: ${result.error || "ошибка"}`;
+      } catch (e) {
+        emailStatus = `⚠️ email сбой: ${e instanceof Error ? e.message : "unknown"}`;
+      }
+    }
+
+    return `✅ Ответ отправлен!\n\n<b>Тикет:</b> ${ticketIdShort}\n<b>Клиент:</b> ${ticket.user.name || ticket.user.email}\n${emailStatus}\n\n<b>Ваш ответ:</b>\n${replyMessage}`;
   } catch (error) {
-    console.error("Error handling admin reply:", error);
+    console.error("[support-bot] handleAdminReply error:", error);
     return `❌ Ошибка при сохранении ответа. Попробуйте позже.`;
   }
 }
 
-// Notify admin about escalation
+// Notify admin about escalation (когда AI сам передаёт диалог человеку)
 async function notifyAdminEscalation(
   userName: string,
   userMessage: string,
-  chatId: number
+  chatId: number,
+  conversationId: string
 ): Promise<void> {
   const botToken = process.env.SUPPORT_BOT_TOKEN;
   const adminChatId = process.env.SUPPORT_CHAT_ID;
-
   if (!botToken || !adminChatId) return;
 
   const message =
-    `🔔 <b>Эскалация из поддержки</b>\n\n` +
+    `🔔 <b>Эскалация из support-бота</b>\n\n` +
     `<b>Пользователь:</b> ${userName}\n` +
-    `<b>Chat ID:</b> ${chatId}\n\n` +
-    `<b>Сообщение:</b>\n${userMessage}`;
+    `<b>Chat ID:</b> <code>${chatId}</code>\n` +
+    `<b>Conversation ID:</b> <code>${conversationId.slice(-8)}</code>\n\n` +
+    `<b>Сообщение:</b>\n${userMessage}\n\n` +
+    `💬 Ответьте напрямую в <a href="https://t.me/staffix_support_bot">@staffix_support_bot</a> или через тикет /reply.`;
 
   try {
     await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -207,73 +330,54 @@ async function notifyAdminEscalation(
       }),
     });
   } catch (error) {
-    console.error("Error notifying admin:", error);
+    console.error("[support-bot] notifyAdminEscalation failed:", error);
   }
 }
 
-// Generate AI response
+// ---------------------------------------------------------------------------
+// AI response generation (теперь с DB-историей)
+// ---------------------------------------------------------------------------
+
 async function generateAIResponse(
   userMessage: string,
-  chatId: number,
-  userName: string
+  history: Array<{ role: string; content: string }>
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-
   if (!apiKey) {
     return "Извините, сервис временно недоступен. Попробуйте позже.";
   }
-
   try {
     const anthropic = new Anthropic({ apiKey });
-
-    // Get or create conversation history
-    let history = conversationHistory.get(chatId) || [];
-
-    // Keep only last 10 messages for context
-    if (history.length > 20) {
-      history = history.slice(-20);
-    }
-
-    // Add user message to history
-    history.push({ role: "user", content: userMessage });
+    // Берём последние 20 сообщений + текущее новое
+    const trimmedHistory = history.slice(-20);
+    const messages = [
+      ...trimmedHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+      { role: "user" as const, content: userMessage },
+    ];
 
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-5-20250929",
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
-      messages: history,
+      messages,
     });
 
-    const assistantMessage =
-      response.content[0].type === "text"
-        ? response.content[0].text
-        : "Извините, не могу обработать ваш запрос.";
-
-    // Add assistant response to history
-    history.push({ role: "assistant", content: assistantMessage });
-    conversationHistory.set(chatId, history);
-
-    // Check if escalation is needed
-    if (
-      assistantMessage.includes("передать ваше обращение") ||
-      assistantMessage.includes("специалисту")
-    ) {
-      await notifyAdminEscalation(userName, userMessage, chatId);
-    }
-
-    return assistantMessage;
+    const text = response.content[0].type === "text" ? response.content[0].text : "Извините, не смог обработать запрос.";
+    return text;
   } catch (error) {
-    console.error("Error generating AI response:", error);
-    return "Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте позже или напишите нам на сайте staffix.io";
+    console.error("[support-bot] generateAIResponse failed:", error);
+    return "Произошла ошибка. Попробуйте позже или напишите на support@staffix.io.";
   }
 }
 
-// Webhook handler
+// ---------------------------------------------------------------------------
+// Webhook entrypoint
+// ---------------------------------------------------------------------------
+
 export async function POST(request: NextRequest) {
   try {
     const update: TelegramUpdate = await request.json();
 
-    // Only process text/voice/audio messages
     if (!update.message?.text && !update.message?.voice && !update.message?.audio) {
       return NextResponse.json({ ok: true });
     }
@@ -283,7 +387,7 @@ export async function POST(request: NextRequest) {
     let userMessage = message.text || "";
     const userName = message.from.first_name + (message.from.last_name ? ` ${message.from.last_name}` : "");
 
-    // Transcribe voice/audio via Groq Whisper
+    // Voice / audio → STT
     if (!userMessage && (message.voice || message.audio)) {
       const fileId = message.voice?.file_id || message.audio?.file_id;
       const botToken = process.env.SUPPORT_BOT_TOKEN;
@@ -294,9 +398,9 @@ export async function POST(request: NextRequest) {
           const filename = message.voice ? "voice.ogg" : "audio.mp3";
           const result = await transcribeAudio(buf, filename);
           userMessage = (result.text || "").trim();
-          console.log(`[Support TG] Transcribed ${message.voice ? "voice" : "audio"} (${result.language || "?"}): "${userMessage.slice(0, 80)}"`);
+          console.log(`[support-bot] STT (${result.language || "?"}): "${userMessage.slice(0, 80)}"`);
         } catch (e) {
-          console.error("[Support TG] STT failed:", e);
+          console.error("[support-bot] STT failed:", e);
         }
       }
       if (!userMessage) {
@@ -308,58 +412,55 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Handle /start command
+    // /start
     if (userMessage === "/start") {
       await sendTelegramMessage(
         chatId,
         `Здравствуйте, ${message.from.first_name}! 👋\n\n` +
           `Я AI-помощник службы поддержки Staffix.\n\n` +
-          `Задайте мне вопрос о платформе, и я постараюсь помочь:\n` +
+          `Задайте вопрос о платформе, и я постараюсь помочь:\n` +
           `• Как настроить AI-сотрудника\n` +
-          `• Как подключить Telegram бота\n` +
-          `• Вопросы о тарифах\n` +
+          `• Как подключить Telegram / WhatsApp / Instagram / Facebook\n` +
+          `• Вопросы о тарифах и оплате\n` +
           `• Технические проблемы\n\n` +
-          `Просто напишите ваш вопрос!`
+          `Просто напишите Ваш вопрос!`
       );
       return NextResponse.json({ ok: true });
     }
 
-    // Handle /help command
     if (userMessage === "/help") {
       await sendTelegramMessage(
         chatId,
         `<b>Чем я могу помочь:</b>\n\n` +
           `• Ответить на вопросы о Staffix\n` +
           `• Помочь с настройкой AI-сотрудника\n` +
-          `• Объяснить как подключить Telegram бота\n` +
+          `• Объяснить как подключить мессенджеры\n` +
           `• Рассказать о тарифах\n\n` +
           `<b>Команды:</b>\n` +
-          `/start - Начать сначала\n` +
-          `/help - Показать эту справку\n` +
-          `/human - Связаться с живым оператором`
+          `/start — Начать сначала\n` +
+          `/help — Эта справка\n` +
+          `/human — Связаться с живым оператором`
       );
       return NextResponse.json({ ok: true });
     }
 
-    // Handle /human command - escalate to human
     if (userMessage === "/human") {
-      await notifyAdminEscalation(userName, "Пользователь запросил связь с оператором", chatId);
+      const conv = await getOrCreateConversation(chatId, message.from);
+      await notifyAdminEscalation(userName, "Пользователь запросил связь с оператором", chatId, conv.id);
       await sendTelegramMessage(
         chatId,
-        `Ваш запрос передан нашему специалисту. Он свяжется с вами в ближайшее время.\n\n` +
-          `Пока ожидаете, вы можете задать мне другие вопросы — возможно, я смогу помочь!`
+        `Ваш запрос передан нашему специалисту. Он свяжется с Вами в ближайшее время.\n\n` +
+          `Пока ожидаете — можете задать другие вопросы, возможно я смогу помочь.`
       );
       return NextResponse.json({ ok: true });
     }
 
-    // Handle /reply command (admin only)
+    // Admin commands — /reply, /tickets
     const adminChatId = process.env.SUPPORT_CHAT_ID;
     if (userMessage.startsWith("/reply ") && String(chatId) === adminChatId) {
-      // Parse: /reply TICKET_ID message
       const parts = userMessage.slice(7).trim().split(" ");
       const ticketIdShort = parts[0];
       const replyMessage = parts.slice(1).join(" ");
-
       if (!ticketIdShort || !replyMessage) {
         await sendTelegramMessage(
           chatId,
@@ -367,13 +468,11 @@ export async function POST(request: NextRequest) {
         );
         return NextResponse.json({ ok: true });
       }
-
-      const result = await handleAdminReply(ticketIdShort, replyMessage, adminChatId);
+      const result = await handleAdminReply(ticketIdShort, replyMessage);
       await sendTelegramMessage(chatId, result);
       return NextResponse.json({ ok: true });
     }
 
-    // Handle /tickets command (admin only) - show open tickets
     if (userMessage === "/tickets" && String(chatId) === adminChatId) {
       try {
         const openTickets = await prisma.supportTicket.findMany({
@@ -382,7 +481,6 @@ export async function POST(request: NextRequest) {
           orderBy: { createdAt: "desc" },
           take: 10,
         });
-
         if (openTickets.length === 0) {
           await sendTelegramMessage(chatId, "✅ Нет открытых тикетов!");
         } else {
@@ -390,39 +488,46 @@ export async function POST(request: NextRequest) {
           for (const t of openTickets) {
             const shortId = t.id.slice(-8);
             const status = t.status === "open" ? "🆕" : "⏳";
-            msg += `${status} <code>${shortId}</code> - ${t.subject}\n`;
-            msg += `   👤 ${t.user.name || t.user.email}\n\n`;
+            msg += `${status} <code>${shortId}</code> — ${t.subject}\n   👤 ${t.user.name || t.user.email}\n\n`;
           }
           msg += `\n💬 Ответить: <code>/reply ID сообщение</code>`;
           await sendTelegramMessage(chatId, msg);
         }
       } catch (error) {
-        console.error("Error fetching tickets:", error);
+        console.error("[support-bot] /tickets error:", error);
         await sendTelegramMessage(chatId, "❌ Ошибка при загрузке тикетов");
       }
       return NextResponse.json({ ok: true });
     }
 
-    // Show typing indicator
+    // Регулярный диалог: персистентная история + AI ответ
     await sendTypingAction(chatId);
 
-    // Generate AI response
-    const aiResponse = await generateAIResponse(userMessage, chatId, userName);
+    const conv = await getOrCreateConversation(chatId, message.from);
+    await appendMessage(conv.id, "user", userMessage);
 
-    // Send response
+    const aiResponse = await generateAIResponse(userMessage, conv.messages);
+
+    await appendMessage(conv.id, "assistant", aiResponse);
     await sendTelegramMessage(chatId, aiResponse);
+
+    // Эскалация если AI сам сообщил что передаёт человеку
+    if (
+      aiResponse.toLowerCase().includes("передам ваше обращение") ||
+      aiResponse.toLowerCase().includes("передать ваше обращение") ||
+      aiResponse.toLowerCase().includes("свяжется с вами в ближайшее время") ||
+      aiResponse.toLowerCase().includes("специалисту")
+    ) {
+      await notifyAdminEscalation(userName, userMessage, chatId, conv.id);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Webhook error:", error);
-    return NextResponse.json({ ok: true }); // Always return 200 to Telegram
+    console.error("[support-bot] webhook error:", error);
+    return NextResponse.json({ ok: true }); // Telegram всегда ждёт 200
   }
 }
 
-// Verify webhook (for setup)
 export async function GET() {
-  return NextResponse.json({
-    status: "ok",
-    message: "Staffix Support Bot Webhook",
-  });
+  return NextResponse.json({ status: "ok", message: "Staffix Support Bot Webhook" });
 }
