@@ -183,6 +183,43 @@ export default function ProductsPage() {
   // ──── AI-обогащение каталога: переводит описания, добавляет русские теги ────
   const [enriching, setEnriching] = useState(false);
   const [enrichProgress, setEnrichProgress] = useState<string>("");
+
+  // ──── Прогресс автоматического (фонового) обогащения каталога ────
+  // Cron каждые 30 мин добивает товары без тегов. Плашка показывает что идёт фон,
+  // чтобы пользователь понимал что не нужно жать кнопку «Обогатить» вручную.
+  const [enrichStatus, setEnrichStatus] = useState<{
+    total: number;
+    enriched: number;
+    remaining: number;
+    estimatedHours: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch("/api/products/enrichment-status");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setEnrichStatus({
+          total: data.total || 0,
+          enriched: data.enriched || 0,
+          remaining: data.remaining || 0,
+          estimatedHours: data.estimatedHours || 0,
+        });
+      } catch {
+        // тихо — плашка не критичная фича
+      }
+    };
+    fetchStatus();
+    // Обновляем каждые 60 секунд пока есть необогащённые товары
+    const interval = setInterval(fetchStatus, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
   const handleEnrichCatalog = async () => {
     if (
       !confirm(
@@ -434,6 +471,56 @@ export default function ProductsPage() {
             </button>
           </div>
         </div>
+
+        {/* Плашка прогресса автообогащения */}
+        {enrichStatus && enrichStatus.remaining > 0 && enrichStatus.total > 0 && (
+          <div
+            className={`mb-6 rounded-xl border p-4 ${
+              isDark
+                ? "bg-purple-500/10 border-purple-500/30"
+                : "bg-purple-50 border-purple-200"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <span className="text-xl leading-6">✨</span>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium ${isDark ? "text-purple-300" : "text-purple-900"}`}>
+                  Каталог обогащается в фоне: {enrichStatus.enriched.toLocaleString("ru-RU")} из{" "}
+                  {enrichStatus.total.toLocaleString("ru-RU")}
+                  {enrichStatus.estimatedHours > 0 && (
+                    <>
+                      {" "}
+                      · готово примерно через{" "}
+                      {enrichStatus.estimatedHours < 2
+                        ? "час"
+                        : `${enrichStatus.estimatedHours} ч`}
+                    </>
+                  )}
+                </p>
+                <p className={`mt-1 text-xs ${isDark ? "text-purple-400/80" : "text-purple-700"}`}>
+                  Можно закрыть вкладку — обогащение идёт автоматически. Каждый товар получит русские
+                  теги и описание, чтобы бот лучше находил его в чате.
+                </p>
+                {/* Прогресс-бар */}
+                <div
+                  className={`mt-2 h-1.5 w-full rounded-full overflow-hidden ${
+                    isDark ? "bg-purple-900/40" : "bg-purple-100"
+                  }`}
+                >
+                  <div
+                    className="h-full bg-purple-500 transition-all duration-500"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        Math.round((enrichStatus.enriched / enrichStatus.total) * 100)
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Статистика */}
         <div className="grid grid-cols-3 gap-4 mb-6">
