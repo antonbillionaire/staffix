@@ -25,6 +25,7 @@ import {
   getProductDetails,
   getCategories,
   getUpsellSuggestions,
+  listByCategory,
 } from "@/lib/sales-tools";
 
 import { callClaudeWithRetry } from "@/lib/claude-retry";
@@ -415,6 +416,11 @@ async function handleChannelToolCall(
 
       case "get_categories": {
         const result = await getCategories(businessId);
+        return JSON.stringify(result);
+      }
+
+      case "list_by_category": {
+        const result = await listByCategory(businessId, toolInput.category, toolInput.max_price);
         return JSON.stringify(result);
       }
 

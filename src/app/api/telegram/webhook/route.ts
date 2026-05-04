@@ -823,6 +823,7 @@ async function generateAIResponse(
             "search_products",
             "get_product_details",
             "get_categories",
+            "list_by_category",
             "create_order",
             "get_client_orders",
             "get_upsell_suggestions",

@@ -6,6 +6,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { dispatchCrmEvent } from "./crm-integrations";
 import { getPaymentButtons } from "./payment-links";
@@ -88,6 +89,25 @@ export const salesToolDefinitions: Anthropic.Tool[] = [
       type: "object" as const,
       properties: {},
       required: [],
+    },
+  },
+  {
+    name: "list_by_category",
+    description:
+      "Показать ВСЕ товары конкретной категории или бренда. Используй когда клиент просит обзор: «какие у вас клеи?», «покажите все ресницы», «что есть из Lovely», «весь ассортимент пинцетов». В отличие от search_products, этот инструмент не ищет по ключевым словам, а возвращает весь список в категории.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        category: {
+          type: "string",
+          description: "Название категории или бренда (например: Клей, Ресницы, Lovely, Barbara)",
+        },
+        max_price: {
+          type: "number",
+          description: "Максимальная цена (необязательно)",
+        },
+      },
+      required: ["category"],
     },
   },
   {
@@ -205,18 +225,33 @@ export async function searchProducts(
 
     // Text search across multiple fields at DB level
     if (query) {
-      const queryWords = query.trim().split(/\s+/).filter(w => w.length > 1);
-      // Each word must match at least one field (AND logic between words)
-      for (const word of queryWords) {
-        conditions.push({
-          OR: [
-            { name: { contains: word, mode: "insensitive" } },
-            { description: { contains: word, mode: "insensitive" } },
-            { category: { contains: word, mode: "insensitive" } },
-            { sku: { contains: word, mode: "insensitive" } },
-            { tags: { has: word } },
-          ],
-        });
+      const allWords = query.trim().split(/\s+/).filter((w) => w.length > 0);
+      // Each word must match at least one field (AND logic between words).
+      // Для коротких слов (1-2 символа) substring даёт мусор (буква "Д" совпадает
+      // в "Дезинфектор"), поэтому ищем их только как точные теги через tags.has.
+      // Для длинных — обычный substring + tags.has.
+      for (const rawWord of allWords) {
+        const word = rawWord.toLowerCase();
+        if (rawWord.length <= 2) {
+          // Короткий код вроде "D", "Д", "B" — только точное совпадение в тегах
+          conditions.push({
+            OR: [
+              { tags: { has: rawWord } },
+              { tags: { has: word } },
+            ],
+          });
+        } else {
+          conditions.push({
+            OR: [
+              { name: { contains: rawWord, mode: "insensitive" } },
+              { description: { contains: rawWord, mode: "insensitive" } },
+              { category: { contains: rawWord, mode: "insensitive" } },
+              { sku: { contains: rawWord, mode: "insensitive" } },
+              { tags: { has: rawWord } },
+              { tags: { has: word } },
+            ],
+          });
+        }
       }
     }
 
@@ -254,6 +289,30 @@ export async function searchProducts(
       });
     }
 
+    // AI-fallback: если ни strict-AND, ни OR ничего не нашли — это либо опечатка,
+    // либо клиент написал на другом языке (Клеопатра вместо Cleopatra). Дёргаем
+    // Haiku с реальными названиями и просим нормализовать запрос. Стоит ~$0.0005.
+    let normalizedQuery: string | null = null;
+    if (products.length === 0 && query && query.trim().length >= 2) {
+      const { normalizeProductQuery } = await import("./product-search-fallback");
+      normalizedQuery = await normalizeProductQuery(query, businessId);
+      if (normalizedQuery && normalizedQuery !== query) {
+        products = await prisma.product.findMany({
+          where: {
+            businessId,
+            isActive: true,
+            OR: [
+              { name: { contains: normalizedQuery, mode: "insensitive" } },
+              { category: { contains: normalizedQuery, mode: "insensitive" } },
+            ],
+            ...(maxPrice ? { price: { lte: maxPrice } } : {}),
+          },
+          orderBy: { name: "asc" },
+          take: 20,
+        });
+      }
+    }
+
     if (products.length === 0) {
       // Get available categories to help the bot suggest alternatives
       const categories = await getAvailableCategories(businessId);
@@ -270,6 +329,10 @@ export async function searchProducts(
       success: true,
       found: true,
       count: products.length,
+      // Если запрос был нормализован AI — отдаём это боту, чтобы он мог уточнить
+      // у клиента: «Возможно вы имели в виду Cleopatra?»
+      interpretedAs: normalizedQuery && normalizedQuery !== query ? normalizedQuery : undefined,
+      originalQuery: normalizedQuery && normalizedQuery !== query ? query : undefined,
       products: products.map((p) => ({
         id: p.id,
         name: p.name,
@@ -307,6 +370,78 @@ export async function getAvailableCategories(businessId: string): Promise<string
     return products.map(p => p.category).filter((c): c is string => c !== null);
   } catch {
     return [];
+  }
+}
+
+/**
+ * Получить ВСЕ товары категории или бренда — для запросов «какие у вас клеи?»,
+ * «покажите все ресницы Lovely». Ищет совпадение в category, в названии (для брендов)
+ * и в тегах. В отличие от searchProducts, не делит запрос на слова — берёт целиком.
+ */
+export async function listByCategory(
+  businessId: string,
+  category: string,
+  maxPrice?: number
+): Promise<SalesToolResult> {
+  try {
+    const cat = category.trim();
+    if (!cat) {
+      return { success: false, error: "Не указана категория" };
+    }
+
+    const conditions: Prisma.ProductWhereInput = {
+      businessId,
+      isActive: true,
+      OR: [
+        { category: { contains: cat, mode: "insensitive" } },
+        { name: { contains: cat, mode: "insensitive" } },
+        { tags: { has: cat.toLowerCase() } },
+      ],
+      ...(maxPrice ? { price: { lte: maxPrice } } : {}),
+    };
+
+    const products = await prisma.product.findMany({
+      where: conditions,
+      orderBy: [{ category: "asc" }, { name: "asc" }],
+      take: 50, // больше чем search_products — обзорный запрос
+    });
+
+    if (products.length === 0) {
+      const allCategories = await getAvailableCategories(businessId);
+      return {
+        success: true,
+        found: false,
+        message: `В категории "${cat}" товаров не найдено.`,
+        availableCategories: allCategories,
+        products: [],
+      };
+    }
+
+    return {
+      success: true,
+      found: true,
+      count: products.length,
+      products: products.map((p) => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        oldPrice: p.oldPrice,
+        category: p.category,
+        stock: p.stock,
+        inStock: p.stock === null || p.stock > 0,
+        stockMessage:
+          p.stock === null ? "В наличии"
+          : p.stock === 0 ? "Нет в наличии"
+          : p.stock < LOW_STOCK_THRESHOLD ? `Осталось ${p.stock} шт.`
+          : `В наличии (${p.stock}+ шт.)`,
+        shortDescription: p.description ? p.description.slice(0, 150) : null,
+        imageUrl: p.imageUrl || null,
+        productUrl: p.productUrl || null,
+      })),
+    };
+  } catch (error) {
+    console.error("listByCategory error:", error);
+    return { success: false, error: "Ошибка получения списка товаров" };
   }
 }
 
@@ -1117,6 +1252,15 @@ export async function executeSalesTool(
 
       case "get_categories": {
         const result = await getCategories(businessId);
+        return JSON.stringify(result);
+      }
+
+      case "list_by_category": {
+        const result = await listByCategory(
+          businessId,
+          toolInput.category as string,
+          toolInput.max_price as number | undefined
+        );
         return JSON.stringify(result);
       }
 
