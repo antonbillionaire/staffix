@@ -618,15 +618,52 @@ export async function createOrder(
     let clientTierLabel = "";
     let cashbackEarned = 0;
 
-    const client = await prisma.client.findUnique({
-      where: { businessId_telegramId: { businessId, telegramId } },
-      select: {
-        loyaltyCashbackPercent: true,
-        loyaltyTier: true,
-        loyaltyPoints: true,
-        loyaltyTotalSpent: true,
-      },
-    });
+    // Ищем клиента в порядке: 1) Telegram ID, 2) телефон, 3) имя.
+    // Раньше lookup был только по telegramId — клиенты, добавленные вручную
+    // через дашборд (только phone) или через каналы WA/IG, не получали скидку.
+    let client: {
+      loyaltyCashbackPercent: number | null;
+      loyaltyTier: string | null;
+      loyaltyPoints: number;
+      loyaltyTotalSpent: number;
+    } | null = null;
+
+    const loyaltySelect = {
+      loyaltyCashbackPercent: true,
+      loyaltyTier: true,
+      loyaltyPoints: true,
+      loyaltyTotalSpent: true,
+    } as const;
+
+    if (telegramId > BigInt(0)) {
+      client = await prisma.client.findUnique({
+        where: { businessId_telegramId: { businessId, telegramId } },
+        select: loyaltySelect,
+      });
+    }
+
+    // Fallback по нормализованному телефону (только цифры, без + и пробелов)
+    if (!client && clientPhone) {
+      const normalizedPhone = clientPhone.replace(/\D/g, "");
+      if (normalizedPhone.length >= 7) {
+        const candidates = await prisma.client.findMany({
+          where: { businessId, phone: { contains: normalizedPhone.slice(-9) } },
+          select: loyaltySelect,
+          take: 1,
+        });
+        client = candidates[0] || null;
+      }
+    }
+
+    // Последний fallback по имени (точное совпадение, без учёта регистра)
+    if (!client && clientName) {
+      const candidates = await prisma.client.findMany({
+        where: { businessId, name: { equals: clientName, mode: "insensitive" } },
+        select: loyaltySelect,
+        take: 1,
+      });
+      client = candidates[0] || null;
+    }
 
     if (client) {
       // Get business loyalty programs

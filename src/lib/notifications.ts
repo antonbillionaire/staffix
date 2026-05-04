@@ -144,12 +144,16 @@ export async function notifyWarehouseOrderConfirmed(
       .map((i) => `• ${i.name} × ${i.quantity}`)
       .join("\n");
 
-    const message =
+    // Оператор и склад — собирают физически, цена их не касается.
+    // Админ — контролирует, цену видит.
+    const baseMessage =
       `📦 <b>Заказ #${data.orderNumber} подтверждён — собирайте!</b>\n\n` +
       `👤 ${data.clientName}${data.clientPhone ? ` | ${data.clientPhone}` : ""}\n` +
       (data.clientAddress ? `📍 ${data.clientAddress}\n` : "") +
-      `\n<b>Состав:</b>\n${itemsList}\n\n` +
-      `💰 Итого: ${data.totalPrice.toLocaleString("ru-RU")}`;
+      `\n<b>Состав:</b>\n${itemsList}`;
+
+    const adminMessage =
+      baseMessage + `\n\n💰 Итого: ${data.totalPrice.toLocaleString("ru-RU")}`;
 
     const inlineKeyboard = {
       inline_keyboard: [
@@ -157,19 +161,31 @@ export async function notifyWarehouseOrderConfirmed(
       ],
     };
 
-    for (const staff of warehouseStaff) {
-      if (staff.telegramChatId) {
-        await fetch(`https://api.telegram.org/bot${business.botToken}/sendMessage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: staff.telegramChatId.toString(),
-            text: message,
-            parse_mode: "HTML",
-            reply_markup: inlineKeyboard,
-          }),
-        }).catch((e) => console.error(`[Notify] Warehouse staff ${staff.name} error:`, e));
-      }
+    // Подгружаем роли, чтобы решить кому показать цену
+    const fullStaff = await prisma.staff.findMany({
+      where: {
+        businessId,
+        telegramChatId: { not: null },
+        notificationsEnabled: true,
+        role: { in: ["operator", "warehouse", "admin"] },
+      },
+      select: { telegramChatId: true, name: true, role: true },
+    });
+
+    for (const staff of fullStaff) {
+      if (!staff.telegramChatId) continue;
+      const showPrice = staff.role === "admin";
+      const text = showPrice ? adminMessage : baseMessage;
+      await fetch(`https://api.telegram.org/bot${business.botToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: staff.telegramChatId.toString(),
+          text,
+          parse_mode: "HTML",
+          reply_markup: inlineKeyboard,
+        }),
+      }).catch((e) => console.error(`[Notify] Warehouse staff ${staff.name} error:`, e));
     }
   } catch (err) {
     console.error("notifyWarehouseOrderConfirmed error:", err);
