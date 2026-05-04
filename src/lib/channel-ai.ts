@@ -26,6 +26,7 @@ import {
   getCategories,
   getUpsellSuggestions,
   listByCategory,
+  identifyClientByPhone,
 } from "@/lib/sales-tools";
 
 import { callClaudeWithRetry } from "@/lib/claude-retry";
@@ -421,6 +422,13 @@ async function handleChannelToolCall(
 
       case "list_by_category": {
         const result = await listByCategory(businessId, toolInput.category, toolInput.max_price);
+        return JSON.stringify(result);
+      }
+
+      case "identify_client": {
+        // Канальный клиент не имеет Telegram ID — авто-привязка не сработает,
+        // но lookup по телефону всё равно даст знание о статусе клиента.
+        const result = await identifyClientByPhone(businessId, toolInput.phone);
         return JSON.stringify(result);
       }
 

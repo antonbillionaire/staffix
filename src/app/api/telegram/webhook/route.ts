@@ -824,6 +824,7 @@ async function generateAIResponse(
             "get_product_details",
             "get_categories",
             "list_by_category",
+            "identify_client",
             "create_order",
             "get_client_orders",
             "get_upsell_suggestions",

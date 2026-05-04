@@ -111,6 +111,21 @@ export const salesToolDefinitions: Anthropic.Tool[] = [
     },
   },
   {
+    name: "identify_client",
+    description:
+      "Найти клиента в базе бизнеса по телефону. Используй ОДИН РАЗ в начале диалога после того как клиент дал номер телефона. Если клиент найден — обращайся к нему по имени, упомяни его уровень лояльности и накопленный кэшбек/баллы. Если не найден — продолжай как с новым клиентом. Не вызывай повторно если уже идентифицировал.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        phone: {
+          type: "string",
+          description: "Номер телефона клиента в любом формате (нормализуется автоматически)",
+        },
+      },
+      required: ["phone"],
+    },
+  },
+  {
     name: "create_order",
     description:
       "Создать заказ после того как клиент выбрал товары и подтвердил покупку. ОБЯЗАТЕЛЬНО: уточни имя, телефон и адрес доставки перед созданием заказа.",
@@ -374,6 +389,111 @@ export async function getAvailableCategories(businessId: string): Promise<string
 }
 
 /**
+ * Идентификация клиента по телефону — для случая когда клиент уже есть в БД
+ * (импортирован из CRM, добавлен вручную, ранее писал из другого канала),
+ * но впервые пишет в этот Telegram-бот.
+ *
+ * Если найден — записываем его telegramId, чтобы все будущие заказы
+ * идентифицировались автоматически без повторного запроса телефона.
+ *
+ * Возвращает информацию о статусе клиента (имя, уровень, кэшбек, история),
+ * чтобы бот мог приветствовать персонально.
+ */
+export async function identifyClientByPhone(
+  businessId: string,
+  phone: string,
+  telegramId?: bigint
+): Promise<SalesToolResult> {
+  try {
+    const normalized = phone.replace(/\D/g, "");
+    if (normalized.length < 7) {
+      return { success: false, error: "Слишком короткий номер" };
+    }
+
+    // Ищем по последним 9 цифрам (стабильно для +998, +7 и т.д.)
+    const lastNine = normalized.slice(-9);
+    const candidates = await prisma.client.findMany({
+      where: { businessId, phone: { contains: lastNine } },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        telegramId: true,
+        loyaltyTier: true,
+        loyaltyCashbackPercent: true,
+        loyaltyPoints: true,
+        loyaltyTotalSpent: true,
+      },
+      take: 1,
+    });
+
+    if (candidates.length === 0) {
+      return {
+        success: true,
+        found: false,
+        message: "Клиент не найден в базе. Это новый клиент.",
+      };
+    }
+
+    const client = candidates[0];
+
+    // Получаем уровни и кэшбек программы для красивого ответа
+    const programs = await prisma.loyaltyProgram.findMany({
+      where: { businessId, enabled: true },
+      select: { type: true, cashbackPercent: true, tiers: true },
+    });
+
+    let tierLabel = "";
+    let tierDiscount = 0;
+    const tieredProgram = programs.find((p) => p.type === "tiered");
+    if (tieredProgram?.tiers && client.loyaltyTier) {
+      const tiers = tieredProgram.tiers as Array<{ name: string; discount: number }>;
+      const tierData = tiers.find((t) => t.name.toLowerCase() === client.loyaltyTier);
+      if (tierData) {
+        tierLabel = tierData.name;
+        tierDiscount = tierData.discount;
+      }
+    }
+
+    let cashbackPercent = 0;
+    if (client.loyaltyCashbackPercent !== null && client.loyaltyCashbackPercent !== undefined) {
+      cashbackPercent = client.loyaltyCashbackPercent;
+    } else {
+      const cashbackProgram = programs.find((p) => p.type === "cashback");
+      if (cashbackProgram?.cashbackPercent) {
+        cashbackPercent = cashbackProgram.cashbackPercent;
+      }
+    }
+
+    // Авто-привязка: если у клиента ещё нет telegramId, а сейчас он пишет из Telegram
+    // — связываем запись с этим Telegram-аккаунтом навсегда. Дальше lookup пойдёт по
+    // telegramId без вопросов.
+    if (telegramId && telegramId > BigInt(0) && !client.telegramId) {
+      await prisma.client.update({
+        where: { id: client.id },
+        data: { telegramId },
+      }).catch((e) => console.error("[identifyClient] failed to link telegramId:", e));
+    }
+
+    return {
+      success: true,
+      found: true,
+      client: {
+        name: client.name,
+        tierName: tierLabel || null,
+        tierDiscountPercent: tierDiscount,
+        cashbackPercent,
+        loyaltyPoints: client.loyaltyPoints,
+        totalSpent: client.loyaltyTotalSpent,
+      },
+    };
+  } catch (error) {
+    console.error("identifyClientByPhone error:", error);
+    return { success: false, error: "Ошибка идентификации" };
+  }
+}
+
+/**
  * Получить ВСЕ товары категории или бренда — для запросов «какие у вас клеи?»,
  * «покажите все ресницы Lovely». Ищет совпадение в category, в названии (для брендов)
  * и в тегах. В отличие от searchProducts, не делит запрос на слова — берёт целиком.
@@ -622,6 +742,8 @@ export async function createOrder(
     // Раньше lookup был только по telegramId — клиенты, добавленные вручную
     // через дашборд (только phone) или через каналы WA/IG, не получали скидку.
     let client: {
+      id: string;
+      telegramId: bigint | null;
       loyaltyCashbackPercent: number | null;
       loyaltyTier: string | null;
       loyaltyPoints: number;
@@ -629,6 +751,8 @@ export async function createOrder(
     } | null = null;
 
     const loyaltySelect = {
+      id: true,
+      telegramId: true,
       loyaltyCashbackPercent: true,
       loyaltyTier: true,
       loyaltyPoints: true,
@@ -663,6 +787,15 @@ export async function createOrder(
         take: 1,
       });
       client = candidates[0] || null;
+    }
+
+    // Авто-привязка: если нашли импортированную/ручную запись, у которой ещё
+    // нет telegramId, а заказ создаётся из Telegram — связываем навсегда.
+    // Все будущие заказы этого клиента пойдут по telegramId без поиска.
+    if (client && !client.telegramId && telegramId > BigInt(0)) {
+      await prisma.client
+        .update({ where: { id: client.id }, data: { telegramId } })
+        .catch((e) => console.error("[create_order] auto-link telegramId failed:", e));
     }
 
     if (client) {
@@ -1297,6 +1430,15 @@ export async function executeSalesTool(
           businessId,
           toolInput.category as string,
           toolInput.max_price as number | undefined
+        );
+        return JSON.stringify(result);
+      }
+
+      case "identify_client": {
+        const result = await identifyClientByPhone(
+          businessId,
+          toolInput.phone as string,
+          telegramId
         );
         return JSON.stringify(result);
       }
