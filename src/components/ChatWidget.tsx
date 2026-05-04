@@ -13,33 +13,10 @@ const initialMessages: Message[] = [
   {
     id: "welcome",
     role: "assistant",
-    content: "Здравствуйте! 👋 Я AI-помощник Staffix. Чем могу помочь?\n\nВы можете спросить меня о:\n• Настройке AI-сотрудника\n• Подключении Telegram бота\n• Тарифных планах\n• Технических вопросах",
+    content:
+      "Здравствуйте! 👋 Я AI-помощник Staffix. Чем могу помочь?\n\nВы можете спросить меня о:\n• Настройке AI-сотрудника\n• Подключении Telegram бота\n• Тарифных планах\n• Технических вопросах",
   },
 ];
-
-// Predefined responses for common questions
-const quickResponses: Record<string, string> = {
-  "привет": "Здравствуйте! Чем могу помочь?",
-  "здравствуйте": "Здравствуйте! Рад вас видеть. Чем могу помочь?",
-  "настроить бота": "Для настройки AI-бота:\n\n1. Перейдите в раздел «AI-сотрудник»\n2. Выберите характер общения\n3. Добавьте информацию о ваших услугах\n4. Загрузите документы в «Базу знаний»\n\nБот автоматически начнёт использовать эту информацию для ответов клиентам.",
-  "подключить telegram": "Для подключения Telegram бота:\n\n1. Создайте бота через @BotFather в Telegram\n2. Скопируйте токен бота\n3. Вставьте токен в настройках AI-сотрудника\n4. Бот автоматически активируется\n\nНужна подробная инструкция?",
-  "тарифы": "У нас есть 3 тарифа:\n\n🆓 **Бесплатный** - 100 сообщений/мес\n💼 **Pro $50** - 2000 сообщений, аналитика\n🏢 **Business $100** - безлимит, приоритетная поддержка\n\nПодробнее на странице /pricing",
-  "цены": "У нас есть 3 тарифа:\n\n🆓 **Бесплатный** - 100 сообщений/мес\n💼 **Pro $50** - 2000 сообщений, аналитика\n🏢 **Business $100** - безлимит, приоритетная поддержка",
-  "пробный период": "Пробный период включает:\n\n• 14 дней бесплатного использования\n• 100 сообщений\n• Все функции стартового плана\n• Email поддержка\n\nПосле окончания можете выбрать подходящий тариф.",
-  "помощь": "Я могу помочь с:\n\n• Настройкой AI-сотрудника\n• Подключением Telegram бота\n• Вопросами о тарифах\n• Техническими проблемами\n\nПросто напишите ваш вопрос!",
-};
-
-function findResponse(message: string): string | null {
-  const lower = message.toLowerCase();
-
-  for (const [key, response] of Object.entries(quickResponses)) {
-    if (lower.includes(key)) {
-      return response;
-    }
-  }
-
-  return null;
-}
 
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -57,34 +34,58 @@ export default function ChatWidget() {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    const trimmed = input.trim();
+    if (!trimmed || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input.trim(),
+      content: trimmed,
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    const nextMessages = [...messages, userMessage];
+    setMessages(nextMessages);
     setInput("");
     setIsLoading(true);
 
-    // Simulate thinking delay
-    await new Promise((resolve) => setTimeout(resolve, 500 + Math.random() * 1000));
+    try {
+      // История без приветственного сообщения и без только что добавленного userMessage
+      const history = nextMessages
+        .filter((m) => m.id !== "welcome")
+        .slice(0, -1)
+        .map((m) => ({ role: m.role, content: m.content }));
 
-    // Find response or use default
-    const quickResponse = findResponse(userMessage.content);
-    const response = quickResponse ||
-      "Спасибо за вопрос! Для более детальной помощи, пожалуйста, напишите в форму поддержки на этой странице или свяжитесь с нами в Telegram: @staffix_support_bot";
+      const response = await fetch("/api/chat-widget", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: trimmed, history }),
+      });
 
-    const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: "assistant",
-      content: response,
-    };
+      const data = await response.json().catch(() => ({}));
+      const reply: string =
+        typeof data.reply === "string" && data.reply.length > 0
+          ? data.reply
+          : "Извините, не удалось получить ответ. Попробуйте ещё раз.";
 
-    setMessages((prev) => [...prev, assistantMessage]);
-    setIsLoading(false);
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: reply,
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (e) {
+      console.error("ChatWidget send error:", e);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Произошла ошибка соединения. Попробуйте ещё раз через минуту.",
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -160,7 +161,8 @@ export default function ChatWidget() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Напишите сообщение..."
-                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                disabled={isLoading}
+                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:opacity-60"
               />
               <button
                 onClick={handleSend}

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { generateSupportReply, isEscalationResponse } from "@/lib/support-bot-prompt";
+import { sendTelegramNotification } from "@/lib/email";
 
 // GET - Fetch a specific ticket
 export async function GET(
@@ -87,7 +89,6 @@ export async function POST(
       );
     }
 
-    // Add message and update ticket
     const newMessage = await prisma.supportMessage.create({
       data: {
         content: message,
@@ -96,7 +97,6 @@ export async function POST(
       },
     });
 
-    // Update ticket status if it was closed or resolved
     if (ticket.status === "closed" || ticket.status === "resolved") {
       await prisma.supportTicket.update({
         where: { id: ticketId },
@@ -104,9 +104,45 @@ export async function POST(
       });
     }
 
+    // AI авто-ответ на followup. История = все предыдущие сообщения тикета (без только что созданного).
+    const previousMessages = await prisma.supportMessage.findMany({
+      where: { ticketId, NOT: { id: newMessage.id } },
+      orderBy: { createdAt: "asc" },
+    });
+    const history = previousMessages.map((m) => ({
+      role: (m.isFromSupport ? "assistant" : "user") as "user" | "assistant",
+      content: m.content,
+    }));
+
+    let aiMessage: typeof newMessage | null = null;
+    let aiResponse: string | null = null;
+    try {
+      aiResponse = await generateSupportReply(history, message);
+      aiMessage = await prisma.supportMessage.create({
+        data: {
+          content: aiResponse,
+          isFromSupport: true,
+          ticketId,
+        },
+      });
+
+      if (isEscalationResponse(aiResponse)) {
+        const shortTicketId = ticketId.slice(-8);
+        await sendTelegramNotification(
+          `🔔 <b>Эскалация в тикете</b>\n\n` +
+          `<b>Тикет:</b> <code>${shortTicketId}</code>\n` +
+          `<b>Сообщение клиента:</b>\n${message}\n\n` +
+          `💬 <i>Ответить:</i>\n<code>/reply ${shortTicketId} Ваш ответ</code>`
+        ).catch((e) => console.error("[support followup] notify failed:", e));
+      }
+    } catch (e) {
+      console.error("[support] AI followup failed:", e);
+    }
+
     return NextResponse.json({
       success: true,
       message: newMessage,
+      aiReply: aiMessage,
     });
   } catch (error) {
     console.error("Message create error:", error);
