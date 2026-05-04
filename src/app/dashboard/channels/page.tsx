@@ -15,6 +15,7 @@ import {
   Users,
   TrendingUp,
   AlertTriangle,
+  AlertCircle,
   Unlink,
   Facebook,
 } from "lucide-react";
@@ -55,6 +56,9 @@ export default function ChannelsPage() {
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Особый случай "no_pages" — самая частая ошибка (подключили личный
+  // профиль, а нужна бизнес-страница). Рендерим отдельным блоком с шагами.
+  const [showNoPagesHelp, setShowNoPagesHelp] = useState(false);
 
   // Theme-aware styles
   const isDark = theme === "dark";
@@ -81,14 +85,20 @@ export default function ChannelsPage() {
       window.history.replaceState({}, "", "/dashboard/channels");
     }
     if (metaError) {
-      const errors: Record<string, string> = {
-        no_code: t("channels.error.noCode"),
-        no_business: t("channels.error.noBusiness"),
-        no_pages: t("channels.error.noPages"),
-        exchange_failed: t("channels.error.exchangeFailed"),
-        forbidden: t("channels.error.forbidden"),
-      };
-      setErrorMessage(errors[metaError] || `${t("channels.error.connectionError")}: ${metaError}`);
+      // no_pages — отдельная история: показываем подробный блок с инструкцией
+      // как создать Facebook Page (чаще всего пользователь подключил свой
+      // личный профиль). Остальные ошибки — короткое сообщение.
+      if (metaError === "no_pages") {
+        setShowNoPagesHelp(true);
+      } else {
+        const errors: Record<string, string> = {
+          no_code: t("channels.error.noCode"),
+          no_business: t("channels.error.noBusiness"),
+          exchange_failed: t("channels.error.exchangeFailed"),
+          forbidden: t("channels.error.forbidden"),
+        };
+        setErrorMessage(errors[metaError] || `${t("channels.error.connectionError")}: ${metaError}`);
+      }
       window.history.replaceState({}, "", "/dashboard/channels");
     }
 
@@ -217,6 +227,49 @@ export default function ChannelsPage() {
         <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 flex items-center gap-3">
           <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
           <p className="text-red-300 text-sm">{errorMessage}</p>
+        </div>
+      )}
+
+      {/* No-pages help — показываем когда подключили личный FB профиль вместо Page.
+          Объясняем что Meta запрещает API на личных профилях + даём шаги. */}
+      {showNoPagesHelp && (
+        <div className={`rounded-xl border p-5 ${isDark ? "bg-amber-500/10 border-amber-500/30" : "bg-amber-50 border-amber-200"}`}>
+          <div className="flex items-start gap-3">
+            <AlertCircle className={`h-6 w-6 flex-shrink-0 mt-0.5 ${isDark ? "text-amber-400" : "text-amber-600"}`} />
+            <div className="flex-1">
+              <h3 className={`font-semibold ${isDark ? "text-amber-300" : "text-amber-900"} mb-2`}>
+                {t("channels.noPages.title")}
+              </h3>
+              <p className={`${isDark ? "text-amber-200/90" : "text-amber-800"} mb-3 text-sm`}>
+                {t("channels.noPages.explanation")}
+              </p>
+              <ol className={`${isDark ? "text-amber-200/90" : "text-amber-800"} text-sm space-y-2 mb-4 list-decimal pl-5`}>
+                <li>
+                  {t("channels.noPages.step1")}{" "}
+                  <a
+                    href="https://www.facebook.com/pages/create"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline font-medium hover:opacity-80"
+                  >
+                    facebook.com/pages/create
+                  </a>
+                </li>
+                <li>{t("channels.noPages.step2")}</li>
+                <li>{t("channels.noPages.step3")}</li>
+                <li>{t("channels.noPages.step4")}</li>
+              </ol>
+              <p className={`${isDark ? "text-amber-200/70" : "text-amber-700"} text-xs italic mb-3`}>
+                {t("channels.noPages.note")}
+              </p>
+              <button
+                onClick={() => setShowNoPagesHelp(false)}
+                className={`text-sm underline ${isDark ? "text-amber-300/80 hover:text-amber-300" : "text-amber-700 hover:text-amber-800"}`}
+              >
+                {t("channels.noPages.dismiss")}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

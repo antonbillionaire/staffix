@@ -64,9 +64,11 @@ export async function GET(request: NextRequest) {
     // 2. Get user's pages
     const pages = await getUserPages(accessToken);
     if (pages.length === 0) {
-      return NextResponse.redirect(
-        `${channelsUrl}?meta_error=${encodeURIComponent("No Facebook Pages found. Create a Page first.")}`
-      );
+      // Most common cause: user connected their personal FB profile, not a
+      // Facebook Page. Meta's bot API only works with Pages — this is their
+      // policy, not our restriction. Use a specific code so the dashboard
+      // can render a friendly fix-it message with steps.
+      return NextResponse.redirect(`${channelsUrl}?meta_error=no_pages`);
     }
 
     // Fetch Meta user ID for data deletion scoping
