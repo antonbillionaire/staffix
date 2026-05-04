@@ -118,6 +118,7 @@ export async function GET(
             botToken: business.botToken ? "***" : null,
             botUsername: business.botUsername,
             onboardingCompleted: business.onboardingCompleted,
+            dashboardMode: business.dashboardMode,
             createdAt: business.createdAt,
             counts: business._count,
             services: business.services.map((s) => ({
@@ -303,6 +304,24 @@ export async function PATCH(
           },
         });
         return NextResponse.json({ success: true, message: "Email подтверждён вручную" });
+      }
+
+      case "set_dashboard_mode": {
+        if (!business) {
+          return NextResponse.json({ error: "Бизнес не найден" }, { status: 400 });
+        }
+        const mode = data?.mode;
+        if (mode !== "service" && mode !== "sales") {
+          return NextResponse.json({ error: "mode must be 'service' or 'sales'" }, { status: 400 });
+        }
+        await prisma.business.update({
+          where: { id: business.id },
+          data: { dashboardMode: mode },
+        });
+        return NextResponse.json({
+          success: true,
+          message: `Режим дашборда переключён на «${mode === "sales" ? "Продажи" : "Услуги"}»`,
+        });
       }
 
       default:

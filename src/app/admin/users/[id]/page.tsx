@@ -42,6 +42,7 @@ interface UserDetail {
     botToken: string | null;
     botUsername: string | null;
     onboardingCompleted: boolean;
+    dashboardMode?: "service" | "sales";
     createdAt: string;
     counts: {
       bookings: number;
@@ -510,6 +511,33 @@ export default function AdminUserDetailPage({
                 </div>
                 {actionLoading === "reset_messages" && <Loader2 className="h-4 w-4 animate-spin" />}
               </button>
+
+              {business && (
+                <div className="pt-3 border-t border-white/5">
+                  <p className="text-xs text-gray-500 mb-2">
+                    Режим дашборда{" "}
+                    <span className="text-gray-400">
+                      (текущий: {business.dashboardMode === "sales" ? "Продажи" : "Услуги"})
+                    </span>
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => performAction("set_dashboard_mode", { mode: "service" })}
+                      disabled={actionLoading !== null || business.dashboardMode === "service"}
+                      className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-lg text-blue-400 text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Услуги
+                    </button>
+                    <button
+                      onClick={() => performAction("set_dashboard_mode", { mode: "sales" })}
+                      disabled={actionLoading !== null || business.dashboardMode === "sales"}
+                      className="flex items-center justify-center gap-2 px-3 py-2 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 rounded-lg text-orange-400 text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Продажи
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="pt-3 border-t border-white/5">
                 <p className="text-xs text-gray-500 mb-3">Изменить план</p>
