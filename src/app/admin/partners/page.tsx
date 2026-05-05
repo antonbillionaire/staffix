@@ -100,12 +100,20 @@ export default function AdminPartnersPage() {
               Реферальная программа Staffix · 20% recurring commission
             </p>
           </div>
-          <button
-            onClick={() => setCreateModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            <Plus className="h-4 w-4" /> Добавить партнёра
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/admin/partners/payouts"
+              className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              <DollarSign className="h-4 w-4" /> Выплаты
+            </Link>
+            <button
+              onClick={() => setCreateModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              <Plus className="h-4 w-4" /> Добавить партнёра
+            </button>
+          </div>
         </div>
 
         {/* Stats */}

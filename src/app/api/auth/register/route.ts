@@ -99,19 +99,31 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Track partner referral (non-blocking)
+    // Track partner referral (non-blocking).
+    // Anti-abuse: self-referral блокируется — партнёр не может зарегистрироваться
+    // под своей же ссылкой. Совпадение по email — самая надёжная проверка.
     if (referralCode) {
-      prisma.partner.findUnique({ where: { referralCode } }).then((partner) => {
-        if (partner) {
-          return prisma.partnerReferral.create({
-            data: {
-              userId: user.id,
-              userEmail: email,
-              referralCode,
-              partnerId: partner.id,
-            },
-          });
+      prisma.partner.findUnique({
+        where: { referralCode },
+        select: { id: true, status: true, email: true },
+      }).then((partner) => {
+        if (!partner) return;
+        // Только approved партнёры засчитывают рефералов
+        if (partner.status !== "approved") return;
+
+        if (partner.email.toLowerCase() === email.toLowerCase()) {
+          console.warn(`[partner-referral] BLOCKED self-referral by email (partner ${partner.id})`);
+          return;
         }
+
+        return prisma.partnerReferral.create({
+          data: {
+            userId: user.id,
+            userEmail: email,
+            referralCode,
+            partnerId: partner.id,
+          },
+        });
       }).catch(console.error);
     }
 

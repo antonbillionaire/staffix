@@ -1791,6 +1791,7 @@ model Partner {
 
   referrals PartnerReferral[]
   earnings  PartnerEarning[]
+  payouts   PartnerPayout[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1835,9 +1836,22 @@ model PartnerEarning {
   paymentAmount    Float // полная сумма платежа реферала ($)
   subscriptionPlan String // starter, pro, business, enterprise
 
-  // Статус
-  status String    @default("pending") // pending, approved, paid
+  // Статус: pending (в hold-периоде) → available (можно выплатить) → paid (выплачено)
+  // cancelled — refund/chargeback клиента, в выплату не идёт
+  status String    @default("pending")
   paidAt DateTime?
+
+  // Когда earning становится доступен для выплаты. По умолчанию createdAt + 30 дней
+  // (защита от refund/chargeback клиента). Cron каждый день переводит pending → available
+  // у тех, у кого availableAt уже прошёл.
+  availableAt DateTime?
+
+  // Если cancelled — почему (refund / chargeback / manual)
+  cancelledReason String?
+
+  // Привязка к batch-выплате (если уже включён в payout)
+  payoutId String?
+  payout   PartnerPayout? @relation(fields: [payoutId], references: [id], onDelete: SetNull)
 
   referralId String
   referral   PartnerReferral @relation(fields: [referralId], references: [id], onDelete: Cascade)
@@ -1849,6 +1863,53 @@ model PartnerEarning {
 
   @@index([partnerId, status])
   @@index([partnerId, createdAt])
+  @@index([status, availableAt])
+  @@index([payoutId])
+}
+
+// Группа выплат партнёру — одна строка = один банковский перевод за период.
+// Содержит несколько earning-записей (всё что было available на момент выплаты).
+// Создаётся когда админ нажимает «Отметил как выплачено» на странице payouts.
+model PartnerPayout {
+  id String @id @default(cuid())
+
+  partnerId String
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  // Сколько перевели партнёру одним переводом
+  amount Float
+
+  // За какой период (для отчётности — месяц года, например "2026-05")
+  periodLabel String?
+
+  // Способ выплаты (всегда "card" в текущей версии — на банковскую карту)
+  paymentMethod String @default("card")
+
+  // Reference банковского перевода — для бухгалтерии и доказательства
+  // Пример: "TINKOFF-12345-2026-05-05" или просто id транзакции банка
+  reference String?
+
+  // Когда фактически был сделан перевод (заполняется админом)
+  paidAt DateTime @default(now())
+
+  // Email админа, который провёл выплату — для аудита
+  paidByEmail String?
+
+  // Заметки (например "перевод задержался из-за выходных")
+  notes String?
+
+  // Снапшот реквизитов на момент выплаты — чтобы потом можно было проверить
+  // куда именно перевели, даже если партнёр поменяет реквизиты позже
+  recipientCardNumber String?
+  recipientCardHolder String?
+  recipientBankName   String?
+
+  earnings PartnerEarning[]
+
+  createdAt DateTime @default(now())
+
+  @@index([partnerId, paidAt])
+  @@index([paidAt])
 }
 
 // ========================================

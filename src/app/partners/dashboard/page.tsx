@@ -38,6 +38,7 @@ interface PartnerData {
     convertedReferrals: number;
     conversionRate: number;
     pendingEarnings: number;
+    availableEarnings: number;
   };
   referrals: Array<{
     id: string;
@@ -53,8 +54,18 @@ interface PartnerData {
     paymentAmount: number;
     subscriptionPlan: string;
     status: string;
+    availableAt: string | null;
     paidAt: string | null;
     createdAt: string;
+  }>;
+  payouts: Array<{
+    id: string;
+    amount: number;
+    periodLabel: string | null;
+    reference: string | null;
+    paidAt: string;
+    recipientCardNumber: string | null;
+    recipientBankName: string | null;
   }>;
 }
 
@@ -157,7 +168,7 @@ export default function PartnerDashboardPage() {
 
   if (!data) return null;
 
-  const { partner, stats, referrals, earnings } = data;
+  const { partner, stats, referrals, earnings, payouts } = data;
   const referralLink = `https://staffix.io/?ref=${partner.referralCode}`;
 
   return (
@@ -214,20 +225,33 @@ export default function PartnerDashboardPage() {
           </p>
         </div>
 
-        {/* Stats */}
-        <div className="grid md:grid-cols-4 gap-4 mb-8">
+        {/* Stats — 2 ряда: финансы и привлечение */}
+        <div className="grid md:grid-cols-3 gap-4 mb-4">
           <div className="bg-[#12122a] border border-white/5 rounded-xl p-5">
             <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">
-              <DollarSign className="h-4 w-4" /> Всего заработано
+              <Clock className="h-4 w-4" /> В hold-периоде
             </div>
-            <div className="text-3xl font-bold text-green-400">${partner.totalEarnings.toFixed(2)}</div>
+            <div className="text-3xl font-bold text-yellow-400">${stats.pendingEarnings.toFixed(2)}</div>
+            <div className="text-xs text-gray-500 mt-1">Доступно к выплате через 30 дней с момента платежа клиента</div>
           </div>
-          <div className="bg-[#12122a] border border-white/5 rounded-xl p-5">
+          <div className="bg-[#12122a] border border-purple-500/30 rounded-xl p-5">
             <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">
-              <Clock className="h-4 w-4" /> Ожидает выплаты
+              <DollarSign className="h-4 w-4" /> Готово к выплате
             </div>
-            <div className="text-3xl font-bold text-yellow-400">${partner.pendingPayout.toFixed(2)}</div>
+            <div className="text-3xl font-bold text-purple-300">${partner.pendingPayout.toFixed(2)}</div>
+            <div className="text-xs text-gray-500 mt-1">
+              Минимум для выплаты — ${partner.minPayoutAmount}
+            </div>
           </div>
+          <div className="bg-[#12122a] border border-green-500/30 rounded-xl p-5">
+            <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">
+              <CheckCircle className="h-4 w-4" /> Уже выплачено
+            </div>
+            <div className="text-3xl font-bold text-green-400">${partner.totalPaid.toFixed(2)}</div>
+            <div className="text-xs text-gray-500 mt-1">За всё время сотрудничества</div>
+          </div>
+        </div>
+        <div className="grid md:grid-cols-3 gap-4 mb-8">
           <div className="bg-[#12122a] border border-white/5 rounded-xl p-5">
             <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">
               <Users className="h-4 w-4" /> Переходов
@@ -241,6 +265,13 @@ export default function PartnerDashboardPage() {
             </div>
             <div className="text-3xl font-bold text-purple-400">{stats.conversionRate}%</div>
             <div className="text-xs text-gray-500 mt-1">переход → платёж</div>
+          </div>
+          <div className="bg-[#12122a] border border-white/5 rounded-xl p-5">
+            <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">
+              <DollarSign className="h-4 w-4" /> Всего заработано
+            </div>
+            <div className="text-3xl font-bold text-white">${partner.totalEarnings.toFixed(2)}</div>
+            <div className="text-xs text-gray-500 mt-1">Включая выплаченное и hold</div>
           </div>
         </div>
 
@@ -287,33 +318,73 @@ export default function PartnerDashboardPage() {
                 Начислений пока нет. Когда ваши рефералы оплатят подписку — комиссия появится здесь.
               </p>
             ) : (
-              <div className="space-y-3">
-                {earnings.slice(0, 10).map((e) => (
-                  <div key={e.id} className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-white capitalize">{e.subscriptionPlan}</p>
-                      <p className="text-xs text-gray-500">{formatDate(e.createdAt)}</p>
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {earnings.map((e) => {
+                  const statusBadge =
+                    e.status === "paid"
+                      ? { text: "Выплачено", color: "bg-green-500/10 text-green-400" }
+                      : e.status === "available"
+                        ? { text: "К выплате", color: "bg-purple-500/10 text-purple-300" }
+                        : e.status === "cancelled"
+                          ? { text: "Отменено", color: "bg-gray-500/10 text-gray-400" }
+                          : { text: "В hold", color: "bg-yellow-500/10 text-yellow-400" };
+                  return (
+                    <div key={e.id} className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-white capitalize">{e.subscriptionPlan}</p>
+                        <p className="text-xs text-gray-500">{formatDate(e.createdAt)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-green-400">
+                          +${e.commissionAmount.toFixed(2)}
+                        </p>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${statusBadge.color}`}>
+                          {statusBadge.text}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-green-400">
-                        +${e.commissionAmount.toFixed(2)}
-                      </p>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          e.status === "paid"
-                            ? "bg-green-500/10 text-green-400"
-                            : "bg-yellow-500/10 text-yellow-400"
-                        }`}
-                      >
-                        {e.status === "paid" ? "Выплачено" : "Ожидает"}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
+
+        {/* Payouts history */}
+        {payouts.length > 0 && (
+          <div className="mt-8 bg-[#12122a] border border-white/5 rounded-xl p-6">
+            <h2 className="font-semibold text-white mb-4">История выплат</h2>
+            <div className="space-y-3">
+              {payouts.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between border-b border-white/5 last:border-0 pb-3 last:pb-0"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-green-400">
+                      ${p.amount.toFixed(2)}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {formatDate(p.paidAt)}
+                      {p.periodLabel && ` · период ${p.periodLabel}`}
+                    </p>
+                  </div>
+                  <div className="text-right text-xs text-gray-400">
+                    {p.recipientCardNumber && (
+                      <div className="font-mono">
+                        Карта {p.recipientCardNumber}
+                        {p.recipientBankName && ` · ${p.recipientBankName}`}
+                      </div>
+                    )}
+                    {p.reference && (
+                      <div className="font-mono text-gray-500 mt-0.5">ref: {p.reference}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Payout details form */}
         <PayoutDetailsForm

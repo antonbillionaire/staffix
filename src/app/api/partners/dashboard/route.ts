@@ -20,6 +20,10 @@ export async function GET(req: NextRequest) {
           orderBy: { createdAt: "desc" },
           take: 100,
         },
+        payouts: {
+          orderBy: { paidAt: "desc" },
+          take: 24, // 2 года истории
+        },
       },
     });
 
@@ -36,6 +40,9 @@ export async function GET(req: NextRequest) {
     const convertedReferrals = partner.referrals.filter((r) => r.converted).length;
     const pendingEarnings = partner.earnings
       .filter((e) => e.status === "pending")
+      .reduce((sum, e) => sum + e.commissionAmount, 0);
+    const availableEarnings = partner.earnings
+      .filter((e) => e.status === "available")
       .reduce((sum, e) => sum + e.commissionAmount, 0);
 
     return NextResponse.json({
@@ -63,6 +70,7 @@ export async function GET(req: NextRequest) {
         convertedReferrals,
         conversionRate: totalReferrals > 0 ? Math.round((convertedReferrals / totalReferrals) * 100) : 0,
         pendingEarnings: Math.round(pendingEarnings * 100) / 100,
+        availableEarnings: Math.round(availableEarnings * 100) / 100,
       },
       referrals: partner.referrals.map((r) => ({
         id: r.id,
@@ -78,8 +86,23 @@ export async function GET(req: NextRequest) {
         paymentAmount: e.paymentAmount,
         subscriptionPlan: e.subscriptionPlan,
         status: e.status,
+        availableAt: e.availableAt,
         paidAt: e.paidAt,
         createdAt: e.createdAt,
+      })),
+      payouts: partner.payouts.map((p) => ({
+        id: p.id,
+        amount: p.amount,
+        periodLabel: p.periodLabel,
+        reference: p.reference,
+        paidAt: p.paidAt,
+        // Маскируем номер карты при отдаче клиенту
+        recipientCardNumber: p.recipientCardNumber
+          ? p.recipientCardNumber.length > 4
+            ? `**** ${p.recipientCardNumber.slice(-4)}`
+            : "****"
+          : null,
+        recipientBankName: p.recipientBankName,
       })),
     });
   } catch (e) {

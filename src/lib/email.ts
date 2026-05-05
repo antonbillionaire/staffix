@@ -1169,6 +1169,155 @@ export async function sendPartnerWelcomeEmail(params: {
 }
 
 /**
+ * Уведомление партнёру что earnings разморозились и доступны для выплаты.
+ * Отправляется только когда впервые перешли порог minPayoutAmount.
+ */
+export async function sendPartnerPayoutReadyEmail(params: {
+  email: string;
+  name: string;
+  accessToken: string;
+  availableAmount: number;
+  minPayout: number;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
+    const dashboardUrl = `${appUrl}/partners/dashboard?token=${params.accessToken}`;
+
+    if (!resend) {
+      console.log(
+        `[DEV] Partner payout-ready email for ${params.email}: $${params.availableAmount.toFixed(2)} available`
+      );
+      return { success: true };
+    }
+
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: params.email,
+      subject: `Готово к выплате: $${params.availableAmount.toFixed(2)} от Staffix`,
+      html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f5f7;margin:0;padding:32px 20px;color:#1a1a2e;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+    <div style="padding:24px 28px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;">
+      <div style="font-size:13px;opacity:0.85;margin-bottom:4px;">💰 Партнёрская выплата</div>
+      <h1 style="margin:0;font-size:22px;">Готово к выплате</h1>
+    </div>
+    <div style="padding:24px 28px;color:#1a1a2e;">
+      <p style="margin:0 0 16px;line-height:1.6;">Здравствуйте, ${params.name}!</p>
+      <p style="margin:0 0 16px;line-height:1.6;">
+        Накопленная партнёрская комиссия превысила минимальный порог $${params.minPayout} и теперь доступна для выплаты.
+      </p>
+      <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:18px 20px;margin-bottom:20px;text-align:center;">
+        <div style="font-size:13px;color:#065f46;font-weight:600;margin-bottom:4px;">К ВЫПЛАТЕ</div>
+        <div style="font-size:32px;font-weight:700;color:#065f46;">$${params.availableAmount.toFixed(2)}</div>
+      </div>
+      <p style="margin:0 0 12px;line-height:1.6;">
+        Выплата будет произведена в ближайшую дату выплат (5-го числа месяца) на указанные Вами реквизиты карты.
+      </p>
+      <p style="margin:0 0 20px;line-height:1.6;font-size:14px;color:#4b5563;">
+        Пожалуйста проверьте что в кабинете указаны актуальные реквизиты:
+      </p>
+      <a href="${dashboardUrl}" style="display:inline-block;padding:12px 22px;background:#10b981;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">Проверить кабинет</a>
+      <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">
+        Если соглашение ещё не подписано — мы свяжемся с Вами для оформления перед первой выплатой.
+      </p>
+    </div>
+    <div style="padding:14px 28px;background:#f9fafb;color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb;">
+      Staffix · <a href="${appUrl}" style="color:#2563eb;">staffix.io</a> · K-Bridge Co., Ltd.
+    </div>
+  </div>
+</body></html>`,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    console.error("sendPartnerPayoutReadyEmail error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Send error" };
+  }
+}
+
+/**
+ * Уведомление партнёру что выплата проведена.
+ */
+export async function sendPartnerPayoutSentEmail(params: {
+  email: string;
+  name: string;
+  accessToken: string;
+  amount: number;
+  reference: string | null;
+  paidAt: Date;
+  recipientCardNumber: string | null;
+  bankName: string | null;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
+    const dashboardUrl = `${appUrl}/partners/dashboard?token=${params.accessToken}`;
+
+    if (!resend) {
+      console.log(`[DEV] Partner payout-sent email for ${params.email}: $${params.amount.toFixed(2)}`);
+      return { success: true };
+    }
+
+    const dateStr = params.paidAt.toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+
+    // Маскируем номер карты до последних 4 цифр
+    const maskedCard = params.recipientCardNumber
+      ? params.recipientCardNumber.length > 4
+        ? `**** ${params.recipientCardNumber.slice(-4)}`
+        : params.recipientCardNumber
+      : null;
+
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: params.email,
+      subject: `Выплачено $${params.amount.toFixed(2)} — Staffix`,
+      html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f5f7;margin:0;padding:32px 20px;color:#1a1a2e;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+    <div style="padding:24px 28px;background:#10b981;color:#fff;">
+      <div style="font-size:13px;opacity:0.85;margin-bottom:4px;">✓ Выплата произведена</div>
+      <h1 style="margin:0;font-size:22px;">$${params.amount.toFixed(2)}</h1>
+    </div>
+    <div style="padding:24px 28px;color:#1a1a2e;">
+      <p style="margin:0 0 16px;line-height:1.6;">Здравствуйте, ${params.name}!</p>
+      <p style="margin:0 0 18px;line-height:1.6;">Партнёрская комиссия выплачена. Детали:</p>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:20px;">
+        <tr><td style="padding:8px 0;color:#6b7280;">Дата перевода:</td><td style="padding:8px 0;text-align:right;color:#1a1a2e;font-weight:500;">${dateStr}</td></tr>
+        <tr style="border-top:1px solid #f3f4f6;"><td style="padding:8px 0;color:#6b7280;">Сумма:</td><td style="padding:8px 0;text-align:right;color:#10b981;font-weight:600;font-size:16px;">$${params.amount.toFixed(2)}</td></tr>
+        ${maskedCard ? `<tr style="border-top:1px solid #f3f4f6;"><td style="padding:8px 0;color:#6b7280;">Карта:</td><td style="padding:8px 0;text-align:right;color:#1a1a2e;font-family:monospace;">${maskedCard}</td></tr>` : ""}
+        ${params.bankName ? `<tr style="border-top:1px solid #f3f4f6;"><td style="padding:8px 0;color:#6b7280;">Банк:</td><td style="padding:8px 0;text-align:right;color:#1a1a2e;">${params.bankName}</td></tr>` : ""}
+        ${params.reference ? `<tr style="border-top:1px solid #f3f4f6;"><td style="padding:8px 0;color:#6b7280;">Reference:</td><td style="padding:8px 0;text-align:right;color:#1a1a2e;font-family:monospace;font-size:12px;">${params.reference}</td></tr>` : ""}
+      </table>
+      <p style="margin:0 0 16px;line-height:1.6;font-size:14px;color:#4b5563;">
+        Перевод обычно поступает на счёт в течение 1-3 рабочих дней. Если в течение 5 дней деньги не пришли — напишите на <a href="mailto:director.kbridge@gmail.com" style="color:#2563eb;">director.kbridge@gmail.com</a>.
+      </p>
+      <a href="${dashboardUrl}" style="display:inline-block;padding:12px 22px;background:#1a1a2e;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">История выплат</a>
+      <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">
+        Спасибо что приводите клиентов в Staffix! Продолжайте — следующая выплата уже копится.
+      </p>
+    </div>
+    <div style="padding:14px 28px;background:#f9fafb;color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb;">
+      Staffix · <a href="${appUrl}" style="color:#2563eb;">staffix.io</a> · K-Bridge Co., Ltd.
+    </div>
+  </div>
+</body></html>`,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    console.error("sendPartnerPayoutSentEmail error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Send error" };
+  }
+}
+
+/**
  * Email отказа партнёру с (опц.) причиной.
  */
 export async function sendPartnerRejectionEmail(params: {
