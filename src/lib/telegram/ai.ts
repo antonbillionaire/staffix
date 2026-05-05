@@ -1,0 +1,369 @@
+/**
+ * generateAIResponse — основной AI-цикл для Telegram бота:
+ *  1. Загружает business + client context из ai-memory
+ *  2. Определяет режим (sales/service) и собирает system prompt
+ *  3. Подгружает историю диалога (через getOrCreateConversation)
+ *  4. Вызывает Claude с tools, итерируется до 5 раз пока stop_reason=tool_use
+ *  5. Финальный текст возвращает + извлечённые imageUrls (фото товаров)
+ *
+ * Важные guardrails:
+ *  - Если Claude вернул только tool_use без текста — собираем ответ из tool_results
+ *    (buildFallbackFromToolResults). Защита от пустых сообщений клиенту.
+ *  - SAFETY NET для notify_manager: если бот написал «передал менеджеру» в тексте,
+ *    но tool не вызвал — сами зовём notify_manager. Защита от галлюцинаций.
+ *  - Если база знаний обновилась И диалог активный — добавляем soft warning в
+ *    промпт, чтобы факты брались из FAQ/услуг, а не из истории/saммари.
+ */
+
+import { callClaudeWithRetry } from "@/lib/claude-retry";
+import { prisma } from "@/lib/prisma";
+import {
+  buildClientContext,
+  buildBusinessContext,
+  buildSystemPrompt,
+  updateClientAfterMessage,
+  updateConversationMessageCount,
+  extractClientName,
+  extractPhone,
+} from "@/lib/ai-memory";
+import { bookingToolDefinitions } from "@/lib/booking-tools";
+import { salesToolDefinitions, executeSalesTool } from "@/lib/sales-tools";
+import { buildSalesSystemPrompt, isSalesMode } from "@/lib/sales-prompt";
+import { botPromisedHandoffRegex } from "@/lib/handoff-detector";
+import { getOrCreateConversation, saveMessage } from "./conversation";
+import { handleToolCall, buildFallbackFromToolResults } from "./tools";
+
+export interface AIResponseWithMedia {
+  text: string;
+  imageUrls: string[];
+}
+
+export async function generateAIResponse(
+  businessId: string,
+  telegramId: bigint,
+  userMessage: string,
+  userName: string
+): Promise<AIResponseWithMedia> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  if (!apiKey) {
+    console.error("[Webhook] ANTHROPIC_API_KEY is not set!");
+    return { text: "Извините, сервис временно недоступен. Попробуйте позже.", imageUrls: [] };
+  }
+
+  try {
+    // 1. Загружаем контекст бизнеса
+    console.log(`[Webhook] Building business context for ${businessId}...`);
+    const businessContext = await buildBusinessContext(businessId);
+    if (!businessContext) {
+      console.error(`[Webhook] buildBusinessContext returned null for ${businessId}`);
+      return { text: "Извините, произошла ошибка. Попробуйте позже.", imageUrls: [] };
+    }
+    console.log(`[Webhook] Business context loaded: ${businessContext.name}`);
+
+    // 2. Загружаем контекст клиента (AI Memory!)
+    console.log(`[Webhook] Building client context for telegramId=${telegramId}...`);
+    const clientContext = await buildClientContext(businessId, telegramId);
+    console.log(`[Webhook] Client context: ${clientContext ? "loaded" : "null (new client)"}`);
+
+    // 3. Определяем режим бота: продажи или запись
+    const salesMode = isSalesMode(businessContext.businessType, businessContext.dashboardMode);
+    console.log(`[Webhook] Mode: ${salesMode ? "sales" : "service"}, type=${businessContext.businessType}`);
+
+    // 4. Строим системный промпт
+    let systemPrompt: string;
+    if (salesMode) {
+      const salesClientCtx = clientContext
+        ? {
+            name: clientContext.name,
+            totalOrders: clientContext.totalVisits, // используем totalVisits как счётчик заказов
+            lastOrderDate: clientContext.lastVisitDate,
+            tags: clientContext.tags,
+            importantNotes: clientContext.importantNotes,
+          }
+        : null;
+
+      const { getAvailableCategories } = await import("@/lib/sales-tools");
+      const categories = await getAvailableCategories(businessId);
+      const totalProducts = await prisma.product.count({ where: { businessId, isActive: true } });
+      const documents = await prisma.document.findMany({
+        where: { businessId, parsed: true },
+        select: { name: true, extractedText: true },
+      });
+
+      systemPrompt = buildSalesSystemPrompt(
+        {
+          name: businessContext.name,
+          businessType: businessContext.businessType,
+          phone: businessContext.phone,
+          address: businessContext.address,
+          workingHours: businessContext.workingHours,
+          welcomeMessage: businessContext.welcomeMessage,
+          aiTone: businessContext.aiTone,
+          aiRules: businessContext.aiRules,
+          language: businessContext.language || "ru",
+          categories,
+          totalProducts,
+          documents,
+          faqs: businessContext.faqs,
+          consultationsEnabled: businessContext.consultationsEnabled,
+          services: businessContext.services,
+          staff: businessContext.staff,
+        },
+        salesClientCtx
+      );
+    } else {
+      systemPrompt = buildSystemPrompt(businessContext, clientContext);
+    }
+
+    // 5. Получаем историю разговора
+    const conversation = await getOrCreateConversation(businessId, telegramId, userName);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recentMessages: any[] = [
+      ...conversation.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
+      { role: "user", content: userMessage },
+    ].slice(-20);
+
+    // 6. Tools — sales mode + consultations включены = ОБА набора
+    // (онлайн-школы / консалтинг принимают и заказы, и записи на консультации).
+    const activeTools = salesMode
+      ? businessContext.consultationsEnabled
+        ? [...salesToolDefinitions, ...bookingToolDefinitions]
+        : salesToolDefinitions
+      : bookingToolDefinitions;
+
+    const today = new Date().toISOString().split("T")[0];
+    const systemHint = salesMode
+      ? `\n\nСегодня: ${today}. Используй инструменты для поиска товаров и оформления заказов.`
+      : `\n\nСегодняшняя дата: ${today}. Используй инструменты для работы с записями.`;
+
+    // База знаний только что обновилась + диалог активный → анти-якорь:
+    // запрещаем боту брать факты из своей истории, source-of-truth = промпт.
+    const refreshNotice = conversation.contextRefreshSoftWarning
+      ? `\n\n⚠️ ВНИМАНИЕ — БАЗА ЗНАНИЙ ОБНОВЛЕНА (правило приоритета фактов)
+База знаний этого бизнеса (FAQ / услуги / товары / документы) только что была изменена владельцем. Это перебивает любую информацию, которую ты помнишь о ценах, датах, услугах или остатках товаров.
+
+ИСТОЧНИК ИСТИНЫ для фактов о бизнесе — ТОЛЬКО разделы текущего системного промпта выше:
+- "Услуги"/"Каталог товаров"
+- "Частые вопросы (FAQ)"
+- "Дополнительная информация из документов"
+
+НЕ ИСТОЧНИК фактов (могут содержать устаревшие данные):
+- Твои собственные предыдущие ответы в этом диалоге
+- Раздел "Резюме предыдущего разговора" / "Что мы обсуждали ранее"
+- AI-summary клиента ("этот клиент спрашивал про X")
+- Любые упоминания конкретных цен/дат/услуг из памяти
+
+Как применять:
+- Если клиент спрашивает "появились ли новые даты?", "сколько сейчас стоит?", "а есть ещё варианты?" — отвечай ТОЛЬКО по разделам FAQ/услуги/документы из промпта. Не по тому, что ты говорил раньше.
+- Если ты раньше сказал "одна дата 08.06" а в FAQ теперь три даты — называй ВСЕ ТРИ. Не извиняйся, не упоминай старый ответ — просто дай актуальную информацию.
+- Если в саммари написано "клиент спрашивал про X, я ответил Y" — используй это только чтобы понять КОНТЕКСТ запроса, но цифры/факты бери из FAQ заново.
+- Контекст разговора (имя, предпочтения, что обсуждали в общем) — сохраняй. Конкретные факты — переспрашивай у промпта.`
+      : "";
+    const systemWithDate = systemPrompt + systemHint + refreshNotice;
+
+    console.log(`[Webhook] Calling Claude API for business=${businessId}, salesMode=${salesMode}`);
+    let response = await callClaudeWithRetry({
+      model: "claude-sonnet-4-5-20250929",
+      max_tokens: 1024,
+      system: systemWithDate,
+      messages: recentMessages,
+      tools: activeTools,
+    });
+    console.log(`[Webhook] Claude response: stop_reason=${response.stop_reason}`);
+
+    // 7. Цикл tool_use (до 5 итераций)
+    let iterations = 0;
+    const maxIterations = 5;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let lastToolResults: any[] = [];
+    // Все tool-names вызванные за оборот — для safety-net проверки notify_manager
+    const calledToolNames: string[] = [];
+
+    while (response.stop_reason === "tool_use" && iterations < maxIterations) {
+      iterations++;
+
+      const toolUseBlocks = response.content.filter((block) => block.type === "tool_use");
+      for (const b of toolUseBlocks) {
+        if (b.type === "tool_use") calledToolNames.push(b.name);
+      }
+
+      recentMessages.push({
+        role: "assistant",
+        content: response.content,
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const toolResults: any[] = [];
+
+      for (const block of toolUseBlocks) {
+        if (block.type === "tool_use") {
+          const inputPreview = (() => {
+            try {
+              return JSON.stringify(block.input).slice(0, 200);
+            } catch {
+              return "(unstringifiable)";
+            }
+          })();
+          console.log(
+            `[Webhook] Tool call: ${block.name} mode=${salesMode ? "sales" : "service"} input=${inputPreview}`
+          );
+
+          // Роутим к нужному диспетчеру по имени, не по режиму:
+          // в sales+consultations возможны и sales, и booking tools в одном диалоге.
+          const SALES_TOOL_NAMES = new Set([
+            "search_products",
+            "get_product_details",
+            "get_categories",
+            "list_by_category",
+            "identify_client",
+            "create_order",
+            "get_client_orders",
+            "get_upsell_suggestions",
+          ]);
+          const isSalesTool = SALES_TOOL_NAMES.has(block.name);
+          const result = isSalesTool
+            ? await executeSalesTool(
+                block.name,
+                block.input as Record<string, unknown>,
+                businessId,
+                telegramId
+              )
+            : await handleToolCall(
+                block.name,
+                block.input as Record<string, string>,
+                businessId,
+                telegramId
+              );
+
+          const resultPreview = typeof result === "string" ? result.slice(0, 200) : "(non-string)";
+          console.log(`[Webhook] Tool result: ${block.name} -> ${resultPreview}`);
+
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: block.id,
+            content: result,
+          });
+        }
+      }
+
+      lastToolResults = toolResults;
+
+      recentMessages.push({
+        role: "user",
+        content: toolResults,
+      });
+
+      try {
+        response = await callClaudeWithRetry({
+          model: "claude-sonnet-4-5-20250929",
+          max_tokens: 1024,
+          system: systemWithDate,
+          messages: recentMessages,
+          tools: activeTools,
+        });
+      } catch (apiError) {
+        // Если API упал ПОСЛЕ успешного tool — собираем ответ из результатов
+        console.error("[Webhook] API error after tool execution:", apiError);
+        return { text: buildFallbackFromToolResults(lastToolResults, salesMode), imageUrls: [] };
+      }
+    }
+
+    // 8. Финальный текстовый ответ
+    const textBlocks = response.content.filter((block) => block.type === "text");
+    let assistantMessage: string;
+    if (textBlocks.length > 0 && textBlocks[0].type === "text") {
+      assistantMessage = textBlocks[0].text;
+    } else if (lastToolResults.length > 0) {
+      console.log("[Webhook] No text blocks in response, building from tool results");
+      assistantMessage = buildFallbackFromToolResults(lastToolResults, salesMode);
+    } else {
+      assistantMessage = "Чем ещё могу помочь?";
+    }
+
+    // 8.5 SAFETY NET: бот обещал «передал менеджеру», но notify_manager не вызвал.
+    // Сами зовём с последним сообщением клиента в качестве reason.
+    // Regex намеренно широкий: false positive (лишний пинг) дешевле false negative
+    // (молчаливая потеря эскалации).
+    const promisedForwardingRegex = botPromisedHandoffRegex();
+    const calledNotifyManager = calledToolNames.includes("notify_manager");
+    if (!calledNotifyManager && promisedForwardingRegex.test(assistantMessage)) {
+      console.warn(
+        `[Webhook] SAFETY NET: bot promised forwarding without calling notify_manager — invoking automatically. business=${businessId}`
+      );
+      try {
+        const { notifyManagerByTelegram } = await import("@/lib/sales-tools");
+        const reason = `[авто-эскалация после обещания бота] ${userMessage.slice(0, 400)}`;
+        await notifyManagerByTelegram(businessId, telegramId, reason, userName, "normal");
+        console.log(`[Webhook] SAFETY NET: notify_manager fired for business=${businessId}`);
+      } catch (e) {
+        console.error("[Webhook] SAFETY NET notify_manager failed:", e);
+      }
+    }
+
+    // 9. Сохраняем в БД
+    await saveMessage(conversation.id, "user", userMessage);
+    await saveMessage(conversation.id, "assistant", assistantMessage);
+
+    // 10. Счётчик сообщений в разговоре
+    await updateConversationMessageCount(conversation.id);
+
+    // 11. Извлекаем имя/телефон из текста и обновляем клиента
+    const extractedName = extractClientName(userMessage);
+    const extractedPhone = extractPhone(userMessage);
+
+    await updateClientAfterMessage(businessId, telegramId, extractedName || userName);
+
+    if (extractedPhone) {
+      await prisma.client.update({
+        where: {
+          businessId_telegramId: {
+            businessId,
+            telegramId,
+          },
+        },
+        data: { phone: extractedPhone },
+      });
+    }
+
+    // imageUrls из tool-результатов (фото товаров)
+    const imageUrls: string[] = [];
+    for (const tr of lastToolResults) {
+      try {
+        const content = typeof tr.content === "string" ? JSON.parse(tr.content) : tr.content;
+        if (content?.products) {
+          for (const p of content.products) {
+            if (p.imageUrl) imageUrls.push(p.imageUrl);
+          }
+        }
+        if (content?.product?.imageUrl) {
+          imageUrls.push(content.product.imageUrl);
+        }
+      } catch {
+        /* not JSON, skip */
+      }
+    }
+
+    return { text: assistantMessage, imageUrls };
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : "";
+    console.error(`[Webhook] generateAIResponse FAILED: ${errMsg}\n${errStack}`);
+
+    if (errMsg.includes("overloaded") || errMsg.includes("529")) {
+      return {
+        text: "Извините, сервер AI временно перегружен. Пожалуйста, попробуйте через 1-2 минуты.",
+        imageUrls: [],
+      };
+    }
+
+    return {
+      text: "Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте позже.",
+      imageUrls: [],
+    };
+  }
+}
