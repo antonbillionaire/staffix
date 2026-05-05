@@ -47,6 +47,9 @@ interface ApiResponse {
     totalEarnings: number;
     totalPaid: number;
     pendingPayout: number;
+    revenueBrought: number;
+    totalReferrals: number;
+    convertedReferrals: number;
   };
 }
 
@@ -123,28 +126,48 @@ export default function AdminPartnersPage() {
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {/* Stats — две строки: воронка (партнёры/рефералы) + деньги */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
           <StatCard
-            label="Всего одобрено"
+            label="Партнёров одобрено"
             value={data?.counts.approved ?? 0}
             icon={<TrendingUp className="h-5 w-5" />}
             color="green"
           />
           <StatCard
-            label="Ожидает"
+            label="Ожидает заявок"
             value={data?.counts.pending ?? 0}
             icon={<Clock className="h-5 w-5" />}
             color="yellow"
           />
           <StatCard
-            label="Total earnings"
+            label="Привлекли клиентов"
+            value={`${data?.totals.totalReferrals ?? 0} (${data?.totals.convertedReferrals ?? 0} платят)`}
+            icon={<TrendingUp className="h-5 w-5" />}
+            color="blue"
+          />
+          <StatCard
+            label="Принесли Staffix"
+            value={fmt(data?.totals.revenueBrought ?? 0)}
+            icon={<DollarSign className="h-5 w-5" />}
+            color="green"
+          />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+          <StatCard
+            label="Комиссия начислена"
             value={fmt(data?.totals.totalEarnings ?? 0)}
             icon={<DollarSign className="h-5 w-5" />}
             color="blue"
           />
           <StatCard
-            label="Pending payout"
+            label="Уже выплачено"
+            value={fmt(data?.totals.totalPaid ?? 0)}
+            icon={<DollarSign className="h-5 w-5" />}
+            color="green"
+          />
+          <StatCard
+            label="К выплате сейчас"
             value={fmt(data?.totals.pendingPayout ?? 0)}
             icon={<DollarSign className="h-5 w-5" />}
             color="purple"

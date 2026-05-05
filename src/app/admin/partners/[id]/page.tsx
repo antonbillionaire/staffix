@@ -21,15 +21,6 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-interface Referral {
-  id: string;
-  userEmail: string;
-  signedUpAt: string;
-  converted: boolean;
-  convertedAt: string | null;
-  convertedPlan: string | null;
-}
-
 interface Earning {
   id: string;
   commissionAmount: number;
@@ -64,13 +55,58 @@ interface Partner {
   adminNotes: string | null;
   agreementSignedAt: string | null;
   createdAt: string;
-  referrals: Referral[];
   earnings: Earning[];
+}
+
+// Per-client агрегат от API: реферал + сумма платежей и комиссий, последний платёж
+interface ClientStat {
+  id: string;
+  userEmail: string;
+  signedUpAt: string;
+  converted: boolean;
+  convertedAt: string | null;
+  convertedPlan: string | null;
+  paymentsCount: number;
+  cancelledCount: number;
+  totalRevenue: number;
+  totalCommission: number;
+  lastPaymentAt: string | null;
+}
+
+interface MonthlyStat {
+  key: string;
+  label: string;
+  signups: number;
+  conversions: number;
+  revenue: number;
+  commission: number;
+}
+
+interface Lifetime {
+  totalReferrals: number;
+  convertedClients: number;
+  payingClients: number;
+  conversionRate: number;
+  revenueBrought: number;
+  commissionEarned: number;
+  avgRevenuePerClient: number;
+  avgCommissionPerClient: number;
+  avgPaymentsPerClient: number;
+}
+
+interface ApiResponse {
+  partner: Partner;
+  clients: ClientStat[];
+  monthly: MonthlyStat[];
+  lifetime: Lifetime;
 }
 
 export default function AdminPartnerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [partner, setPartner] = useState<Partner | null>(null);
+  const [clients, setClients] = useState<ClientStat[]>([]);
+  const [monthly, setMonthly] = useState<MonthlyStat[]>([]);
+  const [lifetime, setLifetime] = useState<Lifetime | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -79,8 +115,11 @@ export default function AdminPartnerDetailPage({ params }: { params: Promise<{ i
     try {
       const res = await fetch(`/api/admin/partners/${id}`);
       if (!res.ok) throw new Error("fetch failed");
-      const d = await res.json();
+      const d: ApiResponse = await res.json();
       setPartner(d.partner);
+      setClients(d.clients || []);
+      setMonthly(d.monthly || []);
+      setLifetime(d.lifetime || null);
     } catch (e) {
       console.error(e);
     } finally {
@@ -137,7 +176,7 @@ export default function AdminPartnerDetailPage({ params }: { params: Promise<{ i
 
   return (
     <div className="min-h-screen bg-[#0a0a1a] text-white p-6">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <Link
           href="/admin/partners"
           className="inline-flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 mb-4"
@@ -255,13 +294,47 @@ export default function AdminPartnerDetailPage({ params }: { params: Promise<{ i
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          <Stat label="Привлёк" value={partner.referrals.length} />
-          <Stat label="Платящих" value={partner.referrals.filter((r) => r.converted).length} />
-          <Stat label="Всего заработано" value={fmt(partner.totalEarnings)} />
-          <Stat label="К выплате" value={fmt(partner.pendingPayout)} highlight={partner.pendingPayout > 0} />
+        {/* ── Lifetime stats: воронка + деньги ─────────────────────── */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+          <Stat label="Привлёк всего" value={lifetime?.totalReferrals ?? 0} />
+          <Stat
+            label="Платящих сейчас"
+            value={`${lifetime?.payingClients ?? 0} (${lifetime?.conversionRate ?? 0}%)`}
+          />
+          <Stat label="Принесли Staffix" value={fmt(lifetime?.revenueBrought ?? 0)} />
+          <Stat
+            label="Комиссия партнёра"
+            value={fmt(lifetime?.commissionEarned ?? 0)}
+            highlight
+          />
         </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+          <Stat label="Уже выплачено" value={fmt(partner.totalPaid)} />
+          <Stat
+            label="К выплате"
+            value={fmt(partner.pendingPayout)}
+            highlight={partner.pendingPayout > 0}
+          />
+          <Stat
+            label="Средняя выручка/клиент"
+            value={fmt(lifetime?.avgRevenuePerClient ?? 0)}
+          />
+          <Stat
+            label="Среднее # платежей"
+            value={(lifetime?.avgPaymentsPerClient ?? 0).toFixed(1)}
+          />
+        </div>
+
+        {/* Cross-check: lifetime.commissionEarned должен совпадать с partner.totalEarnings.
+            Если расходятся — есть drift в денормализованных счётчиках Partner. */}
+        {lifetime &&
+          Math.abs(lifetime.commissionEarned - partner.totalEarnings) > 0.01 && (
+            <div className="mb-6 bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 text-xs text-orange-300">
+              ⚠️ Расхождение: Partner.totalEarnings = ${partner.totalEarnings.toFixed(2)},
+              реальная сумма по earnings = ${lifetime.commissionEarned.toFixed(2)}.
+              Возможный drift из-за refund/chargeback. Проверьте earnings со status=cancelled.
+            </div>
+          )}
 
         {/* Profile + conditions */}
         <div className="grid md:grid-cols-2 gap-6 mb-6">
@@ -302,61 +375,182 @@ export default function AdminPartnerDetailPage({ params }: { params: Promise<{ i
         {/* Admin notes */}
         <AdminNotesEditor partnerId={partner.id} initial={partner.adminNotes || ""} onSaved={load} />
 
-        {/* Referrals + earnings */}
-        <div className="grid md:grid-cols-2 gap-6 mt-6">
-          <ListBox title={`Рефералы (${partner.referrals.length})`}>
-            {partner.referrals.length === 0 ? (
-              <Empty text="Пока никого не привёл" />
-            ) : (
-              partner.referrals.map((r) => (
-                <div key={r.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0 text-sm">
-                  <div>
-                    <div className="text-white">{r.userEmail}</div>
-                    <div className="text-xs text-gray-500">{fmtDate(r.signedUpAt)}</div>
-                  </div>
-                  {r.converted ? (
-                    <span className="text-xs bg-green-500/10 text-green-400 px-2 py-0.5 rounded">
-                      {r.convertedPlan || "платит"}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-gray-500">trial</span>
-                  )}
-                </div>
-              ))
-            )}
-          </ListBox>
+        {/* Monthly stats — последние 12 месяцев */}
+        <MonthlyTable monthly={monthly} fmt={fmt} />
 
-          <ListBox title={`Начисления (${partner.earnings.length})`}>
-            {partner.earnings.length === 0 ? (
-              <Empty text="Пока ничего не заработал" />
-            ) : (
-              partner.earnings.map((e) => (
-                <div key={e.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0 text-sm">
+        {/* Клиенты партнёра — каждый с выручкой и комиссией */}
+        <ClientsTable clients={clients} fmt={fmt} fmtDate={fmtDate} />
+
+        {/* Начисления — последние 100 для аудита */}
+        <ListBox title={`Все начисления (${partner.earnings.length}${partner.earnings.length >= 100 ? "+" : ""})`} className="mt-6">
+          {partner.earnings.length === 0 ? (
+            <Empty text="Пока ничего не заработал" />
+          ) : (
+            <div className="max-h-96 overflow-y-auto">
+              {partner.earnings.map((e) => (
+                <div
+                  key={e.id}
+                  className="flex items-center justify-between py-2 border-b border-white/5 last:border-0 text-sm"
+                >
                   <div>
-                    <div className="text-white">{fmt(e.commissionAmount)}</div>
+                    <div className="text-white">
+                      {fmt(e.commissionAmount)}
+                      <span className="text-gray-500 text-xs ml-2">из {fmt(e.paymentAmount)}</span>
+                    </div>
                     <div className="text-xs text-gray-500">
                       {e.subscriptionPlan} · {fmtDate(e.createdAt)}
                     </div>
                   </div>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded ${
-                      e.status === "paid"
-                        ? "bg-green-500/10 text-green-400"
-                        : e.status === "approved"
-                          ? "bg-purple-500/10 text-purple-400"
-                          : "bg-yellow-500/10 text-yellow-400"
-                    }`}
-                  >
-                    {e.status}
-                  </span>
+                  <EarningStatusBadge status={e.status} />
                 </div>
-              ))
-            )}
-          </ListBox>
-        </div>
+              ))}
+            </div>
+          )}
+        </ListBox>
       </div>
     </div>
   );
+}
+
+/**
+ * Помесячная динамика: 12 месяцев. Колонки — новые рефералы / конверсии /
+ * выручка приведённая Staffix / комиссия партнёру. Простые ASCII-бары
+ * (фиксированная ширина div'ов) — компактно, без charting-библиотек.
+ */
+function MonthlyTable({ monthly, fmt }: { monthly: MonthlyStat[]; fmt: (n: number) => string }) {
+  const maxRevenue = Math.max(...monthly.map((m) => m.revenue), 1);
+  return (
+    <div className="bg-[#12122a] border border-white/5 rounded-xl p-4 mt-6">
+      <h2 className="text-sm font-semibold text-gray-400 mb-3">По месяцам (последние 12)</h2>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs text-gray-500 border-b border-white/5">
+              <th className="text-left py-2 pr-4">Месяц</th>
+              <th className="text-right py-2 px-2">Регистр.</th>
+              <th className="text-right py-2 px-2">Конверсии</th>
+              <th className="text-right py-2 px-2">Принёс</th>
+              <th className="text-right py-2 pl-2">Комиссия</th>
+              <th className="w-32 pl-3">График</th>
+            </tr>
+          </thead>
+          <tbody>
+            {monthly.map((m) => (
+              <tr key={m.key} className="border-b border-white/5 last:border-0">
+                <td className="py-2 pr-4 text-gray-300 capitalize">{m.label}</td>
+                <td className="py-2 px-2 text-right text-white">{m.signups || ""}</td>
+                <td className="py-2 px-2 text-right text-purple-300">{m.conversions || ""}</td>
+                <td className="py-2 px-2 text-right text-gray-300">
+                  {m.revenue > 0 ? fmt(m.revenue) : ""}
+                </td>
+                <td className="py-2 pl-2 text-right text-green-400 font-medium">
+                  {m.commission > 0 ? fmt(m.commission) : ""}
+                </td>
+                <td className="py-2 pl-3">
+                  <div className="h-2 bg-white/5 rounded">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded"
+                      style={{ width: `${(m.revenue / maxRevenue) * 100}%` }}
+                    />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Список клиентов партнёра — каждый с агрегатами:
+ * сколько раз заплатил, общая сумма платежей, общая комиссия, последний платёж.
+ * Сортировка по убыванию totalCommission — топовые клиенты сверху.
+ */
+function ClientsTable({
+  clients,
+  fmt,
+  fmtDate,
+}: {
+  clients: ClientStat[];
+  fmt: (n: number) => string;
+  fmtDate: (d: string | null) => string;
+}) {
+  const sorted = [...clients].sort((a, b) => b.totalCommission - a.totalCommission);
+  return (
+    <div className="bg-[#12122a] border border-white/5 rounded-xl p-4 mt-6">
+      <h2 className="text-sm font-semibold text-gray-400 mb-3">
+        Клиенты партнёра ({clients.length})
+      </h2>
+      {clients.length === 0 ? (
+        <Empty text="Пока никого не привёл" />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-white/5">
+                <th className="text-left py-2 pr-3">Email</th>
+                <th className="text-left py-2 px-2">Зарегистр.</th>
+                <th className="text-left py-2 px-2">Тариф</th>
+                <th className="text-right py-2 px-2">Платежей</th>
+                <th className="text-right py-2 px-2">Принёс</th>
+                <th className="text-right py-2 px-2">Комиссия</th>
+                <th className="text-left py-2 pl-2">Последний</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((c) => (
+                <tr key={c.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                  <td className="py-2 pr-3 text-white truncate max-w-[200px]">{c.userEmail}</td>
+                  <td className="py-2 px-2 text-gray-400 text-xs whitespace-nowrap">
+                    {fmtDate(c.signedUpAt)}
+                  </td>
+                  <td className="py-2 px-2">
+                    {c.converted ? (
+                      <span className="text-xs bg-green-500/10 text-green-400 px-2 py-0.5 rounded capitalize">
+                        {c.convertedPlan || "платит"}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-500">trial</span>
+                    )}
+                  </td>
+                  <td className="py-2 px-2 text-right text-white">
+                    {c.paymentsCount}
+                    {c.cancelledCount > 0 && (
+                      <span className="text-xs text-orange-400 ml-1">
+                        ({c.cancelledCount} ↩)
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-2 px-2 text-right text-gray-300">
+                    {c.totalRevenue > 0 ? fmt(c.totalRevenue) : "—"}
+                  </td>
+                  <td className="py-2 px-2 text-right text-green-400 font-medium">
+                    {c.totalCommission > 0 ? fmt(c.totalCommission) : "—"}
+                  </td>
+                  <td className="py-2 pl-2 text-gray-500 text-xs whitespace-nowrap">
+                    {fmtDate(c.lastPaymentAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EarningStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; color: string }> = {
+    paid: { label: "Выплачено", color: "bg-green-500/10 text-green-400" },
+    available: { label: "К выплате", color: "bg-purple-500/10 text-purple-300" },
+    pending: { label: "В hold", color: "bg-yellow-500/10 text-yellow-400" },
+    cancelled: { label: "Отменено", color: "bg-gray-500/10 text-gray-400" },
+  };
+  const s = map[status] || { label: status, color: "bg-white/5 text-gray-300" };
+  return <span className={`text-xs px-2 py-0.5 rounded ${s.color}`}>{s.label}</span>;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -388,11 +582,19 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ListBox({ title, children }: { title: string; children: React.ReactNode }) {
+function ListBox({
+  title,
+  children,
+  className,
+}: {
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="bg-[#12122a] border border-white/5 rounded-xl p-4">
+    <div className={`bg-[#12122a] border border-white/5 rounded-xl p-4 ${className || ""}`}>
       <h2 className="text-sm font-semibold text-gray-400 mb-3">{title}</h2>
-      <div className="max-h-80 overflow-y-auto">{children}</div>
+      <div>{children}</div>
     </div>
   );
 }

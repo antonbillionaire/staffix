@@ -11,6 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/admin";
@@ -64,13 +65,28 @@ export async function GET(
     }
 
     const { id } = await params;
+
+    // Базовые поля партнёра + ВСЕ рефералы с их earnings (для per-client агрегатов)
     const partner = await prisma.partner.findUnique({
       where: { id },
       select: {
         ...ADMIN_PARTNER_FIELDS,
         referrals: {
           orderBy: { signedUpAt: "desc" },
-          take: 100,
+          include: {
+            earnings: {
+              orderBy: { createdAt: "desc" },
+              select: {
+                id: true,
+                commissionAmount: true,
+                paymentAmount: true,
+                subscriptionPlan: true,
+                status: true,
+                createdAt: true,
+                paidAt: true,
+              },
+            },
+          },
         },
         earnings: {
           orderBy: { createdAt: "desc" },
@@ -83,14 +99,123 @@ export async function GET(
       return NextResponse.json({ error: "Партнёр не найден" }, { status: 404 });
     }
 
+    // ── Per-client агрегаты ─────────────────────────────────────────
+    // Для каждого реферала: сколько раз заплатил, сколько принёс, сколько
+    // комиссии партнёру, последний платёж, MRR (если активный платящий).
+    // cancelled earnings исключаем из «принесли/комиссия» — это refund'ы.
+    const clients = partner.referrals.map((r) => {
+      const activeEarnings = r.earnings.filter((e) => e.status !== "cancelled");
+      const totalRevenue = activeEarnings.reduce(
+        (s, e) => s.plus(e.paymentAmount),
+        new Prisma.Decimal(0)
+      );
+      const totalCommission = activeEarnings.reduce(
+        (s, e) => s.plus(e.commissionAmount),
+        new Prisma.Decimal(0)
+      );
+      const lastPayment = activeEarnings[0]?.createdAt ?? null;
+      const cancelledCount = r.earnings.filter((e) => e.status === "cancelled").length;
+      return {
+        id: r.id,
+        userEmail: r.userEmail,
+        signedUpAt: r.signedUpAt,
+        converted: r.converted,
+        convertedAt: r.convertedAt,
+        convertedPlan: r.convertedPlan,
+        paymentsCount: activeEarnings.length,
+        cancelledCount,
+        totalRevenue: totalRevenue.toNumber(),
+        totalCommission: totalCommission.toNumber(),
+        lastPaymentAt: lastPayment,
+      };
+    });
+
+    // ── Lifetime агрегаты (свежесчитанные, не из Partner.totalEarnings) ─
+    // Для cross-check: должны совпадать с totalEarnings в Partner.
+    const allActiveEarnings = partner.earnings.filter((e) => e.status !== "cancelled");
+    const lifetimeRevenue = clients.reduce((s, c) => s + c.totalRevenue, 0);
+    const lifetimeCommission = clients.reduce((s, c) => s + c.totalCommission, 0);
+    const convertedClients = clients.filter((c) => c.converted).length;
+    const payingClients = clients.filter((c) => c.paymentsCount > 0).length;
+    const avgRevenuePerClient = payingClients > 0 ? lifetimeRevenue / payingClients : 0;
+    const avgCommissionPerClient = payingClients > 0 ? lifetimeCommission / payingClients : 0;
+    const avgPaymentsPerClient =
+      payingClients > 0
+        ? clients.reduce((s, c) => s + c.paymentsCount, 0) / payingClients
+        : 0;
+
+    // ── Помесячная динамика за 12 месяцев ───────────────────────────
+    // signups: PartnerReferral.signedUpAt в этом месяце
+    // conversions: PartnerReferral.convertedAt в этом месяце
+    // revenue / commission: PartnerEarning.createdAt в этом месяце (без cancelled)
+    const now = new Date();
+    const monthKey = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+    const months: Array<{
+      key: string;
+      label: string;
+      signups: number;
+      conversions: number;
+      revenue: number;
+      commission: number;
+    }> = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        key: monthKey(d),
+        label: d.toLocaleDateString("ru-RU", { month: "short", year: "2-digit" }),
+        signups: 0,
+        conversions: 0,
+        revenue: 0,
+        commission: 0,
+      });
+    }
+    const monthByKey = new Map(months.map((m) => [m.key, m]));
+
+    for (const r of partner.referrals) {
+      const su = monthByKey.get(monthKey(r.signedUpAt));
+      if (su) su.signups++;
+      if (r.convertedAt) {
+        const cv = monthByKey.get(monthKey(r.convertedAt));
+        if (cv) cv.conversions++;
+      }
+    }
+    for (const e of allActiveEarnings) {
+      const m = monthByKey.get(monthKey(e.createdAt));
+      if (m) {
+        m.revenue += e.paymentAmount.toNumber();
+        m.commission += e.commissionAmount.toNumber();
+      }
+    }
+
     // Decimal → number для UI
     const partnerForUi = {
-      ...partner,
+      id: partner.id,
+      name: partner.name,
+      email: partner.email,
+      phone: partner.phone,
+      company: partner.company,
+      website: partner.website,
+      description: partner.description,
+      referralCode: partner.referralCode,
+      status: partner.status,
+      approvedAt: partner.approvedAt,
       commissionRate: partner.commissionRate.toNumber(),
       totalEarnings: partner.totalEarnings.toNumber(),
       totalPaid: partner.totalPaid.toNumber(),
       pendingPayout: partner.pendingPayout.toNumber(),
       minPayoutAmount: partner.minPayoutAmount.toNumber(),
+      cardLast4: partner.cardLast4,
+      cardHolder: partner.cardHolder,
+      bankName: partner.bankName,
+      payoutNotes: partner.payoutNotes,
+      adminNotes: partner.adminNotes,
+      agreementSignedAt: partner.agreementSignedAt,
+      createdAt: partner.createdAt,
+      updatedAt: partner.updatedAt,
+      // Не дублируем referrals — в clients[] уже всё что нужно для UI.
+      // earnings оставляем для истории-таблицы.
       earnings: partner.earnings.map((e) => ({
         ...e,
         commissionAmount: e.commissionAmount.toNumber(),
@@ -98,7 +223,23 @@ export async function GET(
       })),
     };
 
-    return NextResponse.json({ partner: partnerForUi });
+    return NextResponse.json({
+      partner: partnerForUi,
+      clients,
+      monthly: months,
+      lifetime: {
+        totalReferrals: clients.length,
+        convertedClients,
+        payingClients,
+        conversionRate:
+          clients.length > 0 ? Math.round((convertedClients / clients.length) * 100) : 0,
+        revenueBrought: lifetimeRevenue,
+        commissionEarned: lifetimeCommission,
+        avgRevenuePerClient: Math.round(avgRevenuePerClient * 100) / 100,
+        avgCommissionPerClient: Math.round(avgCommissionPerClient * 100) / 100,
+        avgPaymentsPerClient: Math.round(avgPaymentsPerClient * 10) / 10,
+      },
+    });
   } catch (error) {
     console.error("GET /api/admin/partners/[id]:", error);
     return NextResponse.json({ error: "Ошибка сервера" }, { status: 500 });

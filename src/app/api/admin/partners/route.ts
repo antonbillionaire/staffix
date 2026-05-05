@@ -69,6 +69,21 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Revenue которую партнёры принесли Staffix (сумма paymentAmount по всем
+    // НЕ-cancelled earnings). Не хранится агрегатом — считаем на лету.
+    const totalRevenue = await prisma.partnerEarning.aggregate({
+      where: { status: { not: "cancelled" } },
+      _sum: { paymentAmount: true },
+    });
+
+    // Сводка рефералов по всем партнёрам (привлечено / стало платящими)
+    const referralCounts = await prisma.partnerReferral.aggregate({
+      _count: { _all: true },
+    });
+    const convertedReferrals = await prisma.partnerReferral.count({
+      where: { converted: true },
+    });
+
     return NextResponse.json({
       partners: partners.map((p) => ({
         id: p.id,
@@ -97,6 +112,9 @@ export async function GET(request: NextRequest) {
         totalEarnings: totalEarnings._sum.totalEarnings?.toNumber() ?? 0,
         totalPaid: totalEarnings._sum.totalPaid?.toNumber() ?? 0,
         pendingPayout: totalEarnings._sum.pendingPayout?.toNumber() ?? 0,
+        revenueBrought: totalRevenue._sum.paymentAmount?.toNumber() ?? 0,
+        totalReferrals: referralCounts._count._all,
+        convertedReferrals,
       },
     });
   } catch (error) {
