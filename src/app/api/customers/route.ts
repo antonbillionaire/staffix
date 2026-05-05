@@ -1,25 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getCurrentBusiness } from "@/lib/auth-helpers";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
+    const business = await getCurrentBusiness();
+    if (!business) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: true },
-    });
-
-    if (!user?.businesses[0]) {
-      return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
-    }
-
-    const businessId = user.businesses[0].id;
-    const dashboardMode = user.businesses[0].dashboardMode || "service";
+    const businessId = business.id;
+    const dashboardMode = business.dashboardMode || "service";
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";

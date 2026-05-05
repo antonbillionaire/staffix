@@ -538,6 +538,21 @@ async function findChannelClient(
   channel: string,
   clientId: string
 ) {
+  // Facebook (Messenger) теперь пишется в отдельное поле fbPsid. Раньше
+  // PSID ошибочно сохранялся в instagramId — поэтому для FB-канала нужен
+  // двойной поиск с fallback на старые записи.
+  if (channel === "facebook" || channel === "messenger") {
+    // 1. Сначала ищем по правильному полю
+    const byPsid = await prisma.channelClient.findFirst({
+      where: { businessId, fbPsid: clientId },
+    });
+    if (byPsid) return byPsid;
+    // 2. Fallback на старое поле — для записей до миграции на fbPsid
+    return prisma.channelClient.findFirst({
+      where: { businessId, instagramId: clientId },
+    });
+  }
+
   const where: Record<string, unknown> = { businessId };
 
   switch (channel) {
@@ -549,11 +564,6 @@ async function findChannelClient(
       break;
     case "telegram":
       where.telegramId = clientId;
-      break;
-    case "facebook":
-    case "messenger":
-      // Facebook uses instagramId field or we search by any matching field
-      where.instagramId = clientId;
       break;
     default:
       return null;
@@ -587,7 +597,9 @@ async function findOrCreateChannelClient(
       break;
     case "facebook":
     case "messenger":
-      data.instagramId = clientId;
+      // Новые FB-клиенты пишутся в правильное поле. Старые остаются в instagramId,
+      // но lookup в findChannelClient их найдёт через fallback.
+      data.fbPsid = clientId;
       break;
   }
 

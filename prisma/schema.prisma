@@ -1100,6 +1100,12 @@ model ChannelClient {
   instagramId       String?
   instagramUsername String?
 
+  // Facebook Messenger (PSID — Page-Scoped ID, длинная строка от Meta).
+  // Раньше Facebook PSID ошибочно сохранялся в поле instagramId — это ломало
+  // идентификацию когда у бизнеса есть и FB и IG клиенты. Новый код пишет PSID
+  // сюда, старые записи находятся через fallback на instagramId в channel-memory.ts.
+  fbPsid String?
+
   // Контактные данные
   email String?
   phone String?

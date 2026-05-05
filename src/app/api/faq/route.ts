@@ -1,27 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
 import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
+import { getCurrentBusinessId } from "@/lib/auth-helpers";
 
 // GET - Fetch all FAQs for user's business
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: true },
-    });
-
-    if (!user || user.businesses.length === 0) {
+    const businessId = await getCurrentBusinessId();
+    if (!businessId) {
+      // Сохраняем старое поведение: нет бизнеса/сессии → 200 с пустым списком
       return NextResponse.json({ faqs: [] });
     }
 
     const faqs = await prisma.fAQ.findMany({
-      where: { businessId: user.businesses[0].id },
+      where: { businessId },
       orderBy: { id: "asc" },
     });
 
@@ -35,18 +27,9 @@ export async function GET() {
 // POST - Create new FAQ
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
+    const businessId = await getCurrentBusinessId();
+    if (!businessId) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: true },
-    });
-
-    if (!user || user.businesses.length === 0) {
-      return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
     }
 
     const { question, answer } = await request.json();
@@ -62,11 +45,11 @@ export async function POST(request: NextRequest) {
       data: {
         question,
         answer,
-        businessId: user.businesses[0].id,
+        businessId,
       },
     });
 
-    await markBusinessConversationsForRefresh(user.businesses[0].id);
+    await markBusinessConversationsForRefresh(businessId);
 
     return NextResponse.json({ faq });
   } catch (error) {

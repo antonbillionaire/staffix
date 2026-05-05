@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { sendAutomationMessage } from "@/lib/automation";
 import { sendClientBroadcastEmail } from "@/lib/email";
 import { randomBytes } from "crypto";
+import { getCurrentBusinessId } from "@/lib/auth-helpers";
 
 const VALID_CHANNELS = ["telegram", "email", "both"] as const;
 type BroadcastChannel = (typeof VALID_CHANNELS)[number];
@@ -11,21 +11,10 @@ type BroadcastChannel = (typeof VALID_CHANNELS)[number];
 // Get broadcasts for business
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
+    const businessId = await getCurrentBusinessId();
+    if (!businessId) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
     }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: true },
-    });
-
-    if (!user?.businesses[0]) {
-      return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
-    }
-
-    const businessId = user.businesses[0].id;
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
 
@@ -93,21 +82,11 @@ export async function GET(request: NextRequest) {
 // Create new broadcast
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
+    const businessId = await getCurrentBusinessId();
+    if (!businessId) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: true },
-    });
-
-    if (!user?.businesses[0]) {
-      return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
-    }
-
-    const businessId = user.businesses[0].id;
     const body = await request.json();
     const { title, content, targetSegment, scheduledAt, sendNow } = body;
     const channel: BroadcastChannel = (VALID_CHANNELS as readonly string[]).includes(body.channel)

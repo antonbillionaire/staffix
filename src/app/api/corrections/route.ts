@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { getCurrentBusinessId } from "@/lib/auth-helpers";
 
 // GET - List corrections for user's business (paginated)
 export async function GET(request: NextRequest) {
@@ -10,16 +11,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: true },
-    });
-
-    if (!user || user.businesses.length === 0) {
+    const businessId = await getCurrentBusinessId();
+    if (!businessId) {
+      // Сохраняем старое поведение: нет бизнеса → 200 с пустым списком (не 404)
       return NextResponse.json({ corrections: [], total: 0 });
     }
-
-    const businessId = user.businesses[0].id;
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));

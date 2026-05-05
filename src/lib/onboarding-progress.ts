@@ -113,7 +113,7 @@ export async function getOnboardingProgress(businessId: string): Promise<Onboard
       ...stepMeta("knowledge_base"),
       done: faqCount > 0 || docCount > 0,
       optional: false,
-      href: "/dashboard/faq",
+      href: "/dashboard/knowledge",
       cta: "Загрузить базу знаний",
     },
     {
