@@ -9,14 +9,14 @@ datasource db {
 
 // Пользователи платформы (владельцы бизнесов)
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  password      String
-  name          String
+  id       String @id @default(cuid())
+  email    String @unique
+  password String
+  name     String
 
   // Верификация email
-  emailVerified Boolean   @default(false)
-  verificationToken String? @unique
+  emailVerified       Boolean   @default(false)
+  verificationToken   String?   @unique
   verificationExpires DateTime?
 
   // Сброс пароля
@@ -24,61 +24,61 @@ model User {
   resetPasswordExpires DateTime?
 
   // Реферальная атрибуция
-  referredByCode  String?   // код партнёра, использованный при регистрации
+  referredByCode String? // код партнёра, использованный при регистрации
 
   // Настройки
-  theme         String    @default("dark") // dark, light
+  theme String @default("dark") // dark, light
 
   // Настройки уведомлений
-  notifyNewBookings    Boolean @default(true)
-  notifyCancellations  Boolean @default(true)
-  notifyLowMessages    Boolean @default(true)
-  notifyTrialEnding    Boolean @default(true)
+  notifyNewBookings   Boolean @default(true)
+  notifyCancellations Boolean @default(true)
+  notifyLowMessages   Boolean @default(true)
+  notifyTrialEnding   Boolean @default(true)
 
   // Drip campaign tracking
   lastLoginAt          DateTime?
   onboardingEmailsSent Json      @default("[]") // ["day2_services", "day5_channel", "day14_inactive"]
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  businesses    Business[]
+  businesses     Business[]
   supportTickets SupportTicket[]
 }
 
 // Бизнесы
 model Business {
-  id            String    @id @default(cuid())
-  name          String
-  phone         String?
-  address       String?
-  workingHours  String?
+  id             String  @id @default(cuid())
+  name           String
+  phone          String?
+  address        String?
+  workingHours   String?
   welcomeMessage String?
 
   // Onboarding
-  businessType  String?   // salon, clinic, barbershop, auto_service, other
-  businessTypes String[]  @default([])  // массив типов бизнеса (мульти-выбор)
-  dashboardMode String    @default("service") // "service" or "sales" — determines dashboard layout
+  businessType         String? // salon, clinic, barbershop, auto_service, other
+  businessTypes        String[] @default([]) // массив типов бизнеса (мульти-выбор)
+  dashboardMode        String   @default("service") // "service" or "sales" — determines dashboard layout
   // Sales-mode businesses (онлайн-школы, консалтинг, коучи) часто продают
   // через бесплатную консультацию: AI должен уметь и оформить заказ, и
   // записать клиента на встречу. Этот флаг разрешает в sales mode подключать
   // booking-инструменты дополнительно к sales-tools.
-  consultationsEnabled Boolean @default(false)
+  consultationsEnabled Boolean  @default(false)
 
   // Распределение новых лидов между менеджерами:
   //   manual       — никого не назначаем автоматически (текущее поведение)
   //   round_robin  — по очереди следующему сотруднику с acceptsLeads=true
   //   by_load      — кому меньше открытых задач + клиентов в активных стадиях
   // lastAssignedStaffId хранит указатель для round-robin между запусками.
-  leadAssignmentMode    String  @default("manual")
-  lastAssignedStaffId   String?
+  leadAssignmentMode  String  @default("manual")
+  lastAssignedStaffId String?
 
   // Кастомные поля карточки клиента — определяются владельцем бизнеса.
   // Формат: [{ key: string, label: string, type: "text"|"number"|"date"|"select", options?: string[] }]
   // Лимит мягкий (валидируется в API): 20 полей. Значения хранятся в Client.customFields.
-  clientFieldsConfig    Json    @default("[]")
-  staffCount    Int?      // количество сотрудников
-  language      String    @default("ru") // ru, uz, kz, kg, tj, am, ge
+  clientFieldsConfig  Json    @default("[]")
+  staffCount          Int? // количество сотрудников
+  language            String  @default("ru") // ru, uz, kz, kg, tj, am, ge
   onboardingCompleted Boolean @default(false)
 
   // ========================================
@@ -86,100 +86,100 @@ model Business {
   // ========================================
 
   // Детальная категория (spa, nail_salon, hair_salon, massage, etc.)
-  industryCategory  String?
+  industryCategory String?
 
   // Город/регион для локальных рекомендаций
-  city              String?
-  country           String?   @default("UZ")
+  city    String?
+  country String? @default("UZ")
 
   // Часовой пояс бизнеса (IANA формат)
-  timezone          String    @default("Asia/Tashkent")
+  timezone String @default("Asia/Tashkent")
 
   // Средний чек (для рекомендаций ценообразования)
-  averageCheck      Int?
+  averageCheck Int?
 
   // Целевая аудитория
   // JSON: { "gender": "female", "ageRange": "25-45", "income": "medium" }
-  targetAudience    Json?
+  targetAudience Json?
 
   // AI-выученные инсайты о бизнесе
   // JSON: { "popularServices": [...], "peakHours": [...], "commonQuestions": [...] }
-  aiInsights        Json?
+  aiInsights Json?
 
   // Статистика для обучения
-  totalConversations Int     @default(0)
-  totalBookings     Int       @default(0)
-  conversionRate    Float?    // % разговоров → записи
+  totalConversations Int    @default(0)
+  totalBookings      Int    @default(0)
+  conversionRate     Float? // % разговоров → записи
 
   // CRM интеграция (вопрос при онбординге)
-  crmSystem     String?   // none, bitrix24, amocrm, smartup, billz, 1c, other
+  crmSystem String? // none, bitrix24, amocrm, smartup, billz, 1c, other
 
   // AI настройки
-  aiTone         String?   // friendly, professional, casual
-  aiRules        String?   // что можно/нельзя говорить
-  systemPrompt   String?   // сгенерированный промпт для AI
-  botDisplayName String?   // Имя бота для клиентов (напр. "Алия", "Виктор")
+  aiTone         String? // friendly, professional, casual
+  aiRules        String? // что можно/нельзя говорить
+  systemPrompt   String? // сгенерированный промпт для AI
+  botDisplayName String? // Имя бота для клиентов (напр. "Алия", "Виктор")
 
   // Telegram bot
-  botToken      String?   @unique
+  botToken      String? @unique
   botUsername   String?
-  botActive     Boolean   @default(false)
-  botLogo       String?   // URL к логотипу бота
-  webhookSecret String?   // HMAC secret для верификации Telegram webhook (secret_token)
+  botActive     Boolean @default(false)
+  botLogo       String? // URL к логотипу бота
+  webhookSecret String? // HMAC secret для верификации Telegram webhook (secret_token)
 
   // Telegram уведомления владельца
-  ownerTelegramUsername String?  // @username владельца для уведомлений
-  ownerTelegramChatId   BigInt?  // автоматически при /start
+  ownerTelegramUsername String? // @username владельца для уведомлений
+  ownerTelegramChatId   BigInt? // автоматически при /start
 
   // Доставка
-  deliveryEnabled     Boolean @default(false)
-  deliveryTimeFrom    Int?    // минуты (от)
-  deliveryTimeTo      Int?    // минуты (до)
-  deliveryFee         Int?    // стоимость доставки
-  deliveryFreeFrom    Int?    // бесплатная доставка от суммы
-  deliveryZones       String? // текстовое описание зон
+  deliveryEnabled  Boolean @default(false)
+  deliveryTimeFrom Int? // минуты (от)
+  deliveryTimeTo   Int? // минуты (до)
+  deliveryFee      Int? // стоимость доставки
+  deliveryFreeFrom Int? // бесплатная доставка от суммы
+  deliveryZones    String? // текстовое описание зон
 
   // Платёжные системы (для магазинов)
-  paymeId          String?   // Payme Merchant ID
-  clickServiceId   String?   // Click Service ID
-  clickMerchantId  String?   // Click Merchant ID
-  kaspiPayLink     String?   // Kaspi статическая ссылка на оплату
+  paymeId         String? // Payme Merchant ID
+  clickServiceId  String? // Click Service ID
+  clickMerchantId String? // Click Merchant ID
+  kaspiPayLink    String? // Kaspi статическая ссылка на оплату
 
   // WhatsApp Business API (прямое подключение от Meta)
-  waPhoneNumberId   String?   // Meta Phone Number ID
-  waAccessToken     String?   // Meta User/System Access Token
-  waVerifyToken     String?   // Random secret для верификации webhook
-  waActive          Boolean   @default(false)
+  waPhoneNumberId String? // Meta Phone Number ID
+  waAccessToken   String? // Meta User/System Access Token
+  waVerifyToken   String? // Random secret для верификации webhook
+  waActive        Boolean @default(false)
 
   // Facebook Messenger (прямое подключение страницы)
-  fbPageId          String?   // Facebook Page ID
-  fbPageAccessToken String?   // Page Access Token
-  fbVerifyToken     String?   // Random secret для верификации webhook
-  fbActive          Boolean   @default(false)
+  fbPageId          String? // Facebook Page ID
+  fbPageAccessToken String? // Page Access Token
+  fbVerifyToken     String? // Random secret для верификации webhook
+  fbActive          Boolean @default(false)
 
   // Instagram (via connected Facebook Page)
-  igBusinessAccountId  String?   // Instagram Business Account ID
-  igUsername           String?   // @username для отображения
-  igActive             Boolean   @default(false)
+  igBusinessAccountId String? // Instagram Business Account ID
+  igUsername          String? // @username для отображения
+  igActive            Boolean @default(false)
 
   // Meta OAuth (shared for FB + IG, managed by Facebook Login flow)
-  metaUserId           String?   // Facebook/Meta User ID (for data deletion scoping)
-  metaUserAccessToken  String?   // Long-lived User Access Token (60 дней)
-  metaTokenExpiresAt   DateTime? // Когда истекает
+  metaUserId          String? // Facebook/Meta User ID (for data deletion scoping)
+  metaUserAccessToken String? // Long-lived User Access Token (60 дней)
+  metaTokenExpiresAt  DateTime? // Когда истекает
 
   // Powered by Staffix (вирусный механизм)
-  hidePoweredBy Boolean   @default(false) // true = подпись скрыта (Pro+)
+  hidePoweredBy Boolean @default(false) // true = подпись скрыта (Pro+)
 
   // Claude API usage tracking
-  tokensUsedInput  Int     @default(0) // input tokens consumed
-  tokensUsedOutput Int     @default(0) // output tokens consumed
+  tokensUsedInput  Int @default(0) // input tokens consumed
+  tokensUsedOutput Int @default(0) // output tokens consumed
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   services      Service[]
   staff         Staff[]
@@ -196,47 +196,47 @@ model Business {
   clients            Client[]
 
   // Уведомления
-  notifications      Notification[]
+  notifications Notification[]
 
   // Рассылки клиентам
-  clientBroadcasts   ClientBroadcast[]
+  clientBroadcasts ClientBroadcast[]
 
   // Мультиканальность (WhatsApp, Instagram)
   channelConnections ChannelConnection[]
   channelClients     ChannelClient[]
 
   // CRM интеграции
-  crmIntegrations    CrmIntegration[]
+  crmIntegrations CrmIntegration[]
 
   // Задачи менеджеров
-  tasks              Task[]
+  tasks Task[]
 
   // Финансы (зарплаты сотрудников)
-  financeTransactions FinanceTransaction[]
-  servicePackages     ServicePackage[]
+  financeTransactions      FinanceTransaction[]
+  servicePackages          ServicePackage[]
   serviceIncompatibilities ServiceIncompatibility[]
 
   // WhatsApp/Facebook разговоры
   channelConversations ChannelConversation[]
 
   // Channel messages and leads
-  channelMessages      ChannelMessage[]
-  leads                Lead[]
+  channelMessages ChannelMessage[]
+  leads           Lead[]
 
   // AI Learning
-  botCorrections     BotCorrection[]
-  aiInsightRecords   AiInsight[]
-  metaInsights       MetaInsight[] @relation("MetaInsightBusiness")
+  botCorrections   BotCorrection[]
+  aiInsightRecords AiInsight[]
+  metaInsights     MetaInsight[]   @relation("MetaInsightBusiness")
 
   // Программы лояльности (может быть несколько типов)
-  loyaltyPrograms    LoyaltyProgram[]
+  loyaltyPrograms LoyaltyProgram[]
 
   // Продажи (магазины, e-commerce)
-  products           Product[]
-  orders             Order[]
+  products Product[]
+  orders   Order[]
 
   // Зоны доставки
-  deliveryZonesRel   DeliveryZone[]
+  deliveryZonesRel DeliveryZone[]
 
   @@index([fbPageId])
   @@index([igBusinessAccountId])
@@ -245,89 +245,89 @@ model Business {
 
 // Зоны доставки
 model DeliveryZone {
-  id          String   @id @default(cuid())
-  name        String   // "Центр", "Окраины", "Экспресс"
-  fee         Int      // стоимость доставки
-  currency    String   @default("UZS") // UZS, KZT, RUB, KGS, USD
-  timeFrom    Int?     // мин. время в минутах
-  timeTo      Int?     // макс. время в минутах
-  freeFrom    Int?     // бесплатно от суммы
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
+  id        String  @id @default(cuid())
+  name      String // "Центр", "Окраины", "Экспресс"
+  fee       Int // стоимость доставки
+  currency  String  @default("UZS") // UZS, KZT, RUB, KGS, USD
+  timeFrom  Int? // мин. время в минутах
+  timeTo    Int? // макс. время в минутах
+  freeFrom  Int? // бесплатно от суммы
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
 
-  businessId  String
-  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([businessId, isActive])
 }
 
 // Услуги
 model Service {
-  id            String    @id @default(cuid())
-  name          String
-  description   String?   // описание услуги
-  price         Int
-  duration      Int       // минуты
+  id          String  @id @default(cuid())
+  name        String
+  description String? // описание услуги
+  price       Int
+  duration    Int // минуты
 
   // Автодобавление: при выборе этой услуги автоматически предложить эти услуги
   // Хранится массив ID услуг через запятую (для простоты)
-  autoAddServiceIds String[]  @default([])
+  autoAddServiceIds String[] @default([])
 
-  businessId    String
-  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  bookings              Booking[]
-  packageItems          ServicePackageItem[]
-  incompatibilitiesA    ServiceIncompatibility[] @relation("ServiceA")
-  incompatibilitiesB    ServiceIncompatibility[] @relation("ServiceB")
+  bookings           Booking[]
+  packageItems       ServicePackageItem[]
+  incompatibilitiesA ServiceIncompatibility[] @relation("ServiceA")
+  incompatibilitiesB ServiceIncompatibility[] @relation("ServiceB")
 
   @@index([businessId])
 }
 
 // Пакет услуг (комбо со скидкой или фикс. ценой)
 model ServicePackage {
-  id            String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  name          String    // "Свадебный комплекс", "Стрижка + борода"
-  description   String?
+  name        String // "Свадебный комплекс", "Стрижка + борода"
+  description String?
 
   // Тип скидки: percent (процент) | fixed (фикс. цена за весь пакет) | none (без скидки)
-  discountType  String    @default("percent")
-  discountPercent Float?  // если discountType = "percent"
-  fixedPrice    Int?      // если discountType = "fixed" — общая цена пакета
+  discountType    String @default("percent")
+  discountPercent Float? // если discountType = "percent"
+  fixedPrice      Int? // если discountType = "fixed" — общая цена пакета
 
-  isActive      Boolean   @default(true)
+  isActive Boolean @default(true)
 
   // AI должен ли предлагать клиентам этот пакет автоматически
-  autoSuggest   Boolean   @default(true)
+  autoSuggest Boolean @default(true)
 
-  businessId    String
-  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  items         ServicePackageItem[]
-  bookings      Booking[]
+  items    ServicePackageItem[]
+  bookings Booking[]
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([businessId, isActive])
 }
 
 // Услуги внутри пакета
 model ServicePackageItem {
-  id          String          @id @default(cuid())
+  id String @id @default(cuid())
 
-  packageId   String
-  package     ServicePackage  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  packageId String
+  package   ServicePackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
 
-  serviceId   String
-  service     Service         @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   // Порядок в пакете (для UI)
-  sortOrder   Int             @default(0)
+  sortOrder Int @default(0)
 
   @@unique([packageId, serviceId])
   @@index([packageId])
@@ -336,32 +336,32 @@ model ServicePackageItem {
 // Несовместимости услуг
 // "После услуги A нельзя делать услугу B в течение N дней"
 model ServiceIncompatibility {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Первая услуга (которая делается)
-  serviceAId      String
-  serviceA        Service   @relation("ServiceA", fields: [serviceAId], references: [id], onDelete: Cascade)
+  serviceAId String
+  serviceA   Service @relation("ServiceA", fields: [serviceAId], references: [id], onDelete: Cascade)
 
   // Несовместимая услуга (one of serviceBId / serviceBText must be set)
-  serviceBId      String?
-  serviceB        Service?  @relation("ServiceB", fields: [serviceBId], references: [id], onDelete: Cascade)
+  serviceBId String?
+  serviceB   Service? @relation("ServiceB", fields: [serviceBId], references: [id], onDelete: Cascade)
 
   // Внешнее ограничение свободным текстом (солнце, баня, алкоголь и т.п.)
-  serviceBText    String?
+  serviceBText String?
 
   // Период несовместимости в днях после серии A
-  cooldownDays    Int       @default(7)
+  cooldownDays Int @default(7)
 
   // Симметрично? (если да — то и B->A нельзя)
-  bidirectional   Boolean   @default(true)
+  bidirectional Boolean @default(true)
 
   // Причина для бота (объясняет клиенту)
-  reason          String?   // "Не рекомендуется делать массаж лица в течение 5 дней после ботокса"
+  reason String? // "Не рекомендуется делать массаж лица в течение 5 дней после ботокса"
 
-  businessId      String
-  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt       DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([businessId])
   @@index([serviceAId])
@@ -370,59 +370,61 @@ model ServiceIncompatibility {
 
 // Мастера/сотрудники
 model Staff {
-  id            String    @id @default(cuid())
-  name          String
-  role          String?   // канонизированное значение из dropdown: admin, manager, master, doctor, operator, custom
-  specialization String?  // свободный текст ("Барбер-стилист", "Терапевт") — только для отображения, фильтры идут по role
-  photo         String?   // base64 data URL или URL к фото
+  id             String  @id @default(cuid())
+  name           String
+  role           String? // канонизированное значение из dropdown: admin, manager, master, doctor, operator, custom
+  specialization String? // свободный текст ("Барбер-стилист", "Терапевт") — только для отображения, фильтры идут по role
+  photo          String? // base64 data URL или URL к фото
 
   // Telegram уведомления
-  telegramUsername      String?   // @elena_master (владелец заполняет в дашборде)
-  telegramChatId        BigInt?   // автоматически сохраняется когда мастер пишет /start боту
-  notificationsEnabled  Boolean   @default(true)
+  telegramUsername     String? // @elena_master (владелец заполняет в дашборде)
+  telegramChatId       BigInt? // автоматически сохраняется когда мастер пишет /start боту
+  notificationsEnabled Boolean @default(true)
 
-  businessId    String
-  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   // Зарплата
-  baseRate          Int?     // Фиксированная ставка (за месяц)
-  commissionPercent Float?   // % с услуги/продажи (например 30%)
+  baseRate          Int? // Фиксированная ставка (за месяц)
+  commissionPercent Float? // % с услуги/продажи (например 30%)
 
   // Включён ли в авто-распределение лидов (round-robin / by-load).
   // Default true — новые сотрудники сразу попадают в ротацию. Владелец
   // может выключить если сотрудник в отпуске / на стажировке / не работает с клиентами.
-  acceptsLeads      Boolean   @default(true)
+  acceptsLeads Boolean @default(true)
 
-  bookings      Booking[]
-  orders        Order[]
-  schedule      StaffSchedule[]
-  timeOffs      StaffTimeOff[]
+  bookings            Booking[]
+  orders              Order[]
+  schedule            StaffSchedule[]
+  timeOffs            StaffTimeOff[]
   financeTransactions FinanceTransaction[]
+  // Задачи назначенные на сотрудника (Task.assignedStaffId → SetNull при удалении)
+  assignedTasks       Task[]               @relation("TaskAssignedStaff")
 
   @@index([businessId])
 }
 
 // Финансовые транзакции по сотрудникам (премии, штрафы, выплаты)
 model FinanceTransaction {
-  id          String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  staffId     String
-  staff       Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  staffId String
+  staff   Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
 
   // Тип: bonus (премия) | fine (штраф) | payout (выплата) | adjustment (корректировка)
-  type        String
+  type String
 
-  amount      Int      // сумма (положительная всегда; знак определяется типом)
-  reason      String?  // комментарий "Премия за выполнение плана", "Штраф за опоздание"
+  amount Int // сумма (положительная всегда; знак определяется типом)
+  reason String? // комментарий "Премия за выполнение плана", "Штраф за опоздание"
 
   // Период к которому относится (для группировки в отчётах)
   periodStart DateTime?
   periodEnd   DateTime?
 
-  businessId  String
-  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([staffId, createdAt])
   @@index([businessId, type, createdAt])
@@ -430,50 +432,50 @@ model FinanceTransaction {
 
 // FAQ / База знаний
 model FAQ {
-  id            String    @id @default(cuid())
-  question      String
-  answer        String
+  id       String @id @default(cuid())
+  question String
+  answer   String
 
-  businessId    String
-  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId])
 }
 
 // Записи клиентов
 model Booking {
-  id            String    @id @default(cuid())
-  clientName    String
-  clientPhone   String?
+  id               String  @id @default(cuid())
+  clientName       String
+  clientPhone      String?
   clientTelegramId BigInt?
 
-  date          DateTime
-  status        String    @default("pending") // pending, confirmed, cancelled, completed
+  date   DateTime
+  status String   @default("pending") // pending, confirmed, cancelled, completed
 
   // Флаги напоминаний
   reminder24hSent Boolean @default(false)
   reminder2hSent  Boolean @default(false)
   reviewRequested Boolean @default(false)
 
-  businessId    String
-  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  serviceId     String?
-  service       Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  serviceId String?
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
 
-  staffId       String?
-  staff         Staff?    @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  staffId String?
+  staff   Staff?  @relation(fields: [staffId], references: [id], onDelete: SetNull)
 
   // Пакет услуг (если запись часть пакета)
   servicePackageId String?
   servicePackage   ServicePackage? @relation(fields: [servicePackageId], references: [id], onDelete: SetNull)
-  packageGroupId   String?  // общий ID для всех записей одного пакета (для группировки)
+  packageGroupId   String? // общий ID для всех записей одного пакета (для группировки)
 
   // Автоматизации
-  reminders     ScheduledReminder[]
-  reviews       Review[]
+  reminders ScheduledReminder[]
+  reviews   Review[]
 
-  createdAt     DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([businessId])
   @@index([businessId, date])
@@ -484,14 +486,14 @@ model Booking {
 
 // Диалоги с клиентами
 model Conversation {
-  id                  String    @id @default(cuid())
-  clientTelegramId    BigInt
-  clientName          String?
+  id               String  @id @default(cuid())
+  clientTelegramId BigInt
+  clientName       String?
 
-  businessId          String
-  business            Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  messages            Message[]
+  messages Message[]
 
   // ========================================
   // AI MEMORY - Фаза 1
@@ -499,32 +501,32 @@ model Conversation {
 
   // AI-сгенерированное краткое содержание разговора
   // Пример: "Клиент записался на массаж на 15 февраля, спрашивал про скидки"
-  summary             String?   @db.Text
+  summary String? @db.Text
 
   // Тема/цель разговора
   // booking, inquiry, complaint, feedback, other
-  topic               String?
+  topic String?
 
   // Результат разговора
   // booked, answered, escalated, unresolved
-  outcome             String?
+  outcome String?
 
   // Извлечённая важная информация
   // JSON: { "bookedService": "массаж", "appointmentDate": "2025-02-15", "mentionedIssues": [] }
-  extractedInfo       Json?
+  extractedInfo Json?
 
   // Количество сообщений (для триггера summarization)
-  messageCount        Int       @default(0)
+  messageCount Int @default(0)
 
   // Флаг: нужно ли обновить summary
-  needsSummary        Boolean   @default(false)
+  needsSummary Boolean @default(false)
 
   // Флаг: база знаний (FAQ/документы/услуги/товары) изменилась — обрезать историю
   // в следующем ответе бота, чтобы новые данные имели приоритет над старыми ответами
-  needsContextRefresh Boolean   @default(false)
+  needsContextRefresh Boolean @default(false)
 
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([businessId, clientTelegramId])
   @@index([businessId, updatedAt])
@@ -533,46 +535,46 @@ model Conversation {
 
 // Сообщения в диалогах
 model Message {
-  id              String    @id @default(cuid())
-  role            String    // user, assistant
-  content         String
+  id      String @id @default(cuid())
+  role    String // user, assistant
+  content String
 
-  conversationId  String
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
-  createdAt       DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([conversationId])
 }
 
 // Подписки
 model Subscription {
-  id              String    @id @default(cuid())
-  plan            String    @default("trial") // trial, starter, pro, business, enterprise
-  messagesUsed    Int       @default(0)
-  messagesLimit   Int       @default(100)
-  expiresAt       DateTime
+  id            String   @id @default(cuid())
+  plan          String   @default("trial") // trial, starter, pro, business, enterprise
+  messagesUsed  Int      @default(0)
+  messagesLimit Int      @default(100)
+  expiresAt     DateTime
 
   // PayPro Global
-  payproOrderId        String?   // PayPro ORDER_ID
-  payproSubscriptionId String?   // PayPro SUBSCRIPTION_ID
-  payproCustomerId     String?   // PayPro CUSTOMER_ID
-  status               String    @default("active") // active, cancelled, suspended, expired
-  billingPeriod        String?   // monthly, yearly
+  payproOrderId        String? // PayPro ORDER_ID
+  payproSubscriptionId String? // PayPro SUBSCRIPTION_ID
+  payproCustomerId     String? // PayPro CUSTOMER_ID
+  status               String  @default("active") // active, cancelled, suspended, expired
+  billingPeriod        String? // monthly, yearly
 
   // Expiry reminder tracking
-  reminder7dSent       Boolean   @default(false)
-  reminder3dSent       Boolean   @default(false)
-  reminder1dSent       Boolean   @default(false)
+  reminder7dSent Boolean @default(false)
+  reminder3dSent Boolean @default(false)
+  reminder1dSent Boolean @default(false)
 
   // Message limit warning (sent once at 80%)
-  limitWarning80Sent   Boolean   @default(false)
+  limitWarning80Sent Boolean @default(false)
 
-  businessId      String    @unique
-  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String   @unique
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([plan, expiresAt])
   @@index([status, expiresAt])
@@ -580,38 +582,38 @@ model Subscription {
 
 // Загруженные документы
 model Document {
-  id            String    @id @default(cuid())
-  name          String    // имя файла
-  type          String    // price_list, services, faq, other
-  url           String    // URL к файлу
-  mimeType      String    // application/pdf, etc.
-  size          Int       // размер в байтах
+  id       String @id @default(cuid())
+  name     String // имя файла
+  type     String // price_list, services, faq, other
+  url      String // URL к файлу
+  mimeType String // application/pdf, etc.
+  size     Int // размер в байтах
 
   // Извлечённые данные
-  extractedText String?   // текст из документа
-  parsed        Boolean   @default(false) // был ли распарсен AI
+  extractedText String? // текст из документа
+  parsed        Boolean @default(false) // был ли распарсен AI
 
-  businessId    String
-  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt     DateTime  @default(now())
+  createdAt DateTime @default(now())
 }
 
 // Тикеты поддержки
 model SupportTicket {
-  id            String    @id @default(cuid())
-  subject       String
-  priority      String    @default("normal") // low, normal, high
-  status        String    @default("open")   // open, in_progress, resolved, closed
-  rating        Int?                           // 1-5 satisfaction rating
+  id       String @id @default(cuid())
+  subject  String
+  priority String @default("normal") // low, normal, high
+  status   String @default("open") // open, in_progress, resolved, closed
+  rating   Int? // 1-5 satisfaction rating
 
-  userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  messages      SupportMessage[]
+  messages SupportMessage[]
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Сообщения в тикетах поддержки
@@ -620,12 +622,12 @@ model SupportMessage {
   content       String
   isFromSupport Boolean   @default(false) // true = от поддержки, false = от пользователя
   isRead        Boolean   @default(false) // прочитано ли пользователем
-  readAt        DateTime?                 // когда прочитано
+  readAt        DateTime? // когда прочитано
 
-  ticketId      String
-  ticket        SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticketId String
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
-  createdAt     DateTime  @default(now())
+  createdAt DateTime @default(now())
 }
 
 // Диалоги пользователей с support-ботом @staffix_support_bot. Раньше история
@@ -634,40 +636,40 @@ model SupportMessage {
 //   1. Бот помнил всё между перезапусками контейнеров
 //   2. Можно было смотреть лог обращений (для аудита и обучения промптов)
 model SupportBotConversation {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Telegram chat id пользователя — natural key
-  telegramChatId  BigInt    @unique
-  telegramUserId  BigInt?
-  username        String?   // @username если есть
-  firstName       String?
-  lastName        String?
-  language        String?   // ru / en / uz / kz — язык первого сообщения
+  telegramChatId BigInt  @unique
+  telegramUserId BigInt?
+  username       String? // @username если есть
+  firstName      String?
+  lastName       String?
+  language       String? // ru / en / uz / kz — язык первого сообщения
 
   // Связан ли с зарегистрированным пользователем Staffix (если он залогинен)
-  userId          String?
+  userId String?
 
-  messages        SupportBotMessage[]
+  messages SupportBotMessage[]
 
   // Последняя активность для UI и cleanup'а старых диалогов
-  lastMessageAt   DateTime  @default(now())
+  lastMessageAt DateTime @default(now())
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([lastMessageAt])
   @@index([userId])
 }
 
 model SupportBotMessage {
-  id              String    @id @default(cuid())
-  role            String    // "user" | "assistant"
-  content         String    @db.Text
+  id      String @id @default(cuid())
+  role    String // "user" | "assistant"
+  content String @db.Text
 
-  conversationId  String
-  conversation    SupportBotConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation   SupportBotConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
-  createdAt       DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([conversationId, createdAt])
 }
@@ -678,58 +680,58 @@ model SupportBotMessage {
 
 // Настройки автоматизаций для бизнеса
 model AutomationSettings {
-  id                    String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Напоминания о записи
-  reminder24hEnabled    Boolean   @default(true)
-  reminder2hEnabled     Boolean   @default(true)
+  reminder24hEnabled Boolean @default(true)
+  reminder2hEnabled  Boolean @default(true)
 
   // Сбор отзывов
-  reviewEnabled         Boolean   @default(true)
-  reviewDelayHours      Int       @default(2)    // через сколько часов после визита
-  reviewGoogleLink      String?                  // ссылка на Google отзывы
-  review2gisLink        String?                  // ссылка на 2GIS отзывы
-  reviewYandexLink      String?                  // ссылка на Яндекс.Карты отзывы
+  reviewEnabled    Boolean @default(true)
+  reviewDelayHours Int     @default(2) // через сколько часов после визита
+  reviewGoogleLink String? // ссылка на Google отзывы
+  review2gisLink   String? // ссылка на 2GIS отзывы
+  reviewYandexLink String? // ссылка на Яндекс.Карты отзывы
 
   // Реактивация клиентов
-  reactivationEnabled   Boolean   @default(true)
-  reactivationDays      Int       @default(30)   // через сколько дней без визита
-  reactivationDiscount  Int       @default(10)   // размер скидки %
+  reactivationEnabled  Boolean @default(true)
+  reactivationDays     Int     @default(30) // через сколько дней без визита
+  reactivationDiscount Int     @default(10) // размер скидки %
 
-  businessId            String    @unique
-  business              Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String   @unique
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Запланированные напоминания
 model ScheduledReminder {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  type            String    // reminder_24h, reminder_2h, review, reactivation
-  status          String    @default("pending") // pending, sent, failed, cancelled
+  type   String // reminder_24h, reminder_2h, review, reactivation
+  status String @default("pending") // pending, sent, failed, cancelled
 
-  scheduledFor    DateTime  // когда отправить
-  sentAt          DateTime? // когда отправлено
+  scheduledFor DateTime // когда отправить
+  sentAt       DateTime? // когда отправлено
 
   // Данные для отправки
   clientTelegramId BigInt
-  clientName      String?
-  serviceName     String?
-  appointmentDate DateTime?
+  clientName       String?
+  serviceName      String?
+  appointmentDate  DateTime?
 
   // Для реактивации
-  lastVisitDate   DateTime?
-  discountCode    String?
+  lastVisitDate DateTime?
+  discountCode  String?
 
-  bookingId       String?
-  booking         Booking?  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId String?
+  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
-  businessId      String
-  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt       DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([status, scheduledFor])
   @@index([businessId, type])
@@ -737,59 +739,59 @@ model ScheduledReminder {
 
 // Отзывы клиентов
 model Review {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  rating          Int       // 1-5
-  comment         String?
+  rating  Int // 1-5
+  comment String?
 
   clientTelegramId BigInt
-  clientName      String?
+  clientName       String?
 
   // Связь с записью
-  bookingId       String?
-  booking         Booking?  @relation(fields: [bookingId], references: [id])
+  bookingId String?
+  booking   Booking? @relation(fields: [bookingId], references: [id])
 
   // Статус
-  isPublic        Boolean   @default(false)   // опубликован ли
-  responded       Boolean   @default(false)   // ответил ли бизнес
-  responseText    String?                     // ответ бизнеса
+  isPublic     Boolean @default(false) // опубликован ли
+  responded    Boolean @default(false) // ответил ли бизнес
+  responseText String? // ответ бизнеса
 
-  businessId      String
-  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt       DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([businessId, rating])
 }
 
 // Клиенты (для отслеживания последнего визита)
 model Client {
-  id                String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  telegramId        BigInt
-  name              String?
-  surname           String?
-  phone             String?
-  email             String?
-  company           String?   // название бизнеса клиента
+  telegramId BigInt
+  name       String?
+  surname    String?
+  phone      String?
+  email      String?
+  company    String? // название бизнеса клиента
 
   // Лояльность: какие программы назначены (пустой = все)
-  loyaltyProgramIds String[]  @default([])
+  loyaltyProgramIds String[] @default([])
 
   // Статус
-  lastVisitDate     DateTime?
-  totalVisits       Int       @default(0)
-  isBlocked         Boolean   @default(false)  // отписался от рассылок
+  lastVisitDate DateTime?
+  totalVisits   Int       @default(0)
+  isBlocked     Boolean   @default(false) // отписался от рассылок
 
   // Последняя реактивация
   lastReactivationSent DateTime?
 
   // Лояльность
-  loyaltyPoints     Int      @default(0)   // бонусные баллы
-  loyaltyVisits     Int      @default(0)   // кол-во визитов для программы
-  loyaltyTotalSpent Int      @default(0)   // общая сумма покупок
-  loyaltyCashbackPercent Float?            // индивидуальный % кэшбека (null = по программе)
-  loyaltyTier       String?               // уровень: bronze, silver, gold, platinum (null = авто по программе)
+  loyaltyPoints          Int     @default(0) // бонусные баллы
+  loyaltyVisits          Int     @default(0) // кол-во визитов для программы
+  loyaltyTotalSpent      Int     @default(0) // общая сумма покупок
+  loyaltyCashbackPercent Float? // индивидуальный % кэшбека (null = по программе)
+  loyaltyTier            String? // уровень: bronze, silver, gold, platinum (null = авто по программе)
 
   // ========================================
   // AI MEMORY - Фаза 1
@@ -797,15 +799,15 @@ model Client {
 
   // AI-сгенерированное краткое описание клиента
   // Пример: "Постоянный клиент, предпочитает тайский массаж, приходит раз в 2 недели"
-  aiSummary         String?   @db.Text
+  aiSummary String? @db.Text
 
   // Предпочтения клиента (извлечённые AI из разговоров)
   // JSON: { "preferredServices": ["тайский массаж"], "preferredTime": "утро", "allergies": ["орехи"] }
-  preferences       Json?
+  preferences Json?
 
   // Важные заметки (добавленные вручную или AI)
   // Пример: "VIP клиент, всегда давать скидку 10%"
-  importantNotes    String?   @db.Text
+  importantNotes String? @db.Text
 
   // Настроение/тон общения с этим клиентом
   // formal, friendly, casual
@@ -813,22 +815,22 @@ model Client {
 
   // Теги для быстрой категоризации
   // ["vip", "новенький", "проблемный"]
-  tags              String[]  @default([])
+  tags String[] @default([])
 
   // Статистика общения
-  totalMessages     Int       @default(0)
-  lastMessageAt     DateTime?
+  totalMessages Int       @default(0)
+  lastMessageAt DateTime?
 
   // Когда последний раз обновлялся AI summary
-  summaryUpdatedAt  DateTime?
+  summaryUpdatedAt DateTime?
 
   // Привязка к продавцу (через ссылку t.me/bot?start=s_staffId)
-  assignedStaffId   String?
+  assignedStaffId String?
 
   // Кастомные поля клиента — словарь { [key]: value } по схеме из Business.clientFieldsConfig.
   // Если бизнес удалит определение поля, данные тут не пропадают — просто перестают
   // отображаться в UI. Можно вернуть, восстановив определение.
-  customFields      Json      @default("{}")
+  customFields Json @default("{}")
 
   // Email-маркетинг: клиент жмёт "отписаться" в письме → ставится true.
   // isBlocked продолжает блокировать ВСЕ каналы, а это поле — только email-рассылки.
@@ -841,16 +843,19 @@ model Client {
   // dealStage: lead | consultation_booked | consultation_done | client | lost
   // По умолчанию все новые клиенты — "lead". Менеджер двигает руками
   // (или AI поднимает stage когда видит что клиент записался / купил).
-  dealStage         String    @default("lead")
-  dealValue         Int?      // сумма сделки в условных единицах (рублях/долларах — что бизнес выбрал)
-  dealClosedAt      DateTime? // когда клиент стал client или lost
-  dealNote          String?   // короткая заметка менеджера про сделку
+  dealStage    String    @default("lead")
+  dealValue    Int? // сумма сделки в условных единицах (рублях/долларах — что бизнес выбрал)
+  dealClosedAt DateTime? // когда клиент стал client или lost
+  dealNote     String? // короткая заметка менеджера про сделку
 
-  businessId        String
-  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  // Задачи привязанные к клиенту (Task.clientId → SetNull при удалении клиента)
+  tasks Task[] @relation("TaskClient")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([businessId, telegramId])
   @@index([businessId, lastVisitDate])
@@ -866,37 +871,39 @@ model Client {
 // в дашборде. AI создаёт задачу когда передаёт диалог человеку (notify_manager),
 // менеджер может создать руками для любого клиента.
 model Task {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  businessId      String
-  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   // Кому назначена. null = "любой свободный менеджер".
   assignedStaffId String?
+  assignedStaff   Staff?  @relation("TaskAssignedStaff", fields: [assignedStaffId], references: [id], onDelete: SetNull)
 
   // С каким клиентом связана (опционально — общая задача без клиента тоже бывает).
-  clientId        String?
+  clientId String?
+  client   Client? @relation("TaskClient", fields: [clientId], references: [id], onDelete: SetNull)
 
-  title           String    // "Перезвонить Ивану", "Подготовить КП"
-  description     String?   @db.Text
+  title       String // "Перезвонить Ивану", "Подготовить КП"
+  description String? @db.Text
 
   // Когда нужно сделать. null = когда успеется (без дедлайна).
-  dueAt           DateTime?
+  dueAt DateTime?
 
   // low | normal | high. Срочные эскалации от AI = high.
-  priority        String    @default("normal")
+  priority String @default("normal")
 
   // pending | done | cancelled
-  status          String    @default("pending")
+  status String @default("pending")
 
   // Кто создал. user.id для ручных, "ai" для авто-созданных.
-  createdBy       String?
+  createdBy String?
 
-  completedAt     DateTime?
-  completedBy     String?   // userId кто закрыл
+  completedAt DateTime?
+  completedBy String? // userId кто закрыл
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([businessId, status, dueAt])
   @@index([businessId, assignedStaffId, status])
@@ -909,99 +916,99 @@ model Task {
 
 // Автоматизации для админа (триггеры + действия)
 model AdminAutomation {
-  id              String    @id @default(cuid())
-  name            String
-  description     String?
+  id          String  @id @default(cuid())
+  name        String
+  description String?
 
   // Триггер
-  trigger         String    // trial_expiring, trial_expired, messages_low, etc.
-  triggerParams   Json      @default("{}")
+  trigger       String // trial_expiring, trial_expired, messages_low, etc.
+  triggerParams Json   @default("{}")
 
   // Действие
-  action          String    // send_email, send_telegram, extend_trial, etc.
-  actionParams    Json      @default("{}")
+  action       String // send_email, send_telegram, extend_trial, etc.
+  actionParams Json   @default("{}")
 
-  isActive        Boolean   @default(true)
+  isActive Boolean @default(true)
 
-  executions      AutomationExecution[]
+  executions AutomationExecution[]
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Логи выполнения автоматизаций
 model AutomationExecution {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  automationId    String
-  automation      AdminAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  automationId String
+  automation   AdminAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
 
   // Для кого сработало
-  userId          String?
-  userEmail       String?
+  userId    String?
+  userEmail String?
 
   // Результат
-  success         Boolean
-  error           String?
-  details         Json      @default("{}")
+  success Boolean
+  error   String?
+  details Json    @default("{}")
 
-  createdAt       DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([automationId, createdAt])
 }
 
 // Рассылки от админа
 model Broadcast {
-  id              String    @id @default(cuid())
-  name            String
+  id   String @id @default(cuid())
+  name String
 
   // Контент
-  subject         String?   // для email
-  content         String    // текст сообщения
+  subject String? // для email
+  content String // текст сообщения
 
   // Канал
-  channel         String    // email, telegram, in_app
+  channel String // email, telegram, in_app
 
   // Фильтры получателей
-  targetPlan      String?   // all, trial, pro, business
-  targetStatus    String?   // all, active, expired, expiring
+  targetPlan   String? // all, trial, pro, business
+  targetStatus String? // all, active, expired, expiring
 
   // Статус
-  status          String    @default("draft") // draft, scheduled, sending, sent, cancelled
-  scheduledFor    DateTime?
-  sentAt          DateTime?
+  status       String    @default("draft") // draft, scheduled, sending, sent, cancelled
+  scheduledFor DateTime?
+  sentAt       DateTime?
 
   // Статистика
-  totalRecipients Int       @default(0)
-  delivered       Int       @default(0)
-  opened          Int       @default(0)
-  clicked         Int       @default(0)
+  totalRecipients Int @default(0)
+  delivered       Int @default(0)
+  opened          Int @default(0)
+  clicked         Int @default(0)
 
-  deliveries      BroadcastDelivery[]
+  deliveries BroadcastDelivery[]
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Доставка рассылки
 model BroadcastDelivery {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  broadcastId     String
-  broadcast       Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  broadcastId String
+  broadcast   Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
 
   // Получатель
-  userId          String
-  userEmail       String
+  userId    String
+  userEmail String
 
   // Статус
-  status          String    @default("pending") // pending, sent, delivered, opened, clicked, failed
-  sentAt          DateTime?
-  openedAt        DateTime?
-  clickedAt       DateTime?
-  error           String?
+  status    String    @default("pending") // pending, sent, delivered, opened, clicked, failed
+  sentAt    DateTime?
+  openedAt  DateTime?
+  clickedAt DateTime?
+  error     String?
 
-  createdAt       DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([broadcastId, status])
   @@index([userId])
@@ -1009,11 +1016,11 @@ model BroadcastDelivery {
 
 // Теги пользователей для сегментации
 model UserTag {
-  id              String    @id @default(cuid())
-  userId          String
-  tag             String
+  id     String @id @default(cuid())
+  userId String
+  tag    String
 
-  createdAt       DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([userId, tag])
   @@index([tag])
@@ -1025,47 +1032,47 @@ model UserTag {
 
 // Подключение каналов (WhatsApp, Instagram, Telegram)
 model ChannelConnection {
-  id                    String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  channel               String    // telegram, whatsapp, instagram
-  isConnected           Boolean   @default(false)
-  isVerified            Boolean   @default(false)
+  channel     String // telegram, whatsapp, instagram
+  isConnected Boolean @default(false)
+  isVerified  Boolean @default(false)
 
   // Telegram
-  telegramBotId         String?
-  telegramBotUsername   String?
+  telegramBotId       String?
+  telegramBotUsername String?
 
   // WhatsApp Business API
-  whatsappPhoneId       String?   // Phone Number ID from Meta
-  whatsappPhoneNumber   String?   // Display phone number
-  whatsappBusinessAccId String?   // WhatsApp Business Account ID
+  whatsappPhoneId       String? // Phone Number ID from Meta
+  whatsappPhoneNumber   String? // Display phone number
+  whatsappBusinessAccId String? // WhatsApp Business Account ID
 
   // Instagram
-  instagramAccountId    String?   // Instagram Account ID
-  instagramUsername     String?
-  instagramPageId       String?   // Connected Facebook Page ID
+  instagramAccountId String? // Instagram Account ID
+  instagramUsername  String?
+  instagramPageId    String? // Connected Facebook Page ID
 
   // Meta API credentials (shared for WhatsApp & Instagram)
-  metaAccessToken       String?   // Access token
-  metaTokenExpiresAt    DateTime?
+  metaAccessToken    String? // Access token
+  metaTokenExpiresAt DateTime?
 
   // Webhook
-  webhookUrl            String?
-  webhookSecret         String?
-  webhookVerified       Boolean   @default(false)
+  webhookUrl      String?
+  webhookSecret   String?
+  webhookVerified Boolean @default(false)
 
   // Status
-  errorMessage          String?
-  errorAt               DateTime?
+  errorMessage String?
+  errorAt      DateTime?
 
-  connectedAt           DateTime?
-  lastActivityAt        DateTime?
+  connectedAt    DateTime?
+  lastActivityAt DateTime?
 
-  businessId            String
-  business              Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([businessId, channel])
   @@index([channel, isConnected])
@@ -1073,64 +1080,64 @@ model ChannelConnection {
 
 // Клиенты со всех каналов (унифицированные)
 model ChannelClient {
-  id                    String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Имя
-  name                  String?
-  firstName             String?
-  lastName              String?
+  name      String?
+  firstName String?
+  lastName  String?
 
   // Telegram
-  telegramId            String?
-  telegramUsername      String?
-  telegramChatId        String?
+  telegramId       String?
+  telegramUsername String?
+  telegramChatId   String?
 
   // WhatsApp
-  whatsappPhone         String?
-  whatsappId            String?
+  whatsappPhone String?
+  whatsappId    String?
 
   // Instagram
-  instagramId           String?
-  instagramUsername     String?
+  instagramId       String?
+  instagramUsername String?
 
   // Контактные данные
-  email                 String?
-  phone                 String?
+  email String?
+  phone String?
 
   // Профиль
-  profilePicUrl         String?
-  language              String?
-  timezone              String?
+  profilePicUrl String?
+  language      String?
+  timezone      String?
 
   // Вовлечённость
-  firstContactAt        DateTime  @default(now())
-  lastContactAt         DateTime  @default(now())
-  lastChannel           String?   // telegram, whatsapp, instagram
-  totalMessages         Int       @default(0)
+  firstContactAt DateTime @default(now())
+  lastContactAt  DateTime @default(now())
+  lastChannel    String? // telegram, whatsapp, instagram
+  totalMessages  Int      @default(0)
 
   // Кастомизация
-  tags                  String[]  @default([])
-  notes                 String?
-  customFields          Json?
+  tags         String[] @default([])
+  notes        String?
+  customFields Json?
 
   // AI Memory — профиль клиента
-  aiSummary             String?   @db.Text    // AI-generated: "Постоянный клиент, предпочитает массаж, приходит каждые 2 недели"
-  preferences           Json?                  // { preferredServices: [...], preferredTime: "morning", allergies: [...] }
-  importantNotes        String?   @db.Text    // "VIP", "аллергия на аммиак", "всегда опаздывает на 10 мин"
-  communicationStyle    String?               // formal, friendly, casual (auto-detected)
-  totalVisits           Int       @default(0)
-  lastVisitDate         DateTime?
-  summaryUpdatedAt      DateTime?
+  aiSummary          String?   @db.Text // AI-generated: "Постоянный клиент, предпочитает массаж, приходит каждые 2 недели"
+  preferences        Json? // { preferredServices: [...], preferredTime: "morning", allergies: [...] }
+  importantNotes     String?   @db.Text // "VIP", "аллергия на аммиак", "всегда опаздывает на 10 мин"
+  communicationStyle String? // formal, friendly, casual (auto-detected)
+  totalVisits        Int       @default(0)
+  lastVisitDate      DateTime?
+  summaryUpdatedAt   DateTime?
 
-  businessId            String
-  business              Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   // Связи
-  messages              ChannelMessage[]
-  leads                 Lead[]
+  messages ChannelMessage[]
+  leads    Lead[]
 
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([businessId, telegramId])
   @@index([businessId, whatsappPhone])
@@ -1140,42 +1147,42 @@ model ChannelClient {
 
 // Сообщения из всех каналов
 model ChannelMessage {
-  id                    String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  channel               String    // telegram, whatsapp, instagram
-  channelMessageId      String?   // ID сообщения в канале
-  chatId                String    // ID чата в канале
+  channel          String // telegram, whatsapp, instagram
+  channelMessageId String? // ID сообщения в канале
+  chatId           String // ID чата в канале
 
-  direction             String    // incoming, outgoing
-  status                String    @default("sent") // pending, sent, delivered, read, failed
+  direction String // incoming, outgoing
+  status    String @default("sent") // pending, sent, delivered, read, failed
 
   // Контент
-  text                  String?
-  attachments           Json?     // [{type, url, ...}]
+  text        String?
+  attachments Json? // [{type, url, ...}]
 
   // AI обработка
-  aiProcessed           Boolean   @default(false)
-  aiResponse            String?
+  aiProcessed Boolean @default(false)
+  aiResponse  String?
 
   // Статусы доставки
-  sentAt                DateTime?
-  deliveredAt           DateTime?
-  readAt                DateTime?
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
 
   // Ошибки
-  errorMessage          String?
-  errorCode             String?
+  errorMessage String?
+  errorCode    String?
 
   // Метаданные
-  metadata              Json?
+  metadata Json?
 
-  clientId              String?
-  client                ChannelClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  clientId String?
+  client   ChannelClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
-  businessId            String
-  business              Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt             DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([businessId, channel])
   @@index([businessId, clientId])
@@ -1185,37 +1192,37 @@ model ChannelMessage {
 
 // Лиды (из рекламы Instagram/WhatsApp)
 model Lead {
-  id                    String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  source                String    // instagram_ad, whatsapp_ctwa, organic, referral, channel_message
-  adId                  String?   // ID рекламы
-  channel               String    // telegram, whatsapp, instagram, messenger
+  source  String // instagram_ad, whatsapp_ctwa, organic, referral, channel_message
+  adId    String? // ID рекламы
+  channel String // telegram, whatsapp, instagram, messenger
 
-  clientName            String?   // Имя клиента
-  firstMessage          String?   // Первое сообщение клиента
-  status                String    @default("cold") // cold, warm, hot, client
+  clientName   String? // Имя клиента
+  firstMessage String? // Первое сообщение клиента
+  status       String  @default("cold") // cold, warm, hot, client
 
   // Оценка
-  score                 Int       @default(0)     // 0-100
-  qualifiedAt           DateTime?                 // когда стал hot или client
-  convertedAt           DateTime?
+  score       Int       @default(0) // 0-100
+  qualifiedAt DateTime? // когда стал hot или client
+  convertedAt DateTime?
 
   // Взаимодействие
-  lastInteractionAt     DateTime?                 // последнее сообщение
-  statusReason          String?                   // почему изменён статус
+  lastInteractionAt DateTime? // последнее сообщение
+  statusReason      String? // почему изменён статус
 
   // Метаданные
-  metadata              Json?
-  notes                 String?
+  metadata Json?
+  notes    String?
 
-  clientId              String?
-  client                ChannelClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  clientId String?
+  client   ChannelClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
-  businessId            String
-  business              Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([businessId, channel, clientId])
   @@index([businessId, source])
@@ -1229,60 +1236,60 @@ model Lead {
 
 // Рассылки от бизнеса своим клиентам
 model ClientBroadcast {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  title           String    // название рассылки
-  content         String    // текст сообщения
+  title   String // название рассылки
+  content String // текст сообщения
 
   // Сегментация
-  targetSegment   String    @default("all") // all, vip, active, inactive
+  targetSegment String @default("all") // all, vip, active, inactive
 
   // Канал доставки: telegram | email | both. Default telegram —
   // обратная совместимость со старыми рассылками.
-  channel         String    @default("telegram")
+  channel String @default("telegram")
 
   // Статус
-  status          String    @default("draft") // draft, scheduled, sending, sent, cancelled
-  scheduledAt     DateTime?
-  sentAt          DateTime?
+  status      String    @default("draft") // draft, scheduled, sending, sent, cancelled
+  scheduledAt DateTime?
+  sentAt      DateTime?
 
   // Статистика
-  recipientsCount Int       @default(0)
+  recipientsCount Int @default(0)
 
-  businessId      String
-  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  deliveries      ClientBroadcastDelivery[]
+  deliveries ClientBroadcastDelivery[]
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([businessId, status])
 }
 
 // Доставка рассылки клиенту
 model ClientBroadcastDelivery {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  broadcastId     String
-  broadcast       ClientBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  broadcastId String
+  broadcast   ClientBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
 
   // Получатель
-  clientId        String
-  telegramId      BigInt
+  clientId   String
+  telegramId BigInt
   // Email — заполняется только для email-доставок. Snapshot на момент рассылки
   // (если клиент потом сменит email, в логе остаётся куда реально ушло).
-  email           String?
+  email      String?
   // Конкретный канал именно этой доставки (telegram | email). Нужен когда
   // у broadcast.channel = "both" — каждой подписке свой канал.
-  channel         String    @default("telegram")
+  channel    String  @default("telegram")
 
   // Статус
-  status          String    @default("pending") // pending, sent, delivered, failed
-  sentAt          DateTime?
-  error           String?
+  status String    @default("pending") // pending, sent, delivered, failed
+  sentAt DateTime?
+  error  String?
 
-  createdAt       DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([broadcastId, status])
   @@index([clientId])
@@ -1293,18 +1300,18 @@ model ClientBroadcastDelivery {
 // ========================================
 
 model Notification {
-  id          String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  type        String   // new_booking, cancellation, reschedule, new_review, new_client
-  title       String
-  message     String
-  isRead      Boolean  @default(false)
-  metadata    Json?    // { bookingId, clientName, staffName, etc. }
+  type     String // new_booking, cancellation, reschedule, new_review, new_client
+  title    String
+  message  String
+  isRead   Boolean @default(false)
+  metadata Json? // { bookingId, clientName, staffName, etc. }
 
-  businessId  String
-  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([businessId, isRead])
   @@index([businessId, createdAt])
@@ -1315,50 +1322,50 @@ model Notification {
 // ========================================
 
 model SalesLead {
-  id                String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Контакты
-  telegramId        BigInt?
-  telegramUsername   String?
-  telegramChatId    BigInt?   @unique
-  instagramId       String?   @unique
-  fbPsid            String?   @unique
-  whatsappPhone     String?   @unique
+  telegramId       BigInt?
+  telegramUsername String?
+  telegramChatId   BigInt? @unique
+  instagramId      String? @unique
+  fbPsid           String? @unique
+  whatsappPhone    String? @unique
 
   // Профиль
-  name              String?
-  businessName      String?
-  businessType      String?
-  phone             String?
-  email             String?
+  name         String?
+  businessName String?
+  businessType String?
+  phone        String?
+  email        String?
 
   // Канал
-  channel           String    @default("telegram") // telegram, instagram, whatsapp
+  channel String @default("telegram") // telegram, instagram, whatsapp
 
   // Воронка
-  stage             String    @default("new") // new, interested, demo_requested, trial_started, converted, lost
+  stage String @default("new") // new, interested, demo_requested, trial_started, converted, lost
 
   // Контекст
-  painPoints        String[]  @default([])
-  objections        String[]  @default([])
-  recommendedPlan   String?
-  notes             String?
+  painPoints      String[] @default([])
+  objections      String[] @default([])
+  recommendedPlan String?
+  notes           String?
 
   // Онбординг — структурированное состояние шага настройки Staffix
   // 0=not_started, 1=registered, 2=business_profile, 3=telegram_bot,
   // 4=extra_channels, 5=team, 6=catalog, 7=knowledge_base, 8=ai_settings,
   // 9=automations, 10=tested, 11=launched
-  onboardingStep    Int?
-  onboardingNotes   String?
+  onboardingStep  Int?
+  onboardingNotes String?
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // История разговора с ботом Staffix
-  history           Json      @default("[]")  // [{role, content}]
+  history Json @default("[]") // [{role, content}]
 
   // Демо-встречи
-  demoBookings      DemoBooking[]
+  demoBookings DemoBooking[]
 
   @@index([stage])
   @@index([channel])
@@ -1367,32 +1374,32 @@ model SalesLead {
 
 // Записи на демо-встречу (Staffix sales)
 model DemoBooking {
-  id                String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Связь с лидом
-  salesLeadId       String
-  salesLead         SalesLead @relation(fields: [salesLeadId], references: [id], onDelete: Cascade)
+  salesLeadId String
+  salesLead   SalesLead @relation(fields: [salesLeadId], references: [id], onDelete: Cascade)
 
   // Контакты лида
-  contactName       String
-  contactPhone      String?
-  contactTelegram   String?
-  contactWhatsapp   String?
-  businessName      String?
-  businessType      String?
-  businessAddress   String?
+  contactName     String
+  contactPhone    String?
+  contactTelegram String?
+  contactWhatsapp String?
+  businessName    String?
+  businessType    String?
+  businessAddress String?
 
   // Расписание
-  scheduledAt       DateTime              // дата и время демо
-  duration          Int       @default(60) // минут
-  status            String    @default("scheduled") // scheduled, confirmed, completed, cancelled, no_show
+  scheduledAt DateTime // дата и время демо
+  duration    Int      @default(60) // минут
+  status      String   @default("scheduled") // scheduled, confirmed, completed, cancelled, no_show
 
   // Заметки
-  notes             String?
-  cancelReason      String?
+  notes        String?
+  cancelReason String?
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([scheduledAt])
   @@index([status])
@@ -1404,30 +1411,30 @@ model DemoBooking {
 
 // Диалоги клиентов через WhatsApp и Facebook Messenger (per-business)
 model ChannelConversation {
-  id           String    @id @default(cuid())
-  channel      String    // "whatsapp" | "facebook"
-  clientId     String    // wa_id (phone) или Facebook PSID
-  clientName   String?
+  id         String  @id @default(cuid())
+  channel    String // "whatsapp" | "facebook"
+  clientId   String // wa_id (phone) или Facebook PSID
+  clientName String?
 
   // История хранится как JSON массив [{role:"user"|"assistant", content:string}]
-  history      Json      @default("[]")
-  messageCount Int       @default(0)
+  history      Json @default("[]")
+  messageCount Int  @default(0)
 
   // AI Memory — summary и метаданные разговора
-  summary       String?   @db.Text    // AI-generated summary каждые 10 сообщений
-  topic         String?               // booking, inquiry, complaint, feedback, order, other
-  outcome       String?               // booked, answered, escalated, unresolved, ordered
-  needsSummary  Boolean   @default(false)
-  extractedInfo Json?                 // { clientNotes: [...], detectedPreferences: [...] }
+  summary       String? @db.Text // AI-generated summary каждые 10 сообщений
+  topic         String? // booking, inquiry, complaint, feedback, order, other
+  outcome       String? // booked, answered, escalated, unresolved, ordered
+  needsSummary  Boolean @default(false)
+  extractedInfo Json? // { clientNotes: [...], detectedPreferences: [...] }
 
   // Флаг: база знаний изменилась — обрезать history в следующем ответе бота
   needsContextRefresh Boolean @default(false)
 
-  businessId   String
-  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([businessId, channel, clientId])
   @@index([businessId, channel])
@@ -1440,42 +1447,42 @@ model ChannelConversation {
 
 // Коррекции бота — владелец исправляет ответы, они становятся правилами
 model BotCorrection {
-  id                String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  originalQuestion  String    @db.Text   // вопрос клиента
-  wrongAnswer       String    @db.Text   // неправильный ответ бота
-  correctAnswer     String    @db.Text   // правильный ответ от владельца
+  originalQuestion String @db.Text // вопрос клиента
+  wrongAnswer      String @db.Text // неправильный ответ бота
+  correctAnswer    String @db.Text // правильный ответ от владельца
 
-  scope             String    @default("global") // global = для всех, client = для конкретного клиента
-  keywords          String[]  @default([])       // ключевые слова для матчинга
-  isActive          Boolean   @default(true)
-  usageCount        Int       @default(0)        // сколько раз применялось
+  scope      String   @default("global") // global = для всех, client = для конкретного клиента
+  keywords   String[] @default([]) // ключевые слова для матчинга
+  isActive   Boolean  @default(true)
+  usageCount Int      @default(0) // сколько раз применялось
 
-  businessId        String
-  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([businessId, isActive])
 }
 
 // AI-инсайты — паттерны которые бот обнаружил и предлагает владельцу
 model AiInsight {
-  id                String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  type              String    // faq_suggestion, popular_question, client_pattern, improvement
-  title             String    // краткое описание
-  description       String    @db.Text  // подробное описание
-  data              Json?     // доп данные: { question: "...", frequency: 5 }
+  type        String // faq_suggestion, popular_question, client_pattern, improvement
+  title       String // краткое описание
+  description String @db.Text // подробное описание
+  data        Json? // доп данные: { question: "...", frequency: 5 }
 
-  status            String    @default("new") // new, accepted, dismissed
+  status String @default("new") // new, accepted, dismissed
 
-  businessId        String
-  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([businessId, status])
 }
@@ -1485,26 +1492,26 @@ model AiInsight {
 // (баги промпта, тренды эскалаций, тарифные алерты, language-issues
 // и т.п.). businessId nullable — некоторые типы агрегатные.
 model MetaInsight {
-  id                String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  type              String    // stuck_conversation, faq_ignored, dont_know_frequency,
-                              // quota_pressure, tool_failure, language_gap, system_health
-  severity          String    @default("info")  // info, warn, critical
-  title             String
-  description       String    @db.Text
-  data              Json?     // структурированный контекст: { businessId, count, examples, ... }
+  type        String // stuck_conversation, faq_ignored, dont_know_frequency,
+  // quota_pressure, tool_failure, language_gap, system_health
+  severity    String @default("info") // info, warn, critical
+  title       String
+  description String @db.Text
+  data        Json? // структурированный контекст: { businessId, count, examples, ... }
 
   // Опционально привязан к конкретному бизнесу — для drill-down
-  businessId        String?
-  business          Business? @relation("MetaInsightBusiness", fields: [businessId], references: [id], onDelete: SetNull)
+  businessId String?
+  business   Business? @relation("MetaInsightBusiness", fields: [businessId], references: [id], onDelete: SetNull)
 
-  status            String    @default("new")  // new, resolved, dismissed
-  resolvedAt        DateTime?
-  resolvedBy        String?   // email админа
-  notes             String?   @db.Text
+  status     String    @default("new") // new, resolved, dismissed
+  resolvedAt DateTime?
+  resolvedBy String? // email админа
+  notes      String?   @db.Text
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status, severity])
   @@index([type, createdAt])
@@ -1516,44 +1523,44 @@ model MetaInsight {
 // ========================================
 
 model OutreachCampaign {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   name        String
   description String?
-  status      String   @default("active") // active, completed, paused
+  status      String  @default("active") // active, completed, paused
 
-  leads       OutreachLead[]
+  leads OutreachLead[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model OutreachLead {
-  id            String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  campaignId    String
-  campaign      OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId String
+  campaign   OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   // Business info (from CSV)
-  businessName  String
-  category      String?
-  city          String?
-  website       String?
+  businessName String
+  category     String?
+  city         String?
+  website      String?
 
   // Contact info
-  email         String?
-  telegram      String?
-  instagram     String?
-  whatsapp      String?
+  email     String?
+  telegram  String?
+  instagram String?
+  whatsapp  String?
 
   // Outreach tracking
-  outreachChannel String  // email | telegram | instagram
-  status          String  @default("pending") // pending | sent | replied | registered | paying
+  outreachChannel String // email | telegram | instagram
+  status          String    @default("pending") // pending | sent | replied | registered | paying
   sentAt          DateTime?
   repliedAt       DateTime?
   notes           String?
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([campaignId, status])
   @@index([campaignId, outreachChannel])
@@ -1564,15 +1571,15 @@ model OutreachLead {
 // ========================================
 
 model StaffSchedule {
-  id        String  @id @default(cuid())
+  id String @id @default(cuid())
 
-  dayOfWeek Int     // 0=Воскресенье, 1=Понедельник ... 6=Суббота
-  startTime String  // "09:00"
-  endTime   String  // "18:00"
+  dayOfWeek Int // 0=Воскресенье, 1=Понедельник ... 6=Суббота
+  startTime String // "09:00"
+  endTime   String // "18:00"
   isWorkday Boolean @default(true)
 
-  staffId   String
-  staff     Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  staffId String
+  staff   Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
 
   @@unique([staffId, dayOfWeek])
   @@index([staffId])
@@ -1580,20 +1587,20 @@ model StaffSchedule {
 
 // Отгулы, отпуска, больничные мастеров
 model StaffTimeOff {
-  id        String   @id @default(cuid())
+  id String @id @default(cuid())
 
   startDate DateTime // начало (полночь UTC)
   endDate   DateTime // конец включительно (полночь UTC)
 
   // vacation | sick | personal | other
-  reason    String   @default("vacation")
-  notes     String?
+  reason String  @default("vacation")
+  notes  String?
 
   // owner = владелец добавил | master = мастер сам сообщил
-  createdBy String   @default("owner")
+  createdBy String @default("owner")
 
-  staffId   String
-  staff     Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  staffId String
+  staff   Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1608,37 +1615,37 @@ model StaffTimeOff {
 
 // Товары / продукты бизнеса
 model Product {
-  id          String    @id @default(cuid())
+  id String @id @default(cuid())
 
   name        String
-  description String?   @db.Text
+  description String? @db.Text
 
-  price       Int       // цена в местной валюте (тиины/копейки/тенге)
-  oldPrice    Int?      // старая цена (для отображения скидки)
+  price    Int // цена в местной валюте (тиины/копейки/тенге)
+  oldPrice Int? // старая цена (для отображения скидки)
 
   // Наличие
-  stock       Int?      // null = не ограничено; 0 = нет в наличии
-  sku         String?   // артикул
+  stock Int? // null = не ограничено; 0 = нет в наличии
+  sku   String? // артикул
 
   // Категоризация
-  category    String?
-  tags        String[]  @default([])
+  category String?
+  tags     String[] @default([])
 
   // Медиа
-  imageUrl    String?
-  productUrl  String?   // ссылка на товар на сайте магазина
+  imageUrl   String?
+  productUrl String? // ссылка на товар на сайте магазина
 
-  isActive    Boolean   @default(true)
+  isActive Boolean @default(true)
 
-  businessId  String
-  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  orderItems  OrderItem[]
+  orderItems OrderItem[]
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  stockLogs   StockLog[]
+  stockLogs StockLog[]
 
   @@index([businessId, isActive])
   @@index([businessId, category])
@@ -1646,65 +1653,65 @@ model Product {
 
 // История изменений остатков
 model StockLog {
-  id          String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  productId   String
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  previousStock Int?   // null = was unlimited
-  newStock      Int?   // null = set to unlimited
-  change        Int    // delta (positive = added, negative = sold/removed)
+  previousStock Int? // null = was unlimited
+  newStock      Int? // null = set to unlimited
+  change        Int // delta (positive = added, negative = sold/removed)
 
-  reason      String   // "order", "manual", "bulk_update", "import"
-  orderId     String?  // optional: link to order
-  note        String?  // optional: free-text note
+  reason  String // "order", "manual", "bulk_update", "import"
+  orderId String? // optional: link to order
+  note    String? // optional: free-text note
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([productId, createdAt])
 }
 
 // Заказы клиентов
 model Order {
-  id              String      @id @default(cuid())
+  id String @id @default(cuid())
 
   // Человекочитаемый номер: #1001, #1002...
-  orderNumber     Int
+  orderNumber Int
 
   // Данные клиента (snapshot на момент заказа)
-  clientName      String
-  clientPhone     String?
-  clientAddress   String?     // для доставки
+  clientName       String
+  clientPhone      String?
+  clientAddress    String? // для доставки
   clientTelegramId BigInt?
-  clientChannel   String?     // telegram | whatsapp | instagram | facebook
-  clientChannelId String?     // channel-specific client ID (waId, igScopedId, etc.)
-  clientNotes     String?     // пожелания клиента
+  clientChannel    String? // telegram | whatsapp | instagram | facebook
+  clientChannelId  String? // channel-specific client ID (waId, igScopedId, etc.)
+  clientNotes      String? // пожелания клиента
 
   // Позиции заказа
-  items           OrderItem[]
+  items OrderItem[]
 
   // Финансы
-  totalPrice      Int         // итоговая сумма
+  totalPrice Int // итоговая сумма
 
   // Статус: new | confirmed | processing | shipped | delivered | cancelled
-  status          String      @default("new")
+  status String @default("new")
 
   // Оплата
-  paymentMethod   String?     // cash | card | online | crypto
-  isPaid          Boolean     @default(false)
+  paymentMethod String? // cash | card | online | crypto
+  isPaid        Boolean @default(false)
 
   // Уведомления
-  notifiedOwner   Boolean     @default(false)
+  notifiedOwner Boolean @default(false)
 
   // Привязка к продавцу/менеджеру
-  staffId         String?
-  staff           Staff?      @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  staffId String?
+  staff   Staff?  @relation(fields: [staffId], references: [id], onDelete: SetNull)
 
-  businessId      String
-  business        Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([businessId, orderNumber])
   @@index([businessId, status])
@@ -1715,18 +1722,18 @@ model Order {
 
 // Позиции заказа
 model OrderItem {
-  id          String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Snapshot данных товара (на случай изменения цены)
-  name        String
-  price       Int
-  quantity    Int       @default(1)
+  name     String
+  price    Int
+  quantity Int    @default(1)
 
-  orderId     String
-  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  productId   String?
-  product     Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 }
 
 // ========================================
@@ -1735,37 +1742,37 @@ model OrderItem {
 
 // Партнёры (CRM-дистрибьюторы, агентства, рефереры)
 model Partner {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Профиль
-  name            String
-  email           String    @unique
-  phone           String?
-  company         String?   // название компании/агентства
-  website         String?
-  description     String?   // как планирует продвигать Staffix
+  name        String
+  email       String  @unique
+  phone       String?
+  company     String? // название компании/агентства
+  website     String?
+  description String? // как планирует продвигать Staffix
 
   // Реферальный код (генерируется при одобрении)
-  referralCode    String?   @unique
+  referralCode String? @unique
 
   // Токен доступа к дашборду (UUID, отправляется на email)
-  accessToken     String?   @unique
+  accessToken String? @unique
 
   // Статус
-  status          String    @default("pending") // pending, approved, rejected, suspended
-  approvedAt      DateTime?
+  status     String    @default("pending") // pending, approved, rejected, suspended
+  approvedAt DateTime?
 
   // Финансы
-  commissionRate  Float     @default(0.20) // 20%
-  totalEarnings   Float     @default(0)    // суммарно заработано
-  totalPaid       Float     @default(0)    // суммарно выплачено
-  pendingPayout   Float     @default(0)    // ожидает выплаты
+  commissionRate Float @default(0.20) // 20%
+  totalEarnings  Float @default(0) // суммарно заработано
+  totalPaid      Float @default(0) // суммарно выплачено
+  pendingPayout  Float @default(0) // ожидает выплаты
 
-  referrals       PartnerReferral[]
-  earnings        PartnerEarning[]
+  referrals PartnerReferral[]
+  earnings  PartnerEarning[]
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
   @@index([referralCode])
@@ -1773,25 +1780,25 @@ model Partner {
 
 // Реферальные переходы (кто пришёл по ссылке партнёра)
 model PartnerReferral {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Кто пришёл
-  userId          String    // User.id кто зарегистрировался
-  userEmail       String
+  userId    String // User.id кто зарегистрировался
+  userEmail String
 
   // Атрибуция
-  referralCode    String
-  signedUpAt      DateTime  @default(now())
+  referralCode String
+  signedUpAt   DateTime @default(now())
 
   // Конверсия в платящего
-  converted       Boolean   @default(false)
-  convertedAt     DateTime?
-  convertedPlan   String?   // starter, pro, business, enterprise
+  converted     Boolean   @default(false)
+  convertedAt   DateTime?
+  convertedPlan String? // starter, pro, business, enterprise
 
-  partnerId       String
-  partner         Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  partnerId String
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
 
-  earnings        PartnerEarning[]
+  earnings PartnerEarning[]
 
   @@unique([userId])
   @@index([partnerId, converted])
@@ -1800,24 +1807,24 @@ model PartnerReferral {
 
 // Начисления партнёру (за каждый платёж реферала)
 model PartnerEarning {
-  id              String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Сумма
-  commissionAmount Float    // сколько начислено партнёру ($)
-  paymentAmount    Float    // полная сумма платежа реферала ($)
-  subscriptionPlan String   // starter, pro, business, enterprise
+  commissionAmount Float // сколько начислено партнёру ($)
+  paymentAmount    Float // полная сумма платежа реферала ($)
+  subscriptionPlan String // starter, pro, business, enterprise
 
   // Статус
-  status          String    @default("pending") // pending, approved, paid
-  paidAt          DateTime?
+  status String    @default("pending") // pending, approved, paid
+  paidAt DateTime?
 
-  referralId      String
-  referral        PartnerReferral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+  referralId String
+  referral   PartnerReferral @relation(fields: [referralId], references: [id], onDelete: Cascade)
 
-  partnerId       String
-  partner         Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  partnerId String
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
 
-  createdAt       DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([partnerId, status])
   @@index([partnerId, createdAt])
@@ -1828,26 +1835,26 @@ model PartnerEarning {
 // ========================================
 
 model LoyaltyProgram {
-  id            String   @id @default(cuid())
-  businessId    String
-  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  enabled       Boolean  @default(false)
-  type          String   @default("cashback") // cashback | visits | tiered
-  name          String?  // Пользовательское название, напр. "Кэшбэк 5%"
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  enabled    Boolean  @default(false)
+  type       String   @default("cashback") // cashback | visits | tiered
+  name       String? // Пользовательское название, напр. "Кэшбэк 5%"
 
   // Cashback: % от суммы возвращается бонусами
-  cashbackPercent  Int?     @default(5)
+  cashbackPercent Int? @default(5)
 
   // Visits: каждый N-й визит — награда
-  visitsForReward  Int?     @default(10)
-  rewardType       String?  @default("discount") // free | discount
-  rewardDiscount   Int?     @default(50)  // скидка % для награды
+  visitsForReward Int?    @default(10)
+  rewardType      String? @default("discount") // free | discount
+  rewardDiscount  Int?    @default(50) // скидка % для награды
 
   // Tiered: уровни по сумме покупок
-  tiers            Json?    // [{minSpent:0,name:"Bronze",discount:0},...]
+  tiers Json? // [{minSpent:0,name:"Bronze",discount:0},...]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([businessId, type]) // один тип программы на бизнес
   @@index([businessId])
@@ -1855,9 +1862,9 @@ model LoyaltyProgram {
 
 // Rate limiting — защита от брутфорса
 model RateLimitEntry {
-  key       String   @id          // e.g. "login:192.168.1.1"
-  attempts  Int      @default(1)
-  resetAt   DateTime
+  key      String   @id // e.g. "login:192.168.1.1"
+  attempts Int      @default(1)
+  resetAt  DateTime
 
   @@map("rate_limit_entries")
 }
@@ -1867,35 +1874,35 @@ model RateLimitEntry {
 // ========================================
 
 model CrmIntegration {
-  id          String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Тип интеграции
-  type        String    // webhook | google_sheets | bitrix24 | amocrm
+  type String // webhook | google_sheets | bitrix24 | amocrm
 
   // Название (задаёт пользователь)
-  name        String
+  name String
 
   // Конфигурация (зависит от типа):
   // webhook:       { url, secret?, headers? }
   // google_sheets: { spreadsheetId, sheetName, credentialsJson }
   // bitrix24:      { domain, token }
   // amocrm:        { domain, token, pipelineId? }
-  config      Json
+  config Json
 
   // Какие события отправлять
   // Варианты: booking_created | booking_confirmed | booking_cancelled |
   //           new_client | review_created | message_received
-  events      String[]  @default([])
+  events String[] @default([])
 
-  isActive    Boolean   @default(true)
-  lastSyncAt  DateTime?
-  lastError   String?   // последняя ошибка отправки
+  isActive   Boolean   @default(true)
+  lastSyncAt DateTime?
+  lastError  String? // последняя ошибка отправки
 
-  businessId  String
-  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([businessId, isActive])
   @@index([businessId, type])
