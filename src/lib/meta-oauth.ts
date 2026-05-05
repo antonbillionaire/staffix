@@ -200,7 +200,13 @@ export async function exchangeWACodeForToken(code: string): Promise<{
       `&code=${code}`
   );
   const data = await res.json();
-  console.log("[WA Token Exchange] response:", JSON.stringify(data).slice(0, 200));
+  // Не логируем сырой data — он содержит access_token. Логируем только структуру.
+  console.log(
+    "[WA Token Exchange] result:",
+    data.error
+      ? `error: ${data.error.message || "unknown"}`
+      : `ok (token length=${(data.access_token || "").length}, expires_in=${data.expires_in || "?"})`
+  );
   if (data.error) throw new Error(data.error.message || "WA code exchange failed");
   return {
     accessToken: data.access_token,

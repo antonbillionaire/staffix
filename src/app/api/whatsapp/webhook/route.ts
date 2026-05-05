@@ -183,7 +183,7 @@ async function processWAMessage(
     const dbToken = business.waAccessToken;
     const waToken = envToken || dbToken;
     if (!waToken) return;
-    console.log(`[WA Webhook] Token source: ${envToken ? 'ENV' : 'DB'}, starts=${waToken.substring(0, 10)}..., len=${waToken.length}`);
+    console.log(`[WA Webhook] Token source: ${envToken ? 'ENV' : 'DB'}, len=${waToken.length}`);
 
     // Check message limit
     const { allowed, reason } = await checkSubscriptionLimit(businessId);

@@ -288,8 +288,17 @@ export function verifyIP(ip: string): boolean {
   // Strip IPv6 prefix
   const cleanIp = ip.replace("::ffff:", "");
 
-  // In test mode: still verify IP but log a warning if bypassed
+  // In test mode: bypass IP check, BUT NEVER in production — иначе при случайно
+  // оставленном PAYPRO_TEST_MODE=true в production защита IP whitelist отключается.
+  // В проде test mode игнорируется и пишется громкое предупреждение.
   if (PAYPRO_TEST_MODE) {
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[PayPro] CRITICAL: PAYPRO_TEST_MODE=true detected in production. " +
+        "Ignoring test mode and enforcing IP whitelist. Remove the env var ASAP."
+      );
+      return PAYPRO_IPS.includes(cleanIp);
+    }
     if (!PAYPRO_IPS.includes(cleanIp)) {
       console.warn(`PayPro test mode: request from non-whitelisted IP ${cleanIp} — allowed for testing only`);
     }

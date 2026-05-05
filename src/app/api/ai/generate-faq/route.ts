@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
+import { rateLimit } from "@/lib/rate-limit";
 
 async function getUserBusiness() {
   const session = await auth();
@@ -28,6 +29,16 @@ export async function POST(request: NextRequest) {
     const business = await getUserBusiness();
     if (!business) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limit: 10 генераций FAQ в час на бизнес — защита от cost-abuse.
+    // Реальный сценарий: пользователь жмёт «Сгенерировать FAQ» 1-2 раза, не больше.
+    const rl = await rateLimit(`ai-generate-faq:${business.id}`, 10, 60);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: `Слишком много запросов. Попробуйте через ${Math.ceil(rl.retryAfterSeconds / 60)} мин.` },
+        { status: 429 }
+      );
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;

@@ -6,6 +6,7 @@ import {
 } from "@/lib/support-bot-prompt";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,20 @@ interface ChatWidgetRequestBody {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 30 сообщений в час на email/IP — защита от cost-abuse Anthropic.
+    // Авторизованные пользователи лимитируются по email, гости (виджет может работать без auth) — по IP.
+    const session = await auth().catch(() => null);
+    const rlKey = session?.user?.email
+      ? `chat-widget:${session.user.email}`
+      : `chat-widget:ip:${getClientIp(request)}`;
+    const rl = await rateLimit(rlKey, 30, 60);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { reply: `Слишком много запросов. Попробуйте через ${Math.ceil(rl.retryAfterSeconds / 60)} мин.` },
+        { status: 429 }
+      );
+    }
+
     const body = (await request.json()) as ChatWidgetRequestBody;
     const userMessage = (body.message || "").trim();
     if (!userMessage) {

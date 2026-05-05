@@ -58,12 +58,20 @@ export async function GET() {
       }),
     ]);
 
+    // Маскируем токены, которые фронт НЕ показывает пользователю и не передаёт обратно.
+    // Это защищает на случай XSS/перехвата кэша браузера.
+    // НЕ маскируем: botToken (Telegram page показывает), webhookSecret (Integrations page),
+    // waVerifyToken (WhatsApp page показывает), payproSubscriptionId (UI логика кнопок отмены).
     return NextResponse.json({
       business: {
         ...business,
-        // Mask sensitive tokens in GET response
+        // Long-lived Meta user-token — нужен только серверу для refresh page tokens
+        metaUserAccessToken: business.metaUserAccessToken ? "***" : null,
+        // Page access tokens — серверные, фронт работает с ними только при ручной настройке (отправляет, не получает)
         waAccessToken: business.waAccessToken ? "***" : null,
         fbPageAccessToken: business.fbPageAccessToken ? "***" : null,
+        // FB verify token — серверный (используется при handshake Meta webhook)
+        fbVerifyToken: business.fbVerifyToken ? "***" : null,
       },
       stats: { bookingsToday, totalClients },
       isAdmin: isAdmin(session?.user?.email),
