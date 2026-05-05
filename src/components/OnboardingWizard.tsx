@@ -12,12 +12,12 @@ import {
   Scissors,
   Users,
   BookOpen,
-  Brain,
   Package,
   Phone,
   Instagram,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface OnboardingStatus {
   botConnected: boolean;
@@ -31,12 +31,14 @@ interface OnboardingStatus {
   dashboardMode: string;
 }
 
-function getSteps(isSales: boolean) {
+type TranslateFn = (key: string, params?: Record<string, string | number>) => string;
+
+function getSteps(isSales: boolean, t: TranslateFn) {
   return [
     {
       id: "telegram",
-      title: "Telegram",
-      desc: "Подключите бота",
+      title: t("wizard.step.telegram.title"),
+      desc: t("wizard.step.telegram.desc"),
       href: "/dashboard/channels/telegram",
       key: "botConnected" as keyof OnboardingStatus,
       icon: MessageSquare,
@@ -44,8 +46,8 @@ function getSteps(isSales: boolean) {
     },
     {
       id: "whatsapp",
-      title: "WhatsApp",
-      desc: "Подключите WA API",
+      title: t("wizard.step.whatsapp.title"),
+      desc: t("wizard.step.whatsapp.desc"),
       href: "/dashboard/channels/whatsapp",
       key: "waConnected" as keyof OnboardingStatus,
       icon: Phone,
@@ -53,8 +55,8 @@ function getSteps(isSales: boolean) {
     },
     {
       id: "meta",
-      title: "IG & Facebook",
-      desc: "Подключите Meta",
+      title: t("wizard.step.meta.title"),
+      desc: t("wizard.step.meta.desc"),
       href: "/dashboard/channels/meta",
       key: "metaConnected" as keyof OnboardingStatus,
       icon: Instagram,
@@ -62,8 +64,8 @@ function getSteps(isSales: boolean) {
     },
     {
       id: "catalog",
-      title: isSales ? "Товары" : "Услуги",
-      desc: isSales ? "Импортируйте каталог товаров" : "Добавьте услуги и цены",
+      title: isSales ? t("wizard.step.products.title") : t("wizard.step.services.title"),
+      desc: isSales ? t("wizard.step.products.desc") : t("wizard.step.services.desc"),
       href: isSales ? "/dashboard/products" : "/dashboard/services",
       key: "hasCatalog" as keyof OnboardingStatus,
       icon: isSales ? Package : Scissors,
@@ -71,8 +73,8 @@ function getSteps(isSales: boolean) {
     },
     {
       id: "staff",
-      title: "Команда",
-      desc: "Добавьте сотрудников",
+      title: t("wizard.step.staff.title"),
+      desc: t("wizard.step.staff.desc"),
       href: "/dashboard/staff",
       key: "hasStaff" as keyof OnboardingStatus,
       icon: Users,
@@ -80,8 +82,8 @@ function getSteps(isSales: boolean) {
     },
     {
       id: "knowledge",
-      title: "База знаний",
-      desc: "Промпт, FAQ, документы",
+      title: t("wizard.step.knowledge.title"),
+      desc: t("wizard.step.knowledge.desc"),
       href: "/dashboard/knowledge",
       key: "hasKnowledge" as keyof OnboardingStatus,
       icon: BookOpen,
@@ -92,6 +94,7 @@ function getSteps(isSales: boolean) {
 
 export default function OnboardingWizard() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isDark = theme === "dark";
 
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
@@ -134,7 +137,7 @@ export default function OnboardingWizard() {
   if (loading || dismissed || !status) return null;
 
   const isSales = status.dashboardMode === "sales";
-  const STEPS = getSteps(isSales);
+  const STEPS = getSteps(isSales, t);
   const completedCount = STEPS.filter((s) => status[s.key]).length;
   const allDone = completedCount === STEPS.length;
   const progress = Math.round((completedCount / STEPS.length) * 100);
@@ -169,8 +172,8 @@ export default function OnboardingWizard() {
               }`}
             >
               {allDone
-                ? "🎉 Staffix полностью настроен!"
-                : `Настройка Staffix — ${completedCount} из ${STEPS.length} шагов`}
+                ? t("wizard.allDone")
+                : t("wizard.title", { done: completedCount, total: STEPS.length })}
             </span>
             <span
               className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -210,7 +213,7 @@ export default function OnboardingWizard() {
                 ? "text-gray-500 hover:text-gray-300 hover:bg-white/5"
                 : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
             }`}
-            title={collapsed ? "Развернуть" : "Свернуть"}
+            title={collapsed ? t("wizard.expand") : t("wizard.collapse")}
           >
             {collapsed ? (
               <ChevronDown className="h-4 w-4" />
@@ -227,7 +230,7 @@ export default function OnboardingWizard() {
                   ? "text-gray-500 hover:text-gray-300 hover:bg-white/5"
                   : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
               }`}
-              title="Скрыть"
+              title={t("wizard.dismiss")}
             >
               <X className="h-4 w-4" />
             </button>
