@@ -127,6 +127,56 @@ const salesBotTools: Anthropic.Tool[] = [
       required: ["step"],
     },
   },
+  {
+    name: "get_sales_facts",
+    description:
+      "Получить точный фактический ответ из базы знаний Staffix. Используй ВСЕГДА когда клиент " +
+      "спрашивает про конкретный тариф, шаги настройки, конкурентов, фичу. Это твой источник " +
+      "истины — не отвечай по памяти про цифры/тарифы/функции, чтобы не выдумать. " +
+      "Доступные темы: pricing, onboarding-steps, competitor-yclients, competitor-altegio, " +
+      "competitor-dikidi, competitor-custom-development, feature-multichannel, feature-ai-search, " +
+      "feature-loyalty, feature-knowledge-base, what-staffix-doesnt-do. " +
+      "Можно передать и свободный запрос клиента — система найдёт релевантный.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        topic: {
+          type: "string",
+          description:
+            "ID темы или ключевые слова из вопроса клиента (например 'тарифы', 'yclients', 'программа лояльности').",
+        },
+      },
+      required: ["topic"],
+    },
+  },
+  {
+    name: "calculate_roi",
+    description:
+      "Посчитать ROI для конкретного клиента из его цифр. Используй когда выяснил у клиента " +
+      "средний чек и сколько клиентов он теряет в месяц. Возвращает структурированный расчёт.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        avg_check: {
+          type: "number",
+          description: "Средний чек клиента в указанной валюте",
+        },
+        lost_clients_per_month: {
+          type: "number",
+          description: "Сколько клиентов клиент теряет в месяц из-за медленных ответов",
+        },
+        plan_price_usd: {
+          type: "number",
+          description: "Цена рекомендуемого тарифа в USD (по умолчанию 45 для Pro)",
+        },
+        currency: {
+          type: "string",
+          description: "USD | UZS | RUB | KZT — для красивого форматирования. По умолчанию USD.",
+        },
+      },
+      required: ["avg_check", "lost_clients_per_month"],
+    },
+  },
 ];
 
 // ========================================
@@ -251,6 +301,40 @@ async function executeTool(
           ? ONBOARDING_STEPS.find((s) => s.num === stepNum + 1)?.title || "Все шаги пройдены"
           : null,
       });
+    }
+
+    case "get_sales_facts": {
+      const { findSalesFact, listSalesTopicIds } = await import("./sales-knowledge");
+      const query = String(toolInput.topic || "").trim();
+      const result = findSalesFact(query);
+      if (result) {
+        return JSON.stringify({
+          found: true,
+          topicId: result.topicId,
+          content: result.content,
+        });
+      }
+      return JSON.stringify({
+        found: false,
+        message: `Тема "${query}" не найдена. Доступные: ${listSalesTopicIds().join(", ")}. Если ответа нет в базе — эскалируй или скажи "уточню у команды".`,
+      });
+    }
+
+    case "calculate_roi": {
+      const { calculateRoi } = await import("./sales-knowledge");
+      const avgCheck = Number(toolInput.avg_check) || 0;
+      const lostClients = Number(toolInput.lost_clients_per_month) || 0;
+      const planUsd = Number(toolInput.plan_price_usd) || 45;
+      const currency = ((toolInput.currency as string) || "USD").toUpperCase() as
+        | "USD" | "UZS" | "RUB" | "KZT";
+      if (avgCheck <= 0 || lostClients <= 0) {
+        return JSON.stringify({
+          success: false,
+          error: "Нужны положительные avg_check и lost_clients_per_month",
+        });
+      }
+      const roi = calculateRoi(avgCheck, lostClients, planUsd, currency);
+      return JSON.stringify({ success: true, ...roi });
     }
 
     default:
@@ -426,16 +510,31 @@ export async function generateStaffixSalesResponse(
       lead.onboardingNotes
     );
 
+    const messageCount = recentHistory.length;
+    const tempLeadStage =
+      messageCount === 0 ? "первое сообщение, холодный лид" :
+      messageCount < 4 ? "ранний контакт, квалифицируется" :
+      messageCount < 10 ? "идёт диалог" :
+      "длинный диалог, лид уже хорошо знаком";
+
     const systemPrompt = getSalesSystemPrompt() +
-      `\n\n## ТЕКУЩИЙ КОНТЕКСТ\n` +
+      `\n\n## ТЕКУЩИЙ КОНТЕКСТ ЭТОГО ДИАЛОГА\n` +
       `Сегодня: ${todayStr} (Asia/Tashkent). Это РЕАЛЬНАЯ сегодняшняя дата — НИКОГДА не выдумывай и не путай дни. ` +
       `Если упоминаешь даты/время — отталкивайся ровно от этой даты.` +
       `\n\nКанал: ${channel}. ID собеседника: ${channelId}` +
       `\nТекущий статус лида: ${lead.stage}` +
+      `\nСообщений в диалоге: ${messageCount} (${tempLeadStage})` +
       (lead.name ? `\nИмя лида: ${lead.name}` : "") +
       (lead.businessName ? `\nБизнес: ${lead.businessName}` : "") +
       (lead.businessType ? `\nТип: ${lead.businessType}` : "") +
-      `\n\n### ТЕКУЩИЙ ЭТАП НАСТРОЙКИ\n${onboardingContext}`;
+      `\n\n### ТЕКУЩИЙ ЭТАП НАСТРОЙКИ\n${onboardingContext}` +
+      `\n\n## КРИТИЧНОЕ НАПОМИНАНИЕ ПЕРЕД ОТВЕТОМ
+1. Язык клиента → отвечай на нём же.
+2. Мужской род → всегда «помог», «понял», «сделал», «рад».
+3. Тарифы/конкуренты/фичи/шаги → ВСЕГДА через get_sales_facts, не по памяти.
+4. ROI с цифрами → calculate_roi, не от руки.
+5. Не знаешь точно → «уточню у команды», не выдумывай.
+6. Дата времени встречи → не назначай сам, только сбор контактов через schedule_demo.`;
 
     // Call Claude with tools
     let response = await anthropic.messages.create({

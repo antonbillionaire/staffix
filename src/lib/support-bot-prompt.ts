@@ -5,6 +5,19 @@ import Anthropic from "@anthropic-ai/sdk";
 // Обновлён до состояния продукта на 4 мая 2026.
 export const SUPPORT_SYSTEM_PROMPT = `Ты — AI-помощник службы поддержки Staffix. Staffix — SaaS-платформа AI-сотрудников для бизнеса в Telegram / WhatsApp / Instagram / Facebook.
 
+## АНТИГАЛЛЮЦИНАЦИЯ — ГЛАВНОЕ ПРАВИЛО
+Когда клиент спрашивает про КОНКРЕТНУЮ ФУНКЦИЮ или ПРОЦЕСС — ВСЕГДА вызывай tool **get_feature_info** перед ответом.
+Это твой источник истины. Не отвечай по памяти про тарифы, шаги настройки, лояльность, импорт, поиск — выдашь устаревшую информацию.
+
+Алгоритм:
+1. Прочитал вопрос клиента
+2. Если он касается функции/процесса/тарифа Staffix — вызови get_feature_info с темой или ключевыми словами
+3. Получил content из базы — перефразируй его кратко в ответ клиенту, факты не меняй
+4. Если tool вернул found: false — это не значит что функции нет; либо переформулируй topic, либо эскалируй
+5. Если вопрос совсем не про Staffix (общий чат, благодарность) — отвечай без tool
+
+НЕ выдумывай факты. Лучше эскалировать чем соврать.
+
 ## ПРАВИЛА ОБЩЕНИЯ (КРИТИЧНО)
 - ВСЕГДА на «Вы». НИКОГДА не переходи на «ты» даже если собеседник пишет на «ты».
 - Первое приветствие — «Здравствуйте» / «Добрый день / вечер». ЗАПРЕЩЕНО: Привет, Эй, Хай, Здорово, Слушай.
@@ -219,9 +232,66 @@ export interface SupportChatMessage {
 }
 
 /**
+ * Tool definition: get_feature_info — даёт боту фактический ответ из базы знаний.
+ * Это единственный tool у саппорт-бота сейчас. Если бот вызывает — мы ищем в
+ * support-knowledge.ts по топику или алиасам и возвращаем компактный текст.
+ */
+const SUPPORT_TOOLS: Anthropic.Tool[] = [
+  {
+    name: "get_feature_info",
+    description:
+      "Получить точный фактический ответ из базы знаний Staffix по конкретной теме. " +
+      "Используй ВСЕГДА когда клиент спрашивает про конкретную функцию, тариф, " +
+      "настройку или процесс — лучше получить факт из базы чем рисковать выдумать. " +
+      "Доступные темы: onboarding, telegram-setup, channels-meta, whatsapp-setup, " +
+      "knowledge-base, loyalty, imports, search, notifications, pricing, " +
+      "subscription-cancel, ai-tone, team-roles, bot-not-replying, broadcasts, voice. " +
+      "Можно передать также свободный запрос клиента — система найдёт релевантный.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        topic: {
+          type: "string",
+          description:
+            "ID темы из списка выше, либо ключевые слова из вопроса клиента " +
+            "(например 'не подключается фейсбук', 'импорт excel', 'gold скидка').",
+        },
+      },
+      required: ["topic"],
+    },
+  },
+];
+
+async function executeSupportTool(
+  toolName: string,
+  toolInput: Record<string, unknown>
+): Promise<string> {
+  if (toolName === "get_feature_info") {
+    const { findFeatureInfo, listTopicIds } = await import("./support-knowledge");
+    const query = String(toolInput.topic || "").trim();
+    const result = findFeatureInfo(query);
+    if (result) {
+      return JSON.stringify({
+        found: true,
+        topicId: result.topicId,
+        content: result.content,
+      });
+    }
+    return JSON.stringify({
+      found: false,
+      message: `Тема "${query}" не найдена в базе знаний. Доступные темы: ${listTopicIds().join(", ")}. Если вопрос за пределами этих тем — эскалируй.`,
+    });
+  }
+  return JSON.stringify({ error: `Unknown tool: ${toolName}` });
+}
+
+/**
  * Генерирует ответ AI-помощника поддержки.
  * history — предыдущие сообщения диалога (без текущего сообщения пользователя).
  * userMessage — новое сообщение пользователя.
+ *
+ * Поддерживает tool calls — бот может вызвать get_feature_info для получения
+ * точного ответа из support-knowledge. Цикл: модель → tool_use → результат → финальный текст.
  */
 export async function generateSupportReply(
   history: SupportChatMessage[],
@@ -235,21 +305,55 @@ export async function generateSupportReply(
   try {
     const anthropic = new Anthropic({ apiKey });
     const trimmed = history.slice(-20);
-    const messages = [
+    const conversationMessages: Anthropic.MessageParam[] = [
       ...trimmed.map((m) => ({ role: m.role, content: m.content })),
       { role: "user" as const, content: userMessage },
     ];
 
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250929",
-      max_tokens: 1024,
-      system: SUPPORT_SYSTEM_PROMPT,
-      messages,
-    });
+    // Цикл tool calling: даём модели до 3 итераций с tool'ами.
+    // На практике 1-2 хватает — модель один раз спрашивает get_feature_info, потом отвечает текстом.
+    const MAX_ITERATIONS = 3;
+    for (let i = 0; i < MAX_ITERATIONS; i++) {
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-5-20250929",
+        max_tokens: 1024,
+        system: SUPPORT_SYSTEM_PROMPT,
+        tools: SUPPORT_TOOLS,
+        messages: conversationMessages,
+      });
 
-    const block = response.content[0];
-    if (block && block.type === "text") return block.text;
-    return "Извините, не смог обработать запрос. Попробуйте переформулировать.";
+      // Если модель вызвала tool — выполняем и продолжаем цикл
+      const toolUses = response.content.filter((b) => b.type === "tool_use");
+      if (toolUses.length > 0 && response.stop_reason === "tool_use") {
+        conversationMessages.push({ role: "assistant", content: response.content });
+        const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
+          toolUses.map(async (tu) => {
+            if (tu.type !== "tool_use") {
+              return {
+                type: "tool_result" as const,
+                tool_use_id: "unknown",
+                content: "Unexpected block",
+              };
+            }
+            const result = await executeSupportTool(tu.name, tu.input as Record<string, unknown>);
+            return {
+              type: "tool_result" as const,
+              tool_use_id: tu.id,
+              content: result,
+            };
+          })
+        );
+        conversationMessages.push({ role: "user", content: toolResults });
+        continue; // следующая итерация — модель сделает финальный текстовый ответ
+      }
+
+      // Модель вернула текст — это финальный ответ
+      const textBlock = response.content.find((b) => b.type === "text");
+      if (textBlock && textBlock.type === "text") return textBlock.text;
+      return "Извините, не смог обработать запрос. Попробуйте переформулировать.";
+    }
+
+    return "Извините, не смог обработать запрос. Передам специалисту.";
   } catch (error) {
     console.error("[support-prompt] generateSupportReply failed:", error);
     return "Произошла ошибка. Попробуйте позже или напишите на support@staffix.io.";
