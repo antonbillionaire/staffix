@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Plus, Pencil, Trash2, X, Loader2, Package, Tag, Search, Upload, ImagePlus } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -581,103 +582,17 @@ export default function ProductsPage() {
             )}
           </div>
         ) : (
-          <div className="space-y-3">
-            {filtered.map((product) => (
-              <div
-                key={product.id}
-                className={`${card} border rounded-xl p-4 flex items-center gap-4 ${!product.isActive ? "opacity-60" : ""}`}
-              >
-                {/* Фото или иконка */}
-                {product.imageUrl ? (
-                  <img
-                    src={product.imageUrl}
-                    alt={product.name}
-                    className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                  />
-                ) : (
-                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    isDark ? "bg-gray-700" : "bg-gray-100"
-                  }`}>
-                    <Package className={`w-6 h-6 ${sub}`} />
-                  </div>
-                )}
-
-                {/* Инфо */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`font-semibold ${text}`}>{product.name}</span>
-                    {!product.isActive && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${isDark ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-500"}`}>
-                        {t("products.hidden")}
-                      </span>
-                    )}
-                    {product.category && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${isDark ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"}`}>
-                        {product.category}
-                      </span>
-                    )}
-                    {product.stock !== null && product.stock <= 5 && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        product.stock === 0
-                          ? "bg-red-500/20 text-red-400"
-                          : "bg-yellow-500/20 text-yellow-500"
-                      }`}>
-                        {product.stock === 0 ? t("products.outOfStock") : t("products.remainingStock").replace("{count}", String(product.stock))}
-                      </span>
-                    )}
-                  </div>
-                  {product.description && (
-                    <p className={`text-sm mt-0.5 truncate ${sub}`}>{product.description}</p>
-                  )}
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className={`font-semibold ${text}`}>
-                      {product.price.toLocaleString("ru-RU")}
-                    </span>
-                    {product.oldPrice && (
-                      <span className={`text-sm line-through ${sub}`}>
-                        {product.oldPrice.toLocaleString("ru-RU")}
-                      </span>
-                    )}
-                    {product.sku && (
-                      <span className={`text-xs ${sub}`}>SKU: {product.sku}</span>
-                    )}
-                    {product.tags.length > 0 && (
-                      <span className={`text-xs ${sub}`}>#{product.tags.join(" #")}</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Кнопки */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => handleToggleActive(product)}
-                    className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                      product.isActive
-                        ? isDark
-                          ? "border-gray-600 hover:border-gray-500 text-gray-300"
-                          : "border-gray-300 hover:border-gray-400 text-gray-600"
-                        : "border-green-500/50 text-green-400 hover:bg-green-500/10"
-                    }`}
-                  >
-                    {product.isActive ? t("products.hide") : t("products.show")}
-                  </button>
-                  <button
-                    onClick={() => openEdit(product)}
-                    className={`p-2 rounded-lg transition-colors ${isDark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-500"}`}
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(product.id)}
-                    className={`p-2 rounded-lg transition-colors ${isDark ? "hover:bg-red-900/30 text-gray-400 hover:text-red-400" : "hover:bg-red-50 text-gray-400 hover:text-red-500"}`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+          <ProductsList
+            products={filtered}
+            card={card}
+            text={text}
+            sub={sub}
+            isDark={isDark}
+            t={t}
+            onToggleActive={handleToggleActive}
+            onEdit={openEdit}
+            onDelete={handleDelete}
+          />
         )}
       </div>
 
@@ -1133,6 +1048,193 @@ export default function ProductsPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// =============================================================================
+// ProductsList — рендерит список товаров. Если их больше 100 — виртуализирует
+// рендер (через @tanstack/react-virtual): в DOM держится только видимый кусок,
+// иначе 4000+ карточек с картинками рушат браузер.
+// Для малых каталогов (<100) — обычный map (стабильнее, без расчёта высот).
+// =============================================================================
+
+interface ProductsListProps {
+  products: Product[];
+  card: string;
+  text: string;
+  sub: string;
+  isDark: boolean;
+  t: (key: string, params?: Record<string, string | number>) => string;
+  onToggleActive: (product: Product) => void;
+  onEdit: (product: Product) => void;
+  onDelete: (id: string) => void;
+}
+
+const VIRTUALIZE_THRESHOLD = 100;
+const ESTIMATED_ROW_HEIGHT = 96; // px — карточка ~88px + gap 12px
+
+function ProductsList(props: ProductsListProps) {
+  if (props.products.length <= VIRTUALIZE_THRESHOLD) {
+    return (
+      <div className="space-y-3">
+        {props.products.map((product) => (
+          <ProductRow key={product.id} product={product} {...props} />
+        ))}
+      </div>
+    );
+  }
+  return <VirtualizedProductsList {...props} />;
+}
+
+function VirtualizedProductsList(props: ProductsListProps) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: props.products.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    overscan: 6,
+  });
+
+  const items = virtualizer.getVirtualItems();
+  const totalHeight = virtualizer.getTotalSize();
+
+  return (
+    <div
+      ref={parentRef}
+      className="overflow-y-auto rounded-xl"
+      style={{ maxHeight: "calc(100vh - 360px)", minHeight: "400px" }}
+    >
+      <div style={{ height: `${totalHeight}px`, position: "relative", width: "100%" }}>
+        {items.map((vi) => {
+          const product = props.products[vi.index];
+          return (
+            <div
+              key={product.id}
+              data-index={vi.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                transform: `translateY(${vi.start}px)`,
+                paddingBottom: "12px",
+              }}
+            >
+              <ProductRow product={product} {...props} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ProductRow({
+  product,
+  card,
+  text,
+  sub,
+  isDark,
+  t,
+  onToggleActive,
+  onEdit,
+  onDelete,
+}: { product: Product } & Omit<ProductsListProps, "products">) {
+  return (
+    <div
+      className={`${card} border rounded-xl p-4 flex items-center gap-4 ${!product.isActive ? "opacity-60" : ""}`}
+    >
+      {/* Фото или иконка */}
+      {product.imageUrl ? (
+        <img
+          src={product.imageUrl}
+          alt={product.name}
+          className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+        />
+      ) : (
+        <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
+          isDark ? "bg-gray-700" : "bg-gray-100"
+        }`}>
+          <Package className={`w-6 h-6 ${sub}`} />
+        </div>
+      )}
+
+      {/* Инфо */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`font-semibold ${text}`}>{product.name}</span>
+          {!product.isActive && (
+            <span className={`text-xs px-2 py-0.5 rounded-full ${isDark ? "bg-gray-700 text-gray-400" : "bg-gray-100 text-gray-500"}`}>
+              {t("products.hidden")}
+            </span>
+          )}
+          {product.category && (
+            <span className={`text-xs px-2 py-0.5 rounded-full ${isDark ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"}`}>
+              {product.category}
+            </span>
+          )}
+          {product.stock !== null && product.stock <= 5 && (
+            <span className={`text-xs px-2 py-0.5 rounded-full ${
+              product.stock === 0
+                ? "bg-red-500/20 text-red-400"
+                : "bg-yellow-500/20 text-yellow-500"
+            }`}>
+              {product.stock === 0 ? t("products.outOfStock") : t("products.remainingStock").replace("{count}", String(product.stock))}
+            </span>
+          )}
+        </div>
+        {product.description && (
+          <p className={`text-sm mt-0.5 truncate ${sub}`}>{product.description}</p>
+        )}
+        <div className="flex items-center gap-3 mt-1">
+          <span className={`font-semibold ${text}`}>
+            {product.price.toLocaleString("ru-RU")}
+          </span>
+          {product.oldPrice && (
+            <span className={`text-sm line-through ${sub}`}>
+              {product.oldPrice.toLocaleString("ru-RU")}
+            </span>
+          )}
+          {product.sku && (
+            <span className={`text-xs ${sub}`}>SKU: {product.sku}</span>
+          )}
+          {product.tags.length > 0 && (
+            <span className={`text-xs ${sub}`}>#{product.tags.join(" #")}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Кнопки */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <button
+          onClick={() => onToggleActive(product)}
+          className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+            product.isActive
+              ? isDark
+                ? "border-gray-600 hover:border-gray-500 text-gray-300"
+                : "border-gray-300 hover:border-gray-400 text-gray-600"
+              : "border-green-500/50 text-green-400 hover:bg-green-500/10"
+          }`}
+        >
+          {product.isActive ? t("products.hide") : t("products.show")}
+        </button>
+        <button
+          onClick={() => onEdit(product)}
+          className={`p-2 rounded-lg transition-colors ${isDark ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-500"}`}
+        >
+          <Pencil className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => onDelete(product.id)}
+          className={`p-2 rounded-lg transition-colors ${isDark ? "hover:bg-red-900/30 text-gray-400 hover:text-red-400" : "hover:bg-red-50 text-gray-400 hover:text-red-500"}`}
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }
