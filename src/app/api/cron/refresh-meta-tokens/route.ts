@@ -10,6 +10,7 @@ import { refreshLongLivedToken, getUserPages } from "@/lib/meta-oauth";
 import { cleanupWebhookDedup } from "@/lib/webhook-dedup";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   // Verify cron secret (Vercel sends Authorization header)

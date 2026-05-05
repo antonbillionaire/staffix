@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 // Use existing Vercel ENV vars (same bot/chat as sales notifications)
 const ADMIN_TELEGRAM_CHAT_ID = process.env.SALES_ADMIN_CHAT_ID;
@@ -45,6 +46,16 @@ ${partner.description}
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 3 заявки в час с IP. У партнёра есть unique constraint по email,
+    // но без RL атакующий может перебирать email'ы и спамить админ-Telegram.
+    const rl = await rateLimit(`partners-apply:${getClientIp(req)}`, 3, 60);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Слишком много заявок. Попробуйте позже." },
+        { status: 429 }
+      );
+    }
+
     const { name, email, phone, company, website, description } = await req.json();
 
     if (!name || !email || !description) {

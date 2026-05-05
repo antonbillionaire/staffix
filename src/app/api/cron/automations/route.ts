@@ -6,6 +6,8 @@ import {
   processSubscriptionReminders,
 } from "@/lib/automation";
 
+export const maxDuration = 300;
+
 export async function GET(request: Request) {
   try {
     // Verify cron secret

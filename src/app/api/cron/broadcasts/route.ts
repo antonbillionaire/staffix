@@ -14,6 +14,8 @@ import { sendAutomationMessage } from "@/lib/automation";
 import { sendClientBroadcastEmail } from "@/lib/email";
 import { randomBytes } from "crypto";
 
+export const maxDuration = 300;
+
 const MAX_BROADCASTS_PER_RUN = 10;
 
 function getOrCreateUnsubscribeToken(existing: string | null): string {

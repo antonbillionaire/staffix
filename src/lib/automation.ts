@@ -189,7 +189,9 @@ export async function processReminders() {
   const now = new Date();
   const results = { sent: 0, failed: 0, errors: [] as string[] };
 
-  // Получаем все бизнесы с активными настройками
+  // Получаем все бизнесы с активными настройками.
+  // take: 200 — защита от OOM на росте. Если бизнесов больше — следующий
+  // тик cron возьмёт остальных. Кроны идут раз в 15 минут.
   const businesses = await prisma.business.findMany({
     where: {
       botToken: { not: null },
@@ -212,8 +214,12 @@ export async function processReminders() {
         include: {
           service: true,
         },
+        // Хедж: не больше 500 ближайших броней на бизнес за раз
+        take: 500,
+        orderBy: { date: "asc" },
       },
     },
+    take: 200,
   });
 
   for (const business of businesses) {
@@ -394,8 +400,11 @@ export async function processReviewRequests() {
         include: {
           service: true,
         },
+        take: 500,
+        orderBy: { date: "desc" },
       },
     },
+    take: 200,
   });
 
   for (const business of businesses) {
@@ -477,8 +486,11 @@ export async function processReactivation() {
           isBlocked: false,
           lastVisitDate: { not: null },
         },
+        take: 1000, // ограничение чтобы не упасть на бизнесах с 10К+ клиентов
+        orderBy: { lastVisitDate: "asc" }, // самые «протухшие» сначала
       },
     },
+    take: 200,
   });
 
   for (const business of businesses) {

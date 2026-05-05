@@ -7,6 +7,9 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+
+// 300s — потолок Vercel Pro. Cron делает много sequential Claude-вызовов.
+export const maxDuration = 300;
 import {
   generateConversationSummary,
   updateClientSummary,

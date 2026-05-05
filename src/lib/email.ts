@@ -591,6 +591,12 @@ export async function sendBroadcastEmail(
       from: FROM_EMAIL,
       to: email,
       subject,
+      // List-Unsubscribe через mailto на админский ящик — соответствует RFC 2369.
+      // Получатели — клиенты Staffix (владельцы бизнесов), отдельной таблицы opt-out
+      // для admin-рассылок пока нет, поэтому отписку обрабатывает админ вручную.
+      headers: {
+        "List-Unsubscribe": "<mailto:director.kbridge@gmail.com?subject=Unsubscribe>",
+      },
       html: `
         <!DOCTYPE html>
         <html>
@@ -610,7 +616,10 @@ export async function sendBroadcastEmail(
               <div style="color: #d1d5db; font-size: 15px; line-height: 1.8; white-space: pre-wrap;">${processedContent}</div>
             </div>
             <div style="padding: 20px 32px; background: rgba(0,0,0,0.2); text-align: center;">
-              <p style="color: #4b5563; font-size: 12px; margin: 0;">© 2025 Staffix — staffix.io</p>
+              <p style="color: #4b5563; font-size: 12px; margin: 0 0 8px;">© ${new Date().getFullYear()} Staffix — staffix.io</p>
+              <p style="color: #4b5563; font-size: 11px; margin: 0;">
+                Не хотите получать рассылки? <a href="mailto:director.kbridge@gmail.com?subject=Unsubscribe" style="color:#6b7280;">Отписаться</a>
+              </p>
             </div>
           </div>
         </body>
@@ -658,6 +667,11 @@ export async function sendOutreachEmail(
       from: FROM_EMAIL,
       to,
       subject,
+      // CAN-SPAM требует механизм отписки в холодных письмах. Mailto-вариант
+      // соответствует RFC 2369 + Gmail one-click через "List-Unsubscribe-Post: List-Unsubscribe=One-Click".
+      headers: {
+        "List-Unsubscribe": "<mailto:director.kbridge@gmail.com?subject=Unsubscribe>",
+      },
       html: `
         <!DOCTYPE html>
         <html>
@@ -728,8 +742,11 @@ export async function sendOutreachEmail(
 
             <!-- Footer -->
             <div style="padding: 20px 32px; background: #f9fafb; border-top: 1px solid #f3f4f6; text-align: center;">
-              <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+              <p style="color: #9ca3af; font-size: 12px; margin: 0 0 8px;">
                 <a href="https://staffix.io" style="color: #f97316; text-decoration: none;">staffix.io</a> — AI-сотрудник для вашего бизнеса
+              </p>
+              <p style="color: #9ca3af; font-size: 11px; margin: 0;">
+                Получили письмо по ошибке? <a href="mailto:director.kbridge@gmail.com?subject=Unsubscribe" style="color: #6b7280; text-decoration: underline;">Отписаться</a>
               </p>
             </div>
           </div>

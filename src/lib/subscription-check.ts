@@ -9,26 +9,30 @@ import { prisma } from "@/lib/prisma";
 
 export interface SubscriptionStatus {
   allowed: boolean;
-  reason?: "expired" | "limit_reached";
+  reason?: "expired" | "limit_reached" | "suspended";
   subscription?: {
     messagesUsed: number;
     messagesLimit: number;
     expiresAt: Date | null;
+    status?: string | null;
   };
 }
 
 /**
  * Check whether a business is allowed to process a new message based on
- * its subscription status (expiration date and message limit).
+ * its subscription status (expiration date, message limit, and PayPro status).
  *
  * If there is no subscription record, the business is allowed (free tier / no limit).
+ *
+ * status='suspended' (failed PayPro charge) — блокируем, чтобы клиент не тратил
+ * сообщения и быстрее заметил что подписка слетела.
  */
 export async function checkSubscriptionLimit(
   businessId: string
 ): Promise<SubscriptionStatus> {
   const subscription = await prisma.subscription.findUnique({
     where: { businessId },
-    select: { messagesUsed: true, messagesLimit: true, expiresAt: true },
+    select: { messagesUsed: true, messagesLimit: true, expiresAt: true, status: true },
   });
 
   if (!subscription) {
@@ -42,6 +46,10 @@ export async function checkSubscriptionLimit(
   const limitReached =
     subscription.messagesLimit !== -1 &&
     subscription.messagesUsed >= subscription.messagesLimit;
+
+  if (subscription.status === "suspended") {
+    return { allowed: false, reason: "suspended", subscription };
+  }
 
   if (isExpired) {
     return { allowed: false, reason: "expired", subscription };

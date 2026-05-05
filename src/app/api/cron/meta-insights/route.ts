@@ -14,6 +14,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateMetaInsights } from "@/lib/meta-insights-generator";
 
+export const maxDuration = 300;
+
 const SEVERITY_LABEL: Record<string, string> = {
   critical: "🔴",
   warn: "🟡",

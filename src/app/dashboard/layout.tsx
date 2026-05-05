@@ -60,6 +60,7 @@ const ChatWidget = dynamic(() => import("@/components/ChatWidget"), { ssr: false
 const OnboardingWizard = dynamic(() => import("@/components/OnboardingWizard"), { ssr: false });
 const OnboardingChecklist = dynamic(() => import("@/components/OnboardingChecklist"), { ssr: false });
 import TrialExpiredBanner from "@/components/TrialExpiredBanner";
+import SubscriptionSuspendedBanner from "@/components/SubscriptionSuspendedBanner";
 import { type PlanId, hasMenuAccess } from "@/lib/plans";
 
 interface NavChild {
@@ -184,6 +185,7 @@ export default function DashboardLayout({
     messagesLimit: 100,
     daysLeft: 14,
     isExpired: false,
+    isSuspended: false, // PayPro failed charge — банер с просьбой обновить карту
   });
 
   // Build nav config based on dashboard mode
@@ -274,6 +276,7 @@ export default function DashboardLayout({
                 messagesLimit: sub.messagesLimit,
                 daysLeft,
                 isExpired,
+                isSuspended: sub.status === "suspended",
               });
             }
           } else {
@@ -822,6 +825,9 @@ export default function DashboardLayout({
         {subscription.plan === "trial" && subscription.isExpired && (
           <TrialExpiredBanner />
         )}
+
+        {/* PayPro suspended banner — failed charge на платном плане */}
+        {subscription.isSuspended && <SubscriptionSuspendedBanner />}
 
         {/* Onboarding wizard */}
         <OnboardingWizard />

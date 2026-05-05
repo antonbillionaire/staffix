@@ -13,6 +13,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateInsightsForBusiness } from "@/lib/insights-generator";
 
+export const maxDuration = 300;
+
 const ANALYSIS_WINDOW_DAYS = 7;
 
 async function notifyOwnerAboutInsights(

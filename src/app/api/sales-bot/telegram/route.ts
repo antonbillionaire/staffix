@@ -195,6 +195,23 @@ async function updateLeadStage(
 // Webhook handler
 export async function POST(request: NextRequest) {
   try {
+    // Verify Telegram secret_token — иначе любой может слать фейковые SalesLead.
+    // Если SALES_BOT_TELEGRAM_SECRET не настроен — пропускаем (для совместимости со старым деплоем),
+    // но логируем громкое предупреждение чтобы это было видно в Vercel.
+    const expectedSecret = process.env.SALES_BOT_TELEGRAM_SECRET;
+    if (expectedSecret) {
+      const receivedSecret = request.headers.get("x-telegram-bot-api-secret-token");
+      if (!receivedSecret || receivedSecret !== expectedSecret) {
+        console.error("[sales-bot/tg] invalid secret_token — rejecting webhook");
+        return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
+      }
+    } else {
+      console.warn(
+        "[sales-bot/tg] SALES_BOT_TELEGRAM_SECRET not set — webhook is unauthenticated! " +
+        "Set the env var and re-register webhook with secret_token via Telegram setWebhook."
+      );
+    }
+
     // Rate limiting: 30 requests per minute per IP
     const ip = getClientIp(request);
     const rl = await rateLimit(`sales-tg:${ip}`, 30, 1);

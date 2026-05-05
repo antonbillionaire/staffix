@@ -20,6 +20,7 @@ export interface Subscription {
   messagesUsed: number;
   messagesLimit: number;
   expiresAt: string;
+  status?: string | null; // active | cancelled | suspended | expired
 }
 
 export interface UseSubscriptionResult {
@@ -42,6 +43,7 @@ export interface UseSubscriptionResult {
   isExpired: boolean;
   isTrialPlan: boolean;
   isTrialExpired: boolean; // Trial plan AND expired
+  isSuspended: boolean;    // PayPro failed charge — нужно обновить карту
   needsUpgrade: boolean;   // Show upgrade prompt (trial expired)
 
   // Feature checks
@@ -108,6 +110,7 @@ export function useSubscription(): UseSubscriptionResult {
   const isExpired = expiresAt ? expiresAt < now : false;
   const isTrialPlan = plan === "trial";
   const isTrialExpired = isTrialPlan && isExpired;
+  const isSuspended = subscription?.status === "suspended";
   const needsUpgrade = isTrialExpired; // Trial ended, needs to pay
 
   // Helper to check if user has access to a required plan level
@@ -135,6 +138,7 @@ export function useSubscription(): UseSubscriptionResult {
     isExpired,
     isTrialPlan,
     isTrialExpired,
+    isSuspended,
     needsUpgrade,
 
     // Feature checks (blocked if trial expired)

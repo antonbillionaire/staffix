@@ -13,6 +13,8 @@ import {
   updateChannelClientSummary,
 } from "@/lib/channel-memory";
 
+export const maxDuration = 300;
+
 const MAX_CONVERSATIONS = 20;
 
 export async function POST(request: Request) {

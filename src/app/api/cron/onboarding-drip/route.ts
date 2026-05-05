@@ -6,6 +6,8 @@ import {
   sendDripReengageReminder,
 } from "@/lib/email";
 
+export const maxDuration = 300;
+
 // Vercel Cron — runs daily at 10:00 UTC
 export async function GET(request: NextRequest) {
   // Verify cron secret
