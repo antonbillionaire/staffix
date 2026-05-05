@@ -27,6 +27,25 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    // Активные promo-материалы — общие для всех партнёров.
+    // Грузим параллельно, не зависят от partner. Если упадут — кабинет всё равно отдаём.
+    const assets = await prisma.partnerAsset
+      .findMany({
+        where: { isActive: true },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          description: true,
+          imageUrl: true,
+          content: true,
+          category: true,
+          language: true,
+        },
+      })
+      .catch(() => []);
+
     if (!partner) {
       return NextResponse.json({ error: "Партнёр не найден" }, { status: 404 });
     }
@@ -104,6 +123,7 @@ export async function GET(req: NextRequest) {
           : null,
         recipientBankName: p.recipientBankName,
       })),
+      assets,
     });
   } catch (e) {
     console.error("Partner dashboard error:", e);

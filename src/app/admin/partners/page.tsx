@@ -17,6 +17,7 @@ import {
   Clock,
   ExternalLink,
   X,
+  Image as ImageIcon,
 } from "lucide-react";
 
 interface Partner {
@@ -106,6 +107,12 @@ export default function AdminPartnersPage() {
               className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg text-sm font-medium transition-colors"
             >
               <DollarSign className="h-4 w-4" /> Выплаты
+            </Link>
+            <Link
+              href="/admin/partners/assets"
+              className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              <ImageIcon className="h-4 w-4" /> Материалы
             </Link>
             <button
               onClick={() => setCreateModalOpen(true)}

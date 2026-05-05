@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendVerificationEmail } from "@/lib/email";
+import { sendVerificationEmail, sendPartnerNewReferralEmail } from "@/lib/email";
 import { notifyNewRegistration } from "@/lib/admin-notify";
 import bcrypt from "bcryptjs";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
@@ -105,8 +105,8 @@ export async function POST(request: NextRequest) {
     if (referralCode) {
       prisma.partner.findUnique({
         where: { referralCode },
-        select: { id: true, status: true, email: true },
-      }).then((partner) => {
+        select: { id: true, status: true, email: true, name: true, accessToken: true },
+      }).then(async (partner) => {
         if (!partner) return;
         // Только approved партнёры засчитывают рефералов
         if (partner.status !== "approved") return;
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
           return;
         }
 
-        return prisma.partnerReferral.create({
+        const referral = await prisma.partnerReferral.create({
           data: {
             userId: user.id,
             userEmail: email,
@@ -124,6 +124,17 @@ export async function POST(request: NextRequest) {
             partnerId: partner.id,
           },
         });
+
+        // Уведомление партнёру о новом реферале (не блокирует регистрацию).
+        if (partner.accessToken) {
+          sendPartnerNewReferralEmail({
+            email: partner.email,
+            name: partner.name,
+            accessToken: partner.accessToken,
+            referralEmail: email,
+            signedUpAt: referral.signedUpAt,
+          }).catch((e) => console.error("[partner-referral] new-referral email failed:", e));
+        }
       }).catch(console.error);
     }
 

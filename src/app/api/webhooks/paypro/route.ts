@@ -19,6 +19,10 @@ import {
   sendPaymentFailedEmail,
   sendSubscriptionSuspendedEmail,
 } from "@/lib/email";
+import {
+  recordPartnerEarning,
+  cancelPartnerEarningForOrder,
+} from "@/lib/partner-commission";
 
 export async function POST(request: NextRequest) {
   try {
@@ -199,6 +203,15 @@ export async function POST(request: NextRequest) {
             orderId: ipn.orderId,
           }).catch((err) => console.error("Payment success email failed:", err));
         }
+
+        // Партнёрская комиссия — первая оплата подписки.
+        recordPartnerEarning({
+          userId: ipn.userId,
+          payproOrderId: ipn.orderId,
+          paymentAmount: parseFloat(ipn.orderTotalAmount) || 0,
+          planId,
+          isFirstPayment: true,
+        }).catch((err) => console.error("Partner commission failed:", err));
         break;
       }
 
@@ -248,6 +261,15 @@ export async function POST(request: NextRequest) {
             orderId: ipn.orderId,
           }).catch((err) => console.error("Renewal email failed:", err));
         }
+
+        // Партнёрская комиссия — recurring lifetime, без email-уведомления.
+        recordPartnerEarning({
+          userId: ipn.userId,
+          payproOrderId: ipn.orderId,
+          paymentAmount: parseFloat(ipn.orderTotalAmount) || 0,
+          planId: business.subscription.plan,
+          isFirstPayment: false,
+        }).catch((err) => console.error("Partner commission failed:", err));
         break;
       }
 
@@ -348,6 +370,11 @@ export async function POST(request: NextRequest) {
         });
 
         console.log(`PayPro: Refund processed for business ${business.id}`);
+
+        // Отменить партнёрскую комиссию по этому orderId (если есть и не paid).
+        cancelPartnerEarningForOrder(ipn.orderId, "refund").catch((err) =>
+          console.error("Partner commission cancel failed:", err)
+        );
         break;
       }
 
@@ -366,6 +393,10 @@ export async function POST(request: NextRequest) {
         });
 
         console.log(`PayPro: Chargeback for business ${business.id}`);
+
+        cancelPartnerEarningForOrder(ipn.orderId, "chargeback").catch((err) =>
+          console.error("Partner commission cancel failed:", err)
+        );
         break;
       }
 
@@ -436,6 +467,15 @@ export async function POST(request: NextRequest) {
             orderId: ipn.orderId,
           }).catch((err) => console.error("Trial-charge email failed:", err));
         }
+
+        // Партнёрская комиссия — trial конвертировался в платящего, считается первой оплатой.
+        recordPartnerEarning({
+          userId: ipn.userId,
+          payproOrderId: ipn.orderId,
+          paymentAmount: parseFloat(ipn.orderTotalAmount) || 0,
+          planId,
+          isFirstPayment: true,
+        }).catch((err) => console.error("Partner commission failed:", err));
         break;
       }
 

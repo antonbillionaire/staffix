@@ -13,6 +13,9 @@ import {
   Clock,
   Zap,
   ExternalLink,
+  Image as ImageIcon,
+  FileText,
+  Download,
 } from "lucide-react";
 
 interface PartnerData {
@@ -66,6 +69,16 @@ interface PartnerData {
     paidAt: string;
     recipientCardNumber: string | null;
     recipientBankName: string | null;
+  }>;
+  assets: Array<{
+    id: string;
+    type: "banner" | "template";
+    title: string;
+    description: string | null;
+    imageUrl: string | null;
+    content: string | null;
+    category: string | null;
+    language: string;
   }>;
 }
 
@@ -169,6 +182,7 @@ export default function PartnerDashboardPage() {
   if (!data) return null;
 
   const { partner, stats, referrals, earnings, payouts } = data;
+  const assets = data.assets || [];
   const referralLink = `https://staffix.io/?ref=${partner.referralCode}`;
 
   return (
@@ -274,6 +288,9 @@ export default function PartnerDashboardPage() {
             <div className="text-xs text-gray-500 mt-1">Включая выплаченное и hold</div>
           </div>
         </div>
+
+        {/* Promo-материалы (баннеры + шаблоны) — глобальные на всех партнёров */}
+        {assets.length > 0 && <PromoAssets assets={assets} />}
 
         <div className="grid md:grid-cols-2 gap-8">
           {/* Recent referrals */}
@@ -555,6 +572,139 @@ function Input({
         placeholder={placeholder}
         className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-blue-500"
       />
+    </div>
+  );
+}
+
+/**
+ * Блок «Promo-материалы»: баннеры (картинки для соцсетей) + шаблоны текстов.
+ * Партнёр копирует текст одной кнопкой, баннер скачивает.
+ */
+function PromoAssets({
+  assets,
+}: {
+  assets: Array<{
+    id: string;
+    type: "banner" | "template";
+    title: string;
+    description: string | null;
+    imageUrl: string | null;
+    content: string | null;
+    category: string | null;
+    language: string;
+  }>;
+}) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copy = async (id: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 1500);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const banners = assets.filter((a) => a.type === "banner");
+  const templates = assets.filter((a) => a.type === "template");
+
+  return (
+    <div className="mb-8 bg-[#12122a] border border-white/5 rounded-xl p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="font-semibold text-white">Promo-материалы</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Готовые тексты и баннеры — копируйте и используйте в соцсетях, мессенджерах, рассылках
+          </p>
+        </div>
+      </div>
+
+      {templates.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 text-xs text-gray-400 uppercase tracking-wide mb-3">
+            <FileText className="h-3.5 w-3.5" /> Шаблоны текстов
+          </div>
+          <div className="grid md:grid-cols-2 gap-3">
+            {templates.map((t) => (
+              <div
+                key={t.id}
+                className="bg-black/20 border border-white/5 rounded-lg p-4 flex flex-col"
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div>
+                    <h3 className="text-sm font-medium text-white">{t.title}</h3>
+                    {t.description && (
+                      <p className="text-xs text-gray-500 mt-0.5">{t.description}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => copy(t.id, t.content || "")}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 rounded text-xs font-medium whitespace-nowrap transition-colors"
+                  >
+                    {copiedId === t.id ? (
+                      <>
+                        <CheckCircle className="h-3 w-3" /> Скопировано
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3 w-3" /> Копировать
+                      </>
+                    )}
+                  </button>
+                </div>
+                {t.content && (
+                  <div className="text-xs text-gray-400 font-mono whitespace-pre-wrap line-clamp-5 flex-1">
+                    {t.content}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {banners.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 text-xs text-gray-400 uppercase tracking-wide mb-3">
+            <ImageIcon className="h-3.5 w-3.5" /> Баннеры
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {banners.map((b) => (
+              <div
+                key={b.id}
+                className="bg-black/20 border border-white/5 rounded-lg overflow-hidden flex flex-col"
+              >
+                {b.imageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={b.imageUrl}
+                    alt={b.title}
+                    className="w-full max-h-40 object-contain bg-black/40"
+                  />
+                )}
+                <div className="p-3 flex-1 flex flex-col">
+                  <h3 className="text-sm font-medium text-white">{b.title}</h3>
+                  {b.description && (
+                    <p className="text-xs text-gray-500 mt-1 flex-1">{b.description}</p>
+                  )}
+                  {b.imageUrl && (
+                    <a
+                      href={b.imageUrl}
+                      download
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
+                    >
+                      <Download className="h-3 w-3" /> Скачать
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

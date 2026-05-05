@@ -1318,6 +1318,147 @@ export async function sendPartnerPayoutSentEmail(params: {
 }
 
 /**
+ * Уведомление партнёру что по его ссылке зарегистрировался новый человек.
+ * Шлётся сразу при регистрации — до конверсии в платящего.
+ */
+export async function sendPartnerNewReferralEmail(params: {
+  email: string;
+  name: string;
+  accessToken: string;
+  referralEmail: string;
+  signedUpAt: Date;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
+    const dashboardUrl = `${appUrl}/partners/dashboard?token=${params.accessToken}`;
+
+    if (!resend) {
+      console.log(`[DEV] Partner new-referral email for ${params.email}: ${params.referralEmail}`);
+      return { success: true };
+    }
+
+    const dateStr = params.signedUpAt.toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: params.email,
+      subject: `Новый реферал по Вашей ссылке — Staffix`,
+      html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f5f7;margin:0;padding:32px 20px;color:#1a1a2e;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+    <div style="padding:24px 28px;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;">
+      <div style="font-size:13px;opacity:0.85;margin-bottom:4px;">🎯 Новая регистрация</div>
+      <h1 style="margin:0;font-size:22px;">+1 реферал</h1>
+    </div>
+    <div style="padding:24px 28px;color:#1a1a2e;">
+      <p style="margin:0 0 16px;line-height:1.6;">Здравствуйте, ${params.name}!</p>
+      <p style="margin:0 0 18px;line-height:1.6;">
+        По Вашей реферальной ссылке только что зарегистрировался новый пользователь:
+      </p>
+      <div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:16px 18px;margin-bottom:20px;">
+        <div style="font-size:13px;color:#4338ca;font-weight:600;margin-bottom:6px;">REFERRAL</div>
+        <div style="font-size:15px;color:#1a1a2e;font-family:monospace;margin-bottom:8px;">${params.referralEmail}</div>
+        <div style="font-size:13px;color:#6b7280;">${dateStr}</div>
+      </div>
+      <p style="margin:0 0 12px;line-height:1.6;font-size:14px;color:#4b5563;">
+        У клиента сейчас бесплатный 14-дневный trial. Комиссия 20% начнёт начисляться, как только он перейдёт на платный тариф — Вы получите отдельное уведомление.
+      </p>
+      <p style="margin:0 0 20px;line-height:1.6;font-size:14px;color:#4b5563;">
+        Можно подсказать клиенту что в дашборде Staffix есть быстрый старт и поддержка — это повышает шанс конверсии.
+      </p>
+      <a href="${dashboardUrl}" style="display:inline-block;padding:12px 22px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">Открыть кабинет</a>
+    </div>
+    <div style="padding:14px 28px;background:#f9fafb;color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb;">
+      Staffix · <a href="${appUrl}" style="color:#2563eb;">staffix.io</a> · K-Bridge Co., Ltd.
+    </div>
+  </div>
+</body></html>`,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    console.error("sendPartnerNewReferralEmail error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Send error" };
+  }
+}
+
+/**
+ * Уведомление партнёру что его реферал стал платящим (первая оплата прошла).
+ * Шлётся ОДИН раз при первой конверсии — recurring платежи не триггерят повторно.
+ */
+export async function sendPartnerReferralConvertedEmail(params: {
+  email: string;
+  name: string;
+  accessToken: string;
+  referralEmail: string;
+  planName: string;
+  commissionAmount: number;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
+    const dashboardUrl = `${appUrl}/partners/dashboard?token=${params.accessToken}`;
+
+    if (!resend) {
+      console.log(
+        `[DEV] Partner converted email for ${params.email}: ${params.referralEmail} → ${params.planName}, +$${params.commissionAmount}`
+      );
+      return { success: true };
+    }
+
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: params.email,
+      subject: `🎉 Реферал стал клиентом: +$${params.commissionAmount.toFixed(2)} комиссии`,
+      html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f5f7;margin:0;padding:32px 20px;color:#1a1a2e;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+    <div style="padding:24px 28px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;">
+      <div style="font-size:13px;opacity:0.85;margin-bottom:4px;">💎 Конверсия в платящего</div>
+      <h1 style="margin:0;font-size:22px;">Реферал стал клиентом</h1>
+    </div>
+    <div style="padding:24px 28px;color:#1a1a2e;">
+      <p style="margin:0 0 16px;line-height:1.6;">Здравствуйте, ${params.name}!</p>
+      <p style="margin:0 0 18px;line-height:1.6;">
+        Отличные новости — Ваш реферал перешёл на платный тариф. Комиссия начислена.
+      </p>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:20px;">
+        <tr><td style="padding:8px 0;color:#6b7280;">Реферал:</td><td style="padding:8px 0;text-align:right;color:#1a1a2e;font-family:monospace;">${params.referralEmail}</td></tr>
+        <tr style="border-top:1px solid #f3f4f6;"><td style="padding:8px 0;color:#6b7280;">Тариф:</td><td style="padding:8px 0;text-align:right;color:#1a1a2e;font-weight:500;text-transform:capitalize;">${params.planName}</td></tr>
+        <tr style="border-top:1px solid #f3f4f6;"><td style="padding:8px 0;color:#6b7280;">Комиссия:</td><td style="padding:8px 0;text-align:right;color:#7c3aed;font-weight:700;font-size:16px;">+$${params.commissionAmount.toFixed(2)}</td></tr>
+      </table>
+      <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:14px 16px;margin-bottom:20px;">
+        <div style="font-size:13px;color:#92400e;line-height:1.5;">
+          <strong>Hold-период 30 дней.</strong> Комиссия станет доступной к выплате после защитного периода (на случай возврата клиенту). Так работает у всех платёжных систем.
+        </div>
+      </div>
+      <p style="margin:0 0 16px;line-height:1.6;font-size:14px;color:#4b5563;">
+        Recurring lifetime: с каждого следующего платежа этого клиента Вам будет начисляться 20% — пока он остаётся подписчиком Staffix.
+      </p>
+      <a href="${dashboardUrl}" style="display:inline-block;padding:12px 22px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">Посмотреть в кабинете</a>
+    </div>
+    <div style="padding:14px 28px;background:#f9fafb;color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb;">
+      Staffix · <a href="${appUrl}" style="color:#2563eb;">staffix.io</a> · K-Bridge Co., Ltd.
+    </div>
+  </div>
+</body></html>`,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    console.error("sendPartnerReferralConvertedEmail error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Send error" };
+  }
+}
+
+/**
  * Email отказа партнёру с (опц.) причиной.
  */
 export async function sendPartnerRejectionEmail(params: {

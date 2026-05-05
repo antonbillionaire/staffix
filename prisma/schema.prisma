@@ -1853,6 +1853,11 @@ model PartnerEarning {
   payoutId String?
   payout   PartnerPayout? @relation(fields: [payoutId], references: [id], onDelete: SetNull)
 
+  // PayPro orderId который сгенерировал эту комиссию.
+  // Нужен чтобы при ORDER_REFUNDED / ORDER_CHARGED_BACK точно отменить именно
+  // тот earning, который относится к возвращённому платежу.
+  payproOrderId String?
+
   referralId String
   referral   PartnerReferral @relation(fields: [referralId], references: [id], onDelete: Cascade)
 
@@ -1865,6 +1870,7 @@ model PartnerEarning {
   @@index([partnerId, createdAt])
   @@index([status, availableAt])
   @@index([payoutId])
+  @@index([payproOrderId])
 }
 
 // Группа выплат партнёру — одна строка = один банковский перевод за период.
@@ -1910,6 +1916,32 @@ model PartnerPayout {
 
   @@index([partnerId, paidAt])
   @@index([paidAt])
+}
+
+// Promo-материалы для всех партнёров: баннеры (картинки) и шаблоны текстов.
+// Создаются админом в /admin/partners/assets, видны партнёрам в кабинете.
+// Глобальные — не привязаны к конкретному партнёру.
+model PartnerAsset {
+  id String @id @default(cuid())
+
+  type        String // "banner" | "template"
+  title       String
+  description String? // подсказка партнёру: куда применить, какая аудитория
+
+  imageUrl String? // для type=banner — ссылка на Vercel Blob
+  content  String? @db.Text // для type=template — готовый текст рассылки/поста
+
+  category String? // "social" | "messenger" | "email" | "ads" | "other"
+  language String  @default("ru") // ru / en / uz / kz
+
+  sortOrder Int     @default(0) // порядок в кабинете партнёра
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type, isActive, sortOrder])
+  @@index([language, isActive])
 }
 
 // ========================================
