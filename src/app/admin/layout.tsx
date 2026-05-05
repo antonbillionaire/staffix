@@ -21,6 +21,7 @@ import {
   Target,
   Megaphone,
   MessageSquare,
+  Handshake,
 } from "lucide-react";
 
 const adminNav = [
@@ -28,6 +29,7 @@ const adminNav = [
   { name: "Клиенты", href: "/admin/users", icon: Users },
   { name: "Подписки", href: "/admin/subscriptions", icon: CreditCard },
   { name: "Лиды", href: "/admin/sales-leads", icon: Target },
+  { name: "Партнёры", href: "/admin/partners", icon: Handshake },
   { name: "Сообщения (Виктор)", href: "/admin/messages", icon: MessageSquare },
   { name: "Переписки клиентов", href: "/admin/conversations", icon: MessageSquare },
   { name: "Meta Insights", href: "/admin/meta-insights", icon: TrendingUp },

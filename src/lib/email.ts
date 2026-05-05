@@ -1084,6 +1084,134 @@ const DRIP_FOOTER = `
  * сохранялся только в БД и пользователь его не получал — клиент ждал
  * ответа неделями, не зная что он есть.
  */
+/**
+ * Welcome email партнёру после approval. Содержит:
+ * - Реферальную ссылку
+ * - Ссылку на личный кабинет с access_token
+ * - Условия комиссии
+ * - Контакт админа
+ */
+export async function sendPartnerWelcomeEmail(params: {
+  email: string;
+  name: string;
+  referralCode: string;
+  accessToken: string;
+  commissionRatePercent: number; // 20 для 20%
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
+    const dashboardUrl = `${appUrl}/partners/dashboard?token=${params.accessToken}`;
+    const referralUrl = `${appUrl}/?ref=${params.referralCode}`;
+
+    if (!resend) {
+      console.log(`[DEV] Partner welcome email for ${params.email}`);
+      console.log(`  Dashboard: ${dashboardUrl}`);
+      console.log(`  Referral:  ${referralUrl}`);
+      return { success: true };
+    }
+
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: params.email,
+      subject: `${params.name}, добро пожаловать в партнёрскую программу Staffix!`,
+      html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f5f7;margin:0;padding:32px 20px;color:#1a1a2e;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+    <div style="padding:24px 28px;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;">
+      <div style="font-size:13px;opacity:0.85;margin-bottom:4px;">🤝 Партнёрская программа Staffix</div>
+      <h1 style="margin:0;font-size:22px;">Добро пожаловать, ${params.name}!</h1>
+    </div>
+    <div style="padding:24px 28px;color:#1a1a2e;">
+      <p style="margin:0 0 16px;line-height:1.6;">
+        Ваша заявка одобрена. С этого момента Вы — партнёр Staffix и получаете <strong>${params.commissionRatePercent}% recurring commission</strong> с каждого платежа клиентов которых Вы привели — пока они платят.
+      </p>
+
+      <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px 18px;margin-bottom:20px;">
+        <div style="font-size:13px;color:#6b7280;font-weight:600;margin-bottom:6px;">ВАША РЕФЕРАЛЬНАЯ ССЫЛКА</div>
+        <a href="${referralUrl}" style="font-size:15px;color:#2563eb;font-family:monospace;word-break:break-all;text-decoration:none;">${referralUrl}</a>
+        <div style="font-size:12px;color:#6b7280;margin-top:8px;">Размещайте её в соцсетях, блоге, рекламе. Каждая регистрация по этой ссылке привязывается к Вам на 60 дней.</div>
+      </div>
+
+      <p style="margin:0 0 12px;line-height:1.6;">В личном кабинете вы видите статистику, заработок, историю выплат и можете указать реквизиты для перечисления комиссии:</p>
+      <a href="${dashboardUrl}" style="display:inline-block;padding:12px 22px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;margin-bottom:20px;">Открыть кабинет партнёра</a>
+
+      <div style="background:#fffbeb;border-left:3px solid #f59e0b;padding:12px 16px;border-radius:6px;margin-bottom:18px;color:#92400e;font-size:13px;line-height:1.6;">
+        ⚠️ Сохраните эту ссылку — она содержит Ваш персональный токен доступа. По ней Вы заходите в кабинет, отдельный логин не нужен.
+      </div>
+
+      <h3 style="margin:24px 0 8px;font-size:16px;color:#1a1a2e;">Условия программы</h3>
+      <ul style="margin:0 0 16px;padding-left:20px;line-height:1.8;color:#4b5563;font-size:14px;">
+        <li>Комиссия <strong>${params.commissionRatePercent}%</strong> с каждого платежа Ваших клиентов</li>
+        <li>Recurring — Вы получаете комиссию пока клиент продолжает платить</li>
+        <li>Hold-период 30 дней (защита от возвратов)</li>
+        <li>Минимальная выплата $50, переводим раз в месяц 5-го числа на указанную Вами карту</li>
+        <li>Самостоятельная регистрация на свою же ссылку запрещена</li>
+      </ul>
+
+      <p style="margin:16px 0 0;line-height:1.6;font-size:13px;color:#6b7280;">
+        Перед первой выплатой подпишем партнёрское соглашение — отправлю отдельным письмом. Если есть вопросы — пишите на <a href="mailto:director.kbridge@gmail.com" style="color:#2563eb;">director.kbridge@gmail.com</a>.
+      </p>
+    </div>
+    <div style="padding:14px 28px;background:#f9fafb;color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb;">
+      Staffix · <a href="${appUrl}" style="color:#2563eb;">staffix.io</a> · K-Bridge Co., Ltd.
+    </div>
+  </div>
+</body></html>`,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    console.error("sendPartnerWelcomeEmail error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Send error" };
+  }
+}
+
+/**
+ * Email отказа партнёру с (опц.) причиной.
+ */
+export async function sendPartnerRejectionEmail(params: {
+  email: string;
+  name: string;
+  reason?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    if (!resend) {
+      console.log(`[DEV] Partner rejection email for ${params.email}`);
+      return { success: true };
+    }
+    const reasonHtml = params.reason
+      ? `<p style="margin:12px 0 0;color:#4b5563;line-height:1.6;font-size:14px;"><strong>Причина:</strong> ${params.reason
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")}</p>`
+      : "";
+
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: params.email,
+      subject: "Заявка на партнёрство Staffix",
+      html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f5f7;margin:0;padding:32px 20px;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:28px;">
+    <h1 style="margin:0 0 12px;font-size:20px;color:#1a1a2e;">Здравствуйте, ${params.name}!</h1>
+    <p style="margin:0;color:#4b5563;line-height:1.6;">Спасибо за интерес к партнёрской программе Staffix. К сожалению, в данный момент мы не готовы одобрить Вашу заявку.</p>
+    ${reasonHtml}
+    <p style="margin:16px 0 0;color:#4b5563;line-height:1.6;font-size:14px;">Это решение не финальное — Вы можете подать заявку позже. Если есть вопросы, пишите на <a href="mailto:director.kbridge@gmail.com" style="color:#2563eb;">director.kbridge@gmail.com</a>.</p>
+  </div>
+</body></html>`,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    console.error("sendPartnerRejectionEmail error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Send error" };
+  }
+}
+
 export async function sendSupportReplyToUserEmail(params: {
   email: string;
   name: string;

@@ -46,9 +46,16 @@ export async function GET(req: NextRequest) {
         company: partner.company,
         referralCode: partner.referralCode,
         commissionRate: partner.commissionRate,
+        minPayoutAmount: partner.minPayoutAmount,
         totalEarnings: partner.totalEarnings,
         totalPaid: partner.totalPaid,
         pendingPayout: partner.pendingPayout,
+        // Реквизиты для выплат — партнёр сам редактирует через PATCH /api/partners/payout-details
+        cardNumber: partner.cardNumber,
+        cardHolder: partner.cardHolder,
+        bankName: partner.bankName,
+        payoutNotes: partner.payoutNotes,
+        agreementSignedAt: partner.agreementSignedAt,
         createdAt: partner.createdAt,
       },
       stats: {

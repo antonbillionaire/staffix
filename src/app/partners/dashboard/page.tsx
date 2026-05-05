@@ -22,9 +22,15 @@ interface PartnerData {
     company: string | null;
     referralCode: string;
     commissionRate: number;
+    minPayoutAmount: number;
     totalEarnings: number;
     totalPaid: number;
     pendingPayout: number;
+    cardNumber: string | null;
+    cardHolder: string | null;
+    bankName: string | null;
+    payoutNotes: string | null;
+    agreementSignedAt: string | null;
     createdAt: string;
   };
   stats: {
@@ -309,20 +315,175 @@ export default function PartnerDashboardPage() {
           </div>
         </div>
 
-        {/* Payout request */}
-        <div className="mt-8 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl p-6 text-center">
-          <h3 className="font-semibold text-white mb-2">Запросить выплату</h3>
-          <p className="text-gray-400 text-sm mb-4">
-            Выплаты производятся вручную на карту / USDT / Kaspi. Минимальная сумма — $50.
+        {/* Payout details form */}
+        <PayoutDetailsForm
+          token={token!}
+          initial={{
+            cardNumber: partner.cardNumber || "",
+            cardHolder: partner.cardHolder || "",
+            bankName: partner.bankName || "",
+            payoutNotes: partner.payoutNotes || "",
+          }}
+          minPayoutAmount={partner.minPayoutAmount}
+          agreementSigned={!!partner.agreementSignedAt}
+          onSaved={loadDashboard}
+        />
+
+        {/* Program terms */}
+        <div className="mt-8 bg-[#12122a] border border-white/5 rounded-xl p-6">
+          <h3 className="font-semibold text-white mb-3">Условия программы</h3>
+          <ul className="space-y-2 text-sm text-gray-400">
+            <li>
+              • Комиссия <strong className="text-white">{Math.round(partner.commissionRate * 100)}%</strong> — recurring,
+              пока ваш реферал продолжает платить за подписку.
+            </li>
+            <li>
+              • Hold-период <strong className="text-white">30 дней</strong> на каждую начисленную комиссию (защита от
+              возвратов).
+            </li>
+            <li>
+              • Минимальная выплата <strong className="text-white">${partner.minPayoutAmount}</strong>. Меньшая сумма
+              переносится на следующий месяц.
+            </li>
+            <li>
+              • Выплаты раз в месяц <strong className="text-white">5-го числа</strong> на указанную вами карту.
+            </li>
+            <li>
+              • Cookie-окно атрибуции <strong className="text-white">60 дней</strong> с момента клика по реф. ссылке.
+            </li>
+            <li>• Самостоятельная регистрация на свою же ссылку запрещена.</li>
+            <li>
+              • Налоги в стране проживания — на вашей стороне (мы не выступаем налоговым агентом).
+            </li>
+          </ul>
+          <p className="mt-4 text-xs text-gray-500">
+            Вопросы по выплатам и программе:{" "}
+            <a href="mailto:director.kbridge@gmail.com" className="text-blue-400 hover:text-blue-300">
+              director.kbridge@gmail.com
+            </a>
           </p>
-          <a
-            href={`mailto:partners@staffix.io?subject=Запрос выплаты — ${partner.referralCode}&body=Привет! Прошу выплатить накопленную комиссию.\n\nПартнёрский код: ${partner.referralCode}\nEmail: ${partner.email}\nСумма к выплате: $${partner.pendingPayout.toFixed(2)}\n\nРеквизиты: `}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:opacity-90 transition-all"
-          >
-            Написать на partners@staffix.io
-          </a>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PayoutDetailsForm({
+  token,
+  initial,
+  minPayoutAmount,
+  agreementSigned,
+  onSaved,
+}: {
+  token: string;
+  initial: { cardNumber: string; cardHolder: string; bankName: string; payoutNotes: string };
+  minPayoutAmount: number;
+  agreementSigned: boolean;
+  onSaved: () => void;
+}) {
+  const [card, setCard] = useState(initial.cardNumber);
+  const [holder, setHolder] = useState(initial.cardHolder);
+  const [bank, setBank] = useState(initial.bankName);
+  const [notes, setNotes] = useState(initial.payoutNotes);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  const dirty =
+    card !== initial.cardNumber ||
+    holder !== initial.cardHolder ||
+    bank !== initial.bankName ||
+    notes !== initial.payoutNotes;
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/partners/payout-details", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          cardNumber: card,
+          cardHolder: holder,
+          bankName: bank,
+          payoutNotes: notes,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        alert(d.error || "Ошибка сохранения");
+        return;
+      }
+      setSavedAt(Date.now());
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mt-8 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl p-6">
+      <h3 className="font-semibold text-white mb-2">Реквизиты для выплат</h3>
+      <p className="text-gray-400 text-sm mb-4">
+        Указанные данные используются для перевода комиссии раз в месяц на вашу карту. Минимальная сумма — $
+        {minPayoutAmount}.
+      </p>
+
+      {!agreementSigned && (
+        <div className="mb-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-sm text-yellow-300">
+          ⚠️ Для первой выплаты понадобится подписать партнёрское соглашение. Мы свяжемся с вами по email когда
+          накопится сумма к выплате.
+        </div>
+      )}
+
+      <div className="grid md:grid-cols-2 gap-3">
+        <Input label="Номер карты" value={card} onChange={setCard} placeholder="1234 5678 9012 3456" />
+        <Input label="Имя на карте" value={holder} onChange={setHolder} placeholder="IVAN PETROV" />
+        <Input label="Банк" value={bank} onChange={setBank} placeholder="Каспи / Сбер / Тинькофф" />
+        <Input
+          label="Дополнительно"
+          value={notes}
+          onChange={setNotes}
+          placeholder="Например: только до 18:00 МСК"
+        />
+      </div>
+
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          onClick={save}
+          disabled={!dirty || saving}
+          className="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          {saving ? "Сохраняем…" : "Сохранить реквизиты"}
+        </button>
+        {savedAt && !dirty && (
+          <span className="text-xs text-green-400">✓ Сохранено</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Input({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-xs text-gray-400 mb-1">{label}</label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-blue-500"
+      />
     </div>
   );
 }

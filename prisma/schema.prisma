@@ -1769,10 +1769,25 @@ model Partner {
   approvedAt DateTime?
 
   // Финансы
-  commissionRate Float @default(0.20) // 20%
-  totalEarnings  Float @default(0) // суммарно заработано
-  totalPaid      Float @default(0) // суммарно выплачено
-  pendingPayout  Float @default(0) // ожидает выплаты
+  commissionRate  Float @default(0.20) // 20%
+  totalEarnings   Float @default(0) // суммарно заработано
+  totalPaid       Float @default(0) // суммарно выплачено
+  pendingPayout   Float @default(0) // ожидает выплаты
+  minPayoutAmount Float @default(50) // минимальная сумма для выплаты ($)
+
+  // Реквизиты для выплат (банковский перевод на карту партнёра).
+  // Заполняет либо партнёр сам в кабинете, либо админ при ручном создании.
+  cardNumber  String? // полный номер или последние 4 — на усмотрение
+  cardHolder  String? // имя на карте если отличается от name
+  bankName    String? // Сбер / Каспи / Тинькофф / Райффайзен / etc.
+  payoutNotes String? // заметки от партнёра ("перевод только Каспи Gold", "до 14:00 МСК")
+
+  // Внутренние заметки админа — партнёр их не видит.
+  adminNotes String? @db.Text
+
+  // Когда подписано партнёрское соглашение (для бухгалтерии и compliance).
+  // null = не подписано, нельзя выплачивать.
+  agreementSignedAt DateTime?
 
   referrals PartnerReferral[]
   earnings  PartnerEarning[]
