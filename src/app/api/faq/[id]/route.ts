@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
 import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
+import { getCurrentBusinessId } from "@/lib/auth-helpers";
 
 // PUT - Update FAQ
 export async function PUT(
@@ -9,8 +9,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
+    const businessId = await getCurrentBusinessId();
+    if (!businessId) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
     }
 
@@ -24,20 +24,11 @@ export async function PUT(
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: true },
-    });
-
-    if (!user || user.businesses.length === 0) {
-      return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
-    }
-
     // Verify FAQ belongs to user's business
     const existingFaq = await prisma.fAQ.findFirst({
       where: {
         id,
-        businessId: user.businesses[0].id,
+        businessId,
       },
     });
 
@@ -50,7 +41,7 @@ export async function PUT(
       data: { question, answer },
     });
 
-    await markBusinessConversationsForRefresh(user.businesses[0].id);
+    await markBusinessConversationsForRefresh(businessId);
 
     return NextResponse.json({ faq });
   } catch (error) {
@@ -65,27 +56,18 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
+    const businessId = await getCurrentBusinessId();
+    if (!businessId) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
     }
 
     const { id } = await params;
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: true },
-    });
-
-    if (!user || user.businesses.length === 0) {
-      return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
-    }
-
     // Verify FAQ belongs to user's business
     const existingFaq = await prisma.fAQ.findFirst({
       where: {
         id,
-        businessId: user.businesses[0].id,
+        businessId,
       },
     });
 
@@ -97,7 +79,7 @@ export async function DELETE(
       where: { id },
     });
 
-    await markBusinessConversationsForRefresh(user.businesses[0].id);
+    await markBusinessConversationsForRefresh(businessId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

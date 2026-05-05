@@ -1,26 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
+import { getCurrentBusinessId } from "@/lib/auth-helpers";
 
 // PATCH /api/products/bulk-stock — update stock for multiple products at once
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
+    const businessId = await getCurrentBusinessId();
+    if (!businessId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: { select: { id: true } } },
-    });
-
-    if (!user?.businesses[0]) {
-      return NextResponse.json({ error: "Business not found" }, { status: 404 });
-    }
-
-    const businessId = user.businesses[0].id;
     const body = await request.json();
     const { updates } = body;
 

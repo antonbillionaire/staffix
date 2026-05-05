@@ -1,26 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
 import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
-
-async function getCurrentBusinessId(email: string): Promise<string | null> {
-  const user = await prisma.user.findUnique({
-    where: { email },
-    include: { businesses: { select: { id: true } } },
-  });
-  return user?.businesses[0]?.id ?? null;
-}
+import { getCurrentBusinessId } from "@/lib/auth-helpers";
 
 // GET - List insights for user's business + counts by status
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
-    }
-
-    const businessId = await getCurrentBusinessId(session.user.email);
+    const businessId = await getCurrentBusinessId();
     if (!businessId) {
+      // Сохраняем старое поведение: нет бизнеса/сессии → 200 с пустым списком
       return NextResponse.json({ insights: [], counts: { new: 0, accepted: 0, dismissed: 0 } });
     }
 
@@ -74,14 +62,9 @@ export async function GET(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
-    }
-
-    const businessId = await getCurrentBusinessId(session.user.email);
+    const businessId = await getCurrentBusinessId();
     if (!businessId) {
-      return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
+      return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
     }
 
     const { id, status, question, answer } = (await request.json()) as {

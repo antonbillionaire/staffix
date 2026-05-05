@@ -11,23 +11,14 @@
  */
 
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getCurrentBusinessId } from "@/lib/auth-helpers";
 
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: { select: { id: true } } },
-    });
-    const businessId = user?.businesses[0]?.id;
+    const businessId = await getCurrentBusinessId();
     if (!businessId) {
-      return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
+      return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
     }
 
     const [total, enriched] = await Promise.all([

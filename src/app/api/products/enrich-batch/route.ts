@@ -13,26 +13,16 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { enrichProduct } from "@/lib/catalog-enricher";
 import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
+import { getCurrentBusiness } from "@/lib/auth-helpers";
 
 export const maxDuration = 60;
 
-async function getUserBusiness(): Promise<{ id: string; language: string | null } | null> {
-  const session = await auth();
-  if (!session?.user?.email) return null;
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-    include: { businesses: { select: { id: true, language: true } } },
-  });
-  return user?.businesses[0] || null;
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const business = await getUserBusiness();
+    const business = await getCurrentBusiness();
     if (!business) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
     }

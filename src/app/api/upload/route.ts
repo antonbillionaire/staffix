@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { getCurrentBusinessId } from "@/lib/auth-helpers";
 
 // Max file size: 10 MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -86,23 +86,10 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 export async function POST(request: NextRequest) {
   try {
-    // Get session
-    const session = await auth();
-    if (!session?.user?.email) {
+    const businessId = await getCurrentBusinessId();
+    if (!businessId) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
     }
-
-    // Get user and business
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: true },
-    });
-
-    if (!user || user.businesses.length === 0) {
-      return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
-    }
-
-    const businessId = user.businesses[0].id;
 
     // Parse FormData
     const formData = await request.formData();
@@ -305,22 +292,13 @@ export async function POST(request: NextRequest) {
 // Get all documents for the business
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
+    const businessId = await getCurrentBusinessId();
+    if (!businessId) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: true },
-    });
-
-    if (!user || user.businesses.length === 0) {
-      return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
-    }
-
     const documents = await prisma.document.findMany({
-      where: { businessId: user.businesses[0].id },
+      where: { businessId },
       select: {
         id: true,
         name: true,
@@ -346,8 +324,8 @@ export async function GET() {
 // Delete a document
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
+    const businessId = await getCurrentBusinessId();
+    if (!businessId) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
     }
 
@@ -358,20 +336,11 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "ID документа не указан" }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: true },
-    });
-
-    if (!user || user.businesses.length === 0) {
-      return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
-    }
-
     // Verify document belongs to user's business
     const document = await prisma.document.findFirst({
       where: {
         id: documentId,
-        businessId: user.businesses[0].id,
+        businessId,
       },
     });
 

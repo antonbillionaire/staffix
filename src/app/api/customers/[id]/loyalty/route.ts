@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getCurrentBusinessId } from "@/lib/auth-helpers";
 
 // PATCH /api/customers/[id]/loyalty — update client loyalty data
 export async function PATCH(
@@ -8,21 +8,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
+    const businessId = await getCurrentBusinessId();
+    if (!businessId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: { select: { id: true } } },
-    });
-
-    if (!user?.businesses[0]) {
-      return NextResponse.json({ error: "Business not found" }, { status: 404 });
-    }
-
-    const businessId = user.businesses[0].id;
     const { id: clientId } = await params;
 
     // Verify client belongs to this business

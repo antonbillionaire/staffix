@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
 import { getCurrentBusinessId } from "@/lib/auth-helpers";
 
 // GET - List corrections for user's business (paginated)
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
-    }
-
     const businessId = await getCurrentBusinessId();
     if (!businessId) {
-      // Сохраняем старое поведение: нет бизнеса → 200 с пустым списком (не 404)
+      // Сохраняем старое поведение: нет бизнеса/сессии → 200 с пустым списком
       return NextResponse.json({ corrections: [], total: 0 });
     }
     const { searchParams } = new URL(request.url);
@@ -41,18 +35,9 @@ export async function GET(request: NextRequest) {
 // POST - Create new correction
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
+    const businessId = await getCurrentBusinessId();
+    if (!businessId) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: true },
-    });
-
-    if (!user || user.businesses.length === 0) {
-      return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
     }
 
     const { originalQuestion, wrongAnswer, correctAnswer, scope } = await request.json();
@@ -78,7 +63,7 @@ export async function POST(request: NextRequest) {
         correctAnswer,
         scope: scope || "global",
         keywords,
-        businessId: user.businesses[0].id,
+        businessId,
       },
     });
 
@@ -92,18 +77,9 @@ export async function POST(request: NextRequest) {
 // PATCH - Update correction
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
+    const businessId = await getCurrentBusinessId();
+    if (!businessId) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: true },
-    });
-
-    if (!user || user.businesses.length === 0) {
-      return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
     }
 
     const { id, correctAnswer, isActive } = await request.json();
@@ -114,7 +90,7 @@ export async function PATCH(request: NextRequest) {
 
     // Verify correction belongs to user's business
     const existing = await prisma.botCorrection.findFirst({
-      where: { id, businessId: user.businesses[0].id },
+      where: { id, businessId },
     });
 
     if (!existing) {
@@ -140,18 +116,9 @@ export async function PATCH(request: NextRequest) {
 // DELETE - Delete correction
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.email) {
+    const businessId = await getCurrentBusinessId();
+    if (!businessId) {
       return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { businesses: true },
-    });
-
-    if (!user || user.businesses.length === 0) {
-      return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
     }
 
     const { id } = await request.json();
@@ -162,7 +129,7 @@ export async function DELETE(request: NextRequest) {
 
     // Verify correction belongs to user's business
     const existing = await prisma.botCorrection.findFirst({
-      where: { id, businessId: user.businesses[0].id },
+      where: { id, businessId },
     });
 
     if (!existing) {
