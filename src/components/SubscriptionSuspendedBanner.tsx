@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { AlertTriangle, CreditCard } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 /**
  * Красный баннер для подписок в статусе "suspended" — это значит PayPro не смог
@@ -14,6 +15,7 @@ import { useTheme } from "@/contexts/ThemeContext";
  */
 export default function SubscriptionSuspendedBanner() {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isDark = theme === "dark";
 
   return (
@@ -35,11 +37,10 @@ export default function SubscriptionSuspendedBanner() {
           </div>
           <div>
             <h3 className={`font-semibold mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
-              Подписка приостановлена
+              {t("suspendedBanner.title")}
             </h3>
             <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-              Не удалось списать оплату с вашей карты. Чтобы продолжить пользоваться Staffix,
-              обновите способ оплаты в личном кабинете PayPro.
+              {t("suspendedBanner.description")}
             </p>
           </div>
         </div>
@@ -50,7 +51,7 @@ export default function SubscriptionSuspendedBanner() {
             className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-colors text-sm"
           >
             <CreditCard className="h-4 w-4" />
-            Обновить карту
+            {t("suspendedBanner.button")}
           </Link>
         </div>
       </div>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, X, CreditCard, Sparkles } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { PLANS } from "@/lib/plans";
 
 interface TrialExpiredBannerProps {
@@ -12,6 +13,7 @@ interface TrialExpiredBannerProps {
 
 export default function TrialExpiredBanner({ daysOverdue = 0 }: TrialExpiredBannerProps) {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const isDark = theme === "dark";
   const [dismissed, setDismissed] = useState(false);
 
@@ -49,11 +51,11 @@ export default function TrialExpiredBanner({ daysOverdue = 0 }: TrialExpiredBann
           </div>
           <div>
             <h3 className={`font-semibold mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
-              Пробный период закончился
+              {t("trialBanner.title")}
             </h3>
             <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-              Чтобы продолжить использовать AI-сотрудника и автоматизации, выберите тарифный план.
-              {daysOverdue > 0 && ` Прошло ${daysOverdue} дней после окончания триала.`}
+              {t("trialBanner.description")}
+              {daysOverdue > 0 && ` ${t("trialBanner.daysOverdue", { days: daysOverdue })}`}
             </p>
           </div>
         </div>
@@ -65,7 +67,7 @@ export default function TrialExpiredBanner({ daysOverdue = 0 }: TrialExpiredBann
             className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-xl hover:opacity-90 transition-all text-sm"
           >
             <CreditCard className="h-4 w-4" />
-            Pro ${proPlan.monthlyPrice}/мес
+            {t("trialBanner.proButton", { price: proPlan.monthlyPrice })}
           </Link>
           <Link
             href="/pricing"
@@ -76,7 +78,7 @@ export default function TrialExpiredBanner({ daysOverdue = 0 }: TrialExpiredBann
             }`}
           >
             <Sparkles className="h-4 w-4 text-yellow-500" />
-            Год за ${proPlan.yearlyPrice} (-20%)
+            {t("trialBanner.yearlyButton", { price: proPlan.yearlyPrice })}
           </Link>
         </div>
       </div>

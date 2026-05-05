@@ -1849,6 +1849,18 @@ export const translations: Record<Language, Record<string, string>> = {
     "aiLearning.dismiss": "Отклонить",
     "aiLearning.clientProfilesInfo": "Профили клиентов создаются автоматически",
     "aiLearning.clientProfilesDesc": "Профили клиентов формируются автоматически из переписок. Просмотрите детали клиентов в разделе Клиенты.",
+
+    // Trial expired banner
+    "trialBanner.title": "Пробный период закончился",
+    "trialBanner.description": "Чтобы продолжить использовать AI-сотрудника и автоматизации, выберите тарифный план.",
+    "trialBanner.daysOverdue": "Прошло {days} дней после окончания триала.",
+    "trialBanner.proButton": "Pro ${price}/мес",
+    "trialBanner.yearlyButton": "Год за ${price} (-20%)",
+
+    // Subscription suspended banner
+    "suspendedBanner.title": "Подписка приостановлена",
+    "suspendedBanner.description": "Не удалось списать оплату с вашей карты. Чтобы продолжить пользоваться Staffix, обновите способ оплаты в личном кабинете PayPro.",
+    "suspendedBanner.button": "Обновить карту",
   },
 
   en: {
@@ -3688,6 +3700,18 @@ export const translations: Record<Language, Record<string, string>> = {
     "aiLearning.dismiss": "Dismiss",
     "aiLearning.clientProfilesInfo": "Client profiles are built automatically",
     "aiLearning.clientProfilesDesc": "Client profiles are built automatically from conversations. View client details in the Customers section.",
+
+    // Trial expired banner
+    "trialBanner.title": "Trial period has ended",
+    "trialBanner.description": "To keep using your AI employee and automations, choose a paid plan.",
+    "trialBanner.daysOverdue": "{days} days have passed since your trial ended.",
+    "trialBanner.proButton": "Pro ${price}/mo",
+    "trialBanner.yearlyButton": "Yearly ${price} (-20%)",
+
+    // Subscription suspended banner
+    "suspendedBanner.title": "Subscription suspended",
+    "suspendedBanner.description": "We couldn't charge your card. To keep using Staffix, please update your payment method in the PayPro customer portal.",
+    "suspendedBanner.button": "Update card",
   },
 
   uz: {
@@ -5525,6 +5549,18 @@ export const translations: Record<Language, Record<string, string>> = {
     "aiLearning.dismiss": "Rad etish",
     "aiLearning.clientProfilesInfo": "Mijozlar profili avtomatik yaratiladi",
     "aiLearning.clientProfilesDesc": "Mijozlar profili yozishmalardan avtomatik shakllanadi. Mijozlar tafsilotlarini Mijozlar bo'limida ko'ring.",
+
+    // Trial expired banner
+    "trialBanner.title": "Sinov muddati tugadi",
+    "trialBanner.description": "AI-xodim va avtomatizatsiyalardan foydalanishni davom ettirish uchun tarif rejasini tanlang.",
+    "trialBanner.daysOverdue": "Sinov muddati tugaganidan beri {days} kun o'tdi.",
+    "trialBanner.proButton": "Pro ${price}/oy",
+    "trialBanner.yearlyButton": "Yillik ${price} (-20%)",
+
+    // Subscription suspended banner
+    "suspendedBanner.title": "Obuna to'xtatilgan",
+    "suspendedBanner.description": "Kartangizdan to'lov olish imkoni bo'lmadi. Staffix-dan foydalanishni davom ettirish uchun PayPro shaxsiy kabinetida to'lov usulini yangilang.",
+    "suspendedBanner.button": "Kartani yangilash",
   },
 
   kz: {
@@ -7362,5 +7398,17 @@ export const translations: Record<Language, Record<string, string>> = {
     "aiLearning.dismiss": "Қабылдамау",
     "aiLearning.clientProfilesInfo": "Клиент профильдері автоматты құрылады",
     "aiLearning.clientProfilesDesc": "Клиент профильдері жазысулардан автоматты қалыптасады. Клиент мәліметтерін Клиенттер бөлімінде қараңыз.",
+
+    // Trial expired banner
+    "trialBanner.title": "Сынақ мерзімі аяқталды",
+    "trialBanner.description": "AI-қызметкерді және автоматтандыруды пайдалануды жалғастыру үшін тариф жоспарын таңдаңыз.",
+    "trialBanner.daysOverdue": "Сынақ мерзімі аяқталғаннан бері {days} күн өтті.",
+    "trialBanner.proButton": "Pro ${price}/ай",
+    "trialBanner.yearlyButton": "Жылдық ${price} (-20%)",
+
+    // Subscription suspended banner
+    "suspendedBanner.title": "Жазылым тоқтатылды",
+    "suspendedBanner.description": "Картаңыздан төлем алу мүмкін болмады. Staffix-ті пайдалануды жалғастыру үшін PayPro жеке кабинетінде төлем әдісін жаңартыңыз.",
+    "suspendedBanner.button": "Картаны жаңарту",
   },
 };
