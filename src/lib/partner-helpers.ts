@@ -75,3 +75,38 @@ export function generateAccessToken(): string {
 export function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, "");
 }
+
+/**
+ * Нормализация email для проверки self-referral.
+ *
+ * Цель — поймать партнёра, который пытается зарегаться под своей же ссылкой
+ * через alias gmail (anton+sub@gmail.com == anton@gmail.com), удалив:
+ *  - домен-алиасы (googlemail.com → gmail.com)
+ *  - +tag после localpart (anton+anything → anton)
+ *  - точки в localpart для @gmail (an.ton → anton, gmail их игнорирует)
+ *
+ * Для не-gmail доменов трогаем только +tag (большинство провайдеров его поддерживают).
+ *
+ * Не панацея — серьёзный абуз обходится через купленный домен. Но 95% «зашёл
+ * под собой ради 20% себе» отрезает.
+ */
+export function normalizeEmail(email: string): string {
+  const trimmed = email.toLowerCase().trim();
+  const at = trimmed.lastIndexOf("@");
+  if (at < 0) return trimmed;
+
+  let local = trimmed.slice(0, at);
+  let domain = trimmed.slice(at + 1);
+
+  // googlemail.com → gmail.com
+  if (domain === "googlemail.com") domain = "gmail.com";
+
+  // +tag — режем
+  const plusIdx = local.indexOf("+");
+  if (plusIdx >= 0) local = local.slice(0, plusIdx);
+
+  // dots в @gmail localpart
+  if (domain === "gmail.com") local = local.replace(/\./g, "");
+
+  return `${local}@${domain}`;
+}

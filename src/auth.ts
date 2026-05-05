@@ -1,9 +1,12 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { notifyNewRegistration } from "@/lib/admin-notify";
+import { sendPartnerNewReferralEmail } from "@/lib/email";
+import { normalizeEmail } from "@/lib/partner-helpers";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   // Session: JWT with 14-day persistence (survives browser close)
@@ -101,14 +104,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
 
           if (!existingUser) {
+            // Партнёрская атрибуция: читаем cookie ДО создания user, чтобы знать
+            // привязывать ли реферала. Cookie установлен middleware при ?ref=CODE.
+            const cookieStore = await cookies();
+            const referralCode = cookieStore.get("staffix_ref")?.value || null;
+
             // Create new user with empty business (onboarding not completed)
             // Google users are automatically email verified
-            await prisma.user.create({
+            const newUser = await prisma.user.create({
               data: {
                 email: user.email!,
                 name: user.name || "User",
                 password: "", // Empty password for OAuth users
                 emailVerified: true, // Google already verified email
+                referredByCode: referralCode,
                 businesses: {
                   create: {
                     name: "Мой бизнес", // Temporary name, will be updated in onboarding
@@ -127,6 +136,41 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
             // Notify admin about new Google registration
             notifyNewRegistration(user.name || "User", user.email!, "Google OAuth (онбординг не завершён)").catch(() => {});
+
+            // Партнёрский referral — non-blocking, повторяет логику /api/auth/register.
+            // Self-referral блок по email + только approved партнёры засчитывают.
+            if (referralCode) {
+              prisma.partner.findUnique({
+                where: { referralCode },
+                select: { id: true, status: true, email: true, name: true, accessToken: true },
+              }).then(async (partner) => {
+                if (!partner) return;
+                if (partner.status !== "approved") return;
+                if (normalizeEmail(partner.email) === normalizeEmail(user.email!)) {
+                  console.warn(`[partner-referral] BLOCKED self-referral by email (Google OAuth, partner ${partner.id})`);
+                  return;
+                }
+
+                const referral = await prisma.partnerReferral.create({
+                  data: {
+                    userId: newUser.id,
+                    userEmail: user.email!,
+                    referralCode,
+                    partnerId: partner.id,
+                  },
+                });
+
+                if (partner.accessToken) {
+                  sendPartnerNewReferralEmail({
+                    email: partner.email,
+                    name: partner.name,
+                    accessToken: partner.accessToken,
+                    referralEmail: user.email!,
+                    signedUpAt: referral.signedUpAt,
+                  }).catch((e) => console.error("[partner-referral] new-referral email failed:", e));
+                }
+              }).catch(console.error);
+            }
           }
           return true;
         } catch (error) {

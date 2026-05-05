@@ -4,6 +4,7 @@ import { sendVerificationEmail, sendPartnerNewReferralEmail } from "@/lib/email"
 import { notifyNewRegistration } from "@/lib/admin-notify";
 import bcrypt from "bcryptjs";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { normalizeEmail } from "@/lib/partner-helpers";
 
 // Generate 6-digit verification code
 function generateVerificationCode(): string {
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
         // Только approved партнёры засчитывают рефералов
         if (partner.status !== "approved") return;
 
-        if (partner.email.toLowerCase() === email.toLowerCase()) {
+        if (normalizeEmail(partner.email) === normalizeEmail(email)) {
           console.warn(`[partner-referral] BLOCKED self-referral by email (partner ${partner.id})`);
           return;
         }

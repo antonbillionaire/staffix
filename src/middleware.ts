@@ -75,9 +75,10 @@ export function middleware(request: NextRequest) {
   // Referral tracking: set cookie when ?ref=CODE is in URL
   const refCode = request.nextUrl.searchParams.get("ref");
   if (refCode && /^[a-zA-Z0-9_-]{3,32}$/.test(refCode)) {
-    // 60-day cookie for referral attribution
+    // 60-day cookie for referral attribution (декларировано в условиях программы
+    // и в кабинете партнёра — должно совпадать).
     response.cookies.set("staffix_ref", refCode, {
-      maxAge: 30 * 24 * 60 * 60, // 30 days
+      maxAge: 60 * 24 * 60 * 60, // 60 days
       httpOnly: true,
       sameSite: "lax",
       path: "/",

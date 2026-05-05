@@ -151,26 +151,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Все available earnings без привязки к payout
-    const earnings = await prisma.partnerEarning.findMany({
-      where: { partnerId, status: "available", payoutId: null },
-      select: { id: true, commissionAmount: true },
-    });
-    if (earnings.length === 0) {
-      return NextResponse.json(
-        { error: "Нет earnings готовых к выплате" },
-        { status: 400 }
-      );
-    }
-
-    const amount = earnings.reduce((s, e) => s + e.commissionAmount, 0);
-
-    // Транзакция: создаём payout, обновляем earnings, обновляем partner агрегаты
+    // Race-free «забронировать earnings»: создаём PartnerPayout с amount=0,
+    // потом updateMany WHERE status=available AND payoutId=null (атомарно
+    // привязывает только те earnings которые ещё свободны), потом считаем
+    // реальную сумму уже привязанных и проставляем её.
+    //
+    // Если два админа одновременно нажмут «Отметить выплачено» — оба создадут
+    // payout, но второй получит 0 earnings (все уже привязаны к первому payout)
+    // и упадёт с понятной ошибкой. Без этого было: оба читали те же earnings,
+    // partner.totalPaid инкрементился дважды, pendingPayout уходил в минус.
     const payout = await prisma.$transaction(async (tx) => {
       const created = await tx.partnerPayout.create({
         data: {
           partnerId,
-          amount,
+          amount: 0, // обновим ниже после привязки earnings
           periodLabel: periodLabel || formatPeriodNow(),
           paymentMethod: "card",
           reference,
@@ -183,9 +177,25 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      await tx.partnerEarning.updateMany({
-        where: { id: { in: earnings.map((e) => e.id) } },
+      const claimed = await tx.partnerEarning.updateMany({
+        where: { partnerId, status: "available", payoutId: null },
         data: { status: "paid", paidAt: new Date(), payoutId: created.id },
+      });
+
+      if (claimed.count === 0) {
+        // Ничего не привязалось — другой админ уже забрал, или ничего не было
+        throw new Error("NO_EARNINGS_AVAILABLE");
+      }
+
+      const linked = await tx.partnerEarning.findMany({
+        where: { payoutId: created.id },
+        select: { commissionAmount: true },
+      });
+      const amount = linked.reduce((s, e) => s + e.commissionAmount, 0);
+
+      await tx.partnerPayout.update({
+        where: { id: created.id },
+        data: { amount },
       });
 
       await tx.partner.update({
@@ -196,8 +206,21 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      return created;
+      return { ...created, amount, earningsCount: claimed.count };
+    }).catch((e) => {
+      if (e instanceof Error && e.message === "NO_EARNINGS_AVAILABLE") return null;
+      throw e;
     });
+
+    if (!payout) {
+      return NextResponse.json(
+        { error: "Нет earnings готовых к выплате" },
+        { status: 400 }
+      );
+    }
+
+    const amount = payout.amount;
+    const earningsCount = payout.earningsCount;
 
     // Email — после успешной транзакции, не валим если упал
     if (sendEmail && partner.accessToken) {
@@ -218,7 +241,7 @@ export async function POST(request: NextRequest) {
       payout: {
         id: payout.id,
         amount: payout.amount,
-        earningsCount: earnings.length,
+        earningsCount,
       },
     });
   } catch (error) {

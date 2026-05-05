@@ -53,6 +53,25 @@ export async function recordPartnerEarning(params: RecordEarningParams) {
       return null;
     }
 
+    // Idempotency: PayPro может прислать дубль webhook (retry, разные ipnTypeId
+    // по одному order — например ORDER_CHARGED с $0 для trial signup плюс
+    // TRIAL_CHARGE с реальной суммой). Если по этому orderId уже есть НЕотменённый
+    // earning — возвращаем его, не дублируем.
+    if (params.payproOrderId) {
+      const existing = await prisma.partnerEarning.findFirst({
+        where: {
+          payproOrderId: params.payproOrderId,
+          status: { not: "cancelled" },
+        },
+      });
+      if (existing) {
+        console.log(
+          `[partner-commission] earning ${existing.id} already exists for order ${params.payproOrderId} — skip duplicate`
+        );
+        return existing;
+      }
+    }
+
     const commission = Math.round(params.paymentAmount * referral.partner.commissionRate * 100) / 100;
     if (commission <= 0) return null;
 
