@@ -1247,7 +1247,7 @@ export async function sendPartnerPayoutSentEmail(params: {
   amount: number;
   reference: string | null;
   paidAt: Date;
-  recipientCardNumber: string | null;
+  recipientCardLast4: string | null;
   bankName: string | null;
 }): Promise<{ success: boolean; error?: string }> {
   try {
@@ -1266,12 +1266,8 @@ export async function sendPartnerPayoutSentEmail(params: {
       year: "numeric",
     });
 
-    // Маскируем номер карты до последних 4 цифр
-    const maskedCard = params.recipientCardNumber
-      ? params.recipientCardNumber.length > 4
-        ? `**** ${params.recipientCardNumber.slice(-4)}`
-        : params.recipientCardNumber
-      : null;
+    // last4 уже хранится в БД, добавляем префикс маски
+    const maskedCard = params.recipientCardLast4 ? `**** ${params.recipientCardLast4}` : null;
 
     const { error } = await resend.emails.send({
       from: FROM_EMAIL,
@@ -1454,6 +1450,70 @@ export async function sendPartnerReferralConvertedEmail(params: {
     return { success: true };
   } catch (error) {
     console.error("sendPartnerReferralConvertedEmail error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Send error" };
+  }
+}
+
+/**
+ * Уведомление партнёру что accessToken был пересоздан админом.
+ * Шлётся когда: партнёр потерял ссылку, или админ ротирует токен из-за подозрений
+ * на утечку. Старая ссылка перестаёт работать.
+ */
+export async function sendPartnerAccessRotatedEmail(params: {
+  email: string;
+  name: string;
+  accessToken: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const resend = getResend();
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io";
+    const dashboardUrl = `${appUrl}/partners/dashboard?token=${params.accessToken}`;
+
+    if (!resend) {
+      console.log(`[DEV] Partner access-rotated email for ${params.email}`);
+      return { success: true };
+    }
+
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: params.email,
+      subject: `Доступ к кабинету Staffix обновлён`,
+      html: `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f5f7;margin:0;padding:32px 20px;color:#1a1a2e;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;">
+    <div style="padding:24px 28px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;">
+      <div style="font-size:13px;opacity:0.85;margin-bottom:4px;">🔑 Обновление доступа</div>
+      <h1 style="margin:0;font-size:22px;">Новая ссылка на кабинет</h1>
+    </div>
+    <div style="padding:24px 28px;color:#1a1a2e;">
+      <p style="margin:0 0 16px;line-height:1.6;">Здравствуйте, ${params.name}!</p>
+      <p style="margin:0 0 16px;line-height:1.6;">
+        Доступ к Вашему партнёрскому кабинету был обновлён. Старая ссылка больше не работает —
+        используйте новую:
+      </p>
+      <div style="margin:20px 0;text-align:center;">
+        <a href="${dashboardUrl}" style="display:inline-block;padding:14px 28px;background:#1d4ed8;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px;">Открыть кабинет</a>
+      </div>
+      <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:14px 16px;margin-bottom:16px;">
+        <div style="font-size:13px;color:#854d0e;line-height:1.5;">
+          <strong>Сохраните это письмо.</strong> Ссылка содержит уникальный токен — храните как пароль и не пересылайте никому.
+        </div>
+      </div>
+      <p style="margin:0;line-height:1.6;font-size:13px;color:#6b7280;">
+        Если ротацию делали не Вы — напишите на <a href="mailto:director.kbridge@gmail.com" style="color:#2563eb;">director.kbridge@gmail.com</a>.
+      </p>
+    </div>
+    <div style="padding:14px 28px;background:#f9fafb;color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb;">
+      Staffix · <a href="${appUrl}" style="color:#2563eb;">staffix.io</a> · K-Bridge Co., Ltd.
+    </div>
+  </div>
+</body></html>`,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (error) {
+    console.error("sendPartnerAccessRotatedEmail error:", error);
     return { success: false, error: error instanceof Error ? error.message : "Send error" };
   }
 }

@@ -79,10 +79,10 @@ export async function GET(request: NextRequest) {
         website: p.website,
         referralCode: p.referralCode,
         status: p.status,
-        commissionRate: p.commissionRate,
-        totalEarnings: p.totalEarnings,
-        totalPaid: p.totalPaid,
-        pendingPayout: p.pendingPayout,
+        commissionRate: p.commissionRate.toNumber(),
+        totalEarnings: p.totalEarnings.toNumber(),
+        totalPaid: p.totalPaid.toNumber(),
+        pendingPayout: p.pendingPayout.toNumber(),
         agreementSignedAt: p.agreementSignedAt,
         approvedAt: p.approvedAt,
         createdAt: p.createdAt,
@@ -94,9 +94,9 @@ export async function GET(request: NextRequest) {
         return acc;
       }, {}),
       totals: {
-        totalEarnings: totalEarnings._sum.totalEarnings || 0,
-        totalPaid: totalEarnings._sum.totalPaid || 0,
-        pendingPayout: totalEarnings._sum.pendingPayout || 0,
+        totalEarnings: totalEarnings._sum.totalEarnings?.toNumber() ?? 0,
+        totalPaid: totalEarnings._sum.totalPaid?.toNumber() ?? 0,
+        pendingPayout: totalEarnings._sum.pendingPayout?.toNumber() ?? 0,
       },
     });
   } catch (error) {

@@ -28,7 +28,7 @@ interface ReadyPartner {
   referralCode: string | null;
   minPayoutAmount: number;
   agreementSignedAt: string | null;
-  cardNumber: string | null;
+  cardLast4: string | null;
   cardHolder: string | null;
   bankName: string | null;
   payoutNotes: string | null;
@@ -47,7 +47,7 @@ interface PayoutHistory {
   paidAt: string;
   paidByEmail: string | null;
   notes: string | null;
-  recipientCardNumber: string | null;
+  recipientCardLast4: string | null;
   partner: { id: string; name: string; email: string; referralCode: string | null };
 }
 
@@ -105,7 +105,7 @@ export default function AdminPayoutsPage() {
       "Email",
       "Реф. код",
       "Сумма USD",
-      "Карта",
+      "Карта (last4)",
       "Имя на карте",
       "Банк",
       "Заметки",
@@ -116,7 +116,7 @@ export default function AdminPayoutsPage() {
         p.email,
         p.referralCode || "",
         p.availableAmount.toFixed(2),
-        p.cardNumber || "",
+        p.cardLast4 ? `**** ${p.cardLast4}` : "",
         p.cardHolder || "",
         p.bankName || "",
         p.payoutNotes || "",
@@ -320,7 +320,7 @@ function ReadyPartnerCard({
 }) {
   const blockers: string[] = [];
   if (!partner.agreementSignedAt) blockers.push("соглашение не подписано");
-  if (!partner.cardNumber) blockers.push("нет реквизитов карты");
+  if (!partner.cardLast4) blockers.push("нет реквизитов карты");
   if (!partner.meetsThreshold) blockers.push(`сумма ниже порога $${partner.minPayoutAmount}`);
 
   const canPay = blockers.length === 0;
@@ -353,8 +353,8 @@ function ReadyPartnerCard({
       {/* Реквизиты с copy-кнопками */}
       <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
         <CopyField
-          label="Карта"
-          value={partner.cardNumber}
+          label="Карта (last 4)"
+          value={partner.cardLast4 ? `**** ${partner.cardLast4}` : null}
           onCopy={(v) => onCopy(v, `${partner.id}-card`)}
           copied={copiedField === `${partner.id}-card`}
         />

@@ -29,7 +29,7 @@ interface PartnerData {
     totalEarnings: number;
     totalPaid: number;
     pendingPayout: number;
-    cardNumber: string | null;
+    cardLast4: string | null;
     cardHolder: string | null;
     bankName: string | null;
     payoutNotes: string | null;
@@ -45,7 +45,7 @@ interface PartnerData {
   };
   referrals: Array<{
     id: string;
-    userEmail: string;
+    userEmail: string; // server-side замаскирован: iva***@mail.ru
     signedUpAt: string;
     converted: boolean;
     convertedAt: string | null;
@@ -60,6 +60,8 @@ interface PartnerData {
     availableAt: string | null;
     paidAt: string | null;
     createdAt: string;
+    cancelledReason: string | null;
+    referralEmail: string | null; // привязка earning ↔ реферал (masked)
   }>;
   payouts: Array<{
     id: string;
@@ -67,7 +69,7 @@ interface PartnerData {
     periodLabel: string | null;
     reference: string | null;
     paidAt: string;
-    recipientCardNumber: string | null;
+    recipientCardLast4: string | null;
     recipientBankName: string | null;
   }>;
   assets: Array<{
@@ -305,9 +307,8 @@ export default function PartnerDashboardPage() {
                 {referrals.slice(0, 10).map((r) => (
                   <div key={r.id} className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-white">
-                        {r.userEmail.replace(/(.{3}).+(@.+)/, "$1***$2")}
-                      </p>
+                      {/* userEmail уже маскирован server-side (`iva***@mail.ru`) */}
+                      <p className="text-sm text-white">{r.userEmail}</p>
                       <p className="text-xs text-gray-500">{formatDate(r.signedUpAt)}</p>
                     </div>
                     <div className="text-right">
@@ -346,13 +347,21 @@ export default function PartnerDashboardPage() {
                           ? { text: "Отменено", color: "bg-gray-500/10 text-gray-400" }
                           : { text: "В hold", color: "bg-yellow-500/10 text-yellow-400" };
                   return (
-                    <div key={e.id} className="flex items-center justify-between">
-                      <div>
+                    <div key={e.id} className="flex items-start justify-between">
+                      <div className="min-w-0">
                         <p className="text-sm text-white capitalize">{e.subscriptionPlan}</p>
+                        {e.referralEmail && (
+                          <p className="text-xs text-gray-400 truncate">от {e.referralEmail}</p>
+                        )}
                         <p className="text-xs text-gray-500">{formatDate(e.createdAt)}</p>
+                        {e.status === "cancelled" && e.cancelledReason && (
+                          <p className="text-xs text-gray-500 italic mt-0.5">
+                            Причина: возврат платежа клиента
+                          </p>
+                        )}
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold text-green-400">
+                        <p className={`text-sm font-semibold ${e.status === "cancelled" ? "text-gray-500 line-through" : "text-green-400"}`}>
                           +${e.commissionAmount.toFixed(2)}
                         </p>
                         <span className={`text-xs px-2 py-0.5 rounded-full ${statusBadge.color}`}>
@@ -387,9 +396,9 @@ export default function PartnerDashboardPage() {
                     </p>
                   </div>
                   <div className="text-right text-xs text-gray-400">
-                    {p.recipientCardNumber && (
+                    {p.recipientCardLast4 && (
                       <div className="font-mono">
-                        Карта {p.recipientCardNumber}
+                        Карта **** {p.recipientCardLast4}
                         {p.recipientBankName && ` · ${p.recipientBankName}`}
                       </div>
                     )}
@@ -407,7 +416,7 @@ export default function PartnerDashboardPage() {
         <PayoutDetailsForm
           token={token!}
           initial={{
-            cardNumber: partner.cardNumber || "",
+            cardLast4: partner.cardLast4 || "",
             cardHolder: partner.cardHolder || "",
             bankName: partner.bankName || "",
             payoutNotes: partner.payoutNotes || "",
@@ -464,12 +473,12 @@ function PayoutDetailsForm({
   onSaved,
 }: {
   token: string;
-  initial: { cardNumber: string; cardHolder: string; bankName: string; payoutNotes: string };
+  initial: { cardLast4: string; cardHolder: string; bankName: string; payoutNotes: string };
   minPayoutAmount: number;
   agreementSigned: boolean;
   onSaved: () => void;
 }) {
-  const [card, setCard] = useState(initial.cardNumber);
+  const [last4, setLast4] = useState(initial.cardLast4);
   const [holder, setHolder] = useState(initial.cardHolder);
   const [bank, setBank] = useState(initial.bankName);
   const [notes, setNotes] = useState(initial.payoutNotes);
@@ -477,12 +486,18 @@ function PayoutDetailsForm({
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
   const dirty =
-    card !== initial.cardNumber ||
+    last4 !== initial.cardLast4 ||
     holder !== initial.cardHolder ||
     bank !== initial.bankName ||
     notes !== initial.payoutNotes;
 
   const save = async () => {
+    // Валидация last4: только цифры, ровно 4
+    const digits = last4.replace(/\D/g, "");
+    if (last4 && digits.length !== 4) {
+      alert("Введите ровно 4 последние цифры карты");
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/partners/payout-details", {
@@ -490,7 +505,7 @@ function PayoutDetailsForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token,
-          cardNumber: card,
+          cardLast4: digits,
           cardHolder: holder,
           bankName: bank,
           payoutNotes: notes,
@@ -523,8 +538,12 @@ function PayoutDetailsForm({
         </div>
       )}
 
+      <div className="mb-3 bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-xs text-blue-200">
+        🔒 Полный номер карты не сохраняем — только последние 4 цифры для идентификации.
+        Перевод админ делает руками в банк-клиенте по ним и вашему имени/банку.
+      </div>
       <div className="grid md:grid-cols-2 gap-3">
-        <Input label="Номер карты" value={card} onChange={setCard} placeholder="1234 5678 9012 3456" />
+        <Input label="Последние 4 цифры карты" value={last4} onChange={setLast4} placeholder="1234" />
         <Input label="Имя на карте" value={holder} onChange={setHolder} placeholder="IVAN PETROV" />
         <Input label="Банк" value={bank} onChange={setBank} placeholder="Каспи / Сбер / Тинькофф" />
         <Input

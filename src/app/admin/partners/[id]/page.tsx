@@ -18,6 +18,7 @@ import {
   Mail,
   FileSignature,
   AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 
 interface Referral {
@@ -48,7 +49,7 @@ interface Partner {
   website: string | null;
   description: string | null;
   referralCode: string | null;
-  accessToken: string | null;
+  // accessToken НЕ возвращается из API (не должен светиться в admin UI)
   status: string;
   approvedAt: string | null;
   commissionRate: number;
@@ -56,7 +57,7 @@ interface Partner {
   totalEarnings: number;
   totalPaid: number;
   pendingPayout: number;
-  cardNumber: string | null;
+  cardLast4: string | null;
   cardHolder: string | null;
   bankName: string | null;
   payoutNotes: string | null;
@@ -223,6 +224,22 @@ export default function AdminPartnerDetailPage({ params }: { params: Promise<{ i
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white text-sm rounded-lg border border-white/10"
                 >
                   <Mail className="h-4 w-4" /> Переотправить welcome
+                </button>
+                <button
+                  onClick={() => {
+                    if (
+                      !confirm(
+                        "Пересоздать accessToken? Старая ссылка перестанет работать. Партнёру уйдёт email с новой ссылкой."
+                      )
+                    )
+                      return;
+                    action("rotate_token");
+                  }}
+                  disabled={actionLoading === "rotate_token"}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-600/80 hover:bg-orange-600 text-white text-sm rounded-lg"
+                  title="Использовать если партнёр потерял ссылку или есть подозрение на утечку"
+                >
+                  <RefreshCw className="h-4 w-4" /> Пересоздать токен
                 </button>
               </>
             )}
@@ -474,20 +491,25 @@ function MinPayoutEditor({ partnerId, initial, onSaved }: { partnerId: string; i
 }
 
 function PayoutEditor({ partner, onSaved }: { partner: Partner; onSaved: () => void }) {
-  const [card, setCard] = useState(partner.cardNumber || "");
+  const [last4, setLast4] = useState(partner.cardLast4 || "");
   const [holder, setHolder] = useState(partner.cardHolder || "");
   const [bank, setBank] = useState(partner.bankName || "");
   const [notes, setNotes] = useState(partner.payoutNotes || "");
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
+    const digits = last4.replace(/\D/g, "");
+    if (last4 && digits.length !== 4) {
+      alert("Введите ровно 4 последние цифры карты");
+      return;
+    }
     setSaving(true);
     await fetch(`/api/admin/partners/${partner.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "update_payout",
-        cardNumber: card,
+        cardLast4: digits,
         cardHolder: holder,
         bankName: bank,
         payoutNotes: notes,
@@ -500,14 +522,18 @@ function PayoutEditor({ partner, onSaved }: { partner: Partner; onSaved: () => v
   return (
     <div className="bg-[#12122a] border border-white/5 rounded-xl p-4">
       <h2 className="text-sm font-semibold text-gray-400 mb-3">Реквизиты для выплат</h2>
+      <p className="text-xs text-gray-500 mb-3">
+        Полный PAN не храним — только last4 для идентификации. Перевод вручную в банк-клиенте.
+      </p>
       <div className="grid md:grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Номер карты</label>
+          <label className="block text-xs text-gray-500 mb-1">Last 4 цифры карты</label>
           <input
             type="text"
-            value={card}
-            onChange={(e) => setCard(e.target.value)}
-            placeholder="1234 5678 9012 3456"
+            value={last4}
+            onChange={(e) => setLast4(e.target.value)}
+            placeholder="1234"
+            maxLength={4}
             className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white"
           />
         </div>

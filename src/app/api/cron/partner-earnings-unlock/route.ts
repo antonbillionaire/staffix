@@ -12,6 +12,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendPartnerPayoutReadyEmail } from "@/lib/email";
 
@@ -48,21 +49,20 @@ export async function GET(request: Request) {
     });
     stats.unlocked = ready.length;
 
-    // 3. Группируем по партнёру: кому сколько разморозили
-    const sumByPartner = new Map<string, number>();
-    for (const e of ready) {
-      sumByPartner.set(e.partnerId, (sumByPartner.get(e.partnerId) || 0) + e.commissionAmount);
-    }
+    // 3. Уникальные partnerIds, которых затронули
+    const partnerIds = Array.from(new Set(ready.map((e) => e.partnerId)));
 
     // 4. Для каждого затронутого партнёра — пересчитать pendingPayout
-    //    (это сумма всех earnings со status=available, не вошедших в payout)
-    for (const [partnerId] of sumByPartner) {
+    //    (это сумма всех earnings со status=available, не вошедших в payout).
+    //    Decimal арифметика — без float drift.
+    for (const partnerId of partnerIds) {
       try {
         const agg = await prisma.partnerEarning.aggregate({
           where: { partnerId, status: "available", payoutId: null },
           _sum: { commissionAmount: true },
         });
-        const newPending = agg._sum.commissionAmount || 0;
+        // _sum.commissionAmount — Prisma.Decimal | null
+        const newPending = agg._sum.commissionAmount ?? new Prisma.Decimal(0);
 
         const partner = await prisma.partner.findUnique({
           where: { id: partnerId },
@@ -78,8 +78,9 @@ export async function GET(request: Request) {
         });
         if (!partner) continue;
 
-        const previouslyBelowThreshold = partner.pendingPayout < partner.minPayoutAmount;
-        const nowAboveThreshold = newPending >= partner.minPayoutAmount;
+        // Decimal-сравнение: .lt и .gte для precise comparison
+        const previouslyBelowThreshold = partner.pendingPayout.lt(partner.minPayoutAmount);
+        const nowAboveThreshold = newPending.gte(partner.minPayoutAmount);
 
         await prisma.partner.update({
           where: { id: partnerId },
@@ -93,8 +94,8 @@ export async function GET(request: Request) {
               email: partner.email,
               name: partner.name,
               accessToken: partner.accessToken,
-              availableAmount: newPending,
-              minPayout: partner.minPayoutAmount,
+              availableAmount: newPending.toNumber(),
+              minPayout: partner.minPayoutAmount.toNumber(),
             }).catch((e) => console.error("Payout-ready email failed:", e));
             stats.partnersNotified++;
           }

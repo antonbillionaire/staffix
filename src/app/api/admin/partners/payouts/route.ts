@@ -11,6 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/admin";
@@ -45,26 +46,35 @@ export async function GET() {
 
     const readyToPayout = partners
       .map((p) => {
-        const total = p.earnings.reduce((s, e) => s + e.commissionAmount, 0);
+        // Decimal sum для precision на агрегации
+        const total = p.earnings.reduce(
+          (s, e) => s.plus(e.commissionAmount),
+          new Prisma.Decimal(0)
+        );
+        const minPayout = p.minPayoutAmount;
         return {
           id: p.id,
           name: p.name,
           email: p.email,
           referralCode: p.referralCode,
-          minPayoutAmount: p.minPayoutAmount,
+          minPayoutAmount: minPayout.toNumber(),
           agreementSignedAt: p.agreementSignedAt,
-          // Реквизиты — для удобства админа в момент выплаты
-          cardNumber: p.cardNumber,
+          // Реквизиты — для удобства админа в момент выплаты (last4 + банк)
+          cardLast4: p.cardLast4,
           cardHolder: p.cardHolder,
           bankName: p.bankName,
           payoutNotes: p.payoutNotes,
           // Сумма к выплате и список earnings
-          availableAmount: total,
-          earnings: p.earnings,
+          availableAmount: total.toNumber(),
+          earnings: p.earnings.map((e) => ({
+            ...e,
+            commissionAmount: e.commissionAmount.toNumber(),
+            paymentAmount: e.paymentAmount.toNumber(),
+          })),
           earningsCount: p.earnings.length,
           // Меты для UI
-          meetsThreshold: total >= p.minPayoutAmount,
-          missingPayoutDetails: !p.cardNumber || !p.cardHolder,
+          meetsThreshold: total.gte(minPayout),
+          missingPayoutDetails: !p.cardLast4 || !p.cardHolder,
         };
       })
       .filter((p) => p.availableAmount > 0)
@@ -82,15 +92,22 @@ export async function GET() {
       take: 100,
     });
 
-    // 3. Сводные totals
+    // 3. Сводные totals (после toNumber() — простая JS-арифметика для UI)
     const totalReady = readyToPayout.reduce((s, p) => s + p.availableAmount, 0);
     const totalAboveThreshold = readyToPayout
       .filter((p) => p.meetsThreshold)
       .reduce((s, p) => s + p.availableAmount, 0);
 
+    // Сериализация PartnerPayout с amount: Decimal → number и last4 (а не cardNumber)
+    const payoutsForUi = recentPayouts.map((p) => ({
+      ...p,
+      amount: p.amount.toNumber(),
+      // recipientCardNumber поле удалено в schema; даём recipientCardLast4
+    }));
+
     return NextResponse.json({
       readyToPayout,
-      recentPayouts,
+      recentPayouts: payoutsForUi,
       totals: {
         partnersReady: readyToPayout.filter((p) => p.meetsThreshold).length,
         amountReady: totalReady,
@@ -164,14 +181,14 @@ export async function POST(request: NextRequest) {
       const created = await tx.partnerPayout.create({
         data: {
           partnerId,
-          amount: 0, // обновим ниже после привязки earnings
+          amount: new Prisma.Decimal(0), // обновим ниже после привязки earnings
           periodLabel: periodLabel || formatPeriodNow(),
           paymentMethod: "card",
           reference,
           paidAt: new Date(),
           paidByEmail: session.user!.email!,
           notes,
-          recipientCardNumber: partner.cardNumber,
+          recipientCardLast4: partner.cardLast4,
           recipientCardHolder: partner.cardHolder,
           recipientBankName: partner.bankName,
         },
@@ -191,7 +208,11 @@ export async function POST(request: NextRequest) {
         where: { payoutId: created.id },
         select: { commissionAmount: true },
       });
-      const amount = linked.reduce((s, e) => s + e.commissionAmount, 0);
+      // Decimal sum для precision
+      const amount = linked.reduce(
+        (s, e) => s.plus(e.commissionAmount),
+        new Prisma.Decimal(0)
+      );
 
       await tx.partnerPayout.update({
         where: { id: created.id },
@@ -219,7 +240,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const amount = payout.amount;
+    const amount = payout.amount.toNumber();
     const earningsCount = payout.earningsCount;
 
     // Email — после успешной транзакции, не валим если упал
@@ -231,7 +252,7 @@ export async function POST(request: NextRequest) {
         amount,
         reference,
         paidAt: payout.paidAt,
-        recipientCardNumber: partner.cardNumber,
+        recipientCardLast4: partner.cardLast4,
         bankName: partner.bankName,
       }).catch((e) => console.error("Payout-sent email failed:", e));
     }
@@ -240,7 +261,7 @@ export async function POST(request: NextRequest) {
       success: true,
       payout: {
         id: payout.id,
-        amount: payout.amount,
+        amount,
         earningsCount,
       },
     });

@@ -1,5 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+
+/**
+ * Маска email для отдачи партнёру: `iva***@mail.ru`.
+ * Причина: партнёр НЕ должен видеть полные emails своих рефералов
+ * (PII / GDPR / 152-ФЗ). Server-side маска — клиентскую можно обойти curl'ом.
+ */
+function maskEmail(email: string): string {
+  if (!email) return "";
+  const at = email.lastIndexOf("@");
+  if (at < 0) return email; // не email — не маскируем
+  const local = email.slice(0, at);
+  const domain = email.slice(at);
+  const visible = local.slice(0, Math.min(3, local.length));
+  return `${visible}***${domain}`;
+}
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
@@ -19,6 +35,7 @@ export async function GET(req: NextRequest) {
         earnings: {
           orderBy: { createdAt: "desc" },
           take: 100,
+          include: { referral: { select: { userEmail: true } } },
         },
         payouts: {
           orderBy: { paidAt: "desc" },
@@ -28,7 +45,7 @@ export async function GET(req: NextRequest) {
     });
 
     // Активные promo-материалы — общие для всех партнёров.
-    // Грузим параллельно, не зависят от partner. Если упадут — кабинет всё равно отдаём.
+    // Грузим отдельно, не зависят от partner. Если упадут — кабинет всё равно отдаём.
     const assets = await prisma.partnerAsset
       .findMany({
         where: { isActive: true },
@@ -54,15 +71,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Аккаунт ещё не одобрен" }, { status: 403 });
     }
 
-    // Summary stats
+    // Summary stats — Decimal sums чтобы избежать float drift
     const totalReferrals = partner.referrals.length;
     const convertedReferrals = partner.referrals.filter((r) => r.converted).length;
     const pendingEarnings = partner.earnings
       .filter((e) => e.status === "pending")
-      .reduce((sum, e) => sum + e.commissionAmount, 0);
+      .reduce((sum, e) => sum.plus(e.commissionAmount), new Prisma.Decimal(0));
     const availableEarnings = partner.earnings
       .filter((e) => e.status === "available")
-      .reduce((sum, e) => sum + e.commissionAmount, 0);
+      .reduce((sum, e) => sum.plus(e.commissionAmount), new Prisma.Decimal(0));
 
     return NextResponse.json({
       partner: {
@@ -71,13 +88,14 @@ export async function GET(req: NextRequest) {
         email: partner.email,
         company: partner.company,
         referralCode: partner.referralCode,
-        commissionRate: partner.commissionRate,
-        minPayoutAmount: partner.minPayoutAmount,
-        totalEarnings: partner.totalEarnings,
-        totalPaid: partner.totalPaid,
-        pendingPayout: partner.pendingPayout,
-        // Реквизиты для выплат — партнёр сам редактирует через PATCH /api/partners/payout-details
-        cardNumber: partner.cardNumber,
+        commissionRate: partner.commissionRate.toNumber(),
+        minPayoutAmount: partner.minPayoutAmount.toNumber(),
+        totalEarnings: partner.totalEarnings.toNumber(),
+        totalPaid: partner.totalPaid.toNumber(),
+        pendingPayout: partner.pendingPayout.toNumber(),
+        // Реквизиты для выплат — last4 (полный номер не хранится).
+        // Партнёр редактирует через PATCH /api/partners/payout-details
+        cardLast4: partner.cardLast4,
         cardHolder: partner.cardHolder,
         bankName: partner.bankName,
         payoutNotes: partner.payoutNotes,
@@ -88,12 +106,12 @@ export async function GET(req: NextRequest) {
         totalReferrals,
         convertedReferrals,
         conversionRate: totalReferrals > 0 ? Math.round((convertedReferrals / totalReferrals) * 100) : 0,
-        pendingEarnings: Math.round(pendingEarnings * 100) / 100,
-        availableEarnings: Math.round(availableEarnings * 100) / 100,
+        pendingEarnings: pendingEarnings.toNumber(),
+        availableEarnings: availableEarnings.toNumber(),
       },
       referrals: partner.referrals.map((r) => ({
         id: r.id,
-        userEmail: r.userEmail,
+        userEmail: maskEmail(r.userEmail), // server-side mask — не отдаём полные emails
         signedUpAt: r.signedUpAt,
         converted: r.converted,
         convertedAt: r.convertedAt,
@@ -101,26 +119,25 @@ export async function GET(req: NextRequest) {
       })),
       earnings: partner.earnings.map((e) => ({
         id: e.id,
-        commissionAmount: e.commissionAmount,
-        paymentAmount: e.paymentAmount,
+        commissionAmount: e.commissionAmount.toNumber(),
+        paymentAmount: e.paymentAmount.toNumber(),
         subscriptionPlan: e.subscriptionPlan,
         status: e.status,
         availableAt: e.availableAt,
         paidAt: e.paidAt,
         createdAt: e.createdAt,
+        cancelledReason: e.cancelledReason,
+        // Привязка к рефералу — партнёр видит «откуда пришёл этот earning»
+        referralEmail: e.referral?.userEmail ? maskEmail(e.referral.userEmail) : null,
       })),
       payouts: partner.payouts.map((p) => ({
         id: p.id,
-        amount: p.amount,
+        amount: p.amount.toNumber(),
         periodLabel: p.periodLabel,
         reference: p.reference,
         paidAt: p.paidAt,
-        // Маскируем номер карты при отдаче клиенту
-        recipientCardNumber: p.recipientCardNumber
-          ? p.recipientCardNumber.length > 4
-            ? `**** ${p.recipientCardNumber.slice(-4)}`
-            : "****"
-          : null,
+        // Уже храним только last4 (после миграции PCI-safety).
+        recipientCardLast4: p.recipientCardLast4,
         recipientBankName: p.recipientBankName,
       })),
       assets,

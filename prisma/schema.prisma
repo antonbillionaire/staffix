@@ -1768,16 +1768,16 @@ model Partner {
   status     String    @default("pending") // pending, approved, rejected, suspended
   approvedAt DateTime?
 
-  // Финансы
-  commissionRate  Float @default(0.20) // 20%
-  totalEarnings   Float @default(0) // суммарно заработано
-  totalPaid       Float @default(0) // суммарно выплачено
-  pendingPayout   Float @default(0) // ожидает выплаты
-  minPayoutAmount Float @default(50) // минимальная сумма для выплаты ($)
+  // Финансы — Decimal чтобы избежать float drift на агрегации
+  commissionRate  Decimal @default(0.20) @db.Decimal(5, 4) // 20% = 0.2000
+  totalEarnings   Decimal @default(0) @db.Decimal(12, 2) // суммарно заработано ($)
+  totalPaid       Decimal @default(0) @db.Decimal(12, 2) // суммарно выплачено
+  pendingPayout   Decimal @default(0) @db.Decimal(12, 2) // ожидает выплаты
+  minPayoutAmount Decimal @default(50) @db.Decimal(12, 2) // минимум для выплаты
 
-  // Реквизиты для выплат (банковский перевод на карту партнёра).
-  // Заполняет либо партнёр сам в кабинете, либо админ при ручном создании.
-  cardNumber  String? // полный номер или последние 4 — на усмотрение
+  // Реквизиты для выплат. Только последние 4 цифры карты — full PAN не хранится
+  // (PCI-DSS scope). Полный номер админ вводит руками в банк-клиент.
+  cardLast4   String? // 4 цифры
   cardHolder  String? // имя на карте если отличается от name
   bankName    String? // Сбер / Каспи / Тинькофф / Райффайзен / etc.
   payoutNotes String? // заметки от партнёра ("перевод только Каспи Gold", "до 14:00 МСК")
@@ -1831,9 +1831,9 @@ model PartnerReferral {
 model PartnerEarning {
   id String @id @default(cuid())
 
-  // Сумма
-  commissionAmount Float // сколько начислено партнёру ($)
-  paymentAmount    Float // полная сумма платежа реферала ($)
+  // Сумма — Decimal чтобы избежать float drift при агрегации сотен записей
+  commissionAmount Decimal @db.Decimal(12, 2) // сколько начислено партнёру ($)
+  paymentAmount    Decimal @db.Decimal(12, 2) // полная сумма платежа реферала ($)
   subscriptionPlan String // starter, pro, business, enterprise
 
   // Статус: pending (в hold-периоде) → available (можно выплатить) → paid (выплачено)
@@ -1856,7 +1856,10 @@ model PartnerEarning {
   // PayPro orderId который сгенерировал эту комиссию.
   // Нужен чтобы при ORDER_REFUNDED / ORDER_CHARGED_BACK точно отменить именно
   // тот earning, который относится к возвращённому платежу.
-  payproOrderId String?
+  // @unique — защита от race condition при дублирующихся PayPro webhooks.
+  // NULL допускается (legacy/manual earnings) — Postgres трактует множественные
+  // NULL как distinct, так что unique их не блокирует.
+  payproOrderId String? @unique
 
   referralId String
   referral   PartnerReferral @relation(fields: [referralId], references: [id], onDelete: Cascade)
@@ -1870,7 +1873,6 @@ model PartnerEarning {
   @@index([partnerId, createdAt])
   @@index([status, availableAt])
   @@index([payoutId])
-  @@index([payproOrderId])
 }
 
 // Группа выплат партнёру — одна строка = один банковский перевод за период.
@@ -1883,7 +1885,7 @@ model PartnerPayout {
   partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
 
   // Сколько перевели партнёру одним переводом
-  amount Float
+  amount Decimal @db.Decimal(12, 2)
 
   // За какой период (для отчётности — месяц года, например "2026-05")
   periodLabel String?
@@ -1905,8 +1907,9 @@ model PartnerPayout {
   notes String?
 
   // Снапшот реквизитов на момент выплаты — чтобы потом можно было проверить
-  // куда именно перевели, даже если партнёр поменяет реквизиты позже
-  recipientCardNumber String?
+  // куда именно перевели, даже если партнёр поменяет реквизиты позже.
+  // Только last4 — full PAN не хранится (PCI-DSS).
+  recipientCardLast4  String?
   recipientCardHolder String?
   recipientBankName   String?
 
