@@ -7,6 +7,9 @@
  *   manual       — return null, owner / referral links handle assignment
  *   round_robin  — pick the next acceptsLeads staff after lastAssignedStaffId
  *   by_load      — pick the staff with the fewest open tasks + active deals
+ *   ai_smart     — return null, AI назначит позже через route_to_specialist tool
+ *                  когда поймёт специализацию из контекста разговора. Если
+ *                  назначить заранее — AI не сможет переназначить (continuity).
  */
 
 import { prisma } from "./prisma";
@@ -18,6 +21,9 @@ export async function pickStaffForNewLead(businessId: string): Promise<string | 
       select: { leadAssignmentMode: true, lastAssignedStaffId: true },
     });
     if (!business || business.leadAssignmentMode === "manual") return null;
+    // AI smart режим — оставляем клиента без назначения, AI сам направит
+    // через route_to_specialist tool когда поймёт контекст.
+    if (business.leadAssignmentMode === "ai_smart") return null;
 
     // Fetch eligible staff in stable order so round-robin is deterministic.
     const eligible = await prisma.staff.findMany({

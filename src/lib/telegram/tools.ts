@@ -22,6 +22,7 @@ import {
 } from "@/lib/booking-tools";
 import { dispatchCrmEvent } from "@/lib/crm-integrations";
 import { notifyManagerByTelegram } from "@/lib/sales-tools";
+import { executeRouteToSpecialist } from "@/lib/ai-routing";
 
 export async function handleToolCall(
   toolName: string,
@@ -157,6 +158,21 @@ export async function handleToolCall(
           telegramId,
           toolInput.note
         );
+        return JSON.stringify(result);
+      }
+
+      case "route_to_specialist": {
+        // AI smart routing — направление клиента к специалисту по специализации.
+        // Tool инжектится только когда Business.leadAssignmentMode = "ai_smart"
+        // и в команде есть staff с заполненным routingDescription. Фактическое
+        // уведомление специалиста произойдёт через notify_manager (она уже
+        // умеет читать Client.assignedStaffId и роутить туда).
+        const result = await executeRouteToSpecialist({
+          businessId,
+          clientTelegramId: telegramId,
+          staffId: toolInput.staff_id,
+          reason: toolInput.reason || "AI определил специализацию по контексту",
+        });
         return JSON.stringify(result);
       }
 

@@ -10,6 +10,7 @@ interface Staff {
   name: string;
   role: string;
   specialization: string | null;
+  routingDescription?: string | null;
   photo: string | null;
   telegramUsername: string | null;
   telegramChatId: string | null;
@@ -100,6 +101,7 @@ export default function StaffPage() {
     name: "",
     role: "manager",                   // канонизированная роль из dropdown (admin/manager/master/doctor/operator/custom)
     specialization: "" as string,      // свободный текст ("Терапевт", "Барбер-стилист") — для отображения
+    routingDescription: "" as string,  // описание для AI smart routing (режим ai_smart)
     photo: "",
     telegramUsername: "",
     notificationsEnabled: true,
@@ -145,7 +147,7 @@ export default function StaffPage() {
   }, []);
 
   // Lead distribution mode (manual / round_robin / by_load) and per-staff toggle.
-  const [leadMode, setLeadMode] = useState<"manual" | "round_robin" | "by_load">("manual");
+  const [leadMode, setLeadMode] = useState<"manual" | "round_robin" | "by_load" | "ai_smart">("manual");
   const [leadModeSaving, setLeadModeSaving] = useState(false);
 
   useEffect(() => {
@@ -161,7 +163,7 @@ export default function StaffPage() {
       .catch(() => {});
   }, [fetchStaff]);
 
-  const handleLeadModeChange = async (next: "manual" | "round_robin" | "by_load") => {
+  const handleLeadModeChange = async (next: "manual" | "round_robin" | "by_load" | "ai_smart") => {
     setLeadMode(next);
     setLeadModeSaving(true);
     try {
@@ -211,6 +213,7 @@ export default function StaffPage() {
     name: "",
     role: "manager" as string,
     specialization: "",
+    routingDescription: "",
     photo: "",
     telegramUsername: "",
     notificationsEnabled: true,
@@ -226,6 +229,7 @@ export default function StaffPage() {
         name: person.name,
         role: split.role,
         specialization: split.specialization,
+        routingDescription: person.routingDescription || "",
         photo: person.photo || "",
         telegramUsername: person.telegramUsername || "",
         notificationsEnabled: person.notificationsEnabled,
@@ -441,23 +445,39 @@ export default function StaffPage() {
             </div>
             {leadModeSaving && <Loader2 className={`h-4 w-4 animate-spin ${isDark ? "text-gray-400" : "text-gray-500"}`} />}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
-            {(["manual", "round_robin", "by_load"] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => handleLeadModeChange(m)}
-                className={`text-left p-3 rounded-lg border transition-colors ${
-                  leadMode === m
-                    ? "border-blue-500 bg-blue-500/10"
-                    : isDark
-                      ? "border-white/10 hover:border-white/20"
-                      : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <p className={`text-sm font-medium ${isDark ? "text-white" : "text-gray-900"}`}>{t(`staffPage.leadMode.${m}`)}</p>
-                <p className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>{t(`staffPage.leadMode.${m}Hint`)}</p>
-              </button>
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-3">
+            {(["manual", "round_robin", "by_load", "ai_smart"] as const).map((m) => {
+              // Локальные подписи для нового режима — ключи для t() добавим позже,
+              // пока fallback'ом показываем русский текст. Старые режимы продолжают
+              // брать из translations.
+              const aiSmartLabels = {
+                ai_smart: "AI распределяет по контексту",
+                ai_smartHint:
+                  "Бот направляет клиента к специалисту с подходящей специализацией. Заполните «Описание для AI» у каждого сотрудника.",
+              };
+              const label =
+                m === "ai_smart" ? aiSmartLabels.ai_smart : t(`staffPage.leadMode.${m}`);
+              const hint =
+                m === "ai_smart"
+                  ? aiSmartLabels.ai_smartHint
+                  : t(`staffPage.leadMode.${m}Hint`);
+              return (
+                <button
+                  key={m}
+                  onClick={() => handleLeadModeChange(m)}
+                  className={`text-left p-3 rounded-lg border transition-colors ${
+                    leadMode === m
+                      ? "border-blue-500 bg-blue-500/10"
+                      : isDark
+                        ? "border-white/10 hover:border-white/20"
+                        : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <p className={`text-sm font-medium ${isDark ? "text-white" : "text-gray-900"}`}>{label}</p>
+                  <p className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>{hint}</p>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -656,6 +676,28 @@ export default function StaffPage() {
                 />
                 <p className={`text-xs mt-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
                   {t("staffPage.specializationHint") || "Роль определяет какие уведомления получает сотрудник. Специализация — пояснение для отображения."}
+                </p>
+              </div>
+
+              {/* Routing description — для AI smart routing */}
+              <div>
+                <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
+                  Описание для AI
+                  <span className={`ml-2 text-xs font-normal ${isDark ? "text-gray-500" : "text-gray-500"}`}>
+                    (используется в режиме «AI распределяет лидов»)
+                  </span>
+                </label>
+                <textarea
+                  value={formData.routingDescription}
+                  onChange={(e) => setFormData({ ...formData, routingDescription: e.target.value })}
+                  placeholder="Например: Принимаю иностранных туристов в Узбекистан, помогаю с визой, бронированием отелей в Ташкенте, Самарканде, Бухаре."
+                  rows={3}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
+                />
+                <p className={`text-xs mt-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
+                  Опишите 1-3 предложениями к каким клиентам Вы подходите. AI читает это и направляет
+                  клиента по контексту разговора. Если оставить пустым — этот сотрудник не участвует
+                  в AI-роутинге, но остальные функции (записи, обычные уведомления) работают как раньше.
                 </p>
               </div>
 

@@ -196,7 +196,7 @@ export async function PUT(request: Request) {
     if (language !== undefined) updateData.language = language;
     if (consultationsEnabled !== undefined) updateData.consultationsEnabled = Boolean(consultationsEnabled);
     if (leadAssignmentMode !== undefined) {
-      const valid = ["manual", "round_robin", "by_load"];
+      const valid = ["manual", "round_robin", "by_load", "ai_smart"];
       if (!valid.includes(leadAssignmentMode)) {
         return NextResponse.json({ error: "Недопустимый режим распределения лидов" }, { status: 400 });
       }

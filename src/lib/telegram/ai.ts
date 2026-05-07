@@ -30,6 +30,11 @@ import { bookingToolDefinitions } from "@/lib/booking-tools";
 import { salesToolDefinitions, executeSalesTool } from "@/lib/sales-tools";
 import { buildSalesSystemPrompt, isSalesMode } from "@/lib/sales-prompt";
 import { botPromisedHandoffRegex } from "@/lib/handoff-detector";
+import {
+  loadRoutableStaff,
+  buildRouteToSpecialistTool,
+  buildRoutingPromptSection,
+} from "@/lib/ai-routing";
 import { getOrCreateConversation, saveMessage } from "./conversation";
 import { handleToolCall, buildFallbackFromToolResults } from "./tools";
 
@@ -130,11 +135,32 @@ export async function generateAIResponse(
 
     // 6. Tools — sales mode + consultations включены = ОБА набора
     // (онлайн-школы / консалтинг принимают и заказы, и записи на консультации).
-    const activeTools = salesMode
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let activeTools: any[] = salesMode
       ? businessContext.consultationsEnabled
         ? [...salesToolDefinitions, ...bookingToolDefinitions]
         : salesToolDefinitions
       : bookingToolDefinitions;
+
+    // 6.5 AI smart routing — добавляем route_to_specialist tool ТОЛЬКО если
+    // у бизнеса включён режим ai_smart И есть staff с routingDescription.
+    // Иначе всё работает как раньше (ничего не ломаем).
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { leadAssignmentMode: true },
+    });
+    let routingPromptSection = "";
+    if (business?.leadAssignmentMode === "ai_smart") {
+      const routableStaff = await loadRoutableStaff(businessId);
+      const routingTool = buildRouteToSpecialistTool(routableStaff);
+      if (routingTool) {
+        activeTools = [...activeTools, routingTool];
+        routingPromptSection = buildRoutingPromptSection(routableStaff);
+        console.log(
+          `[Webhook] AI smart routing enabled: ${routableStaff.length} routable staff for business=${businessId}`
+        );
+      }
+    }
 
     const today = new Date().toISOString().split("T")[0];
     const systemHint = salesMode
@@ -164,7 +190,7 @@ export async function generateAIResponse(
 - Если в саммари написано "клиент спрашивал про X, я ответил Y" — используй это только чтобы понять КОНТЕКСТ запроса, но цифры/факты бери из FAQ заново.
 - Контекст разговора (имя, предпочтения, что обсуждали в общем) — сохраняй. Конкретные факты — переспрашивай у промпта.`
       : "";
-    const systemWithDate = systemPrompt + systemHint + refreshNotice;
+    const systemWithDate = systemPrompt + systemHint + refreshNotice + routingPromptSection;
 
     console.log(`[Webhook] Calling Claude API for business=${businessId}, salesMode=${salesMode}`);
     let response = await callClaudeWithRetry({

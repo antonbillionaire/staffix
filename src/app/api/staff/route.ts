@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     }
 
     const data = await request.json();
-    const { name, role, specialization, photo, telegramUsername, notificationsEnabled, baseRate, commissionPercent } = data;
+    const { name, role, specialization, routingDescription, photo, telegramUsername, notificationsEnabled, baseRate, commissionPercent } = data;
 
     if (!name) {
       return NextResponse.json({ error: "Имя обязательно" }, { status: 400 });
@@ -83,6 +83,10 @@ export async function POST(request: Request) {
         name,
         role: normalizedRole,
         specialization: typeof specialization === "string" && specialization.trim() ? specialization.trim() : null,
+        routingDescription:
+          typeof routingDescription === "string" && routingDescription.trim()
+            ? routingDescription.trim()
+            : null,
         photo: photo || null,
         telegramUsername: telegramUsername || null,
         notificationsEnabled: notificationsEnabled !== undefined ? notificationsEnabled : true,

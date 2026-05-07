@@ -28,7 +28,7 @@ export async function PUT(
 
     const { id } = await params;
     const data = await request.json();
-    const { name, role, specialization, photo, telegramUsername, notificationsEnabled, baseRate, commissionPercent, acceptsLeads } = data;
+    const { name, role, specialization, routingDescription, photo, telegramUsername, notificationsEnabled, baseRate, commissionPercent, acceptsLeads } = data;
 
     const person = await prisma.staff.findUnique({
       where: { id },
@@ -61,6 +61,12 @@ export async function PUT(
         specialization: specialization !== undefined
           ? (typeof specialization === "string" && specialization.trim() ? specialization.trim() : null)
           : undefined,
+        routingDescription:
+          routingDescription !== undefined
+            ? typeof routingDescription === "string" && routingDescription.trim()
+              ? routingDescription.trim()
+              : null
+            : undefined,
         photo: photo !== undefined ? (photo || null) : undefined,
         telegramUsername: telegramUsername !== undefined ? (telegramUsername || null) : undefined,
         notificationsEnabled: notificationsEnabled !== undefined ? notificationsEnabled : undefined,
