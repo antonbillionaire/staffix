@@ -234,97 +234,128 @@ export async function searchProducts(
   maxPrice?: number
 ): Promise<SalesToolResult> {
   try {
-    // Build DB-level text search — search across name, description, category, tags
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const conditions: any[] = [{ businessId, isActive: true }];
+    // Стоп-слова — предлоги/союзы которые не должны блокировать AND-поиск.
+    // Раньше слово «в» в запросе «гель в тубе» резало результат до нуля
+    // (искалось как точный тег `tags.has("в")`).
+    const STOP_WORDS = new Set([
+      "в", "во", "на", "с", "со", "у", "к", "ко", "и", "или", "от", "до",
+      "из", "по", "за", "для", "о", "об", "про", // ВНИМАНИЕ: «про» НЕ в стоп-листе ниже —
+      // в каталогах часто есть «Gel PRO», «Pro», «про»; пользователь Михаила прислал
+      // именно "Gel PRO в тубе". Для других языков можно расширить позже.
+      "the", "a", "an", "of", "for", "in", "on", "at", "to", "with",
+    ]);
+    // «про» убираем из стоп-слов — это часть бренда у Михаила. Пересоздаём set без него.
+    STOP_WORDS.delete("про");
 
-    // Text search across multiple fields at DB level
-    if (query) {
-      const allWords = query.trim().split(/\s+/).filter((w) => w.length > 0);
-      // Each word must match at least one field (AND logic between words).
-      // Для коротких слов (1-2 символа) substring даёт мусор (буква "Д" совпадает
-      // в "Дезинфектор"), поэтому ищем их только как точные теги через tags.has.
-      // Для длинных — обычный substring + tags.has.
-      for (const rawWord of allWords) {
-        const word = rawWord.toLowerCase();
-        if (rawWord.length <= 2) {
-          // Короткий код вроде "D", "Д", "B" — только точное совпадение в тегах
-          conditions.push({
-            OR: [
-              { tags: { has: rawWord } },
-              { tags: { has: word } },
-            ],
-          });
-        } else {
-          conditions.push({
-            OR: [
-              { name: { contains: rawWord, mode: "insensitive" } },
-              { description: { contains: rawWord, mode: "insensitive" } },
-              { category: { contains: rawWord, mode: "insensitive" } },
-              { sku: { contains: rawWord, mode: "insensitive" } },
-              { tags: { has: rawWord } },
-              { tags: { has: word } },
-            ],
-          });
-        }
-      }
-    }
+    // Слова из запроса: lowercase, без stop-words, без коротких (≤1 символ).
+    // Слова длиной 2 оставляем — короткие коды размеров «D», «XS», «10мл» имеют смысл.
+    const queryWords = query
+      ? query
+          .toLowerCase()
+          .trim()
+          .split(/\s+/)
+          .filter((w) => w.length >= 2 && !STOP_WORDS.has(w))
+      : [];
 
-    if (category) {
-      conditions.push({ category: { contains: category, mode: "insensitive" } });
-    }
+    // Шаг 1 — найти ID товаров через raw SQL.
+    // ПОЧЕМУ raw SQL: Prisma `tags.has(X)` ищет точное равенство элемента массива,
+    // не substring внутри него. Тег `«гель про»` (одна строка с пробелом) не находится
+    // через `has("про")`. Postgres `unnest(tags)` + ILIKE даёт substring-search
+    // в каждом теге — единственный способ ВСЕГДА находить если в тегах есть нужное слово.
+    //
+    // Каждое слово запроса должно matchить хотя бы ОДНО поле:
+    //   name | description | category | sku | любой элемент tags (substring)
+    // AND между словами — все слова должны быть найдены.
+    //
+    // Параметризация через Prisma.sql защищает от SQL injection.
 
-    if (maxPrice) {
-      conditions.push({ price: { lte: maxPrice } });
-    }
-
-    // Primary search: DB-level filtering
-    let products = await prisma.product.findMany({
-      where: { AND: conditions },
-      orderBy: { name: "asc" },
-      take: 20,
+    // Собираем условия по словам запроса
+    const wordClauses: Prisma.Sql[] = queryWords.map((w) => {
+      const pattern = `%${w}%`;
+      return Prisma.sql`(
+        LOWER("name") LIKE ${pattern}
+        OR LOWER(COALESCE("description", '')) LIKE ${pattern}
+        OR LOWER(COALESCE("category", '')) LIKE ${pattern}
+        OR LOWER(COALESCE("sku", '')) LIKE ${pattern}
+        OR EXISTS (SELECT 1 FROM unnest("tags") t WHERE LOWER(t) LIKE ${pattern})
+      )`;
     });
 
-    // Fallback: if strict AND didn't find anything, try OR across fields
-    if (products.length === 0 && query) {
-      products = await prisma.product.findMany({
-        where: {
-          businessId,
-          isActive: true,
-          OR: [
-            { name: { contains: query, mode: "insensitive" } },
-            { description: { contains: query, mode: "insensitive" } },
-            { category: { contains: query, mode: "insensitive" } },
-            { sku: { contains: query, mode: "insensitive" } },
-          ],
-          ...(maxPrice ? { price: { lte: maxPrice } } : {}),
-        },
-        orderBy: { name: "asc" },
-        take: 20,
-      });
-    }
+    const wordsWhere =
+      wordClauses.length > 0
+        ? Prisma.sql`AND ${Prisma.join(wordClauses, " AND ")}`
+        : Prisma.empty;
 
-    // AI-fallback: если ни strict-AND, ни OR ничего не нашли — это либо опечатка,
-    // либо клиент написал на другом языке (Клеопатра вместо Cleopatra). Дёргаем
-    // Haiku с реальными названиями и просим нормализовать запрос. Стоит ~$0.0005.
+    const categoryWhere = category
+      ? Prisma.sql`AND LOWER(COALESCE("category", '')) LIKE ${`%${category.toLowerCase()}%`}`
+      : Prisma.empty;
+
+    const priceWhere =
+      typeof maxPrice === "number" && maxPrice > 0
+        ? Prisma.sql`AND "price" <= ${maxPrice}`
+        : Prisma.empty;
+
+    const idRows = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM "Product"
+      WHERE "businessId" = ${businessId}
+        AND "isActive" = true
+        ${wordsWhere}
+        ${categoryWhere}
+        ${priceWhere}
+      ORDER BY "name" ASC
+      LIMIT 20
+    `;
+
+    // Шаг 2 — догружаем полные объекты через стандартный findMany.
+    // Это даёт корректную типизацию Product без явных type assertions.
+    let products =
+      idRows.length > 0
+        ? await prisma.product.findMany({
+            where: { id: { in: idRows.map((r) => r.id) } },
+            orderBy: { name: "asc" },
+          })
+        : [];
+
+    // AI-fallback: если raw substring-поиск ничего не нашёл — опечатка или
+    // другой язык (Клеопатра vs Cleopatra). Дёргаем Haiku с реальными названиями.
     let normalizedQuery: string | null = null;
     if (products.length === 0 && query && query.trim().length >= 2) {
       const { normalizeProductQuery } = await import("./product-search-fallback");
       normalizedQuery = await normalizeProductQuery(query, businessId);
       if (normalizedQuery && normalizedQuery !== query) {
-        products = await prisma.product.findMany({
-          where: {
-            businessId,
-            isActive: true,
-            OR: [
-              { name: { contains: normalizedQuery, mode: "insensitive" } },
-              { category: { contains: normalizedQuery, mode: "insensitive" } },
-            ],
-            ...(maxPrice ? { price: { lte: maxPrice } } : {}),
-          },
-          orderBy: { name: "asc" },
-          take: 20,
+        // Повторный поиск нормализованным запросом — через тот же raw SQL.
+        const nq = normalizedQuery.toLowerCase().trim();
+        const nqWords = nq.split(/\s+/).filter((w) => w.length >= 2 && !STOP_WORDS.has(w));
+        const nqClauses: Prisma.Sql[] = nqWords.map((w) => {
+          const p = `%${w}%`;
+          return Prisma.sql`(
+            LOWER("name") LIKE ${p}
+            OR LOWER(COALESCE("description", '')) LIKE ${p}
+            OR LOWER(COALESCE("category", '')) LIKE ${p}
+            OR EXISTS (SELECT 1 FROM unnest("tags") t WHERE LOWER(t) LIKE ${p})
+          )`;
         });
+        const nqWhere =
+          nqClauses.length > 0
+            ? Prisma.sql`AND ${Prisma.join(nqClauses, " AND ")}`
+            : Prisma.empty;
+
+        const retryIds = await prisma.$queryRaw<Array<{ id: string }>>`
+          SELECT id FROM "Product"
+          WHERE "businessId" = ${businessId}
+            AND "isActive" = true
+            ${nqWhere}
+            ${priceWhere}
+          ORDER BY "name" ASC
+          LIMIT 20
+        `;
+        products =
+          retryIds.length > 0
+            ? await prisma.product.findMany({
+                where: { id: { in: retryIds.map((r) => r.id) } },
+                orderBy: { name: "asc" },
+              })
+            : [];
       }
     }
 
