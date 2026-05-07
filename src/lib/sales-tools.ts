@@ -12,6 +12,7 @@ import { dispatchCrmEvent } from "./crm-integrations";
 import { getPaymentButtons } from "./payment-links";
 import { sendOwnerNotification } from "./notifications";
 import { promoteDealStageByTelegram } from "./deal-pipeline";
+import { logActivityFireAndForget } from "./activity-log";
 
 const LOW_STOCK_THRESHOLD = 5;
 
@@ -1461,6 +1462,30 @@ export async function notifyManagerByTelegram(
     console.log(
       `${tag} DONE dashboard=${dashboardCreated} telegram=${telegramDelivered} reason="${telegramReason}"`
     );
+
+    // Activity log: видно ли клиенту в /dashboard/activity что эскалация
+    // прошла и куда ушла. Для дебага — реквизиты в technical.
+    logActivityFireAndForget({
+      businessId,
+      type: "notification_sent",
+      severity: telegramDelivered ? "info" : dashboardCreated ? "warn" : "error",
+      summary: telegramDelivered
+        ? `Уведомление менеджеру (${assignedManagerName || "владелец"}) доставлено в Telegram`
+        : dashboardCreated
+          ? `Уведомление сохранено в дашборде (Telegram-доставка не прошла)`
+          : `Уведомление НЕ доставлено`,
+      technical: {
+        tool: "notify_manager",
+        reason: reason?.slice(0, 200) || null,
+        urgency: urgency || "normal",
+        target: assignedManagerName ? "assigned_manager" : "owner",
+        targetName: assignedManagerName,
+        telegramDelivered,
+        dashboardCreated,
+        deliveryError: telegramReason || null,
+        clientTelegramId: clientTelegramId.toString(),
+      },
+    });
 
     // Запрос всегда сохранён (в дашборде), даже если Telegram-канал владельца не настроен.
     return {

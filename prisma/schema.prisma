@@ -208,6 +208,9 @@ model Business {
   // CRM интеграции
   crmIntegrations CrmIntegration[]
 
+  // Журнал активности бота (см. BusinessActivityLog)
+  activityLogs BusinessActivityLog[]
+
   // Задачи менеджеров
   tasks Task[]
 
@@ -2040,4 +2043,46 @@ model WebhookDedup {
 
   @@index([processedAt])
   @@map("webhook_dedup")
+}
+
+// Журнал активности бота для бизнеса. Видит только владелец своего бизнеса
+// через /dashboard/activity. Используется для дебага и прозрачности —
+// клиент видит ЧТО делал AI-сотрудник, без доступа к Vercel-логам.
+//
+// Severity:
+//   info  — обычные события (получено сообщение, AI ответил, уведомление доставлено)
+//   warn  — что-то нештатное но не fatal (fallback на owner вместо staff)
+//   error — реальные ошибки (Telegram API упал, БД transaction провалилась)
+//
+// Type — открытый список строк, не enum — чтобы добавлять новые без миграций:
+//   message_received | message_sent | ai_response | tool_called |
+//   notification_sent | client_assigned | booking_created | order_created |
+//   payment_received | error
+//
+// summary — короткая человеко-читаемая строка для UI ("Клиент Иван написал «привет»")
+// technical — JSON с деталями для разработчика (latency, http_status, errorCode, stack)
+//
+// Изоляция: API endpoint фильтрует по `businessId = currentUser.business.id`,
+// клиент не может увидеть логи чужого бизнеса.
+model BusinessActivityLog {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  type     String // см. перечисление в документации модели
+  severity String @default("info") // info | warn | error
+
+  summary   String @db.Text
+  technical Json? // {chatId, model, tokens, latency, errorCode, stack, ...}
+
+  // Опциональные привязки к сущностям — для UI-линков «открыть клиента / staff»
+  channel  String? // telegram | whatsapp | instagram | facebook
+  clientId String? // ID клиента (Client.id) если применимо
+  staffId  String? // ID сотрудника если применимо
+
+  createdAt DateTime @default(now())
+
+  @@index([businessId, createdAt(sort: Desc)])
+  @@index([businessId, type, createdAt(sort: Desc)])
+  @@index([businessId, severity, createdAt(sort: Desc)])
 }

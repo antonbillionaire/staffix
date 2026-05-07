@@ -16,6 +16,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { logActivityFireAndForget } from "@/lib/activity-log";
 
 export interface RoutableStaff {
   id: string;
@@ -289,6 +290,28 @@ export async function executeRouteToSpecialist(params: {
     console.log(
       `[ai-routing] business=${params.businessId} routed to staff=${staff.id} (${staff.name}) ${alreadyAssignedToOther ? "[multi-route, main stays " + currentMainStaffName + "]" : "[primary]"}. Reason: ${params.reason.slice(0, 100)}`
     );
+
+    // Activity log: направление + статус доставки уведомления
+    logActivityFireAndForget({
+      businessId: params.businessId,
+      type: alreadyAssignedToOther ? "tool_called" : "client_assigned",
+      severity: delivered ? "info" : "warn",
+      summary: alreadyAssignedToOther
+        ? `AI направил доп. запрос специалисту «${staff.name}» (основной менеджер: ${currentMainStaffName || "—"})`
+        : `AI направил клиента специалисту «${staff.name}». ${delivered ? "Уведомление доставлено." : "Уведомление НЕ доставлено."}`,
+      technical: {
+        tool: "route_to_specialist",
+        staffId: staff.id,
+        staffName: staff.name,
+        reason: params.reason,
+        notificationDelivered: delivered,
+        targetType: targetLabel,
+        clientTelegramId: params.clientTelegramId.toString(),
+        multiRoute: alreadyAssignedToOther,
+        currentMainStaff: currentMainStaffName,
+      },
+      staffId: staff.id,
+    });
 
     return {
       success: true,

@@ -29,6 +29,7 @@ import {
 import { handleCallbackQuery } from "@/lib/telegram/callbacks";
 import { handleStartCommand } from "@/lib/telegram/start-handler";
 import { generateAIResponse } from "@/lib/telegram/ai";
+import { logActivityFireAndForget } from "@/lib/activity-log";
 
 async function findBusinessByBotToken(
   botToken: string
@@ -468,16 +469,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    // Activity log: получено сообщение от клиента (для /dashboard/activity)
+    logActivityFireAndForget({
+      businessId: business.id,
+      type: "message_received",
+      severity: "info",
+      summary: `Клиент ${userName || "(без имени)"}: «${userMessage.slice(0, 120)}${userMessage.length > 120 ? "…" : ""}»`,
+      technical: {
+        chatId: chatId.toString(),
+        telegramId: telegramId.toString(),
+        username: message.from.username || null,
+        messageLength: userMessage.length,
+      },
+      channel: "telegram",
+    });
+
     // Печатает...
     await sendTypingAction(botToken, chatId);
 
     console.log(
       `[Webhook] Generating AI response for business=${business.id}, msg="${userMessage.slice(0, 50)}..."`
     );
+    const aiStart = Date.now();
     const aiResponse = await generateAIResponse(business.id, telegramId, userMessage, userName);
+    const aiLatencyMs = Date.now() - aiStart;
     console.log(
       `[Webhook] AI response generated (${aiResponse.text.length} chars, ${aiResponse.imageUrls.length} images)`
     );
+
+    // Activity log: AI ответил
+    logActivityFireAndForget({
+      businessId: business.id,
+      type: "ai_response",
+      severity: "info",
+      summary: `AI ответил клиенту (${(aiLatencyMs / 1000).toFixed(1)} сек, ${aiResponse.text.length} симв.)`,
+      technical: {
+        chatId: chatId.toString(),
+        latencyMs: aiLatencyMs,
+        responseLength: aiResponse.text.length,
+        imageCount: aiResponse.imageUrls.length,
+        responsePreview: aiResponse.text.slice(0, 200),
+      },
+      channel: "telegram",
+    });
 
     await sendTelegramMessage(botToken, chatId, aiResponse.text);
 
