@@ -361,65 +361,17 @@ export async function POST(request: NextRequest) {
       message.from.last_name
     );
 
-    // Handle /start command
-    if (userMessage === "/start") {
-      await sendTelegramMessage(
-        chatId,
-        `Здравствуйте, ${message.from.first_name}! 👋\n\n` +
-          `Я — консультант <b>Staffix</b>, платформы AI-сотрудников для бизнеса.\n\n` +
-          `Staffix — это AI, который отвечает вашим клиентам 24/7, записывает на услуги, ведёт CRM и напоминает о визитах. Всё автоматически, от <b>$20/мес</b>.\n\n` +
-          `Чем могу помочь?`,
-        {
-          inline_keyboard: [
-            [
-              { text: "💰 Тарифы", callback_data: "pricing" },
-              { text: "🚀 Возможности", callback_data: "features" },
-            ],
-            [
-              { text: "🎁 Попробовать бесплатно", callback_data: "try_free" },
-              { text: "📞 Демонстрация", callback_data: "demo" },
-            ],
-          ],
-        }
-      );
-      return NextResponse.json({ ok: true });
-    }
-
-    // Handle /pricing command
-    if (userMessage === "/pricing" || userMessage === "/prices") {
-      await sendTelegramMessage(
-        chatId,
-        `💰 <b>Тарифы Staffix</b>\n\n` +
-          `🆓 <b>Пробный</b> — Бесплатно (14 дней, 100 сообщений)\n` +
-          `📦 <b>Starter</b> — $20/мес (200 сообщений)\n` +
-          `⭐ <b>Pro</b> — $45/мес (1000 сообщений) ★ Популярный\n` +
-          `🏢 <b>Business</b> — $95/мес (3000 сообщений)\n` +
-          `🏭 <b>Enterprise</b> — $180/мес (безлимит)\n\n` +
-          `Годовая оплата — скидка 20%!\n` +
-          `Все планы включают ВСЕ функции.\n\n` +
-          `👉 Попробуйте бесплатно: <b>https://staffix.io</b>`
-      );
-      return NextResponse.json({ ok: true });
-    }
-
-    // Handle /help command
-    if (userMessage === "/help") {
-      await sendTelegramMessage(
-        chatId,
-        `<b>Staffix — AI-сотрудник для вашего бизнеса</b>\n\n` +
-          `Я могу рассказать вам о:\n` +
-          `• Возможностях Staffix\n` +
-          `• Тарифах и ценах\n` +
-          `• Настройке и запуске\n` +
-          `• Подборе плана для вашего бизнеса\n\n` +
-          `<b>Команды:</b>\n` +
-          `/start — Главное меню\n` +
-          `/pricing — Тарифы\n` +
-          `/help — Справка\n\n` +
-          `Или просто напишите ваш вопрос!`
-      );
-      return NextResponse.json({ ok: true });
-    }
+    // /start, /pricing, /help — НЕ ловим хард-кодом. Pos позиционируем Виктора
+    // как полноценный AI-консультант (как user-боты в других каналах).
+    // Все команды идут через generateStaffixSalesResponse — AI сам строит ответ
+    // из system prompt + истории. Это даёт:
+    //  - живой диалог с первого сообщения, а не дерево кнопок
+    //  - запись в SalesLead.history (видно в /admin/messages)
+    //  - тот же UX что в IG/WA (там кнопок не было — бот сразу общался)
+    //
+    // Старые callback_query handlers (pricing/features/try_free/demo) выше в коде
+    // оставлены для backwards compat — если у кого-то открыто старое сообщение с
+    // кнопками, нажатие сработает. Новые /start уже без кнопок.
 
     // Show typing indicator
     await sendTypingAction(chatId);

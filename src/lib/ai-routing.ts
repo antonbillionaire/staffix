@@ -120,20 +120,27 @@ ${list}
 ПРАВИЛО РОУТИНГА:
 - Когда из разговора ПОНЯТНО к какой специализации относится запрос клиента — вызови tool route_to_specialist с подходящим staff_id.
 - Если контекст НЕЯСЕН (клиент только что написал, мало деталей) — НЕ вызывай tool, задай уточняющий вопрос.
-- Tool вызывай ОДИН раз за разговор. Если клиент уже назначен — продолжай работать как обычно.
+- Если в одном разговоре у клиента ДВА запроса разных специализаций (пример: "тур в Самарканд И тур в Китай") — вызови route_to_specialist ДВАЖДЫ, по разу на каждую специализацию. Каждому специалисту прилетит своё уведомление.
 - Если запрос не подходит ни одному специалисту — используй обычный notify_manager.`;
 }
 
 /**
  * Выполнение tool route_to_specialist.
  *
- * Проверяет:
- *  - staff существует в этом бизнесе и acceptsLeads
- *  - У клиента ещё нет assignedStaffId (continuity — не перекидываем)
+ * Логика:
+ *  1. Находим staff (валидный, acceptsLeads)
+ *  2. assignedStaffId логика:
+ *     - если у клиента ещё НЕТ assignedStaffId → ставим этого специалиста как «основного»
+ *     - если уже назначен ТОТ ЖЕ специалист → ничего не меняем
+ *     - если уже назначен ДРУГОЙ специалист → НЕ перезаписываем (continuity для основного
+ *       контакта). Но всё равно отправляем уведомление новому специалисту — это второй
+ *       параллельный запрос (например клиент пишет про тур в Самарканд И в Китай).
+ *  3. ВСЕГДА отправляем Telegram-уведомление matched staff (или owner fallback).
+ *     Это критично — без этого AI считает что направил, а специалист ничего не получил.
  *
- * Возвращает результат для AI:
- *  - success=true с именем специалиста и сообщением
- *  - error если staff не найден или клиент уже назначен другому
+ * Раньше была проблема: tool устанавливал assignedStaffId, и потом надеялся что AI
+ * вызовет notify_manager для уведомления. Если AI не вызывал — специалист не знал.
+ * Теперь tool сам отправляет уведомление.
  */
 export async function executeRouteToSpecialist(params: {
   businessId: string;
@@ -144,6 +151,7 @@ export async function executeRouteToSpecialist(params: {
   success: boolean;
   message?: string;
   staffName?: string;
+  delivered?: boolean;
   error?: string;
 }> {
   try {
@@ -156,6 +164,8 @@ export async function executeRouteToSpecialist(params: {
       select: {
         id: true,
         name: true,
+        telegramChatId: true,
+        notificationsEnabled: true,
       },
     });
 
@@ -166,9 +176,13 @@ export async function executeRouteToSpecialist(params: {
       };
     }
 
-    // Continuity: проверяем не назначен ли клиент уже другому специалисту.
-    // Если назначен — НЕ перезаписываем (иначе клиента бы перекидывало между
-    // менеджерами при каждом сообщении с новым контекстом).
+    // Достаём бизнес для уведомления (botToken + ownerTelegramChatId как fallback)
+    const business = await prisma.business.findUnique({
+      where: { id: params.businessId },
+      select: { botToken: true, ownerTelegramChatId: true, name: true },
+    });
+
+    // Проверяем текущее назначение клиента
     const existing = await prisma.client.findUnique({
       where: {
         businessId_telegramId: {
@@ -176,46 +190,113 @@ export async function executeRouteToSpecialist(params: {
           telegramId: params.clientTelegramId,
         },
       },
-      select: { assignedStaffId: true },
+      select: { assignedStaffId: true, name: true, phone: true },
     });
 
-    if (existing?.assignedStaffId && existing.assignedStaffId !== staff.id) {
-      const currentStaff = await prisma.staff.findUnique({
-        where: { id: existing.assignedStaffId },
+    const alreadyAssignedToOther =
+      existing?.assignedStaffId && existing.assignedStaffId !== staff.id;
+    let currentMainStaffName: string | null = null;
+
+    if (alreadyAssignedToOther) {
+      // НЕ перезаписываем основного менеджера, но уведомление этому specialist'у всё равно отправим
+      const current = await prisma.staff.findUnique({
+        where: { id: existing!.assignedStaffId! },
         select: { name: true },
       });
-      return {
-        success: true,
-        message: `Клиент уже работает с ${currentStaff?.name || "другим специалистом"} — продолжайте диалог.`,
-        staffName: currentStaff?.name || undefined,
-      };
-    }
-
-    await prisma.client.upsert({
-      where: {
-        businessId_telegramId: {
+      currentMainStaffName = current?.name || null;
+    } else {
+      // Либо клиент новый, либо назначен на этого же staff — ставим / подтверждаем
+      await prisma.client.upsert({
+        where: {
+          businessId_telegramId: {
+            businessId: params.businessId,
+            telegramId: params.clientTelegramId,
+          },
+        },
+        create: {
           businessId: params.businessId,
           telegramId: params.clientTelegramId,
+          assignedStaffId: staff.id,
         },
-      },
-      create: {
-        businessId: params.businessId,
-        telegramId: params.clientTelegramId,
-        assignedStaffId: staff.id,
-      },
-      update: {
-        assignedStaffId: staff.id,
-      },
-    });
+        update: {
+          assignedStaffId: staff.id,
+        },
+      });
+    }
+
+    // Отправляем уведомление matched staff. Если у него нет telegramChatId или
+    // notifications отключены — fallback на ownerTelegramChatId. Если и его нет —
+    // лог-предупреждение, но возвращаем success (запись в БД сделана).
+    const targetChatId =
+      staff.notificationsEnabled !== false && staff.telegramChatId
+        ? staff.telegramChatId
+        : business?.ownerTelegramChatId ?? null;
+
+    const targetLabel =
+      staff.notificationsEnabled !== false && staff.telegramChatId
+        ? `staff "${staff.name}"`
+        : "owner (fallback)";
+
+    let delivered = false;
+
+    const clientLabel = existing?.name
+      ? `👤 ${existing.name}${existing.phone ? ` · ${existing.phone}` : ""}`
+      : `👤 Клиент (Telegram ID: ${params.clientTelegramId.toString()})`;
+
+    const headerLabel = alreadyAssignedToOther
+      ? `📩 Дополнительный запрос (основной менеджер: ${currentMainStaffName || "—"})`
+      : `📩 Новый клиент направлен Вам`;
+
+    const text =
+      `${headerLabel}\n\n` +
+      `${clientLabel}\n` +
+      `Специализация: ${staff.name}\n` +
+      `Причина роутинга: ${params.reason}\n\n` +
+      `Клиент ждёт ответа в Telegram.`;
+
+    if (business?.botToken && targetChatId) {
+      try {
+        const tgRes = await fetch(
+          `https://api.telegram.org/bot${business.botToken}/sendMessage`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: targetChatId.toString(),
+              text,
+              // Plain text — без parse_mode, чтобы спецсимволы в имени клиента не сломали отправку
+            }),
+          }
+        );
+        if (tgRes.ok) {
+          delivered = true;
+          console.log(`[ai-routing] notification delivered to ${targetLabel} (chat=${targetChatId})`);
+        } else {
+          const body = await tgRes.text().catch(() => "");
+          console.error(
+            `[ai-routing] TG notification FAILED ${tgRes.status}: ${body.slice(0, 200)}`
+          );
+        }
+      } catch (e) {
+        console.error("[ai-routing] TG notification error:", e);
+      }
+    } else {
+      console.warn(
+        `[ai-routing] No notification sent: botToken=${!!business?.botToken}, targetChatId=${targetChatId}`
+      );
+    }
 
     console.log(
-      `[ai-routing] business=${params.businessId} routed to staff=${staff.id} (${staff.name}). Reason: ${params.reason.slice(0, 100)}`
+      `[ai-routing] business=${params.businessId} routed to staff=${staff.id} (${staff.name}) ${alreadyAssignedToOther ? "[multi-route, main stays " + currentMainStaffName + "]" : "[primary]"}. Reason: ${params.reason.slice(0, 100)}`
     );
 
     return {
       success: true,
-      message: `Клиент направлен к специалисту ${staff.name}. Менеджер получит уведомление о новом запросе.`,
+      message: alreadyAssignedToOther
+        ? `Доп. запрос направлен специалисту ${staff.name}. Основной менеджер клиента остался ${currentMainStaffName || "прежний"}.`
+        : `Клиент направлен специалисту ${staff.name}.`,
       staffName: staff.name,
+      delivered,
     };
   } catch (error) {
     console.error("[ai-routing] executeRouteToSpecialist failed:", error);
