@@ -104,6 +104,28 @@ export async function getUserPages(userAccessToken: string): Promise<MetaPage[]>
       `&access_token=${userAccessToken}`
   );
   const data = await res.json();
+
+  // Diagnostic log: tells us on prod what Meta really returned for this user.
+  // Token is masked, page tokens are never logged.
+  console.log("[Meta OAuth] getUserPages response:", JSON.stringify({
+    httpStatus: res.status,
+    tokenLength: userAccessToken.length,
+    hasError: !!data.error,
+    errorCode: data.error?.code ?? null,
+    errorSubcode: data.error?.error_subcode ?? null,
+    errorType: data.error?.type ?? null,
+    errorMessage: data.error?.message ?? null,
+    pagesCount: Array.isArray(data.data) ? data.data.length : null,
+    pageNames: Array.isArray(data.data)
+      ? data.data.map((p: { id: string; name: string; instagram_business_account?: unknown }) => ({
+          id: p.id,
+          name: p.name,
+          hasIg: !!p.instagram_business_account,
+        }))
+      : null,
+    pagingNext: data.paging?.next ? "present" : "absent",
+  }));
+
   if (data.error) throw new Error(data.error.message || "Failed to fetch pages");
   return data.data || [];
 }

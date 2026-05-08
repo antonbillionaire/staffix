@@ -61,8 +61,22 @@ export async function GET(request: NextRequest) {
     // 1. Exchange code for long-lived token
     const { accessToken, expiresIn } = await exchangeCodeForLongLivedToken(code);
 
+    console.log("[Meta OAuth] callback: token exchanged, fetching pages", {
+      businessId,
+      userId: session.user.id,
+      tokenLength: accessToken.length,
+      expiresIn,
+    });
+
     // 2. Get user's pages
     const pages = await getUserPages(accessToken);
+
+    console.log("[Meta OAuth] callback: pages result", {
+      businessId,
+      pagesCount: pages.length,
+      pagesWithIg: pages.filter((p) => !!p.instagram_business_account).length,
+    });
+
     if (pages.length === 0) {
       // Most common cause: user connected their personal FB profile, not a
       // Facebook Page. Meta's bot API only works with Pages — this is their
@@ -183,7 +197,13 @@ export async function GET(request: NextRequest) {
     const igParam = igAccount?.username ? `&ig_username=${igAccount.username}` : "";
     return NextResponse.redirect(`${channelsUrl}?meta_connected=${connected}${igParam}`);
   } catch (err) {
-    console.error("Meta OAuth callback error:", err);
+    console.error("[Meta OAuth] callback error:", {
+      businessId,
+      userId: session.user.id,
+      errorName: err instanceof Error ? err.name : null,
+      errorMessage: err instanceof Error ? err.message : String(err),
+      errorStack: err instanceof Error ? err.stack : null,
+    });
     return NextResponse.redirect(
       `${channelsUrl}?meta_error=${encodeURIComponent(
         err instanceof Error ? err.message : "Connection failed"
