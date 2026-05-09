@@ -224,10 +224,13 @@ async function processBusinessFBMessage(
 
     if (!business?.fbActive) return;
 
-    // Prefer System User token (never expires), fall back to business token
-    const baseFbToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN
-      || process.env.STAFFIX_FB_PAGE_ACCESS_TOKEN
-      || business.fbPageAccessToken;
+    // Use customer's per-Page token first (long-lived, no expiration when
+    // generated from a long-lived user token). Env token only as fallback —
+    // it's Staffix's own System User and has no role on customer Pages, so
+    // using it for external businesses would 403 from Meta.
+    const baseFbToken = business.fbPageAccessToken
+      || process.env.FACEBOOK_PAGE_ACCESS_TOKEN
+      || process.env.STAFFIX_FB_PAGE_ACCESS_TOKEN;
     if (!baseFbToken) return;
 
     // Convert System User token → Page Access Token (required for Messenger API)

@@ -218,10 +218,13 @@ async function processIGMessage(
     },
   });
 
-  // Prefer System User token (never expires), fall back to business token
-  const effectiveIGToken = process.env.FACEBOOK_PAGE_ACCESS_TOKEN
-    || process.env.STAFFIX_FB_PAGE_ACCESS_TOKEN
-    || business?.fbPageAccessToken;
+  // Use customer's per-Page token first (long-lived, no expiration when
+  // generated from a long-lived user token). Env token only as fallback —
+  // it's Staffix's own System User and has no role on customer Pages, so
+  // using it for external businesses would 403 from Meta.
+  const effectiveIGToken = business?.fbPageAccessToken
+    || process.env.FACEBOOK_PAGE_ACCESS_TOKEN
+    || process.env.STAFFIX_FB_PAGE_ACCESS_TOKEN;
 
   if (!business || !effectiveIGToken) {
     // Not a customer business — fall back to Staffix sales bot
