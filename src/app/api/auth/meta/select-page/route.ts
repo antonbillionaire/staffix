@@ -51,12 +51,16 @@ export async function POST(request: NextRequest) {
 
     const igAccount = page.instagram_business_account;
 
-    // Subscribe page to webhook events
+    // Subscribe page to webhook events. Split into two calls because Meta
+    // rejects the whole request if any single field requires a permission we
+    // don't have — and leadgen needs leads_retrieval which isn't in our scope.
+    // Without the split, messaging webhooks fail to subscribe too.
     await subscribePageWebhooks(
       page.id,
       page.access_token,
-      "messages,messaging_postbacks,messaging_handovers,feed,leadgen"
+      "messages,messaging_postbacks,messaging_handovers,feed"
     );
+    await subscribePageWebhooks(page.id, page.access_token, "leadgen");
 
     // Save to Business table
     const updateData: Record<string, unknown> = {
