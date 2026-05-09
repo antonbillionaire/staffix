@@ -47,7 +47,8 @@ export async function generateAIResponse(
   businessId: string,
   telegramId: bigint,
   userMessage: string,
-  userName: string
+  userName: string,
+  telegramUsername?: string | null
 ): Promise<AIResponseWithMedia> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
@@ -342,7 +343,7 @@ export async function generateAIResponse(
     const extractedName = extractClientName(userMessage);
     const extractedPhone = extractPhone(userMessage);
 
-    await updateClientAfterMessage(businessId, telegramId, extractedName || userName);
+    await updateClientAfterMessage(businessId, telegramId, extractedName || userName, telegramUsername);
 
     if (extractedPhone) {
       await prisma.client.update({

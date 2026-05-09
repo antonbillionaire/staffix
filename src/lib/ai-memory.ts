@@ -632,7 +632,8 @@ ${business.aiRules ? `## Дополнительные правила:\n${busines
 export async function updateClientAfterMessage(
   businessId: string,
   telegramId: bigint,
-  clientName?: string
+  clientName?: string,
+  telegramUsername?: string | null
 ): Promise<void> {
   try {
     await prisma.client.upsert({
@@ -646,11 +647,15 @@ export async function updateClientAfterMessage(
         businessId,
         telegramId,
         name: clientName,
+        telegramUsername: telegramUsername || null,
         totalMessages: 1,
         lastMessageAt: new Date(),
       },
       update: {
         name: clientName || undefined,
+        // Юзеры могут менять @handle — всегда перезаписываем последним значением.
+        // null оставляем как есть (если username вдруг скрыт — не стираем старый).
+        telegramUsername: telegramUsername || undefined,
         totalMessages: { increment: 1 },
         lastMessageAt: new Date(),
       },

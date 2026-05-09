@@ -229,6 +229,8 @@ export async function POST(request: NextRequest) {
     }
     const userName =
       message.from.first_name + (message.from.last_name ? ` ${message.from.last_name}` : "");
+    // @username из Telegram (без @). Может быть undefined если у юзера не задан handle.
+    const telegramUsername = message.from.username || null;
 
     // Обработка контакта (поделился номером)
     if (message.contact) {
@@ -254,6 +256,7 @@ export async function POST(request: NextRequest) {
         create: {
           businessId: business.id,
           telegramId,
+          telegramUsername,
           phone,
           name: message.contact.first_name,
           assignedStaffId: autoAssign,
@@ -261,6 +264,7 @@ export async function POST(request: NextRequest) {
         update: {
           phone,
           name: message.contact.first_name,
+          telegramUsername: telegramUsername || undefined,
         },
       });
 
@@ -491,7 +495,7 @@ export async function POST(request: NextRequest) {
       `[Webhook] Generating AI response for business=${business.id}, msg="${userMessage.slice(0, 50)}..."`
     );
     const aiStart = Date.now();
-    const aiResponse = await generateAIResponse(business.id, telegramId, userMessage, userName);
+    const aiResponse = await generateAIResponse(business.id, telegramId, userMessage, userName, telegramUsername);
     const aiLatencyMs = Date.now() - aiStart;
     console.log(
       `[Webhook] AI response generated (${aiResponse.text.length} chars, ${aiResponse.imageUrls.length} images)`

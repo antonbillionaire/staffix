@@ -140,6 +140,7 @@ export async function GET(request: NextRequest) {
       return {
         id: client.id,
         telegramId: client.telegramId.toString(),
+        telegramUsername: client.telegramUsername,
         name: client.name || conversation?.clientName || "Клиент",
         phone: client.phone,
         totalVisits: client.totalVisits,
@@ -185,6 +186,11 @@ export async function GET(request: NextRequest) {
           ? { clientName: { contains: search, mode: "insensitive" as const } }
           : {}),
       },
+      include: {
+        client: {
+          select: { telegramUsername: true, instagramUsername: true },
+        },
+      },
       orderBy: { lastInteractionAt: "desc" },
     });
 
@@ -192,6 +198,8 @@ export async function GET(request: NextRequest) {
     const channelCustomers = channelLeads.map((lead) => ({
       id: lead.id,
       telegramId: null,
+      telegramUsername: lead.client?.telegramUsername ?? null,
+      instagramUsername: lead.client?.instagramUsername ?? null,
       name: lead.clientName || "Клиент",
       phone: null,
       totalVisits: 0,
@@ -226,7 +234,7 @@ export async function GET(request: NextRequest) {
 
     // Merge: Telegram clients + channel leads
     const allCustomers = [
-      ...enrichedClients.map((c) => ({ ...c, channel: "telegram" as string, leadStatus: null as string | null })),
+      ...enrichedClients.map((c) => ({ ...c, instagramUsername: null as string | null, channel: "telegram" as string, leadStatus: null as string | null })),
       ...channelCustomers,
     ];
 

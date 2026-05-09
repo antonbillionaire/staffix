@@ -38,6 +38,8 @@ import {
 interface Customer {
   id: string;
   telegramId: string | null;
+  telegramUsername?: string | null;
+  instagramUsername?: string | null;
   name: string;
   channel?: string;
   leadStatus?: string | null;
@@ -651,6 +653,11 @@ export default function CustomersPage() {
                                   </span>
                                 )}
                               </div>
+                              {(customer.telegramUsername || customer.instagramUsername) && (
+                                <p className="text-xs text-blue-400 truncate">
+                                  @{customer.telegramUsername || customer.instagramUsername}
+                                </p>
+                              )}
                               {customer.phone && (
                                 <p className={`text-xs ${textTertiary} truncate`}>{customer.phone}</p>
                               )}
@@ -714,6 +721,11 @@ export default function CustomersPage() {
                             </span>
                           )}
                         </p>
+                        {(customer.telegramUsername || customer.instagramUsername) && (
+                          <p className="text-sm text-blue-400">
+                            @{customer.telegramUsername || customer.instagramUsername}
+                          </p>
+                        )}
                         {customer.phone && (
                           <p className={`text-sm ${textTertiary} flex items-center gap-1`}>
                             <Phone className="h-3 w-3" />

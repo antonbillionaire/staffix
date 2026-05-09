@@ -31,6 +31,10 @@ interface Lead {
   convertedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  client?: {
+    telegramUsername: string | null;
+    instagramUsername: string | null;
+  } | null;
 }
 
 interface Funnel {
@@ -245,6 +249,11 @@ export default function LeadsPage() {
                         <div className={`text-sm font-medium ${textPrimary}`}>
                           {lead.clientName || lead.clientId || "—"}
                         </div>
+                        {(lead.client?.telegramUsername || lead.client?.instagramUsername) && (
+                          <div className="text-xs text-blue-400">
+                            @{lead.client.telegramUsername || lead.client.instagramUsername}
+                          </div>
+                        )}
                         {lead.firstMessage && (
                           <div className={`text-xs ${textSecondary} truncate max-w-[200px]`}>
                             {lead.firstMessage}

@@ -779,12 +779,13 @@ model Review {
 model Client {
   id String @id @default(cuid())
 
-  telegramId BigInt
-  name       String?
-  surname    String?
-  phone      String?
-  email      String?
-  company    String? // название бизнеса клиента
+  telegramId       BigInt
+  telegramUsername String? // @username из Telegram (без @), обновляется при каждом сообщении
+  name             String?
+  surname          String?
+  phone            String?
+  email            String?
+  company          String? // название бизнеса клиента
 
   // Лояльность: какие программы назначены (пустой = все)
   loyaltyProgramIds String[] @default([])

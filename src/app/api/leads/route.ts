@@ -60,6 +60,12 @@ export async function GET(request: NextRequest) {
           convertedAt: true,
           createdAt: true,
           updatedAt: true,
+          client: {
+            select: {
+              telegramUsername: true,
+              instagramUsername: true,
+            },
+          },
         },
       }),
       prisma.lead.groupBy({
