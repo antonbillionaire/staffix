@@ -27,12 +27,18 @@ export function verifyMetaWebhookSignature(
   }
 
   // If Meta didn't send a signature, reject
-  if (!signatureHeader) return false;
+  if (!signatureHeader) {
+    console.error("[Webhook Verify] No x-hub-signature-256 header — rejecting webhook");
+    return false;
+  }
+
+  const computedSignatures: string[] = [];
 
   // Try each secret — Instagram webhooks may use a different app secret
   for (const secret of secrets) {
     const expectedSignature =
       "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");
+    computedSignatures.push(expectedSignature);
 
     const expected = Buffer.from(expectedSignature);
     const received = Buffer.from(signatureHeader);
@@ -40,6 +46,20 @@ export function verifyMetaWebhookSignature(
       return true;
     }
   }
+
+  // Diagnostic log on mismatch. Sig and computed sigs are HMAC hashes — not
+  // secrets themselves, safe to log. Body length only, not body content.
+  console.error("[Webhook Verify] Signature mismatch:", JSON.stringify({
+    bodyLength: rawBody.length,
+    bodyPreview: rawBody.slice(0, 80),
+    receivedSig: signatureHeader,
+    receivedSigLength: signatureHeader.length,
+    secretsConfigured: [
+      process.env.META_APP_SECRET ? "META_APP_SECRET" : null,
+      process.env.INSTAGRAM_APP_SECRET ? "INSTAGRAM_APP_SECRET" : null,
+    ].filter(Boolean),
+    computedSignatures,
+  }));
 
   return false;
 }
