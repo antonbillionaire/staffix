@@ -25,6 +25,13 @@ export function buildMetaOAuthUrl(businessId: string): string {
     "instagram_basic",
     "instagram_manage_messages",
     "instagram_manage_comments",
+    // Required (per Graph API v17 changelog) so /me/accounts returns Pages
+    // linked to a Meta Business Account. Currently in Standard Access — only
+    // works for users with a role on our app (admins/devs/testers) until App
+    // Review approves Advanced Access. External users in the meantime fall
+    // back to "no_pages" the same way they did before this scope was added,
+    // so adding it now is safe.
+    "business_management",
   ].join(",");
 
   const state = Buffer.from(JSON.stringify({ businessId })).toString("base64url");
