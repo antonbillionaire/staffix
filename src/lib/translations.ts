@@ -1223,6 +1223,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "messages.botPrefix": "Бот: ",
     "messages.messagesCount": "сообщ.",
     "messages.noMessages": "Нет сообщений",
+    "messages.send": "Отправить",
+    "messages.replyPlaceholder": "Напишите ответ клиенту…",
+    "messages.replyHint": "Enter — отправить, Shift+Enter — новая строка",
     "messages.selectClient": "Выберите клиента",
     "messages.selectClientHint": "Нажмите на клиента слева чтобы увидеть переписку",
 
@@ -3096,6 +3099,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "messages.botPrefix": "Bot: ",
     "messages.messagesCount": "msgs",
     "messages.noMessages": "No messages",
+    "messages.send": "Send",
+    "messages.replyPlaceholder": "Type a reply to the customer…",
+    "messages.replyHint": "Enter to send, Shift+Enter for new line",
     "messages.selectClient": "Select a client",
     "messages.selectClientHint": "Click on a client on the left to see the conversation",
 
@@ -4969,6 +4975,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "messages.botPrefix": "Bot: ",
     "messages.messagesCount": "xabar",
     "messages.noMessages": "Xabarlar yo'q",
+    "messages.send": "Yuborish",
+    "messages.replyPlaceholder": "Mijozga javob yozing…",
+    "messages.replyHint": "Enter — yuborish, Shift+Enter — yangi qator",
     "messages.selectClient": "Mijozni tanlang",
     "messages.selectClientHint": "Yozishmani ko'rish uchun chapdagi mijozni bosing",
 
@@ -6840,6 +6849,9 @@ export const translations: Record<Language, Record<string, string>> = {
     "messages.botPrefix": "Бот: ",
     "messages.messagesCount": "хабар",
     "messages.noMessages": "Хабарламалар жоқ",
+    "messages.send": "Жіберу",
+    "messages.replyPlaceholder": "Клиентке жауап жазыңыз…",
+    "messages.replyHint": "Enter — жіберу, Shift+Enter — жаңа жол",
     "messages.selectClient": "Клиентті таңдаңыз",
     "messages.selectClientHint": "Хат алмасуды көру үшін сол жақтағы клиентті басыңыз",
 

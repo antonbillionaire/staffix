@@ -80,6 +80,43 @@ export default function MessagesPage() {
   const [correctionSaving, setCorrectionSaving] = useState(false);
   const [correctionSuccess, setCorrectionSuccess] = useState(false);
 
+  // Manual reply
+  const [replyText, setReplyText] = useState("");
+  const [replySending, setReplySending] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
+
+  const handleSendReply = async () => {
+    if (!selectedClient || !selectedChannel) return;
+    const text = replyText.trim();
+    if (!text || replySending) return;
+    setReplySending(true);
+    setReplyError(null);
+    try {
+      const res = await fetch("/api/messages/reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId: selectedClient,
+          channel: selectedChannel,
+          text,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setReplyError(data.error || "Не удалось отправить");
+        return;
+      }
+      setReplyText("");
+      // Refresh messages to show the sent one
+      await fetchMessages(selectedClient, selectedChannel);
+    } catch (e) {
+      console.error("Send reply error:", e);
+      setReplyError("Ошибка сети");
+    } finally {
+      setReplySending(false);
+    }
+  };
+
   const isDark = theme === "dark";
   const cardBg = isDark ? "bg-[#12122a]" : "bg-white";
   const borderColor = isDark ? "border-white/5" : "border-gray-200";
@@ -373,6 +410,51 @@ export default function MessagesPage() {
                   ))
                 )}
                 <div ref={messagesEndRef} />
+              </div>
+
+              {/* Manual reply input */}
+              <div className={`border-t ${borderColor} p-3`}>
+                {replyError && (
+                  <div className="mb-2 px-3 py-2 rounded-lg bg-red-500/15 text-red-400 text-xs">
+                    {replyError}
+                  </div>
+                )}
+                <div className="flex items-end gap-2">
+                  <textarea
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendReply();
+                      }
+                    }}
+                    placeholder={t("messages.replyPlaceholder")}
+                    rows={1}
+                    className={`flex-1 resize-none px-3 py-2 rounded-lg text-sm ${
+                      isDark
+                        ? "bg-white/5 text-white placeholder:text-gray-500 border border-white/10"
+                        : "bg-gray-50 text-gray-900 placeholder:text-gray-400 border border-gray-200"
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500/50 max-h-32`}
+                    style={{ minHeight: 40 }}
+                    disabled={replySending}
+                  />
+                  <button
+                    onClick={handleSendReply}
+                    disabled={replySending || !replyText.trim()}
+                    className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/40 disabled:cursor-not-allowed text-white text-sm font-medium flex items-center gap-1.5"
+                  >
+                    {replySending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    <span className="hidden sm:inline">{t("messages.send")}</span>
+                  </button>
+                </div>
+                <p className={`text-[10px] mt-1.5 ${textTertiary}`}>
+                  {t("messages.replyHint")}
+                </p>
               </div>
             </>
           ) : (
