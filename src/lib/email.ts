@@ -109,12 +109,13 @@ export async function sendSubscriptionReminder(
   email: string,
   name: string,
   planName: string,
-  daysLeft: number
+  daysLeft: number,
+  isTrial: boolean = false
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const resend = getResend();
     if (!resend) {
-      console.log(`[DEV] Subscription reminder for ${email}: ${daysLeft} days left`);
+      console.log(`[DEV] ${isTrial ? "Trial" : "Subscription"} reminder for ${email}: ${daysLeft} days left`);
       return { success: true };
     }
 
@@ -123,9 +124,10 @@ export async function sendSubscriptionReminder(
     const daysText = daysLeft <= 1
       ? "Сегодня последний день"
       : `Осталось ${daysLeft} ${daysLeft <= 4 ? "дня" : "дней"}`;
+    const noun = isTrial ? "Триал" : "Подписка";
     const subject = daysLeft <= 1
-      ? `Подписка Staffix истекает сегодня!`
-      : `Подписка Staffix: осталось ${daysLeft} ${daysLeft <= 4 ? "дня" : "дней"}`;
+      ? `${noun} Staffix истекает сегодня!`
+      : `${noun} Staffix: осталось ${daysLeft} ${daysLeft <= 4 ? "дня" : "дней"}`;
 
     const { error } = await resend.emails.send({
       from: FROM_EMAIL,
@@ -155,12 +157,16 @@ export async function sendSubscriptionReminder(
                 <p style="font-size: 14px; color: #9ca3af; margin: 0;">План: ${planName}</p>
               </div>
               <p style="color: #9ca3af; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">
-                ${daysLeft <= 1
-                  ? "Чтобы не потерять доступ к AI-сотруднику, CRM и автоматизациям — продлите подписку сейчас."
-                  : "Продлите подписку, чтобы ваш AI-сотрудник продолжал работать без перебоев."}
+                ${isTrial
+                  ? (daysLeft <= 1
+                      ? "Триал заканчивается. Выберите тариф, чтобы AI-сотрудник продолжил отвечать клиентам без перерыва."
+                      : "После окончания триала AI-сотрудник остановится. Выберите тариф заранее, чтобы избежать паузы.")
+                  : (daysLeft <= 1
+                      ? "Чтобы не потерять доступ к AI-сотруднику, CRM и автоматизациям — продлите подписку сейчас."
+                      : "Продлите подписку, чтобы ваш AI-сотрудник продолжал работать без перебоев.")}
               </p>
               <a href="https://www.staffix.io/pricing" style="display: block; text-align: center; padding: 14px 24px; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: #ffffff; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px;">
-                Продлить подписку
+                ${isTrial ? "Выбрать тариф" : "Продлить подписку"}
               </a>
             </div>
             <div style="padding: 24px 32px; background: rgba(0,0,0,0.2); text-align: center;">

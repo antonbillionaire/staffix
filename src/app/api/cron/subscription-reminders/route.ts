@@ -4,12 +4,15 @@ import { sendSubscriptionReminder } from "@/lib/email";
 import { getPlan, type PlanId } from "@/lib/plans";
 
 // Vercel Cron — runs daily at 09:00 UTC. Sends 7-day / 3-day / 1-day
-// reminders before the paid period ends.
+// reminders before access ends.
 //
-// Targets only status='cancelled' subscriptions: the user explicitly cancelled
-// auto-renewal and risks losing access on expiresAt. Active auto-renewing
-// subscriptions don't need our reminder — PayPro sends a renewal receipt and
-// the customer expects the charge.
+// Two cohorts are covered:
+//   1) plan='trial' (any status) — trial about to expire. New signups need
+//      a heads-up to convert before the bot stops responding.
+//   2) status='cancelled' on a paid plan — the user explicitly cancelled
+//      auto-renewal and risks losing access on expiresAt. Active auto-renewing
+//      subscriptions don't need our reminder — PayPro sends a renewal receipt
+//      and the customer expects the charge.
 //
 // Each reminder type fires once per cycle thanks to the reminder*Sent flags
 // on Subscription. The flags are reset in the PayPro webhook on renewal.
@@ -26,12 +29,15 @@ export async function GET(request: NextRequest) {
   const now = new Date();
 
   try {
-    // Pull cancelled subscriptions expiring in the next 8 days (covers all 3 windows).
+    // Pull two cohorts in one query: trial (any status) + cancelled paid plan.
+    // Both need 7d/3d/1d reminders before their access window ends.
     const subs = await prisma.subscription.findMany({
       where: {
-        status: "cancelled",
-        plan: { not: "trial" },
         expiresAt: { gt: now, lt: new Date(now.getTime() + 8 * DAY_MS) },
+        OR: [
+          { plan: "trial" },
+          { status: "cancelled", plan: { not: "trial" } },
+        ],
       },
       include: {
         business: { include: { user: { select: { email: true, name: true } } } },
@@ -48,6 +54,7 @@ export async function GET(request: NextRequest) {
       const user = sub.business.user;
       if (!user?.email) continue;
 
+      const isTrial = sub.plan === "trial";
       const planConfig = getPlan(sub.plan as PlanId);
       const daysLeft = Math.ceil((sub.expiresAt.getTime() - now.getTime()) / DAY_MS);
 
@@ -57,7 +64,8 @@ export async function GET(request: NextRequest) {
           user.email,
           user.name || "пользователь",
           planConfig.name,
-          7
+          7,
+          isTrial
         );
         if (r.success) {
           await prisma.subscription.update({
@@ -77,7 +85,8 @@ export async function GET(request: NextRequest) {
           user.email,
           user.name || "пользователь",
           planConfig.name,
-          3
+          3,
+          isTrial
         );
         if (r.success) {
           await prisma.subscription.update({
@@ -97,7 +106,8 @@ export async function GET(request: NextRequest) {
           user.email,
           user.name || "пользователь",
           planConfig.name,
-          1
+          1,
+          isTrial
         );
         if (r.success) {
           await prisma.subscription.update({
