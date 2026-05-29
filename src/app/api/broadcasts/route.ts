@@ -4,6 +4,7 @@ import { sendAutomationMessage } from "@/lib/automation";
 import { sendClientBroadcastEmail } from "@/lib/email";
 import { randomBytes } from "crypto";
 import { getCurrentBusinessId } from "@/lib/auth-helpers";
+import { checkSubscriptionLimit } from "@/lib/subscription-check";
 
 const VALID_CHANNELS = ["telegram", "email", "both"] as const;
 type BroadcastChannel = (typeof VALID_CHANNELS)[number];
@@ -97,6 +98,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Заполните все обязательные поля" },
         { status: 400 }
+      );
+    }
+
+    // Subscription gate. Outbound broadcasts on a trial/expired/suspended
+    // account would let the owner keep using paid features without paying —
+    // and a single broadcast can fan out to thousands of recipients, eating
+    // the message quota silently. Block at the entry point.
+    const subStatus = await checkSubscriptionLimit(businessId);
+    if (!subStatus.allowed) {
+      return NextResponse.json(
+        {
+          error: "subscription_blocked",
+          reason: subStatus.reason,
+          message:
+            subStatus.reason === "limit_reached"
+              ? "Лимит сообщений исчерпан. Обновите тариф, чтобы отправлять рассылки."
+              : subStatus.reason === "suspended"
+              ? "Подписка приостановлена. Обновите данные карты, чтобы продолжить."
+              : "Подписка истекла. Продлите тариф, чтобы отправлять рассылки.",
+        },
+        { status: 402 }
       );
     }
 
