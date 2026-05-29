@@ -30,6 +30,7 @@ import { handleCallbackQuery } from "@/lib/telegram/callbacks";
 import { handleStartCommand } from "@/lib/telegram/start-handler";
 import { generateAIResponse } from "@/lib/telegram/ai";
 import { logActivityFireAndForget } from "@/lib/activity-log";
+import { checkSubscriptionLimit, incrementMessageCount } from "@/lib/subscription-check";
 
 async function findBusinessByBotToken(
   botToken: string
@@ -45,51 +46,11 @@ async function findBusinessByBotToken(
   }
 }
 
-async function checkMessageLimit(businessId: string): Promise<{
-  allowed: boolean;
-  remaining: number;
-  plan: string;
-}> {
-  try {
-    const subscription = await prisma.subscription.findUnique({
-      where: { businessId },
-    });
-
-    if (!subscription) {
-      return { allowed: false, remaining: 0, plan: "none" };
-    }
-
-    if (new Date() > subscription.expiresAt) {
-      return { allowed: false, remaining: 0, plan: subscription.plan };
-    }
-
-    // -1 = безлимит для enterprise
-    if (subscription.messagesLimit === -1) {
-      return { allowed: true, remaining: -1, plan: subscription.plan };
-    }
-
-    const remaining = subscription.messagesLimit - subscription.messagesUsed;
-
-    if (remaining <= 0) {
-      return { allowed: false, remaining: 0, plan: subscription.plan };
-    }
-
-    return { allowed: true, remaining, plan: subscription.plan };
-  } catch {
-    return { allowed: false, remaining: 0, plan: "error" };
-  }
-}
-
-async function incrementMessageUsage(businessId: string): Promise<void> {
-  try {
-    await prisma.subscription.update({
-      where: { businessId },
-      data: { messagesUsed: { increment: 1 } },
-    });
-  } catch (error) {
-    console.error("Error incrementing message usage:", error);
-  }
-}
+// Telegram uses the shared subscription gate from lib/subscription-check.ts
+// (same as Messenger / Instagram / WhatsApp webhooks). Until 2026-05-29 this
+// file had its own checkMessageLimit/incrementMessageUsage duplicates that
+// didn't honor status="suspended" and silently diverged from the other
+// channels — now unified.
 
 export async function POST(request: NextRequest) {
   // Сохраняем как можно раньше — чтобы catch мог отправить fallback клиенту
@@ -459,15 +420,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Лимит сообщений
-    const { allowed, plan } = await checkMessageLimit(business.id);
+    // Лимит сообщений / статус подписки
+    const { allowed, reason } = await checkSubscriptionLimit(business.id);
 
     if (!allowed) {
-      let errorMsg = "К сожалению, лимит сообщений исчерпан. Пожалуйста, обратитесь к администратору.";
-
-      if (plan === "none") {
-        errorMsg = "Бот временно недоступен. Пожалуйста, свяжитесь с нами напрямую.";
-      }
+      // Suspended (PayPro charge failed) → owner needs to fix card. Apologize
+      // without exposing internals. Expired / limit_reached → similar apology;
+      // the customer doesn't need the technical reason, the owner sees it in
+      // the dashboard banner and email.
+      const errorMsg =
+        reason === "suspended"
+          ? "Бот временно недоступен. Пожалуйста, свяжитесь с нами напрямую."
+          : "К сожалению, лимит сообщений исчерпан. Пожалуйста, обратитесь к администратору.";
 
       await sendTelegramMessage(botToken, chatId, errorMsg);
       return NextResponse.json({ ok: true });
@@ -525,8 +489,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Не блокируем ответ счётчиком
-    incrementMessageUsage(business.id).catch((e) =>
-      console.error("[Webhook] incrementMessageUsage error:", e)
+    incrementMessageCount(business.id).catch((e) =>
+      console.error("[Webhook] incrementMessageCount error:", e)
     );
 
     return NextResponse.json({ ok: true });
