@@ -135,6 +135,22 @@ export async function POST(request: NextRequest) {
         if (ipn.creditDays > 0) {
           expiresAt.setDate(expiresAt.getDate() + ipn.creditDays);
         }
+        // Pro-rata for trial → paid: carry over any unused trial days so the
+        // user isn't punished for paying early. Cancellation of trial cycle
+        // doesn't refund, but rewarding early payment removes the "wait until
+        // last day" anti-pattern. Capped at 14 days as a sanity bound — a
+        // single trial period is at most that long.
+        const prevSub = business.subscription;
+        if (prevSub?.plan === "trial" && prevSub.expiresAt > new Date()) {
+          const trialRemainingDays = Math.ceil(
+            (prevSub.expiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+          );
+          const credit = Math.min(trialRemainingDays, 14);
+          if (credit > 0) {
+            expiresAt.setDate(expiresAt.getDate() + credit);
+            console.log(`PayPro: pro-rata +${credit}d carried from trial for business ${business.id}`);
+          }
+        }
 
         // Plan-change cleanup: if the user already had a different PayPro
         // subscription, terminate it now so we don't double-bill them. The
