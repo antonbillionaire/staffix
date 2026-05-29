@@ -103,7 +103,17 @@ export default function MessagesPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setReplyError(data.error || "Не удалось отправить");
+        // 402 = subscription gate. Show the server's localized-ish message
+        // (English) rather than the raw error code so the owner sees a clear
+        // explanation and the upgrade link.
+        if (res.status === 402) {
+          setReplyError(
+            (data.message as string | undefined) ||
+              "Subscription expired. Renew your plan to reply to customers."
+          );
+        } else {
+          setReplyError(data.error || "Не удалось отправить");
+        }
         return;
       }
       setReplyText("");

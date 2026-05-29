@@ -15,6 +15,7 @@ import { prisma } from "@/lib/prisma";
 import { sendTelegramMessage } from "@/lib/telegram/api";
 import { sendFBMessage, getPageAccessToken } from "@/lib/facebook-utils";
 import { stripMarkdown } from "@/lib/strip-markdown";
+import { checkSubscriptionLimit, incrementMessageCount } from "@/lib/subscription-check";
 
 const META_API_BASE = "https://graph.facebook.com/v21.0";
 
@@ -63,6 +64,26 @@ export async function POST(request: NextRequest) {
     });
     if (!business) {
       return NextResponse.json({ error: "Business not found" }, { status: 404 });
+    }
+
+    // Subscription gate — manual reply counts toward the plan's message limit
+    // and stops when trial/subscription expired or PayPro suspended the account.
+    // Without this, owners could keep replying for free after the trial ended.
+    const subStatus = await checkSubscriptionLimit(business.id);
+    if (!subStatus.allowed) {
+      return NextResponse.json(
+        {
+          error: "subscription_blocked",
+          reason: subStatus.reason,
+          message:
+            subStatus.reason === "limit_reached"
+              ? "Message limit reached. Upgrade your plan to keep replying."
+              : subStatus.reason === "suspended"
+              ? "Subscription suspended. Update your payment method to continue."
+              : "Subscription expired. Renew your plan to reply to customers.",
+        },
+        { status: 402 }
+      );
     }
 
     const cleanText = stripMarkdown(text);
@@ -177,6 +198,9 @@ export async function POST(request: NextRequest) {
         });
       }
     }
+
+    // Count manual reply toward the plan's message quota — same as AI auto-reply.
+    await incrementMessageCount(business.id);
 
     console.log(`[Manual Reply] Sent (${channel}, business=${business.id}, to=${clientId.slice(0, 8)}...)`);
     return NextResponse.json({ success: true });
