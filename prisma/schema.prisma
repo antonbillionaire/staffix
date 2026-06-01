@@ -14,6 +14,13 @@ model User {
   password String
   name     String
 
+  // Блокировка (для админских санкций — подозрительная активность,
+  // конкурентный probing, спам, нарушение условий). isBlocked=true
+  // запрещает логин и заставляет бот молчать для бизнеса юзера.
+  isBlocked     Boolean   @default(false)
+  blockedReason String?
+  blockedAt     DateTime?
+
   // Верификация email
   emailVerified       Boolean   @default(false)
   verificationToken   String?   @unique

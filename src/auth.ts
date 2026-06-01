@@ -66,6 +66,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           throw new Error("Неверный email или пароль");
         }
 
+        // Block check before email-verification check — blocked user must not
+        // get any signal about state of their account beyond "access denied".
+        if (finalUser.isBlocked) {
+          throw new Error("Аккаунт заблокирован. Свяжитесь с support@staffix.io");
+        }
+
         // Check email verification
         if (!finalUser.emailVerified) {
           throw new Error("Пожалуйста, подтвердите email");
@@ -96,6 +102,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           });
 
           if (existingUser) {
+            // Block check — refuse Google sign-in for blocked accounts the
+            // same way Credentials does. Returning false aborts the flow.
+            if (existingUser.isBlocked) {
+              console.warn(`[auth] Blocked user attempted Google sign-in: ${existingUser.email}`);
+              return false;
+            }
             // Track last login
             prisma.user.update({
               where: { id: existingUser.id },

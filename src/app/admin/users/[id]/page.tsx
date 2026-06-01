@@ -23,6 +23,9 @@ import {
   Copy,
   Check,
   AlertTriangle,
+  Ban,
+  ShieldCheck,
+  Trash2,
 } from "lucide-react";
 
 interface UserDetail {
@@ -32,6 +35,9 @@ interface UserDetail {
     name: string;
     createdAt: string;
     emailVerified: boolean;
+    isBlocked?: boolean;
+    blockedReason?: string | null;
+    blockedAt?: string | null;
   };
   business: {
     id: string;
@@ -142,6 +148,48 @@ export default function AdminUserDetailPage({
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleBlock = async () => {
+    const reason = window.prompt(
+      "Причина блокировки (видна только в админке):",
+      "Подозрительная активность / probing"
+    );
+    if (reason === null) return; // cancelled
+    await performAction("block_user", { reason });
+  };
+
+  const handleUnblock = async () => {
+    if (!window.confirm("Разблокировать пользователя?")) return;
+    await performAction("unblock_user");
+  };
+
+  const handleDelete = async () => {
+    const email = data?.user.email || "";
+    const confirmText = window.prompt(
+      `ВНИМАНИЕ: удаление необратимое. Будет удалён юзер, его бизнес и все данные.\n\nДля подтверждения введите email пользователя:\n${email}`
+    );
+    if (confirmText === null) return;
+    if (confirmText.trim().toLowerCase() !== email.toLowerCase()) {
+      alert("Email не совпал — удаление отменено.");
+      return;
+    }
+    setActionLoading("delete_user");
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
+      const result = await res.json();
+      if (res.ok) {
+        alert(result.message || "Пользователь удалён");
+        router.push("/admin/users");
+      } else {
+        setMessage({ type: "error", text: result.error || "Ошибка удаления" });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Ошибка сети при удалении" });
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -587,6 +635,88 @@ export default function AdminUserDetailPage({
               <Mail className="h-4 w-4" />
               Написать email
             </a>
+          </div>
+
+          {/* Sanctions: block / unblock / delete.
+              Block is the default safe move — reversible, preserves data for
+              audit. Delete is irreversible and requires typing the email to
+              confirm (in handleDelete). */}
+          <div className="bg-[#12122a] border border-red-500/20 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-white mb-1">
+              Санкции
+            </h2>
+            <p className="text-xs text-gray-500 mb-4">
+              Подозрительная активность, probing, нарушение условий
+            </p>
+
+            {user.isBlocked ? (
+              <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                <div className="flex items-center gap-2 mb-1">
+                  <Ban className="h-4 w-4 text-red-400" />
+                  <span className="text-sm font-medium text-red-300">
+                    Заблокирован
+                  </span>
+                </div>
+                {user.blockedReason && (
+                  <p className="text-xs text-gray-400 mb-1">
+                    Причина: {user.blockedReason}
+                  </p>
+                )}
+                {user.blockedAt && (
+                  <p className="text-xs text-gray-500">
+                    с {formatDate(user.blockedAt)}
+                  </p>
+                )}
+              </div>
+            ) : null}
+
+            <div className="space-y-2">
+              {user.isBlocked ? (
+                <button
+                  onClick={handleUnblock}
+                  disabled={actionLoading !== null}
+                  className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {actionLoading === "unblock_user" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="h-4 w-4" />
+                  )}
+                  Разблокировать
+                </button>
+              ) : (
+                <button
+                  onClick={handleBlock}
+                  disabled={actionLoading !== null}
+                  className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 rounded-lg text-orange-400 text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {actionLoading === "block_user" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Ban className="h-4 w-4" />
+                  )}
+                  Заблокировать
+                </button>
+              )}
+
+              <button
+                onClick={handleDelete}
+                disabled={actionLoading !== null}
+                className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {actionLoading === "delete_user" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                Удалить полностью
+              </button>
+            </div>
+
+            <p className="text-[10px] text-gray-500 mt-3 leading-relaxed">
+              Блокировка — обратимая, данные сохраняются. Удаление —
+              необратимое, чистит юзера + бизнес + все связанные данные.
+            </p>
           </div>
         </div>
       </div>

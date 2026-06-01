@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 
 export interface SubscriptionStatus {
   allowed: boolean;
-  reason?: "expired" | "limit_reached" | "suspended";
+  reason?: "expired" | "limit_reached" | "suspended" | "blocked";
   subscription?: {
     messagesUsed: number;
     messagesLimit: number;
@@ -30,11 +30,24 @@ export interface SubscriptionStatus {
 export async function checkSubscriptionLimit(
   businessId: string
 ): Promise<SubscriptionStatus> {
-  const subscription = await prisma.subscription.findUnique({
-    where: { businessId },
-    select: { messagesUsed: true, messagesLimit: true, expiresAt: true, status: true },
+  // Pull the business with its owner — we need User.isBlocked to short-circuit
+  // any outbound activity for admin-blocked accounts (competitor probing,
+  // confirmed abuse, ToS violations).
+  const business = await prisma.business.findUnique({
+    where: { id: businessId },
+    select: {
+      subscription: {
+        select: { messagesUsed: true, messagesLimit: true, expiresAt: true, status: true },
+      },
+      user: { select: { isBlocked: true } },
+    },
   });
 
+  if (business?.user?.isBlocked) {
+    return { allowed: false, reason: "blocked" };
+  }
+
+  const subscription = business?.subscription;
   if (!subscription) {
     return { allowed: true };
   }

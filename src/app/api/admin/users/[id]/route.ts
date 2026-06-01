@@ -107,6 +107,9 @@ export async function GET(
         name: user.name,
         createdAt: user.createdAt,
         emailVerified: user.emailVerified,
+        isBlocked: user.isBlocked,
+        blockedReason: user.blockedReason,
+        blockedAt: user.blockedAt,
       },
       business: business
         ? {
@@ -324,6 +327,37 @@ export async function PATCH(
         });
       }
 
+      case "block_user": {
+        const reason = (data?.reason as string | undefined)?.trim() || null;
+        await prisma.user.update({
+          where: { id },
+          data: {
+            isBlocked: true,
+            blockedReason: reason,
+            blockedAt: new Date(),
+          },
+        });
+        return NextResponse.json({
+          success: true,
+          message: "Пользователь заблокирован — логин и бот отключены",
+        });
+      }
+
+      case "unblock_user": {
+        await prisma.user.update({
+          where: { id },
+          data: {
+            isBlocked: false,
+            blockedReason: null,
+            blockedAt: null,
+          },
+        });
+        return NextResponse.json({
+          success: true,
+          message: "Пользователь разблокирован",
+        });
+      }
+
       default:
         return NextResponse.json(
           { error: "Неизвестное действие" },
@@ -334,6 +368,61 @@ export async function PATCH(
     console.error("Admin user update error:", error);
     return NextResponse.json(
       { error: "Ошибка сервера" },
+      { status: 500 }
+    );
+  }
+}
+
+// Полное удаление юзера — необратимое. Удаляет аккаунт, бизнес и весь
+// связанный контент через cascade в Prisma. Использовать только для
+// подтверждённого спама/абуза; для подозрительной активности лучше
+// block_user (обратимо, аудиторский след сохраняется).
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+
+    if (!session?.user?.email || !isAdmin(session.user.email)) {
+      return NextResponse.json({ error: "Доступ запрещён" }, { status: 403 });
+    }
+
+    const { id } = await params;
+
+    // Защита от случайного удаления собственного админ-аккаунта
+    if (session.user.id === id) {
+      return NextResponse.json(
+        { error: "Нельзя удалить свой собственный аккаунт" },
+        { status: 400 }
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, name: true },
+    });
+    if (!user) {
+      return NextResponse.json(
+        { error: "Пользователь не найден" },
+        { status: 404 }
+      );
+    }
+
+    // Cascade в Prisma чистит Business и всё под ним
+    // (Subscription, Conversations, Clients, и т.д. — onDelete: Cascade).
+    await prisma.user.delete({ where: { id } });
+
+    console.log(`[Admin] User deleted: ${user.email} (${user.id}) by ${session.user.email}`);
+
+    return NextResponse.json({
+      success: true,
+      message: `Пользователь ${user.email} удалён полностью`,
+    });
+  } catch (error) {
+    console.error("Admin user delete error:", error);
+    return NextResponse.json(
+      { error: "Ошибка удаления пользователя" },
       { status: 500 }
     );
   }
