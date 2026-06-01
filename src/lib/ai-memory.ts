@@ -338,6 +338,11 @@ export async function buildBusinessContext(
 // ФОРМИРОВАНИЕ СИСТЕМНОГО ПРОМПТА
 // ========================================
 
+// Anti-probe boundary — prepended at the very top of every user bot prompt so
+// it has the highest LLM attention weight (system instructions earliest in the
+// context have strongest grip on behavior). Hides Staffix/Claude/Anthropic etc.
+import { ANTI_PROBE_USER_BOT } from "@/lib/security-prompts";
+
 /**
  * Создаёт системный промпт с контекстом клиента и бизнеса
  */
@@ -370,7 +375,9 @@ export function buildSystemPrompt(
 
   const botName = business.botDisplayName || "AI-помощник";
 
-  let prompt = `Ты — ${botName}, AI-сотрудник компании "${business.name}".
+  let prompt = `${ANTI_PROBE_USER_BOT}
+
+Ты — ${botName}, AI-сотрудник компании "${business.name}".
 
 КРИТИЧЕСКИ ВАЖНО: Твоё имя — ${botName}. ВСЕГДА представляйся как ${botName}. Если клиент спрашивает как тебя зовут — отвечай "${botName}". Никогда не используй другое имя.
 

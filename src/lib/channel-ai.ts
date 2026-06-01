@@ -30,6 +30,9 @@ import {
 } from "@/lib/sales-tools";
 
 import { callClaudeWithRetry } from "@/lib/claude-retry";
+// Anti-probe boundary — prepended to every WA/IG/FB user-bot system prompt
+// so it has the highest LLM attention weight.
+import { ANTI_PROBE_USER_BOT } from "@/lib/security-prompts";
 
 type HistoryMessage = { role: "user" | "assistant"; content: string };
 
@@ -195,7 +198,9 @@ export function buildChannelSystemPrompt(
     : "";
 
   const botName = biz.botDisplayName || "AI-помощник";
-  let prompt = `Ты — ${botName}, AI-сотрудник бизнеса «${biz.name}» в ${channelName}.
+  let prompt = `${ANTI_PROBE_USER_BOT}
+
+Ты — ${botName}, AI-сотрудник бизнеса «${biz.name}» в ${channelName}.
 
 КРИТИЧЕСКИ ВАЖНО: Твоё имя — ${botName}. ВСЕГДА представляйся как ${botName}. Если клиент спрашивает как тебя зовут — отвечай "${botName}". Никогда не используй другое имя.
 
