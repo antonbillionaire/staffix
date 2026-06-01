@@ -136,9 +136,17 @@ describe("buildChannelSystemPrompt", () => {
     const prompt = buildChannelSystemPrompt(biz, "whatsapp");
     expect(prompt).toContain("long.pdf");
     expect(prompt).toContain("...");
-    // Should not contain the full 60000 chars — document body capped at 50000.
-    // Headroom for non-document prompt sections (services, FAQ, format/language rules) ~6000 chars.
-    expect(prompt.length).toBeLessThan(56500);
+    // The document section must be truncated — not contain the full 60000-char
+    // body. We assert that directly instead of comparing total prompt length,
+    // because the non-document sections (anti-probe, services, FAQ, format
+    // rules) legitimately grow over time and a razor-thin total bound breaks
+    // every time we add anything to the prompt header. Capping ~52000 leaves
+    // headroom for "..." marker, file name, surrounding markup, but excludes
+    // the full untruncated body.
+    const longAaaaIndex = prompt.indexOf("A".repeat(50001));
+    expect(longAaaaIndex).toBe(-1); // 50001 consecutive A's would mean uncapped
+    // Sanity bound on total prompt size — generous, won't break on header growth.
+    expect(prompt.length).toBeLessThan(70000);
   });
 
   it("includes multiple documents within total limit", () => {
