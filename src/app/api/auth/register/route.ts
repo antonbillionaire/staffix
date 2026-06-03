@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendVerificationEmail, sendPartnerNewReferralEmail } from "@/lib/email";
-import { notifyNewRegistration } from "@/lib/admin-notify";
 import bcrypt from "bcryptjs";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { normalizeEmail } from "@/lib/partner-helpers";
+import { validateEmailAddress } from "@/lib/email-validator";
 
 // Generate 6-digit verification code
 function generateVerificationCode(): string {
@@ -53,6 +53,18 @@ export async function POST(request: NextRequest) {
 
     // Normalize email to lowercase
     const normalizedEmail = email.toLowerCase().trim();
+
+    // Validate format, TLD, disposable provider, and DNS MX before doing
+    // anything else expensive. This catches asdasd@asdasd.asd-style fakes
+    // at the edge so they never become DB rows.
+    const emailCheck = await validateEmailAddress(normalizedEmail);
+    if (!emailCheck.ok) {
+      console.warn(`[register] email rejected: ${normalizedEmail} (${emailCheck.code})`);
+      return NextResponse.json(
+        { error: emailCheck.error || "Неверный email" },
+        { status: 400 }
+      );
+    }
 
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
@@ -142,8 +154,11 @@ export async function POST(request: NextRequest) {
     // Remove password from response
     const { password: _, verificationToken: __, ...userWithoutPassword } = user;
 
-    // Notify admin about new registration (non-blocking)
-    notifyNewRegistration(name, email, businessName).catch(() => {});
+    // Admin notification deliberately deferred until /api/auth/verify-email
+    // succeeds — otherwise admin sees every fake account that doesn't even
+    // pass MX validation but somehow slipped through. Only people who
+    // actually confirm a working email become "new registrations" worth
+    // looking at.
 
     // Send verification email
     const emailResult = await sendVerificationEmail(email, verificationCode, name);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendVerificationEmail, sendWelcomeEmail } from "@/lib/email";
-import { notifyEmailVerified } from "@/lib/admin-notify";
+import { notifyEmailVerified, notifyNewRegistration } from "@/lib/admin-notify";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 // Generate 6-digit verification code
@@ -76,8 +76,22 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Notify admin
+    // Pull business name for the admin notification. Moved here from
+    // /api/auth/register so admin only sees real signups (the ones that
+    // actually proved control of an inbox), not every test/fake row.
+    const businessForNotify = await prisma.business.findFirst({
+      where: { userId: user.id },
+      select: { name: true },
+    });
+
+    // Notify admin — both "verified" (existing) and "new registration"
+    // (moved from /register) fire here. Single Telegram ping per real signup.
     notifyEmailVerified(user.name, user.email).catch(() => {});
+    notifyNewRegistration(
+      user.name,
+      user.email,
+      businessForNotify?.name || "—"
+    ).catch(() => {});
 
     // Send welcome onboarding email
     sendWelcomeEmail(user.email, user.name).catch(() => {});
