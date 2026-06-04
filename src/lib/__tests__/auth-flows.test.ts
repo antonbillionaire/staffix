@@ -9,6 +9,9 @@ vi.mock("@/lib/prisma", () => ({
       create: vi.fn(),
       update: vi.fn(),
     },
+    business: {
+      findFirst: vi.fn(),
+    },
     partner: {
       findUnique: vi.fn(),
     },
