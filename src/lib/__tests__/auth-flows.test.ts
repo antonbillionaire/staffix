@@ -43,6 +43,14 @@ vi.mock("@/lib/admin-notify", () => ({
   notifyEmailVerified: vi.fn().mockResolvedValue(undefined),
 }));
 
+// email-validator does real DNS MX lookups in production. In tests we
+// short-circuit it to "ok" so the registration tests aren't gated on
+// CI network reachability / DNS latency. Validator behavior itself
+// gets its own focused test elsewhere.
+vi.mock("@/lib/email-validator", () => ({
+  validateEmailAddress: vi.fn().mockResolvedValue({ ok: true }),
+}));
+
 vi.mock("resend", () => ({
   Resend: vi.fn().mockImplementation(() => ({
     emails: {
