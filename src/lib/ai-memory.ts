@@ -346,10 +346,26 @@ import { ANTI_PROBE_USER_BOT } from "@/lib/security-prompts";
 /**
  * Создаёт системный промпт с контекстом клиента и бизнеса
  */
+/**
+ * Возвращает системный промпт разделённым на два куска:
+ *
+ *   stable    — бизнес-контекст (имя, услуги, документы, FAQ, правила).
+ *               Один и тот же для всех клиентов бизнеса. Caller оборачивает
+ *               в cache_control + ttl:'1h' — переиспользуется десятки раз.
+ *   variable  — клиентский контекст (имя, история визитов, summary, теги).
+ *               Уникален для каждого клиента и иногда меняется в течение
+ *               сессии. Caller оборачивает в cache_control + ttl:'5m'.
+ *
+ * До этого разделения у нас был один большой блок с cache_control. Любая
+ * правка клиентского контекста ломала кэш для документов (а у клиента
+ * типа Right Flight это до 20K символов справки) — каждое сообщение
+ * стоило ~$0.10 вместо ~$0.005. Это была главная причина дрейфа $11/день
+ * на одного клиента.
+ */
 export function buildSystemPrompt(
   business: BusinessContext,
   client: ClientContext | null
-): string {
+): { stable: string; variable: string } {
   const toneMap: Record<string, string> = {
     friendly: "Общайся дружелюбно и тепло, используй эмодзи умеренно.",
     professional: "Общайся профессионально и вежливо, без лишних эмоций.",
@@ -552,74 +568,79 @@ ${toneMap[business.aiTone || "friendly"] || toneMap.friendly}
 3. ТОЛЬКО после успешного вызова tool — отвечай "Передал, менеджер свяжется"
 `;
 
-  // Добавляем данные нового клиента если это первый визит
+  // ── Здесь заканчивается стабильный (кэшируемый) префикс ──
+  const stable = prompt;
+
+  // Дальше — переменный хвост: клиентский контекст. Меняется на каждого
+  // клиента и иногда — внутри одного диалога (когда summary обновляется).
+  let variable = "";
+
   if (!client || client.totalVisits === 0) {
-    prompt += `\n## СТРАТЕГИЯ ДЛЯ НОВОГО КЛИЕНТА:\nЭто новый клиент. Сначала поздоровайся и узнай его имя. Затем задай 1-2 вопроса чтобы понять потребность. Не вываливай весь прайс сразу — предложи наиболее подходящую услугу.`;
+    variable += `\n## СТРАТЕГИЯ ДЛЯ НОВОГО КЛИЕНТА:\nЭто новый клиент. Сначала поздоровайся и узнай его имя. Затем задай 1-2 вопроса чтобы понять потребность. Не вываливай весь прайс сразу — предложи наиболее подходящую услугу.`;
   }
 
-  // Добавляем контекст клиента если есть
   if (client) {
-    prompt += `\n\n## ИНФОРМАЦИЯ О КЛИЕНТЕ (используй для персонализации):`;
+    variable += `\n\n## ИНФОРМАЦИЯ О КЛИЕНТЕ (используй для персонализации):`;
 
     if (client.name) {
-      prompt += `\n- Имя: ${client.name}`;
+      variable += `\n- Имя: ${client.name}`;
     }
 
     if (client.totalVisits > 0) {
-      prompt += `\n- Был у нас: ${client.totalVisits} раз(а)`;
+      variable += `\n- Был у нас: ${client.totalVisits} раз(а)`;
     }
 
     if (client.lastVisitDate) {
       const lastVisit = new Date(client.lastVisitDate);
-      prompt += `\n- Последний визит: ${lastVisit.toLocaleDateString("ru-RU")}`;
+      variable += `\n- Последний визит: ${lastVisit.toLocaleDateString("ru-RU")}`;
     }
 
     if (client.summary) {
-      prompt += `\n- О клиенте: ${client.summary}`;
+      variable += `\n- О клиенте: ${client.summary}`;
     }
 
     if (client.importantNotes) {
-      prompt += `\n- ВАЖНО: ${client.importantNotes}`;
+      variable += `\n- ВАЖНО: ${client.importantNotes}`;
     }
 
     if (client.preferences) {
       const prefs = client.preferences;
       if (prefs.preferredServices) {
-        prompt += `\n- Предпочитает: ${(prefs.preferredServices as string[]).join(", ")}`;
+        variable += `\n- Предпочитает: ${(prefs.preferredServices as string[]).join(", ")}`;
       }
     }
 
     if (client.recentBookings.length > 0) {
-      prompt += `\n- Последние записи:`;
+      variable += `\n- Последние записи:`;
       for (const booking of client.recentBookings.slice(0, 3)) {
         const date = new Date(booking.date).toLocaleDateString("ru-RU");
-        prompt += `\n  • ${date}: ${booking.serviceName || "услуга"} (${booking.status})`;
+        variable += `\n  • ${date}: ${booking.serviceName || "услуга"} (${booking.status})`;
       }
     }
 
     if (client.conversationSummaries.length > 0) {
-      prompt += `\n- Из прошлых разговоров:`;
+      variable += `\n- Из прошлых разговоров:`;
       for (const summary of client.conversationSummaries) {
-        prompt += `\n  • ${summary}`;
+        variable += `\n  • ${summary}`;
       }
     }
 
     if (client.tags.length > 0) {
-      prompt += `\n- Теги: ${client.tags.join(", ")}`;
+      variable += `\n- Теги: ${client.tags.join(", ")}`;
     }
 
     if (client.loyaltyPoints > 0) {
-      prompt += `\n- Бонусные баллы: ${client.loyaltyPoints}`;
+      variable += `\n- Бонусные баллы: ${client.loyaltyPoints}`;
     }
     if (client.loyaltyVisits > 0) {
-      prompt += `\n- Визитов (лояльность): ${client.loyaltyVisits}`;
+      variable += `\n- Визитов (лояльность): ${client.loyaltyVisits}`;
     }
     if (client.loyaltyTotalSpent > 0) {
-      prompt += `\n- Общая сумма покупок: ${client.loyaltyTotalSpent.toLocaleString()}`;
+      variable += `\n- Общая сумма покупок: ${client.loyaltyTotalSpent.toLocaleString()}`;
     }
   }
 
-  return prompt;
+  return { stable, variable };
 }
 
 // ========================================

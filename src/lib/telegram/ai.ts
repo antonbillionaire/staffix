@@ -76,8 +76,9 @@ export async function generateAIResponse(
     const salesMode = isSalesMode(businessContext.businessType, businessContext.dashboardMode);
     console.log(`[Webhook] Mode: ${salesMode ? "sales" : "service"}, type=${businessContext.businessType}`);
 
-    // 4. Строим системный промпт
-    let systemPrompt: string;
+    // 4. Строим системный промпт — обе функции теперь возвращают
+    // { stable, variable } для split-кэширования (1h на префикс, 5m на хвост).
+    let systemPrompt: { stable: string; variable: string };
     if (salesMode) {
       const salesClientCtx = clientContext
         ? {
@@ -191,9 +192,18 @@ export async function generateAIResponse(
 - Если в саммари написано "клиент спрашивал про X, я ответил Y" — используй это только чтобы понять КОНТЕКСТ запроса, но цифры/факты бери из FAQ заново.
 - Контекст разговора (имя, предпочтения, что обсуждали в общем) — сохраняй. Конкретные факты — переспрашивай у промпта.`
       : "";
-    const systemWithDate = systemPrompt + systemHint + refreshNotice + routingPromptSection;
+    // Все «дрейфующие» куски (дата, refreshNotice, routing) пакуем в
+    // переменный хвост, рядом с клиентским контекстом. Стабильный префикс
+    // остаётся неизменным от вызова к вызову — Anthropic держит его в кэше.
+    const variableTail = systemPrompt.variable + systemHint + refreshNotice + routingPromptSection;
+    const systemBlocks = [
+      { type: "text" as const, text: systemPrompt.stable, cache_control: { type: "ephemeral" as const, ttl: "1h" as const } },
+      ...(variableTail.trim()
+        ? [{ type: "text" as const, text: variableTail, cache_control: { type: "ephemeral" as const, ttl: "5m" as const } }]
+        : []),
+    ];
 
-    console.log(`[Webhook] Calling Claude API for business=${businessId}, salesMode=${salesMode}`);
+    console.log(`[Webhook] Calling Claude API for business=${businessId}, salesMode=${salesMode}, stableLen=${systemPrompt.stable.length}, variableLen=${variableTail.length}`);
     let response = await callClaudeWithRetry({
       model: "claude-sonnet-4-5-20250929",
       // 500 ≈ ~375 chars output — enough for the 1–3 sentence default in
@@ -202,7 +212,7 @@ export async function generateAIResponse(
       // specific business needs longer replies it goes via aiRules
       // override at the top of the prompt, not a global cap.
       max_tokens: 500,
-      system: systemWithDate,
+      system: systemBlocks,
       messages: recentMessages,
       tools: activeTools,
     });
@@ -295,7 +305,7 @@ export async function generateAIResponse(
         response = await callClaudeWithRetry({
           model: "claude-sonnet-4-5-20250929",
           max_tokens: 500,
-          system: systemWithDate,
+          system: systemBlocks,
           messages: recentMessages,
           tools: activeTools,
         });

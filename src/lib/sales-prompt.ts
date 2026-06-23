@@ -32,10 +32,18 @@ interface SalesClientContext {
   importantNotes: string | null;
 }
 
+/**
+ * См. документацию к buildSystemPrompt в ai-memory.ts — те же причины
+ * разделения на stable/variable. Sales-промпт раньше дополнительно ронял
+ * кэш из-за порядка: клиентский блок шёл В СЕРЕДИНЕ, а документы и FAQ
+ * (самая большая часть) — ПОСЛЕ него. Любое изменение в клиентском блоке
+ * (новый клиент, новое summary) пересоздавало кэш для документов. Теперь
+ * порядок: stable (вся справка) → variable (клиент).
+ */
 export function buildSalesSystemPrompt(
   business: SalesBusinessContext,
   client: SalesClientContext | null
-): string {
+): { stable: string; variable: string } {
   const toneMap: Record<string, string> = {
     friendly: "Общайся дружелюбно и тепло. Создавай ощущение живого помощника-консультанта, а не робота.",
     professional: "Общайся профессионально и вежливо. Конкретно и чётко отвечай на вопросы.",
@@ -202,36 +210,6 @@ ${business.categories && business.categories.length > 0
 - НЕ говори "я передал менеджеру" БЕЗ вызова notify_manager — это критическая ошибка
 `;
 
-  // Добавляем контекст клиента
-  if (client && (client.name || client.totalOrders > 0)) {
-    prompt += `\n## О КЛИЕНТЕ (для персонализации):`;
-
-    if (client.name) {
-      prompt += `\n- Имя: ${client.name}`;
-    }
-
-    if (client.totalOrders > 0) {
-      prompt += `\n- Заказов у нас: ${client.totalOrders}`;
-      prompt += `\n- Постоянный клиент — тепло поприветствуй, например: "Рады снова видеть вас!"`;
-    }
-
-    if (client.lastOrderDate) {
-      prompt += `\n- Последний заказ: ${client.lastOrderDate.toLocaleDateString("ru-RU")}`;
-    }
-
-    if (client.importantNotes) {
-      prompt += `\n- ВАЖНО: ${client.importantNotes}`;
-    }
-
-    if (client.tags.includes("vip")) {
-      prompt += `\n- VIP-клиент: обслуживай с особым вниманием`;
-    }
-  } else {
-    prompt += `\n## НОВЫЙ КЛИЕНТ:
-Клиент обращается впервые. Поприветствуй его и задай 1-2 вопроса чтобы понять потребность.
-НЕ вываливай весь каталог сразу — сначала узнай что ищет.`;
-  }
-
   // Сначала справочные документы (фоновая информация)
   if (business.documents && business.documents.length > 0) {
     const docs = business.documents.filter((d) => d.extractedText);
@@ -263,7 +241,42 @@ ${business.categories && business.categories.length > 0
 - Если в FAQ перечислены даты/варианты/опции — называй ВСЕ перечисленные, не только первую.`;
   }
 
-  return prompt;
+  // ── Здесь заканчивается стабильный (кэшируемый) префикс ──
+  const stable = prompt;
+
+  // Дальше — переменный хвост: клиентский контекст. Меняется на каждого клиента.
+  let variable = "";
+
+  if (client && (client.name || client.totalOrders > 0)) {
+    variable += `\n## О КЛИЕНТЕ (для персонализации):`;
+
+    if (client.name) {
+      variable += `\n- Имя: ${client.name}`;
+    }
+
+    if (client.totalOrders > 0) {
+      variable += `\n- Заказов у нас: ${client.totalOrders}`;
+      variable += `\n- Постоянный клиент — тепло поприветствуй, например: "Рады снова видеть вас!"`;
+    }
+
+    if (client.lastOrderDate) {
+      variable += `\n- Последний заказ: ${client.lastOrderDate.toLocaleDateString("ru-RU")}`;
+    }
+
+    if (client.importantNotes) {
+      variable += `\n- ВАЖНО: ${client.importantNotes}`;
+    }
+
+    if (client.tags.includes("vip")) {
+      variable += `\n- VIP-клиент: обслуживай с особым вниманием`;
+    }
+  } else {
+    variable += `\n## НОВЫЙ КЛИЕНТ:
+Клиент обращается впервые. Поприветствуй его и задай 1-2 вопроса чтобы понять потребность.
+НЕ вываливай весь каталог сразу — сначала узнай что ищет.`;
+  }
+
+  return { stable, variable };
 }
 
 /**

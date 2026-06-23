@@ -34,9 +34,21 @@ const CACHE_MIN_CHARS = 4096;
 
 /**
  * Применяет cache_control к последнему text-блоку system-параметра.
- * Если system — строка, оборачиваем в массив с одним блоком и cache_control.
- * Если массив — добавляем cache_control к последнему text-блоку.
- * Если меньше CACHE_MIN_CHARS — возвращаем как есть (caching не сэкономит).
+ *
+ * TTL: используем '1h' вместо дефолтного '5m'. Запись 1h-кэша дороже в 2×,
+ * но read цена та же. Break-even: 1h окупается уже при ≥8 чтениях кэша на одну
+ * запись. В нашем сценарии (бизнес обслуживает разные диалоги в течение дня)
+ * 5m TTL почти всегда истекает между сообщениями одного клиента — каждое его
+ * сообщение становится новым cache_create. С 1h TTL префикс держится на всю
+ * рабочую сессию клиента и переиспользуется десятки раз.
+ *
+ * Сценарии:
+ * - Если system — строка длиной ≥ CACHE_MIN_CHARS, оборачиваем в один блок
+ *   с cache_control + ttl:'1h'.
+ * - Если массив — НЕ трогаем (вызывающий контролирует cache_control сам;
+ *   это путь split-prompt для buildSystemPrompt/buildSalesSystemPrompt,
+ *   где префикс отдельным блоком 1h, клиентский хвост — 5m).
+ * - Если меньше CACHE_MIN_CHARS — без изменений (caching не сэкономит).
  */
 function withPromptCaching(params: MessageCreateParams): MessageCreateParams {
   const sys = params.system;
@@ -46,7 +58,7 @@ function withPromptCaching(params: MessageCreateParams): MessageCreateParams {
     if (sys.length < CACHE_MIN_CHARS) return params;
     return {
       ...params,
-      system: [{ type: "text", text: sys, cache_control: { type: "ephemeral" } }],
+      system: [{ type: "text", text: sys, cache_control: { type: "ephemeral", ttl: "1h" } }],
     };
   }
 
@@ -57,16 +69,16 @@ function withPromptCaching(params: MessageCreateParams): MessageCreateParams {
       0
     );
     if (totalLen < CACHE_MIN_CHARS) return params;
-    // Если уже есть cache_control где-то — не трогаем (вызывающий знает что делает)
+    // Если вызывающий уже расставил cache_control — не трогаем (split-prompt путь)
     if (sys.some((b) => "cache_control" in b && b.cache_control)) return params;
-    // Добавляем cache_control к последнему блоку (стандартная практика — кешируем хвост стабильного префикса)
+    // Иначе автоматически кэшируем последний text-блок с часовым TTL
     const lastIdx = sys.length - 1;
     const lastBlock = sys[lastIdx];
     if (lastBlock.type !== "text") return params;
     const newSystem = [...sys];
     newSystem[lastIdx] = {
       ...lastBlock,
-      cache_control: { type: "ephemeral" },
+      cache_control: { type: "ephemeral", ttl: "1h" },
     };
     return { ...params, system: newSystem };
   }
