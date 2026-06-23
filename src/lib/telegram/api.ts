@@ -14,43 +14,82 @@
 
 import { stripMarkdown } from "@/lib/strip-markdown";
 
+// Внутренний тип "обычного" Message от Telegram. Используется и для
+// update.message, и для update.business_message — структура одинаковая, отличается
+// только наличие поля business_connection_id (заполнено только в business-варианте).
+export interface TelegramMessage {
+  message_id: number;
+  from: {
+    id: number;
+    first_name: string;
+    last_name?: string;
+    username?: string;
+    is_bot?: boolean;
+  };
+  chat: {
+    id: number;
+    type: string;
+  };
+  date: number;
+  text?: string;
+  contact?: {
+    phone_number: string;
+    first_name: string;
+    last_name?: string;
+  };
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
+  voice?: {
+    file_id: string;
+    duration: number;
+    mime_type?: string;
+    file_size?: number;
+  };
+  audio?: {
+    file_id: string;
+    duration: number;
+    mime_type?: string;
+    file_size?: number;
+  };
+  // Заполнено только для message из business-чата. Это якорь для send: чтобы
+  // ответить от имени владельца, мы передаём этот id обратно в sendMessage.
+  business_connection_id?: string;
+  // Бот, который реально отправил сообщение от имени владельца (для исходящих).
+  // Нужно для loop prevention — мы игнорируем business_message где
+  // sender_business_bot.id == id нашего бота (это эхо нашего же ответа).
+  sender_business_bot?: {
+    id: number;
+    is_bot: boolean;
+    username?: string;
+  };
+}
+
 export interface TelegramUpdate {
   update_id: number;
-  message?: {
-    message_id: number;
-    from: {
+  message?: TelegramMessage;
+  // Новые типы апдейтов из Telegram Business API. Доки:
+  // https://core.telegram.org/bots/api#update
+  business_connection?: {
+    id: string;            // BusinessConnection.id
+    user: {                // владелец, у кого работает бот
       id: number;
       first_name: string;
       last_name?: string;
       username?: string;
     };
-    chat: {
-      id: number;
-      type: string;
-    };
+    user_chat_id: number;  // личный chat_id с владельцем, для системных сообщений
     date: number;
-    text?: string;
-    contact?: {
-      phone_number: string;
-      first_name: string;
-      last_name?: string;
-    };
-    location?: {
-      latitude: number;
-      longitude: number;
-    };
-    voice?: {
-      file_id: string;
-      duration: number;
-      mime_type?: string;
-      file_size?: number;
-    };
-    audio?: {
-      file_id: string;
-      duration: number;
-      mime_type?: string;
-      file_size?: number;
-    };
+    can_reply: boolean;    // право отвечать (может быть false)
+    is_enabled: boolean;   // подключение активно или владелец поставил паузу
+  };
+  business_message?: TelegramMessage;
+  edited_business_message?: TelegramMessage;
+  deleted_business_messages?: {
+    business_connection_id: string;
+    chat_id: number;
+    message_ids: number[];
   };
   callback_query?: {
     id: string;
@@ -86,7 +125,12 @@ export function splitTelegramMessage(text: string, maxLen = 4096): string[] {
 export async function sendTelegramMessage(
   botToken: string,
   chatId: number,
-  text: string
+  text: string,
+  // Опциональный business_connection_id — если передан, сообщение уйдёт
+  // ОТ ИМЕНИ ВЛАДЕЛЬЦА в его личный чат (Telegram Business API). Клиент
+  // в чате увидит ответ как сообщение от самого владельца, а не от бота.
+  // Если не передан — обычная отправка от бота (старое поведение).
+  businessConnectionId?: string
 ): Promise<boolean> {
   try {
     const cleanText = stripMarkdown(text);
@@ -103,6 +147,7 @@ export async function sendTelegramMessage(
           body: JSON.stringify({
             chat_id: chatId,
             text: chunk,
+            ...(businessConnectionId ? { business_connection_id: businessConnectionId } : {}),
           }),
         }
       );

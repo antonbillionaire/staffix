@@ -39,6 +39,57 @@ export default function TelegramChannelPage() {
     name: "",
   });
 
+  // Telegram Business — отдельное подключение бота в личные чаты владельца.
+  // Активируется владельцем в TG-приложении, мы только показываем статус.
+  const [tgBiz, setTgBiz] = useState<{
+    connected: boolean;
+    canReply?: boolean;
+    isEnabled?: boolean;
+    pausedByOwner?: boolean;
+  }>({ connected: false });
+  const [tgBizPausing, setTgBizPausing] = useState(false);
+  const [tgBizEnabling, setTgBizEnabling] = useState(false);
+  const [tgBizEnabled, setTgBizEnabled] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/telegram-business")
+      .then((r) => r.json())
+      .then((d) => setTgBiz(d))
+      .catch(() => {});
+  }, []);
+
+  const enableBusinessFeature = async () => {
+    setTgBizEnabling(true);
+    try {
+      const r = await fetch("/api/telegram-business", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "enable" }),
+      });
+      if (r.ok) setTgBizEnabled(true);
+    } finally {
+      setTgBizEnabling(false);
+    }
+  };
+
+  const togglePause = async () => {
+    if (!tgBiz.connected) return;
+    setTgBizPausing(true);
+    try {
+      const next = !tgBiz.pausedByOwner;
+      const r = await fetch("/api/telegram-business", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paused: next }),
+      });
+      if (r.ok) {
+        setTgBiz((prev) => ({ ...prev, pausedByOwner: next }));
+      }
+    } finally {
+      setTgBizPausing(false);
+    }
+  };
+
   const cardBg = isDark ? "bg-[#12122a]" : "bg-white";
   const borderColor = isDark ? "border-white/5" : "border-gray-200";
   const textPrimary = isDark ? "text-white" : "text-gray-900";
@@ -345,6 +396,86 @@ export default function TelegramChannelPage() {
             <p>4. {t("channels.tg.avatarStep4")}</p>
             <p>5. {t("channels.tg.avatarStep5")}</p>
           </div>
+        </div>
+      )}
+
+      {/* Telegram Business — AI в личных чатах владельца */}
+      {botInfo.connected && (
+        <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className={`text-lg font-semibold ${textPrimary} mb-2 flex items-center gap-2`}>
+                <Sparkles className="h-5 w-5 text-violet-400" />
+                AI в личных чатах Telegram
+              </h3>
+              <p className={`${textSecondary} text-sm`}>
+                Опциональная функция Telegram Business: AI отвечает клиентам, которые пишут в ваш личный Telegram (не в бота). Требуется Telegram Premium у вас.
+              </p>
+            </div>
+            {tgBiz.connected && (
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                  tgBiz.pausedByOwner
+                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                    : tgBiz.isEnabled && tgBiz.canReply
+                      ? "bg-green-500/20 text-green-400 border border-green-500/40"
+                      : "bg-red-500/20 text-red-400 border border-red-500/40"
+                }`}
+              >
+                {tgBiz.pausedByOwner
+                  ? "На паузе"
+                  : tgBiz.isEnabled && tgBiz.canReply
+                    ? "Активно"
+                    : !tgBiz.isEnabled
+                      ? "Отключено в TG"
+                      : "Нет права отвечать"}
+              </span>
+            )}
+          </div>
+
+          {!tgBiz.connected ? (
+            <div className="mt-4 space-y-3">
+              <button
+                onClick={enableBusinessFeature}
+                disabled={tgBizEnabling || tgBizEnabled}
+                className="w-full bg-gradient-to-r from-violet-600 to-purple-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+              >
+                {tgBizEnabling
+                  ? "Подготавливаю бота…"
+                  : tgBizEnabled
+                    ? "Бот готов ✓ — теперь подключите в Telegram (см. ниже)"
+                    : "Шаг 1: подготовить бота к подключению"}
+              </button>
+              <div className={`${isDark ? "bg-white/5" : "bg-gray-50"} rounded-lg p-4 space-y-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                <p className="font-medium mb-2">Шаг 2: подключите в Telegram (один раз):</p>
+                <p>1. Откройте Telegram → Settings → Telegram Business</p>
+                <p>2. Перейдите в раздел «Chatbots»</p>
+                <p>3. Введите имя бота: <span className="font-mono">@{botInfo.username}</span></p>
+                <p>4. Настройте в каких чатах бот будет работать (например, только с не-контактами)</p>
+                <p className={`mt-3 text-xs ${textSecondary}`}>
+                  После подключения здесь появится тогглер «Пауза» и текущий статус. Telegram присылает обновление статуса сам — обновите страницу через минуту после подключения.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 flex items-center gap-3">
+              <button
+                onClick={togglePause}
+                disabled={tgBizPausing}
+                className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  tgBiz.pausedByOwner
+                    ? "bg-green-600 hover:bg-green-700 text-white"
+                    : "bg-amber-600 hover:bg-amber-700 text-white"
+                }`}
+              >
+                {tgBizPausing
+                  ? "Сохраняю…"
+                  : tgBiz.pausedByOwner
+                    ? "Возобновить AI в личных чатах"
+                    : "Поставить AI на паузу"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

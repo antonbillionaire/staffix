@@ -120,7 +120,18 @@ async function registerWebhook(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         url: webhookUrl,
-        allowed_updates: ["message", "callback_query"],
+        // Telegram по умолчанию шлёт только обычные message и callback_query.
+        // Чтобы получать business_* апдейты (фича Telegram Business — AI в
+        // личных чатах владельца), их нужно явно перечислить в allowed_updates.
+        // Без этого Telegram молча игнорирует наш webhook для business событий.
+        allowed_updates: [
+          "message",
+          "callback_query",
+          "business_connection",
+          "business_message",
+          "edited_business_message",
+          "deleted_business_messages",
+        ],
         secret_token: webhookSecret,
       }),
     });

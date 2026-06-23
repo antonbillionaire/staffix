@@ -29,6 +29,12 @@ import {
 import { handleCallbackQuery } from "@/lib/telegram/callbacks";
 import { handleStartCommand } from "@/lib/telegram/start-handler";
 import { generateAIResponse } from "@/lib/telegram/ai";
+import {
+  handleBusinessConnection,
+  handleBusinessMessage,
+  handleEditedBusinessMessage,
+  handleDeletedBusinessMessages,
+} from "@/lib/telegram/business-handler";
 import { logActivityFireAndForget } from "@/lib/activity-log";
 import { checkSubscriptionLimit, incrementMessageCount } from "@/lib/subscription-check";
 
@@ -144,6 +150,26 @@ export async function POST(request: NextRequest) {
     // Inline buttons
     if (update.callback_query) {
       await handleCallbackQuery(botToken, business.id, update.callback_query);
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── Telegram Business API updates ─────────────────────────────────────
+    // Эти апдейты приходят на тот же webhook, если владелец подключил бота
+    // в TG → Settings → Telegram Business → Chatbots. Обрабатываем отдельно.
+    if (update.business_connection) {
+      await handleBusinessConnection(botToken, update.business_connection);
+      return NextResponse.json({ ok: true });
+    }
+    if (update.business_message) {
+      await handleBusinessMessage(botToken, update.business_message);
+      return NextResponse.json({ ok: true });
+    }
+    if (update.edited_business_message) {
+      handleEditedBusinessMessage(update.edited_business_message);
+      return NextResponse.json({ ok: true });
+    }
+    if (update.deleted_business_messages) {
+      handleDeletedBusinessMessages(update.deleted_business_messages);
       return NextResponse.json({ ok: true });
     }
 

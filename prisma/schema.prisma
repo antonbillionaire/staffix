@@ -212,6 +212,11 @@ model Business {
   channelConnections ChannelConnection[]
   channelClients     ChannelClient[]
 
+  // Telegram Business — бот в личных чатах владельца (см. TelegramBusinessConnection).
+  // Опционально: владелец сам подключает через TG Settings → Business → Chatbots.
+  // Один бизнес = одно подключение (один владельцев аккаунт у нас и есть Business).
+  tgBusinessConnection TelegramBusinessConnection?
+
   // CRM интеграции
   crmIntegrations CrmIntegration[]
 
@@ -1095,6 +1100,63 @@ model ChannelConnection {
 
   @@unique([businessId, channel])
   @@index([channel, isConnected])
+}
+
+// Telegram Business API connection — бот подключен к личным чатам владельца.
+// Документация: https://core.telegram.org/bots/api#businessconnection
+//
+// Жизненный цикл:
+//   1. Владелец в TG → Settings → Telegram Business → Chatbots добавляет @нашего-бота
+//   2. Нам прилетает Update.business_connection с id, user_chat_id, can_reply, is_enabled
+//   3. Мы upsert'им запись по connectionId, привязываем к Business через ownerUserId
+//   4. На каждый Update.business_message от клиента в личном чате владельца —
+//      пропускаем через AI и шлём ответ обратно с этим connectionId
+//   5. Если is_enabled=false (владелец отключил) — игнорируем входящие
+//
+// Требование Telegram: у владельца нужен Telegram Premium для самой возможности
+// подключить бота (фича Telegram Business). На нашей стороне это никак не
+// гейтится — TG просто не отдаст update если у владельца нет Premium.
+model TelegramBusinessConnection {
+  id String @id @default(cuid())
+
+  // BusinessConnection.id из Telegram — стабильный идентификатор подключения.
+  // Используется как business_connection_id в исходящих sendMessage.
+  connectionId String @unique
+
+  // Owner identity (Telegram user id владельца, у кого работает бот в личных чатах).
+  // Привязка к нашему Business — через этот же id, который должен совпадать с
+  // Business.ownerTelegramChatId (тот, кто запустил /start в @нашем-боте раньше).
+  ownerUserId BigInt
+
+  // Личный chat_id владельца — нужен чтобы слать ему системные нотификации
+  // ("AI подключился к личным чатам", "Клиент Х написал, я обработал").
+  ownerChatId BigInt
+
+  // Из BusinessConnection: можем ли отвечать (может быть false если владелец
+  // снял право в настройках подключения).
+  canReply Boolean @default(false)
+
+  // Из BusinessConnection: подключение активно или владелец поставил на паузу
+  // через TG-настройки.
+  isEnabled Boolean @default(true)
+
+  // Наш собственный мастер-выключатель из дашборда (быстро отключить без
+  // похода в TG-настройки).
+  pausedByOwner Boolean @default(false)
+
+  // Когда впервые подключилось и когда последнее изменение пришло
+  connectedAt DateTime  @default(now())
+  lastEventAt DateTime?
+
+  // Привязка к бизнесу
+  businessId String   @unique
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([connectionId])
+  @@index([ownerUserId])
 }
 
 // Клиенты со всех каналов (унифицированные)
