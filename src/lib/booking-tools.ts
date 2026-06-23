@@ -921,10 +921,10 @@ export const bookingToolDefinitions: any[] = [
         },
         client_phone: {
           type: "string",
-          description: "Телефон клиента (если известен)",
+          description: "Телефон клиента в международном формате (+998..., +7..., +996...). ОБЯЗАТЕЛЬНО спроси у клиента ДО вызова этого инструмента, если его ещё нет в истории диалога или в данных клиента. Без телефона мастер не сможет связаться при отмене/переносе.",
         },
       },
-      required: ["date", "time", "client_name"],
+      required: ["date", "time", "client_name", "client_phone"],
     },
   },
   {
