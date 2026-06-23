@@ -70,6 +70,10 @@
     {
       "path": "/api/cron/partner-earnings-unlock",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/cache-warmer",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

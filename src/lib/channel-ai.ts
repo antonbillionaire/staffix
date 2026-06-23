@@ -29,6 +29,7 @@ import {
   identifyClientByPhone,
 } from "@/lib/sales-tools";
 
+import Anthropic from "@anthropic-ai/sdk";
 import { callClaudeWithRetry, logClaudeUsage } from "@/lib/claude-retry";
 // Anti-probe boundary — prepended to every WA/IG/FB user-bot system prompt
 // so it has the highest LLM attention weight.
@@ -877,4 +878,44 @@ async function sendLimitWarningEmail(
       </div>
     `,
   });
+}
+
+/**
+ * Pre-warm the Anthropic prompt cache for a (business, channel) pair.
+ *
+ * Why: Anthropic per docs — "The cache is refreshed for no additional cost
+ * each time the cached content is used". TTL is 1h; a successful cache_read
+ * extends the timer. If we touch the cache every ~30 min, it stays warm
+ * indefinitely — production calls never pay cache_create (~$0.18 each for
+ * Right Flight-sized 30K prefix).
+ *
+ * The call is minimal:
+ *  - system   = the EXACT same buildChannelSystemPrompt output that
+ *               production uses (so the cache key matches byte-for-byte)
+ *  - messages = single "ping" user message
+ *  - max_tokens = 1 (we don't care about the reply)
+ *  - tools    = omitted (warming the cache, not invoking AI)
+ *
+ * Returns usage so the cron can log how many tokens were read vs. created.
+ */
+export async function warmChannelCache(
+  businessId: string,
+  channel: string
+): Promise<Anthropic.Message["usage"] | null> {
+  const biz = await loadBusinessProfile(businessId);
+  if (!biz) return null;
+
+  const systemPrompt = buildChannelSystemPrompt(biz, channel);
+  // Если префикс короткий — кэширование не сэкономит, не зовём Claude.
+  if (systemPrompt.length < 4096) return null;
+
+  const response = await callClaudeWithRetry({
+    model: "claude-sonnet-4-5-20250929",
+    max_tokens: 1,
+    system: systemPrompt,
+    messages: [{ role: "user", content: "ping" }],
+  });
+
+  logClaudeUsage(`warm/${channel}`, response.usage, { biz: businessId });
+  return response.usage;
 }
