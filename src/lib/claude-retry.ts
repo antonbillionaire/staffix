@@ -74,6 +74,44 @@ function withPromptCaching(params: MessageCreateParams): MessageCreateParams {
   return params;
 }
 
+/**
+ * Логирует использование токенов в одну строку для Vercel logs.
+ * Цель — измерять реальный cache hit rate и находить дорогих клиентов:
+ *
+ *   [Claude usage] tg/main biz=biz_abc client=12345 in=320 cache_read=8400 cache_create=0 out=180 hit=96%
+ *
+ * Anthropic ценник (Sonnet 4.5, на момент 2026-06):
+ *   - input_tokens         — $3/Mtok (uncached, обычная цена)
+ *   - cache_read_*         — $0.30/Mtok (90% скидка)
+ *   - cache_creation_*     — $3.75/Mtok (25% markup на запись)
+ *   - output_tokens        — $15/Mtok
+ *
+ * hit% = cache_read / (input + cache_read + cache_create). Высокий hit% →
+ * экономия в 10× на префиксе. Низкий → префикс нестабилен или TTL (5 мин)
+ * истекает между сообщениями (клиент пишет редко).
+ */
+export function logClaudeUsage(
+  label: string,
+  usage: Message["usage"],
+  extra?: Record<string, string | number | bigint | undefined>
+): void {
+  const cacheRead = usage.cache_read_input_tokens ?? 0;
+  const cacheCreate = usage.cache_creation_input_tokens ?? 0;
+  const inputUncached = usage.input_tokens ?? 0;
+  const out = usage.output_tokens ?? 0;
+  const totalInput = inputUncached + cacheRead + cacheCreate;
+  const hitPct = totalInput > 0 ? Math.round((cacheRead / totalInput) * 100) : 0;
+  const extraStr = extra
+    ? " " + Object.entries(extra)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(" ")
+    : "";
+  console.log(
+    `[Claude usage] ${label} in=${inputUncached} cache_read=${cacheRead} cache_create=${cacheCreate} out=${out} hit=${hitPct}%${extraStr}`
+  );
+}
+
 export async function callClaudeWithRetry(params: MessageCreateParams, retries = 2): Promise<Message> {
   const cachedParams = withPromptCaching(params);
   for (let attempt = 0; attempt <= retries; attempt++) {

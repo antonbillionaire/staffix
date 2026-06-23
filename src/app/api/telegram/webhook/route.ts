@@ -154,18 +154,17 @@ export async function POST(request: NextRequest) {
     // было, IG/FB/WA уже отвечали.)
     const msg = update.message;
     if (msg) {
+      // Локальный TGUpdate type не описывает media-поля (photo/video/...) —
+      // используем any-cast для всех, чтобы пройти TS check на Vercel.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const m = msg as any;
       const hasMedia =
-        msg.photo ||
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (msg as any).video ||
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (msg as any).sticker ||
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (msg as any).animation ||
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (msg as any).document ||
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (msg as any).video_note;
+        m.photo ||
+        m.video ||
+        m.sticker ||
+        m.animation ||
+        m.document ||
+        m.video_note;
       const hasText =
         msg.text ||
         msg.contact ||

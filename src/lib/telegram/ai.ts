@@ -15,7 +15,7 @@
  *    промпт, чтобы факты брались из FAQ/услуг, а не из истории/saммари.
  */
 
-import { callClaudeWithRetry } from "@/lib/claude-retry";
+import { callClaudeWithRetry, logClaudeUsage } from "@/lib/claude-retry";
 import { prisma } from "@/lib/prisma";
 import {
   buildClientContext,
@@ -206,6 +206,7 @@ export async function generateAIResponse(
       messages: recentMessages,
       tools: activeTools,
     });
+    logClaudeUsage("tg/main", response.usage, { biz: businessId, tg: telegramId, sales: salesMode ? 1 : 0 });
     console.log(`[Webhook] Claude response: stop_reason=${response.stop_reason}`);
 
     // 7. Цикл tool_use (до 5 итераций)
@@ -298,6 +299,7 @@ export async function generateAIResponse(
           messages: recentMessages,
           tools: activeTools,
         });
+        logClaudeUsage("tg/tool-loop", response.usage, { biz: businessId, tg: telegramId, iter: iterations + 1 });
       } catch (apiError) {
         // Если API упал ПОСЛЕ успешного tool — собираем ответ из результатов
         console.error("[Webhook] API error after tool execution:", apiError);

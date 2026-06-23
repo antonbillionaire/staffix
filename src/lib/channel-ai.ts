@@ -29,7 +29,7 @@ import {
   identifyClientByPhone,
 } from "@/lib/sales-tools";
 
-import { callClaudeWithRetry } from "@/lib/claude-retry";
+import { callClaudeWithRetry, logClaudeUsage } from "@/lib/claude-retry";
 // Anti-probe boundary — prepended to every WA/IG/FB user-bot system prompt
 // so it has the highest LLM attention weight.
 import { ANTI_PROBE_USER_BOT } from "@/lib/security-prompts";
@@ -642,6 +642,7 @@ export async function generateChannelAIResponse(
       messages,
       tools,
     });
+    logClaudeUsage(`${channel}/main`, response.usage, { biz: businessId, client: clientId });
 
     // Tool loop — process tool_use responses (max 5 iterations)
     let iterations = 0;
@@ -703,6 +704,7 @@ export async function generateChannelAIResponse(
           messages,
           tools,
         });
+        logClaudeUsage(`${channel}/tool-loop`, response.usage, { biz: businessId, client: clientId, iter: iterations });
       } catch (apiError) {
         console.error("[Channel AI] API error after tool execution:", apiError);
         break;
