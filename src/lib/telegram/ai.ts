@@ -196,7 +196,12 @@ export async function generateAIResponse(
     console.log(`[Webhook] Calling Claude API for business=${businessId}, salesMode=${salesMode}`);
     let response = await callClaudeWithRetry({
       model: "claude-sonnet-4-5-20250929",
-      max_tokens: 1024,
+      // 500 ≈ ~375 chars output — enough for the 1–3 sentence default in
+      // ai-memory.ts buildSystemPrompt. Tool-loop turns still get the same
+      // cap, which keeps verbose multi-step replies bounded too. If a
+      // specific business needs longer replies it goes via aiRules
+      // override at the top of the prompt, not a global cap.
+      max_tokens: 500,
       system: systemWithDate,
       messages: recentMessages,
       tools: activeTools,
@@ -288,7 +293,7 @@ export async function generateAIResponse(
       try {
         response = await callClaudeWithRetry({
           model: "claude-sonnet-4-5-20250929",
-          max_tokens: 1024,
+          max_tokens: 500,
           system: systemWithDate,
           messages: recentMessages,
           tools: activeTools,

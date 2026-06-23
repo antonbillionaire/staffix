@@ -204,6 +204,14 @@ export function buildChannelSystemPrompt(
 
 КРИТИЧЕСКИ ВАЖНО: Твоё имя — ${botName}. ВСЕГДА представляйся как ${botName}. Если клиент спрашивает как тебя зовут — отвечай "${botName}". Никогда не используй другое имя.
 
+${biz.aiRules ? `## ⭐ ПРАВИЛА ОТ ВЛАДЕЛЬЦА БИЗНЕСА — ВЫСШИЙ ПРИОРИТЕТ
+Эти правила задал владелец в настройках. Они перебивают любые рекомендации ниже по тексту (длине ответов, стилю, формулировкам). Если рекомендация ниже противоречит правилу — следуй правилу.
+
+${biz.aiRules}
+
+` : ""}## ДЛИНА ОТВЕТА (по умолчанию)
+Ответ — 1–3 коротких предложения, обычно до 400 символов. Люди в мессенджерах не пишут простыни — отвечай так же. Длиннее можно ТОЛЬКО если клиент сам просит подробности или нужно перечислить варианты. Если владелец задал другую длину в правилах выше — следуй ему.
+
 Твоя задача — вежливо и точно отвечать на вопросы клиентов, помогать с записью и информацией об услугах. Общайся ${tone} тоном.
 
 ## ПРАВИЛА ВЕЖЛИВОСТИ (всегда, независимо от тона):
@@ -261,9 +269,8 @@ export function buildChannelSystemPrompt(
     prompt += `\n\nПриветственное сообщение для новых клиентов:\n${biz.welcomeMessage}`;
   }
 
-  if (biz.aiRules) {
-    prompt += `\n\nВажные правила:\n${biz.aiRules}`;
-  }
+  // Owner rules moved to top of prompt (highest LLM attention) — they were
+  // here at the very bottom and got drowned by the rules above.
 
   prompt += `\n\nФОРМАТ ОТВЕТА (КРИТИЧНО):
 Пиши клиенту ПРОСТЫМ ТЕКСТОМ, как человек в мессенджере. НЕ используй Markdown:
@@ -629,7 +636,7 @@ export async function generateChannelAIResponse(
     // Call Claude with appropriate tools (with retry on overload)
     let response = await callClaudeWithRetry({
       model: "claude-sonnet-4-5-20250929",
-      max_tokens: 1024,
+      max_tokens: 500,
       system: systemPrompt,
       messages,
       tools,
@@ -690,7 +697,7 @@ export async function generateChannelAIResponse(
       try {
         response = await callClaudeWithRetry({
           model: "claude-sonnet-4-5-20250929",
-          max_tokens: 1024,
+          max_tokens: 500,
           system: systemPrompt,
           messages,
           tools,
