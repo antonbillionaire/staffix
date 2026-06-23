@@ -147,7 +147,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Поддерживаемые типы: текст, контакт, геолокация, голосовое, аудио
+    // Поддерживаемые типы: текст, контакт, геолокация, голосовое, аудио.
+    // Картинки / видео / стикеры / документы — отвечаем вежливым отказом
+    // вместо молчаливого drop'а: иначе клиент думает что бот сломался.
+    // (Раньше в TG silently игнорировали — единственный канал где это так
+    // было, IG/FB/WA уже отвечали.)
+    const msg = update.message;
+    if (msg) {
+      const hasMedia =
+        msg.photo ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (msg as any).video ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (msg as any).sticker ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (msg as any).animation ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (msg as any).document ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (msg as any).video_note;
+      const hasText =
+        msg.text ||
+        msg.contact ||
+        msg.location ||
+        msg.voice ||
+        msg.audio;
+      if (hasMedia && !hasText) {
+        await sendTelegramMessage(
+          botToken,
+          msg.chat.id,
+          "Извините, я не распознаю изображения и файлы. Опишите вопрос текстом или отправьте голосовое сообщение — я отвечу."
+        );
+        return NextResponse.json({ ok: true });
+      }
+    }
+
     if (
       !update.message?.text &&
       !update.message?.contact &&

@@ -129,7 +129,7 @@ export async function POST(request: Request) {
     });
     const nonTextToken = biz?.waAccessToken || process.env.WHATSAPP_ACCESS_TOKEN;
     if (biz?.waPhoneNumberId && nonTextToken) {
-      sendWAMessage(biz.waPhoneNumberId, nonTextToken, msg.waId, "Извините, я пока могу работать только с текстовыми и голосовыми сообщениями. Напишите ваш вопрос текстом или попробуйте записать ещё раз.").catch(() => {});
+      sendWAMessage(biz.waPhoneNumberId, nonTextToken, msg.waId, "Извините, я не распознаю изображения и файлы. Опишите вопрос текстом или отправьте голосовое сообщение — я отвечу.").catch(() => {});
     }
     return respond200();
   }

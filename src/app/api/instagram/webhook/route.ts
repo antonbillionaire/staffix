@@ -139,7 +139,7 @@ export async function POST(request: Request) {
         });
         if (biz?.fbPageAccessToken && biz.fbPageId) {
           const pgToken = await getPageAccessToken(biz.fbPageId, biz.fbPageAccessToken).catch(() => biz.fbPageAccessToken!);
-          await sendIGMessage(biz.fbPageId, pgToken, sender.id, "Извините, я пока могу работать только с текстовыми и голосовыми сообщениями. Напишите ваш вопрос текстом или попробуйте записать ещё раз.").catch(() => {});
+          await sendIGMessage(biz.fbPageId, pgToken, sender.id, "Извините, я не распознаю изображения и файлы. Опишите вопрос текстом или отправьте голосовое сообщение — я отвечу.").catch(() => {});
         }
         continue;
       }

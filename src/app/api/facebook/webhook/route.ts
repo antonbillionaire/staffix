@@ -148,7 +148,7 @@ export async function POST(request: Request) {
         select: { fbPageAccessToken: true },
       });
       if (biz?.fbPageAccessToken) {
-        sendFBMessage(biz.fbPageAccessToken, msg.senderId, "Извините, я пока могу работать только с текстовыми и голосовыми сообщениями. Напишите ваш вопрос текстом или попробуйте записать ещё раз.", msg.pageId).catch(() => {});
+        sendFBMessage(biz.fbPageAccessToken, msg.senderId, "Извините, я не распознаю изображения и файлы. Опишите вопрос текстом или отправьте голосовое сообщение — я отвечу.", msg.pageId).catch(() => {});
       }
       continue;
     }
