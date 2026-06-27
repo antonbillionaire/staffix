@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { getClientIp } from "../rate-limit";
+vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
 describe("getClientIp", () => {
   function makeRequest(headers: Record<string, string>): Request {

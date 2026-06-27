@@ -33,6 +33,11 @@ vi.mock("@/lib/email", () => ({
   sendSubscriptionSuspendedEmail: vi.fn().mockResolvedValue({ success: true }),
 }));
 
+vi.mock("@/lib/partner-commission", () => ({
+  recordPartnerEarning: vi.fn().mockResolvedValue(undefined),
+  cancelPartnerEarningForOrder: vi.fn().mockResolvedValue(undefined),
+}));
+
 // We need to mock the paypro module's verifyIP, verifyHash, verifySignature
 // but the route imports them, so we mock the whole module
 vi.mock("@/lib/paypro", async (importOriginal) => {

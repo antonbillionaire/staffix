@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { parseWorkingHours } from "../booking-tools";
+vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
 describe("parseWorkingHours", () => {
   // Helper: create a date for a specific day of week (0=Sun, 1=Mon, etc.)

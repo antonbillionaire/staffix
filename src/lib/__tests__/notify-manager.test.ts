@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock prisma before importing module
+vi.mock("@prisma/client", () => ({ Prisma: {} }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     business: {

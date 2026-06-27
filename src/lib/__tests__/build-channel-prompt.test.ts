@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { buildChannelSystemPrompt } from "../channel-ai";
+vi.mock("@prisma/client", () => ({ Prisma: {}, PrismaClient: class {} }));
 
 // Minimal business profile for testing
 function makeBiz(overrides: Record<string, unknown> = {}) {
