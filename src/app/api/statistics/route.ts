@@ -57,22 +57,37 @@ export async function GET(request: NextRequest) {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // ========= PARALLEL BATCH: All independent queries =========
+    //
+    // ВАЖНО про мульти-канальность: для каждого «универсального» показателя
+    // (сообщения, клиенты, дни активности, частые вопросы) запрашиваем
+    // обе таблицы: Message (Telegram) и ChannelMessage (WhatsApp / Instagram
+    // / Facebook). Раньше считалось только TG — для бизнесов на других
+    // каналах вся страница «Моя статистика» показывала нули. Аналогично
+    // для клиентов: Client (TG) + ChannelClient (WA/IG/FB).
     const [
-      // Core stats
-      totalMessages,
+      // Core stats (Telegram)
+      tgTotalMessages,
       totalBookings,
-      conversations,
-      messages,
-      userMessages,
+      tgConversations,
+      tgMessages,
+      tgUserMessages,
       clients,
       bookingStatusCounts,
       completedBookings,
       broadcastsSent,
       reviews,
+      // Core stats (Channel — WA/IG/FB)
+      channelTotalMessages,
+      channelMessagesForDay,
+      channelIncomingMessages,
+      channelClients,
+      channelUniqueClientsRows,
       // Previous period (for trends)
-      prevMessages,
+      prevTgMessages,
+      prevChannelMessages,
       prevBookings,
-      prevConversations,
+      prevTgConversations,
+      prevChannelUniqueClientsRows,
       prevOrders,
       // Order stats
       totalOrders,
@@ -84,7 +99,7 @@ export async function GET(request: NextRequest) {
       channelMessageCounts,
       recentConversations,
     ] = await Promise.all([
-      // --- Core stats ---
+      // --- Telegram-side core stats ---
       prisma.message.count({
         where: {
           conversation: { businessId: business.id },
@@ -149,10 +164,49 @@ export async function GET(request: NextRequest) {
         where: { businessId: business.id, createdAt: { gte: startDate } },
         select: { rating: true },
       }),
+      // --- ChannelMessage-side core stats (WA / IG / FB) ---
+      // Counts ВСЕ сообщения (входящие + исходящие) — параллель с Message.count
+      prisma.channelMessage.count({
+        where: { businessId: business.id, createdAt: { gte: startDate } },
+      }),
+      // Для серии "сообщения по дням" нужны только createdAt
+      prisma.channelMessage.findMany({
+        where: { businessId: business.id, createdAt: { gte: startDate } },
+        select: { createdAt: true },
+        orderBy: { createdAt: "asc" },
+      }),
+      // Для популярных вопросов — только входящие, с текстом
+      prisma.channelMessage.findMany({
+        where: {
+          businessId: business.id,
+          direction: "incoming",
+          createdAt: { gte: startDate },
+          text: { not: null },
+        },
+        select: { text: true },
+      }),
+      // Все клиенты в каналах WA/IG/FB (для подсчёта общей базы)
+      prisma.channelClient.count({
+        where: { businessId: business.id },
+      }),
+      // Уникальные клиенты текущего периода (по conversation)
+      prisma.channelConversation.findMany({
+        where: {
+          businessId: business.id,
+          createdAt: { gte: startDate },
+        },
+        select: { channel: true, clientId: true },
+      }),
       // --- Previous period (for trends) ---
       period !== "all" ? prisma.message.count({
         where: {
           conversation: { businessId: business.id },
+          createdAt: { gte: prevStartDate, lt: startDate },
+        },
+      }) : Promise.resolve(0),
+      period !== "all" ? prisma.channelMessage.count({
+        where: {
+          businessId: business.id,
           createdAt: { gte: prevStartDate, lt: startDate },
         },
       }) : Promise.resolve(0),
@@ -169,6 +223,13 @@ export async function GET(request: NextRequest) {
         },
         select: { clientTelegramId: true },
         distinct: ["clientTelegramId"],
+      }) : Promise.resolve([]),
+      period !== "all" ? prisma.channelConversation.findMany({
+        where: {
+          businessId: business.id,
+          createdAt: { gte: prevStartDate, lt: startDate },
+        },
+        select: { channel: true, clientId: true },
       }) : Promise.resolve([]),
       period !== "all" ? prisma.order.count({
         where: {
@@ -222,20 +283,29 @@ export async function GET(request: NextRequest) {
 
     // ========= Process results (pure computation, no DB) =========
 
-    // Unique clients
-    const totalClients = conversations.length;
+    // Объединённый счётчик сообщений = TG + WA + IG + FB.
+    const totalMessages = tgTotalMessages + channelTotalMessages;
+
+    // Уникальные клиенты периода: TG-телеграм-id плюс ChannelConversation
+    // (channel + clientId) которые ещё не дублируются.
+    const channelClientKeys = new Set(
+      channelUniqueClientsRows.map((c) => `${c.channel}:${c.clientId}`)
+    );
+    const totalClients = tgConversations.length + channelClientKeys.size;
 
     // Calculate conversion rate
     const conversionRate = totalClients > 0
       ? Math.round((totalBookings / totalClients) * 100)
       : 0;
 
-    // Group messages by day
+    // Group messages by day — TG + Channel объединяем в одну серию.
     const messagesByDayMap = new Map<string, number>();
-    messages.forEach((msg) => {
-      const dateStr = msg.createdAt.toISOString().split("T")[0];
+    const bumpDay = (d: Date) => {
+      const dateStr = d.toISOString().split("T")[0];
       messagesByDayMap.set(dateStr, (messagesByDayMap.get(dateStr) || 0) + 1);
-    });
+    };
+    tgMessages.forEach((msg) => bumpDay(msg.createdAt));
+    channelMessagesForDay.forEach((msg) => bumpDay(msg.createdAt));
 
     // Show appropriate number of days based on period, zero-fill missing days
     const maxDays = period === "week" ? 7 : period === "month" ? 30 : 90;
@@ -256,10 +326,16 @@ export async function GET(request: NextRequest) {
       messagesByDay.push(...entries);
     }
 
-    // Keyword-based grouping: normalize messages and group similar ones
+    // Keyword-based grouping: normalize messages and group similar ones.
+    // Берём входящие со всех каналов: Message.role=user (TG) +
+    // ChannelMessage.direction=incoming (WA/IG/FB).
+    const allIncomingTexts: string[] = [
+      ...tgUserMessages.map((m) => m.content),
+      ...channelIncomingMessages.map((m) => m.text || ""),
+    ];
     const questionCounts = new Map<string, { display: string; count: number }>();
-    userMessages.forEach((msg) => {
-      const text = msg.content.trim();
+    allIncomingTexts.forEach((rawText) => {
+      const text = (rawText || "").trim();
       if (text.length < 3) return; // Skip very short messages like "Да", "Ок"
 
       // Normalize: lowercase, remove punctuation, collapse whitespace
@@ -451,20 +527,35 @@ export async function GET(request: NextRequest) {
       ? (totalClients > 0 ? Math.round((totalOrders / totalClients) * 100) : 0)
       : conversionRate;
 
+    // База клиентов — это все клиенты всех каналов. Раньше тут стоял
+    // fallback `clients.length || totalClients`, и для бизнесов без TG
+    // (только IG/WA/FB) показывало 0. Теперь складываем явно: Client (TG)
+    // + ChannelClient (WA/IG/FB).
+    const totalClientsCombined = clients.length + channelClients;
+
+    // Trends: для сообщений и клиентов предыдущего периода тоже объединяем
+    // оба источника.
+    const prevMessagesCombined = prevTgMessages + prevChannelMessages;
+    const prevChannelClientKeys = new Set(
+      prevChannelUniqueClientsRows.map((c) => `${c.channel}:${c.clientId}`)
+    );
+    const prevClientsCombined =
+      prevTgConversations.length + prevChannelClientKeys.size;
+
     return NextResponse.json({
       dashboardMode: business.dashboardMode || "service",
       totalMessages,
       totalBookings,
-      totalClients: clients.length || totalClients,
+      totalClients: totalClientsCombined || totalClients,
       avgResponseTime,
       conversionRate: conversionRateAdjusted,
       popularQuestions,
       messagesByDay,
       // Trends
       trends: {
-        messages: calcTrend(totalMessages, prevMessages),
+        messages: calcTrend(totalMessages, prevMessagesCombined),
         bookings: calcTrend(totalBookings, prevBookings),
-        clients: calcTrend(totalClients, prevConversations.length),
+        clients: calcTrend(totalClients, prevClientsCombined),
         orders: calcTrend(totalOrders, prevOrders),
       },
       // Enhanced CRM stats
