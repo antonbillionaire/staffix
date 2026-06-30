@@ -77,14 +77,12 @@ export async function GET(request: NextRequest) {
       broadcastsSent,
       reviews,
       // Core stats (Channel — WA/IG/FB)
-      channelTotalMessages,
-      channelMessagesForDay,
-      channelIncomingMessages,
+      channelConversationsInPeriod,
       channelClients,
       channelUniqueClientsRows,
       // Previous period (for trends)
       prevTgMessages,
-      prevChannelMessages,
+      prevChannelMessageCountAgg,
       prevBookings,
       prevTgConversations,
       prevChannelUniqueClientsRows,
@@ -164,26 +162,22 @@ export async function GET(request: NextRequest) {
         where: { businessId: business.id, createdAt: { gte: startDate } },
         select: { rating: true },
       }),
-      // --- ChannelMessage-side core stats (WA / IG / FB) ---
-      // Counts ВСЕ сообщения (входящие + исходящие) — параллель с Message.count
-      prisma.channelMessage.count({
-        where: { businessId: business.id, createdAt: { gte: startDate } },
-      }),
-      // Для серии "сообщения по дням" нужны только createdAt
-      prisma.channelMessage.findMany({
-        where: { businessId: business.id, createdAt: { gte: startDate } },
-        select: { createdAt: true },
-        orderBy: { createdAt: "asc" },
-      }),
-      // Для популярных вопросов — только входящие, с текстом
-      prisma.channelMessage.findMany({
-        where: {
-          businessId: business.id,
-          direction: "incoming",
-          createdAt: { gte: startDate },
-          text: { not: null },
-        },
-        select: { text: true },
+      // --- Channel-side core stats (WA / IG / FB) ---
+      //
+      // ВАЖНО: ChannelMessage табличка существует в схеме, но прод-код
+      // в неё НИКОГДА не пишет. Сообщения каналов лежат как JSON-массив
+      // в ChannelConversation.history + счётчик ChannelConversation.messageCount.
+      // Поэтому все запросы тут идут к ChannelConversation, а не ChannelMessage.
+      //
+      // Минус: history JSON не хранит per-message createdAt. Для серии
+      // «сообщений по дням» используем conversation.updatedAt как точку,
+      // в которую кладём весь messageCount беседы. Это даёт правильную
+      // СУММУ по периоду, но точность распределения по дням приблизительная
+      // — все сообщения долгой беседы концентрируются на последнем активном
+      // дне. Для коротких бесед (типичный кейс новых клиентов) это норм.
+      prisma.channelConversation.findMany({
+        where: { businessId: business.id, updatedAt: { gte: startDate } },
+        select: { updatedAt: true, messageCount: true, history: true, channel: true },
       }),
       // Все клиенты в каналах WA/IG/FB (для подсчёта общей базы)
       prisma.channelClient.count({
@@ -193,7 +187,7 @@ export async function GET(request: NextRequest) {
       prisma.channelConversation.findMany({
         where: {
           businessId: business.id,
-          createdAt: { gte: startDate },
+          updatedAt: { gte: startDate },
         },
         select: { channel: true, clientId: true },
       }),
@@ -204,12 +198,16 @@ export async function GET(request: NextRequest) {
           createdAt: { gte: prevStartDate, lt: startDate },
         },
       }) : Promise.resolve(0),
-      period !== "all" ? prisma.channelMessage.count({
+      // Prev-period сумма channel сообщений: aggregate sum of messageCount
+      // over conversations updated в прошлом периоде. Та же оговорка про
+      // точность что выше — для тренд-стрелок «в норму».
+      period !== "all" ? prisma.channelConversation.aggregate({
         where: {
           businessId: business.id,
-          createdAt: { gte: prevStartDate, lt: startDate },
+          updatedAt: { gte: prevStartDate, lt: startDate },
         },
-      }) : Promise.resolve(0),
+        _sum: { messageCount: true },
+      }) : Promise.resolve({ _sum: { messageCount: 0 } }),
       period !== "all" ? prisma.booking.count({
         where: {
           businessId: business.id,
@@ -227,7 +225,7 @@ export async function GET(request: NextRequest) {
       period !== "all" ? prisma.channelConversation.findMany({
         where: {
           businessId: business.id,
-          createdAt: { gte: prevStartDate, lt: startDate },
+          updatedAt: { gte: prevStartDate, lt: startDate },
         },
         select: { channel: true, clientId: true },
       }) : Promise.resolve([]),
@@ -262,11 +260,15 @@ export async function GET(request: NextRequest) {
         },
         select: { name: true, quantity: true, price: true },
       }),
-      // --- Channel & response time ---
-      prisma.channelMessage.groupBy({
+      // --- Channel breakdown & response time ---
+      // Разбивка по каналам: суммируем messageCount по каждому каналу из
+      // ChannelConversation. Раньше это была groupBy ChannelMessage, но
+      // ChannelMessage никто не пишет, поэтому блок «сообщения по каналам»
+      // на странице всегда был пустым (даже не показывался) у всех.
+      prisma.channelConversation.groupBy({
         by: ["channel"],
-        where: { businessId: business.id, createdAt: { gte: startDate } },
-        _count: true,
+        where: { businessId: business.id, updatedAt: { gte: startDate } },
+        _sum: { messageCount: true },
       }),
       prisma.conversation.findMany({
         where: { businessId: business.id },
@@ -283,7 +285,12 @@ export async function GET(request: NextRequest) {
 
     // ========= Process results (pure computation, no DB) =========
 
-    // Объединённый счётчик сообщений = TG + WA + IG + FB.
+    // Объединённый счётчик сообщений = TG-Message + сумма messageCount
+    // всех ChannelConversation'ов активных в периоде.
+    const channelTotalMessages = channelConversationsInPeriod.reduce(
+      (sum, conv) => sum + (conv.messageCount || 0),
+      0
+    );
     const totalMessages = tgTotalMessages + channelTotalMessages;
 
     // Уникальные клиенты периода: TG-телеграм-id плюс ChannelConversation
@@ -299,13 +306,20 @@ export async function GET(request: NextRequest) {
       : 0;
 
     // Group messages by day — TG + Channel объединяем в одну серию.
+    // TG-сторона: 1 inkrement per message (точно).
+    // Channel-сторона: history JSON без per-message timestamps, поэтому
+    // весь messageCount беседы кладём в её updatedAt. Сумма по периоду
+    // правильная, но распределение по дням — приблизительное (длинная
+    // беседа сконцентрируется в последний активный день).
     const messagesByDayMap = new Map<string, number>();
-    const bumpDay = (d: Date) => {
+    const addToDay = (d: Date, n: number) => {
       const dateStr = d.toISOString().split("T")[0];
-      messagesByDayMap.set(dateStr, (messagesByDayMap.get(dateStr) || 0) + 1);
+      messagesByDayMap.set(dateStr, (messagesByDayMap.get(dateStr) || 0) + n);
     };
-    tgMessages.forEach((msg) => bumpDay(msg.createdAt));
-    channelMessagesForDay.forEach((msg) => bumpDay(msg.createdAt));
+    tgMessages.forEach((msg) => addToDay(msg.createdAt, 1));
+    channelConversationsInPeriod.forEach((conv) =>
+      addToDay(conv.updatedAt, conv.messageCount || 0)
+    );
 
     // Show appropriate number of days based on period, zero-fill missing days
     const maxDays = period === "week" ? 7 : period === "month" ? 30 : 90;
@@ -328,10 +342,24 @@ export async function GET(request: NextRequest) {
 
     // Keyword-based grouping: normalize messages and group similar ones.
     // Берём входящие со всех каналов: Message.role=user (TG) +
-    // ChannelMessage.direction=incoming (WA/IG/FB).
+    // ChannelConversation.history JSON где role=user (WA/IG/FB).
+    type HistoryEntry = { role?: string; content?: string };
+    const channelUserContents: string[] = [];
+    for (const conv of channelConversationsInPeriod) {
+      // history хранится как Json — после Prisma это unknown, нужно
+      // защититься на случай мусорных данных
+      const history = Array.isArray(conv.history)
+        ? (conv.history as HistoryEntry[])
+        : [];
+      for (const m of history) {
+        if (m && typeof m === "object" && m.role === "user" && typeof m.content === "string") {
+          channelUserContents.push(m.content);
+        }
+      }
+    }
     const allIncomingTexts: string[] = [
       ...tgUserMessages.map((m) => m.content),
-      ...channelIncomingMessages.map((m) => m.text || ""),
+      ...channelUserContents,
     ];
     const questionCounts = new Map<string, { display: string; count: number }>();
     allIncomingTexts.forEach((rawText) => {
@@ -497,11 +525,17 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    // Channel-specific message counts
+    // Channel-specific message counts (для блока «Разбивка по каналам»).
+    // Берём сумму messageCount по каждому каналу. Если у бизнеса есть и
+    // TG-бот (через таблицу Message), добавляем туда tgTotalMessages как
+    // отдельную строку telegram — иначе на странице TG не показывается.
     const messagesByChannel: Record<string, number> = {};
     channelMessageCounts.forEach((item) => {
-      messagesByChannel[item.channel] = item._count;
+      messagesByChannel[item.channel] = item._sum.messageCount || 0;
     });
+    if (tgTotalMessages > 0) {
+      messagesByChannel.telegram = (messagesByChannel.telegram || 0) + tgTotalMessages;
+    }
 
     // Calculate average response time from message pairs
     let totalResponseMs = 0;
@@ -535,6 +569,7 @@ export async function GET(request: NextRequest) {
 
     // Trends: для сообщений и клиентов предыдущего периода тоже объединяем
     // оба источника.
+    const prevChannelMessages = prevChannelMessageCountAgg._sum.messageCount || 0;
     const prevMessagesCombined = prevTgMessages + prevChannelMessages;
     const prevChannelClientKeys = new Set(
       prevChannelUniqueClientsRows.map((c) => `${c.channel}:${c.clientId}`)

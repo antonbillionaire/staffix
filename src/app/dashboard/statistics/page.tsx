@@ -287,35 +287,47 @@ export default function StatisticsPage() {
           </div>
         </div>
 
-        {/* Messages by channel */}
+        {/* Messages by channel — count + share% of total */}
         {stats.messagesByChannel && Object.keys(stats.messagesByChannel).length > 0 && (
           <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
             <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>{t("statistics.messagesByChannel")}</h3>
             <div className="space-y-3">
               {(() => {
                 const channels = stats.messagesByChannel!;
-                const maxVal = Math.max(...Object.values(channels), 1);
-                const channelMeta: Record<string, { label: string; color: string; bg: string }> = {
-                  telegram: { label: "Telegram", color: "bg-blue-500", bg: "bg-blue-500/10" },
-                  whatsapp: { label: "WhatsApp", color: "bg-green-500", bg: "bg-green-500/10" },
-                  instagram: { label: "Instagram", color: "bg-pink-500", bg: "bg-pink-500/10" },
-                  facebook: { label: "Facebook", color: "bg-blue-600", bg: "bg-blue-600/10" },
+                // Доли считаем от ОБЩЕГО числа канальных сообщений (а не от лидера).
+                // Так бары визуально складываются в 100% и читаются как «вклад
+                // каждого канала», а не «отставание от лидера». Используем
+                // totalChannel, а не stats.totalMessages, потому что totalMessages
+                // включает Telegram-Message-таблицу которая не лежит в этой
+                // разбивке (TG считается отдельно через ChannelMessage только
+                // если у бота заведена строка в ChannelMessage — у текущей TG-
+                // интеграции этого нет).
+                const totalChannel = Object.values(channels).reduce((a, b) => a + b, 0);
+                const channelMeta: Record<string, { label: string; color: string }> = {
+                  telegram: { label: "Telegram", color: "bg-blue-500" },
+                  whatsapp: { label: "WhatsApp", color: "bg-green-500" },
+                  instagram: { label: "Instagram", color: "bg-pink-500" },
+                  facebook: { label: "Facebook", color: "bg-blue-600" },
                 };
                 return Object.entries(channels)
                   .sort(([, a], [, b]) => b - a)
                   .map(([channel, count]) => {
-                    const meta = channelMeta[channel] || { label: channel, color: "bg-gray-500", bg: "bg-gray-500/10" };
-                    const pct = Math.round((count / maxVal) * 100);
+                    const meta = channelMeta[channel] || { label: channel, color: "bg-gray-500" };
+                    const sharePct = totalChannel > 0
+                      ? Math.round((count / totalChannel) * 1000) / 10  // 1 знак после запятой
+                      : 0;
                     return (
                       <div key={channel} className="space-y-1">
                         <div className="flex justify-between items-center">
                           <span className={`text-sm font-medium ${textPrimary}`}>{meta.label}</span>
-                          <span className={`text-sm ${textSecondary}`}>{count}</span>
+                          <span className={`text-sm ${textSecondary}`}>
+                            {count} <span className={`ml-1 font-medium ${textPrimary}`}>{sharePct}%</span>
+                          </span>
                         </div>
                         <div className={`h-2 rounded-full ${isDark ? "bg-white/10" : "bg-gray-100"}`}>
                           <div
                             className={`h-full rounded-full ${meta.color} transition-all`}
-                            style={{ width: `${pct}%` }}
+                            style={{ width: `${sharePct}%` }}
                           />
                         </div>
                       </div>
