@@ -211,7 +211,7 @@ export async function generateAIResponse(
       // cap, which keeps verbose multi-step replies bounded too. If a
       // specific business needs longer replies it goes via aiRules
       // override at the top of the prompt, not a global cap.
-      max_tokens: 500,
+      max_tokens: 300,
       system: systemBlocks,
       messages: recentMessages,
       tools: activeTools,
@@ -301,15 +301,19 @@ export async function generateAIResponse(
         content: toolResults,
       });
 
+      // ЭКСПЕРИМЕНТ (июль 2026): tool-loop итерации на Haiku 4.5 вместо Sonnet.
+      // См. подробный комментарий в channel-ai.ts — Haiku в 3× дешевле, справляется
+      // с промежуточной работой (интерпретация результатов инструментов) на 90%+,
+      // главный ответ клиенту остаётся на Sonnet.
       try {
         response = await callClaudeWithRetry({
-          model: "claude-sonnet-4-5-20250929",
-          max_tokens: 500,
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 300,
           system: systemBlocks,
           messages: recentMessages,
           tools: activeTools,
         });
-        logClaudeUsage("tg/tool-loop", response.usage, { biz: businessId, tg: telegramId, iter: iterations + 1 });
+        logClaudeUsage("tg/tool-loop-haiku", response.usage, { biz: businessId, tg: telegramId, iter: iterations + 1 });
       } catch (apiError) {
         // Если API упал ПОСЛЕ успешного tool — собираем ответ из результатов
         console.error("[Webhook] API error after tool execution:", apiError);
