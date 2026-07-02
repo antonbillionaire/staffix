@@ -738,27 +738,67 @@ export async function generateChannelAIResponse(
       ? textBlocks[0].text
       : "Извините, не удалось сформировать ответ. Пожалуйста, попробуйте ещё раз.";
 
-    // SAFETY NET: если бот в тексте обещал «передал менеджеру» но
-    // notify_manager в этом обороте не вызывался — зовём его сами.
-    // Зеркалит логику Telegram webhook через единый detector.
+    // SAFETY NET: два триггера для гарантированной эскалации к владельцу:
+    //  1) Бот в тексте обещал «передам менеджеру» / «свяжемся» — regex.
+    //  2) Клиент только что прислал НОВЫЙ телефон (raньше в ChannelClient.phone
+    //     не было). Ловит кейс где бот на Turn 1 просит номер (regex fires),
+    //     на Turn 2 клиент присылает "+998...", бот отвечает "спасибо" (regex
+    //     не срабатывает) — раньше телефон терялся молча, теперь уведомим.
+    // Зеркалит логику TG webhook через единый detector.
     const { botPromisedHandoffRegex } = await import("@/lib/handoff-detector");
+    const { extractPhone } = await import("@/lib/ai-memory");
     const promisedForwardingRegex = botPromisedHandoffRegex();
-    if (
-      !calledToolNames.includes("notify_manager") &&
-      promisedForwardingRegex.test(replyText)
-    ) {
+    const calledNotifyManagerCh = calledToolNames.includes("notify_manager");
+    const extractedPhoneCh = extractPhone(userMessage);
+
+    // Был ли у клиента телефон до этого сообщения? Смотрим в ChannelClient.
+    let channelClientHadPhoneBefore = false;
+    if (extractedPhoneCh) {
+      const existing = await prisma.channelClient.findFirst({
+        where: {
+          businessId,
+          OR: [
+            { instagramId: clientId },
+            { fbPsid: clientId },
+            { whatsappPhone: clientId },
+          ],
+        },
+        select: { phone: true },
+      });
+      channelClientHadPhoneBefore = !!existing?.phone;
+    }
+    const newContactProvidedCh = !!extractedPhoneCh && !channelClientHadPhoneBefore;
+
+    const shouldNotifyCh = !calledNotifyManagerCh && (
+      promisedForwardingRegex.test(replyText) || newContactProvidedCh
+    );
+
+    if (shouldNotifyCh) {
+      const trigger = newContactProvidedCh ? "new-contact" : "handoff-promise";
       console.warn(
-        `[Channel AI] SAFETY NET: bot promised forwarding without calling notify_manager — invoking automatically. business=${businessId} channel=${channel}`
+        `[Channel AI] SAFETY NET: ${trigger} — invoking notify_manager. business=${businessId} channel=${channel}`
       );
       try {
         const { notifyManagerByTelegram } = await import("@/lib/sales-tools");
-        await notifyManagerByTelegram(
-          businessId,
-          BigInt(0),
-          `[авто-эскалация после обещания бота, канал ${channel}] ${userMessage.slice(0, 400)}`,
-          clientName,
-          "normal"
-        );
+
+        // Контекст: предыдущее сообщение бота из истории + текущее клиента + телефон.
+        // Без этого владелец видит "+998..." без понимания зачем звонить.
+        const history = (conv.history as HistoryMessage[]) || [];
+        const prevAssistantTurn = history
+          .filter((m) => m.role === "assistant")
+          .slice(-1)[0]?.content?.slice(0, 300);
+
+        const contextLines: string[] = [`Канал: ${channel}`];
+        if (prevAssistantTurn) contextLines.push(`Бот ранее: ${prevAssistantTurn}`);
+        contextLines.push(`Клиент: ${userMessage.slice(0, 400)}`);
+        if (extractedPhoneCh) contextLines.push(`Телефон: ${extractedPhoneCh}`);
+
+        const label = newContactProvidedCh
+          ? "[новый контакт от клиента]"
+          : "[авто-эскалация после обещания бота]";
+        const reason = `${label}\n${contextLines.join("\n")}`;
+
+        await notifyManagerByTelegram(businessId, BigInt(0), reason, clientName, "normal");
       } catch (e) {
         console.error("[Channel AI] SAFETY NET notify_manager failed:", e);
       }

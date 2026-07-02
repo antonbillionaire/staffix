@@ -27,7 +27,7 @@ import {
   extractPhone,
 } from "@/lib/ai-memory";
 import { bookingToolDefinitions } from "@/lib/booking-tools";
-import { salesToolDefinitions, executeSalesTool } from "@/lib/sales-tools";
+import { salesToolDefinitions, executeSalesTool, notifyManagerByTelegram } from "@/lib/sales-tools";
 import { buildSalesSystemPrompt, isSalesMode } from "@/lib/sales-prompt";
 import { botPromisedHandoffRegex } from "@/lib/handoff-detector";
 import {
@@ -333,21 +333,60 @@ export async function generateAIResponse(
       assistantMessage = "Чем ещё могу помочь?";
     }
 
-    // 8.5 SAFETY NET: бот обещал «передал менеджеру», но notify_manager не вызвал.
-    // Сами зовём с последним сообщением клиента в качестве reason.
-    // Regex намеренно широкий: false positive (лишний пинг) дешевле false negative
-    // (молчаливая потеря эскалации).
+    // 8.5 SAFETY NET: если бот в этом обороте обещал «передал менеджеру» ИЛИ
+    // клиент только что прислал новый телефон — гарантированно уведомляем владельца.
+    //
+    // Два триггера, любой достаточен:
+    //  1) Regex по тексту бота — покрывает "передам менеджеру" / "свяжемся" и т.п.
+    //  2) В сообщении клиента впервые появился телефон, которого раньше не было в
+    //     Client.phone. Ловит кейс Right Flight (июль 2026): Turn 1 — бот просит номер
+    //     (regex fires); Turn 2 — клиент шлёт "+998...", бот отвечает "спасибо" (regex
+    //     не срабатывает). Раньше молча писали телефон в Client.phone, владелец о нём
+    //     не знал. Теперь второй заход тоже уведомит — с телефоном И контекстом переписки.
     const promisedForwardingRegex = botPromisedHandoffRegex();
     const calledNotifyManager = calledToolNames.includes("notify_manager");
-    if (!calledNotifyManager && promisedForwardingRegex.test(assistantMessage)) {
+    const extractedPhoneEarly = extractPhone(userMessage);
+
+    // Был ли у клиента телефон ДО этого сообщения — отличаем "только что дал контакт"
+    // от "давно у нас в базе с телефоном" чтобы не спамить владельца.
+    let clientHadPhoneBefore = false;
+    if (extractedPhoneEarly) {
+      const existing = await prisma.client.findUnique({
+        where: { businessId_telegramId: { businessId, telegramId } },
+        select: { phone: true },
+      });
+      clientHadPhoneBefore = !!existing?.phone;
+    }
+    const newContactProvided = !!extractedPhoneEarly && !clientHadPhoneBefore;
+
+    const shouldNotify = !calledNotifyManager && (
+      promisedForwardingRegex.test(assistantMessage) || newContactProvided
+    );
+
+    if (shouldNotify) {
+      const trigger = newContactProvided ? "new-contact" : "handoff-promise";
       console.warn(
-        `[Webhook] SAFETY NET: bot promised forwarding without calling notify_manager — invoking automatically. business=${businessId}`
+        `[Webhook] SAFETY NET: ${trigger} — invoking notify_manager. business=${businessId}`
       );
       try {
-        const { notifyManagerByTelegram } = await import("@/lib/sales-tools");
-        const reason = `[авто-эскалация после обещания бота] ${userMessage.slice(0, 400)}`;
+        // Контекст: предыдущее сообщение бота + текущее клиента + телефон.
+        // Без контекста владелец видит просто "+998901234567" и не понимает зачем.
+        const prevAssistantTurn = conversation.messages
+          .filter((m) => m.role === "assistant")
+          .slice(-1)[0]?.content?.slice(0, 300);
+
+        const contextLines: string[] = [];
+        if (prevAssistantTurn) contextLines.push(`Бот ранее: ${prevAssistantTurn}`);
+        contextLines.push(`Клиент: ${userMessage.slice(0, 400)}`);
+        if (extractedPhoneEarly) contextLines.push(`Телефон: ${extractedPhoneEarly}`);
+
+        const label = newContactProvided
+          ? "[новый контакт от клиента]"
+          : "[авто-эскалация после обещания бота]";
+        const reason = `${label}\n${contextLines.join("\n")}`;
+
         await notifyManagerByTelegram(businessId, telegramId, reason, userName, "normal");
-        console.log(`[Webhook] SAFETY NET: notify_manager fired for business=${businessId}`);
+        console.log(`[Webhook] SAFETY NET: notify_manager fired (${trigger}) for business=${businessId}`);
       } catch (e) {
         console.error("[Webhook] SAFETY NET notify_manager failed:", e);
       }
