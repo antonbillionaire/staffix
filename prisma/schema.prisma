@@ -1451,12 +1451,19 @@ model SalesLead {
   // История разговора с ботом Staffix
   history Json @default("[]") // [{role, content}]
 
+  // Follow-up nudges — Виктор автоматически шлёт короткие напоминания
+  // тёплым лидам, которые замолчали после его вопроса. Считаем nudge'и
+  // чтобы не спамить (лимит 3). См. /api/cron/victor-follow-up.
+  lastNudgeAt DateTime?
+  nudgeCount  Int       @default(0)
+
   // Демо-встречи
   demoBookings DemoBooking[]
 
   @@index([stage])
   @@index([channel])
   @@index([createdAt])
+  @@index([nudgeCount, updatedAt])
 }
 
 // Записи на демо-встречу (Staffix sales)

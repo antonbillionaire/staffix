@@ -74,6 +74,10 @@
     {
       "path": "/api/cron/cache-warmer",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/victor-follow-up",
+      "schedule": "*/30 * * * *"
     }
   ]
 }
