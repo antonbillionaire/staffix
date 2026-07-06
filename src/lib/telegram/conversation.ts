@@ -2,18 +2,16 @@
  * Telegram conversation persistence — получаем/создаём Conversation и сохраняем Message.
  *
  * Особенность: при включённом флаге `needsContextRefresh` (выставляется когда
- * владелец обновил базу знаний) логика разная для активного и остывшего диалога:
- *  - Активный (последнее сообщение <10 мин назад): историю НЕ режем, ставим
- *    soft warning — бот в промпте увидит предупреждение «факты могли устареть».
- *  - Остывший: режем историю в 0, чтобы бот не якорил ответы на старые цены/даты.
+ * владелец обновил базу знаний в дашборде) — жёстко режем историю до реплик
+ * клиента только, выбрасывая ВСЕ ассистент-ответы. Это защита от того, что
+ * бот якорит новый ответ на свои же прошлые цифры/цены/даты, которые теперь
+ * устарели. Плюс в системный промпт добавляется явный warning.
  *
- * Этот компромисс защищает UX (середина диалога не «забывается») при том что
- * ответы остаются актуальными после обновления базы знаний.
+ * Раньше (до июля 2026) был 10-минутный cooldown с soft warning — слабо,
+ * модель всё равно предпочитала историю новому промпту.
  */
 
 import { prisma } from "@/lib/prisma";
-
-const CONTEXT_REFRESH_COOLDOWN_MS = 10 * 60 * 1000;
 
 export async function getOrCreateConversation(
   businessId: string,
@@ -48,22 +46,17 @@ export async function getOrCreateConversation(
       let softWarning = false;
 
       if (conversation.needsContextRefresh) {
-        const lastMsgAt = conversation.messages[0]?.createdAt ?? null;
-        const isActive =
-          lastMsgAt &&
-          Date.now() - lastMsgAt.getTime() < CONTEXT_REFRESH_COOLDOWN_MS;
-
-        if (isActive) {
-          softWarning = true;
-          console.log(
-            `[Webhook] Active conversation ${conversation.id}: keeping history, soft warning enabled`
-          );
-        } else {
-          messagesAsc = [];
-          console.log(
-            `[Webhook] Cold conversation ${conversation.id}: history trimmed (knowledge base updated)`
-          );
-        }
+        // Жёсткая стратегия (Right Flight case, июль 2026): при обновлении
+        // базы знаний ВСЕГДА выкидываем свои прошлые ассистент-ответы —
+        // они содержат старые цифры, старые цены, старые даты. Оставляем
+        // ТОЛЬКО реплики клиента как контекст «о чём был разговор».
+        // Раньше был 10-минутный cooldown с soft warning — слабо, модель
+        // всё равно якорилась на своих старых ответах в истории.
+        messagesAsc = messagesAsc.filter((m) => m.role === "user").slice(-10);
+        softWarning = true;
+        console.log(
+          `[Webhook] Conv ${conversation.id}: knowledge refreshed — kept ${messagesAsc.length} user turns, dropped assistant history`
+        );
 
         await prisma.conversation
           .update({

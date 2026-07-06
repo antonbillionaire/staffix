@@ -34,8 +34,10 @@ interface Stats {
   conversionRate: number;
   popularQuestions: { question: string; count: number }[];
   messagesByDay: { date: string; count: number }[];
+  // Лиды переданные ботом (notify_manager эскалации)
+  leadsEscalated?: number;
   // Trends (% change vs previous period)
-  trends?: { messages: number; bookings: number; clients: number; orders?: number };
+  trends?: { messages: number; bookings: number; clients: number; orders?: number; leadsEscalated?: number };
   // Enhanced stats
   customerSegments?: { vip: number; active: number; inactive: number };
   bookingsByStatus?: { pending: number; confirmed: number; completed: number; cancelled: number };
@@ -255,6 +257,24 @@ export default function StatisticsPage() {
             {stats.avgResponseTime <= 1 ? t("statistics.lessThan1s") : `${stats.avgResponseTime}${t("statistics.seconds")}`}
           </p>
           <p className={textSecondary}>{t("statistics.avgResponseTime")}</p>
+        </div>
+
+        {/* Лиды переданные ботом (notify_manager эскалации) — метрика которую Right Flight
+            хотел видеть: сколько лидов бот реально прислал владельцу вручную */}
+        <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
+          <div className="flex items-center justify-between">
+            <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center">
+              <TrendingUp className="h-6 w-6 text-orange-500" />
+            </div>
+            {stats.trends?.leadsEscalated !== undefined && stats.trends.leadsEscalated !== 0 && (
+              <div className={`flex items-center gap-1 text-sm ${stats.trends.leadsEscalated > 0 ? "text-green-500" : "text-red-500"}`}>
+                {stats.trends.leadsEscalated > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                {stats.trends.leadsEscalated > 0 ? "+" : ""}{stats.trends.leadsEscalated}%
+              </div>
+            )}
+          </div>
+          <p className={`text-3xl font-bold ${textPrimary} mt-4`}>{stats.leadsEscalated ?? 0}</p>
+          <p className={textSecondary}>Лидов передано владельцу</p>
         </div>
       </div>
 

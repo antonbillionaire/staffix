@@ -96,6 +96,12 @@ export async function GET(request: NextRequest) {
       // Channel & response time
       channelMessageCounts,
       recentConversations,
+      // Лиды, которые бот эскалировал владельцу (notify_manager tool creates
+      // Notification with type=manager_escalation). Это метрика «лидов
+      // переданных ботом», которую Anton хотел видеть в дашборде — Right Flight
+      // ощущал что реально приходит ~50 лидов, но в стате их не было видно.
+      leadsEscalatedTotal,
+      leadsEscalatedPrev,
     ] = await Promise.all([
       // --- Telegram-side core stats ---
       prisma.message.count({
@@ -281,6 +287,22 @@ export async function GET(request: NextRequest) {
         },
         take: 20,
       }),
+      // Лиды-эскалации в текущем периоде
+      prisma.notification.count({
+        where: {
+          businessId: business.id,
+          type: "manager_escalation",
+          createdAt: { gte: startDate },
+        },
+      }),
+      // Лиды-эскалации в предыдущем периоде (для тренда %)
+      period !== "all" ? prisma.notification.count({
+        where: {
+          businessId: business.id,
+          type: "manager_escalation",
+          createdAt: { gte: prevStartDate, lt: startDate },
+        },
+      }) : Promise.resolve(0),
     ]);
 
     // ========= Process results (pure computation, no DB) =========
@@ -592,7 +614,11 @@ export async function GET(request: NextRequest) {
         bookings: calcTrend(totalBookings, prevBookings),
         clients: calcTrend(totalClients, prevClientsCombined),
         orders: calcTrend(totalOrders, prevOrders),
+        leadsEscalated: calcTrend(leadsEscalatedTotal, leadsEscalatedPrev),
       },
+      // Лиды: сколько раз бот эскалировал клиента владельцу (notify_manager).
+      // Это то что владелец реально видит как «бот прислал мне ~50 лидов».
+      leadsEscalated: leadsEscalatedTotal,
       // Enhanced CRM stats
       customerSegments,
       bookingsByStatus,

@@ -566,29 +566,29 @@ export async function generateChannelAIResponse(
         : m
     );
 
-    // База знаний обновилась — стратегия зависит от того, активен ли диалог.
-    // Если диалог "остыл" (последнее сообщение давно) — обнуляем историю.
-    // Если активный — историю сохраняем, но добавляем мягкое предупреждение
-    // в системный промпт, чтобы бот не повторял свои прошлые ответы автоматически.
-    const CONTEXT_REFRESH_COOLDOWN_MS = 10 * 60 * 1000;
+    // База знаний обновилась — жёсткая стратегия защиты от «якорения на истории»
+    // (Right Flight case, июль 2026: владелец обновил цены на туры, бот всё равно
+    // называл старые из своих же прошлых ответов).
+    //
+    // Раньше: 10-минутный cooldown + soft warning. Слабо — LLM всё равно
+    // предпочитает историю новому промпту, если история длинная.
+    // Теперь: ВСЕГДА выкидываем свои прошлые ответы из истории (assistant-ходы),
+    // оставляем только вопросы клиента как контекст того что он спрашивал.
+    // Плюс жёсткий system-reminder в конце сообщений (LLM больше внимания
+    // финалу prompt'а). Это работает для ЛЮБОГО диалога, активный или нет.
     let recentHistory: HistoryMessage[];
     let refreshSoftWarning = false;
     if (conv.needsContextRefresh) {
-      const lastTouchedAt = conv.updatedAt instanceof Date
-        ? conv.updatedAt.getTime()
-        : new Date(conv.updatedAt).getTime();
-      const isActive =
-        Number.isFinite(lastTouchedAt) &&
-        Date.now() - lastTouchedAt < CONTEXT_REFRESH_COOLDOWN_MS;
-
-      if (isActive) {
-        recentHistory = history.slice(-20);
-        refreshSoftWarning = true;
-        console.log(`[Channel AI] Active conv ${conv.id}: keeping history, soft warning enabled`);
-      } else {
-        recentHistory = [];
-        console.log(`[Channel AI] Cold conv ${conv.id}: history trimmed (knowledge base updated)`);
-      }
+      // Оставляем ТОЛЬКО реплики клиента — они несут контекст «о чём был разговор»,
+      // но не содержат утверждений от бота, которые могли устареть.
+      // Берём последние 10 пользовательских реплик — этого достаточно для памяти
+      // о контексте, но история становится в 2 раза короче и без «токсичных»
+      // ассистент-ответов.
+      recentHistory = history.filter((m) => m.role === "user").slice(-10);
+      refreshSoftWarning = true;
+      console.log(
+        `[Channel AI] conv ${conv.id}: knowledge refreshed — kept ${recentHistory.length} user turns, dropped assistant history`
+      );
 
       await prisma.channelConversation.update({
         where: { id: conv.id },
