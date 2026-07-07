@@ -590,6 +590,13 @@ export default function TelegramChannelPage() {
                         <p className="mt-1">Что делать: с этого аккаунта запустите /start в вашем боте, тогда мы «увяжем» бизнес и Telegram Business.</p>
                       </div>
                     )}
+                    {/* Technical details — helps diagnose when narrative isn't enough */}
+                    <details className={`mt-3 ${textSecondary}`}>
+                      <summary className="cursor-pointer text-xs hover:underline">Технические детали (для поддержки)</summary>
+                      <pre className={`mt-2 p-2 rounded text-xs overflow-x-auto ${isDark ? "bg-black/40" : "bg-gray-100"}`}>
+                        {JSON.stringify(tgBizDiag, null, 2)}
+                      </pre>
+                    </details>
                   </div>
                 )}
               </div>
