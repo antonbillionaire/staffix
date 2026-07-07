@@ -453,7 +453,10 @@ export default function TelegramChannelPage() {
                   </div>
                   <div className="flex-1">
                     <p className={`font-semibold text-base ${isDark ? "text-amber-300" : "text-amber-900"}`}>
-                      Включите Business Mode в @BotFather
+                      Включите Secretary Mode в @BotFather
+                    </p>
+                    <p className={`text-xs mt-0.5 ${isDark ? "text-amber-200/80" : "text-amber-800/80"}`}>
+                      В BotFather эта опция называется «Secretary Mode», хотя в Telegram Business её показывают как «Business». Это одно и то же.
                     </p>
                     <p className={`text-xs mt-0.5 ${isDark ? "text-amber-200/80" : "text-amber-800/80"}`}>
                       Один раз для этого бота. Обязательный шаг — без него Telegram выдаст ошибку «этот бот не поддерживает Telegram для бизнеса».
@@ -465,7 +468,7 @@ export default function TelegramChannelPage() {
                   <li>Отправьте команду <span className="font-mono font-semibold">/mybots</span></li>
                   <li>Выберите бота <span className="font-mono font-semibold">@{botInfo.username}</span></li>
                   <li>Нажмите <span className="font-semibold">Bot Settings</span></li>
-                  <li>Нажмите <span className="font-semibold">Business Mode</span></li>
+                  <li>Нажмите <span className="font-semibold">Secretary Mode</span></li>
                   <li>Нажмите <span className="font-semibold">Turn on</span></li>
                 </ol>
               </div>
