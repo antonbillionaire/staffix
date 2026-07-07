@@ -39,15 +39,32 @@ export default function TelegramChannelPage() {
     name: "",
   });
 
-  // Telegram Business — отдельное подключение бота в личные чаты владельца.
-  // Активируется владельцем в TG-приложении, мы только показываем статус.
+  // Telegram Business — подключения бота к личным чатам. Может быть несколько:
+  // владелец + сотрудники бизнеса. Каждый подключается сам через TG-приложение.
+  type TgBizConnection = {
+    id: string;
+    connectionId: string;
+    ownerUserId: string;
+    canReply: boolean;
+    isEnabled: boolean;
+    pausedByOwner: boolean;
+    connectedAt: string;
+    lastEventAt: string | null;
+    role: "owner" | "staff";
+    staff: { id: string; name: string; role: string | null } | null;
+  };
   const [tgBiz, setTgBiz] = useState<{
     connected: boolean;
+    // Плоские поля владельческого подключения — для обратной совместимости
+    // с блоком «статус» вверху карточки.
     canReply?: boolean;
     isEnabled?: boolean;
     pausedByOwner?: boolean;
+    // Multi-owner список
+    connections?: TgBizConnection[];
   }>({ connected: false });
-  const [tgBizPausing, setTgBizPausing] = useState(false);
+  // Per-connection pause state — какой row сейчас в процессе паузы
+  const [tgBizPausingId, setTgBizPausingId] = useState<string | null>(null);
   const [tgBizEnabling, setTgBizEnabling] = useState(false);
   const [tgBizEnabled, setTgBizEnabled] = useState(false);
 
@@ -92,21 +109,33 @@ export default function TelegramChannelPage() {
     }
   };
 
-  const togglePause = async () => {
-    if (!tgBiz.connected) return;
-    setTgBizPausing(true);
+  // Паузим/возобновляем одно конкретное подключение. Owner может делать это
+  // как для себя, так и для любого сотрудника — API это разрешает.
+  const togglePauseFor = async (conn: TgBizConnection) => {
+    setTgBizPausingId(conn.id);
     try {
-      const next = !tgBiz.pausedByOwner;
+      const next = !conn.pausedByOwner;
       const r = await fetch("/api/telegram-business", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paused: next }),
+        body: JSON.stringify({ paused: next, connectionRowId: conn.id }),
       });
       if (r.ok) {
-        setTgBiz((prev) => ({ ...prev, pausedByOwner: next }));
+        setTgBiz((prev) => {
+          const updated = (prev.connections || []).map((c) =>
+            c.id === conn.id ? { ...c, pausedByOwner: next } : c
+          );
+          const ownerAfter = updated.find((c) => c.role === "owner");
+          return {
+            ...prev,
+            connections: updated,
+            // Если паузили владельческое — обновляем и плоское поле
+            pausedByOwner: ownerAfter?.pausedByOwner ?? prev.pausedByOwner,
+          };
+        });
       }
     } finally {
-      setTgBizPausing(false);
+      setTgBizPausingId(null);
     }
   };
 
@@ -602,22 +631,83 @@ export default function TelegramChannelPage() {
               </div>
             </div>
           ) : (
-            <div className="mt-4 flex items-center gap-3">
-              <button
-                onClick={togglePause}
-                disabled={tgBizPausing}
-                className={`flex-1 px-4 py-2.5 rounded-xl font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                  tgBiz.pausedByOwner
-                    ? "bg-green-600 hover:bg-green-700 text-white"
-                    : "bg-amber-600 hover:bg-amber-700 text-white"
-                }`}
-              >
-                {tgBizPausing
-                  ? "Сохраняю…"
-                  : tgBiz.pausedByOwner
-                    ? "Возобновить AI в личных чатах"
-                    : "Поставить AI на паузу"}
-              </button>
+            <div className="mt-4 space-y-4">
+              {/* Список подключений: владелец + сотрудники, каждый со своим статусом и паузой */}
+              <div className="space-y-2">
+                {(tgBiz.connections || []).map((conn) => {
+                  const label = conn.role === "owner"
+                    ? "Владелец"
+                    : conn.staff?.name
+                      ? `${conn.staff.name}${conn.staff.role ? ` (${conn.staff.role})` : ""}`
+                      : "Сотрудник";
+                  const statusColor = conn.pausedByOwner
+                    ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                    : conn.isEnabled && conn.canReply
+                      ? "bg-green-500/20 text-green-400 border-green-500/40"
+                      : "bg-red-500/20 text-red-400 border-red-500/40";
+                  const statusText = conn.pausedByOwner
+                    ? "На паузе"
+                    : conn.isEnabled && conn.canReply
+                      ? "Активно"
+                      : !conn.isEnabled
+                        ? "Отключено в TG"
+                        : "Нет права отвечать";
+
+                  return (
+                    <div
+                      key={conn.id}
+                      className={`${isDark ? "bg-white/5 border-white/10" : "bg-gray-50 border-gray-200"} rounded-lg p-4 border flex items-center justify-between gap-3`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className={`font-medium text-sm ${textPrimary}`}>{label}</p>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${statusColor}`}>
+                            {statusText}
+                          </span>
+                        </div>
+                        <p className={`text-xs mt-1 ${textSecondary}`}>
+                          Подключено {new Date(conn.connectedAt).toLocaleDateString("ru-RU")}
+                          {conn.lastEventAt ? ` · последняя активность ${new Date(conn.lastEventAt).toLocaleDateString("ru-RU")}` : ""}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => togglePauseFor(conn)}
+                        disabled={tgBizPausingId === conn.id || !conn.isEnabled || !conn.canReply}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                          conn.pausedByOwner
+                            ? "bg-green-600 hover:bg-green-700 text-white"
+                            : "bg-amber-600 hover:bg-amber-700 text-white"
+                        }`}
+                      >
+                        {tgBizPausingId === conn.id
+                          ? "…"
+                          : conn.pausedByOwner
+                            ? "Возобновить"
+                            : "Пауза"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Инструкция как подключить сотрудников (multi-owner) */}
+              <div className={`${isDark ? "bg-blue-500/10 border-blue-500/30" : "bg-blue-50 border-blue-200"} rounded-lg p-4 border text-sm`}>
+                <p className={`font-semibold mb-2 ${isDark ? "text-blue-300" : "text-blue-900"}`}>
+                  Хотите чтобы AI работал ещё и у сотрудников?
+                </p>
+                <p className={isDark ? "text-blue-100/90" : "text-blue-900/90"}>
+                  Каждый сотрудник может подключить бота к своему личному Telegram. Для этого:
+                </p>
+                <ol className={`mt-2 space-y-1 list-decimal list-inside ${isDark ? "text-blue-100" : "text-blue-900"}`}>
+                  <li>Добавьте сотрудника в <span className="font-semibold">Дашборд → Сотрудники</span></li>
+                  <li>Сотрудник запускает <span className="font-mono">/start</span> в этом же боте со своего аккаунта</li>
+                  <li>Сотрудник подключает бота в своём <span className="font-semibold">Telegram → Settings → Telegram Business → Chatbots</span></li>
+                  <li>Новое подключение появится в списке выше</li>
+                </ol>
+                <p className={`text-xs mt-2 ${isDark ? "text-blue-200/70" : "text-blue-800/80"}`}>
+                  Каждому сотруднику нужен свой <span className="font-semibold">Telegram Premium</span>. Secretary Mode в @BotFather включается один раз для бота — сотрудникам его отдельно включать не нужно.
+                </p>
+              </div>
             </div>
           )}
         </div>
