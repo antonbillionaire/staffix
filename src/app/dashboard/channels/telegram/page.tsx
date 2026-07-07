@@ -435,6 +435,26 @@ export default function TelegramChannelPage() {
 
           {!tgBiz.connected ? (
             <div className="mt-4 space-y-3">
+              {/* ⚠️ КРИТИЧНО (Anton July 2026): Шаг 1 — включить Business Mode в @BotFather.
+                   Без этого Telegram Business App выдаёт «этот бот пока не поддерживает
+                   Telegram для бизнеса» на этапе добавления. Мы это делать за клиента
+                   не можем — Telegram Bot API не даёт метода включить флаг программно. */}
+              <div className={`${isDark ? "bg-amber-500/10 border-amber-500/40" : "bg-amber-50 border-amber-300"} rounded-lg p-4 border text-sm`}>
+                <p className={`font-semibold mb-2 ${isDark ? "text-amber-300" : "text-amber-900"}`}>
+                  Шаг 1: включите Business Mode в @BotFather (обязательно, ОДИН РАЗ)
+                </p>
+                <div className={`space-y-1 ${isDark ? "text-amber-100" : "text-amber-900"}`}>
+                  <p>1. Откройте в Telegram чат с <span className="font-mono">@BotFather</span></p>
+                  <p>2. Отправьте команду <span className="font-mono">/mybots</span></p>
+                  <p>3. Выберите вашего Staffix-бота: <span className="font-mono">@{botInfo.username}</span></p>
+                  <p>4. Нажмите <span className="font-semibold">Bot Settings</span></p>
+                  <p>5. Нажмите <span className="font-semibold">Business Mode</span></p>
+                  <p>6. Нажмите <span className="font-semibold">Turn on</span></p>
+                </div>
+                <p className={`mt-2 text-xs ${isDark ? "text-amber-200/70" : "text-amber-800/80"}`}>
+                  Без этого Telegram выдаёт «этот бот не поддерживает Telegram для бизнеса» при попытке добавить. Это настройка на стороне Telegram, мы не можем сделать это за вас.
+                </p>
+              </div>
               <button
                 onClick={enableBusinessFeature}
                 disabled={tgBizEnabling || tgBizEnabled}
@@ -444,16 +464,17 @@ export default function TelegramChannelPage() {
                   ? "Подготавливаю бота…"
                   : tgBizEnabled
                     ? "Бот готов ✓ — теперь подключите в Telegram (см. ниже)"
-                    : "Шаг 1: подготовить бота к подключению"}
+                    : "Шаг 2: подготовить бота на стороне Staffix"}
               </button>
               <div className={`${isDark ? "bg-white/5" : "bg-gray-50"} rounded-lg p-4 space-y-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                <p className="font-medium mb-2">Шаг 2: подключите в Telegram (один раз):</p>
+                <p className="font-medium mb-2">Шаг 3: подключите в Telegram:</p>
                 <p>1. Откройте Telegram → Settings → Telegram Business</p>
-                <p>2. Перейдите в раздел «Chatbots»</p>
+                <p>2. Перейдите в раздел «Chatbots» (нужен Telegram Premium)</p>
                 <p>3. Введите имя бота: <span className="font-mono">@{botInfo.username}</span></p>
                 <p>4. Настройте в каких чатах бот будет работать (например, только с не-контактами)</p>
+                <p>5. В разделе Permissions включите «Reply to Messages»</p>
                 <p className={`mt-3 text-xs ${textSecondary}`}>
-                  После подключения здесь появится тогглер «Пауза» и текущий статус. Telegram присылает обновление статуса сам — обновите страницу через минуту после подключения.
+                  После подключения здесь появится тогглер «Пауза» и текущий статус. Обновите страницу через минуту.
                 </p>
               </div>
             </div>
