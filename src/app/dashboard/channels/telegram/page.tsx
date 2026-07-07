@@ -434,47 +434,99 @@ export default function TelegramChannelPage() {
           </div>
 
           {!tgBiz.connected ? (
-            <div className="mt-4 space-y-3">
-              {/* ⚠️ КРИТИЧНО (Anton July 2026): Шаг 1 — включить Business Mode в @BotFather.
-                   Без этого Telegram Business App выдаёт «этот бот пока не поддерживает
-                   Telegram для бизнеса» на этапе добавления. Мы это делать за клиента
-                   не можем — Telegram Bot API не даёт метода включить флаг программно. */}
-              <div className={`${isDark ? "bg-amber-500/10 border-amber-500/40" : "bg-amber-50 border-amber-300"} rounded-lg p-4 border text-sm`}>
-                <p className={`font-semibold mb-2 ${isDark ? "text-amber-300" : "text-amber-900"}`}>
-                  Шаг 1: включите Business Mode в @BotFather (обязательно, ОДИН РАЗ)
+            <div className="mt-6 space-y-5">
+              {/* Требования */}
+              <div className={`${isDark ? "bg-blue-500/10 border-blue-500/30" : "bg-blue-50 border-blue-200"} rounded-lg p-4 border text-sm`}>
+                <p className={`font-semibold mb-1 ${isDark ? "text-blue-300" : "text-blue-900"}`}>
+                  Что понадобится
                 </p>
-                <div className={`space-y-1 ${isDark ? "text-amber-100" : "text-amber-900"}`}>
-                  <p>1. Откройте в Telegram чат с <span className="font-mono">@BotFather</span></p>
-                  <p>2. Отправьте команду <span className="font-mono">/mybots</span></p>
-                  <p>3. Выберите вашего Staffix-бота: <span className="font-mono">@{botInfo.username}</span></p>
-                  <p>4. Нажмите <span className="font-semibold">Bot Settings</span></p>
-                  <p>5. Нажмите <span className="font-semibold">Business Mode</span></p>
-                  <p>6. Нажмите <span className="font-semibold">Turn on</span></p>
-                </div>
-                <p className={`mt-2 text-xs ${isDark ? "text-amber-200/70" : "text-amber-800/80"}`}>
-                  Без этого Telegram выдаёт «этот бот не поддерживает Telegram для бизнеса» при попытке добавить. Это настройка на стороне Telegram, мы не можем сделать это за вас.
+                <p className={isDark ? "text-blue-100/90" : "text-blue-900/90"}>
+                  Активная подписка Telegram Premium у Вас на аккаунте — без неё пункт «Telegram Business» в настройках просто не появится. Оформляется в Telegram → Settings → Telegram Premium.
                 </p>
               </div>
-              <button
-                onClick={enableBusinessFeature}
-                disabled={tgBizEnabling || tgBizEnabled}
-                className="w-full bg-gradient-to-r from-violet-600 to-purple-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
-              >
-                {tgBizEnabling
-                  ? "Подготавливаю бота…"
-                  : tgBizEnabled
-                    ? "Бот готов ✓ — теперь подключите в Telegram (см. ниже)"
-                    : "Шаг 2: подготовить бота на стороне Staffix"}
-              </button>
-              <div className={`${isDark ? "bg-white/5" : "bg-gray-50"} rounded-lg p-4 space-y-2 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                <p className="font-medium mb-2">Шаг 3: подключите в Telegram:</p>
-                <p>1. Откройте Telegram → Settings → Telegram Business</p>
-                <p>2. Перейдите в раздел «Chatbots» (нужен Telegram Premium)</p>
-                <p>3. Введите имя бота: <span className="font-mono">@{botInfo.username}</span></p>
-                <p>4. Настройте в каких чатах бот будет работать (например, только с не-контактами)</p>
-                <p>5. В разделе Permissions включите «Reply to Messages»</p>
-                <p className={`mt-3 text-xs ${textSecondary}`}>
-                  После подключения здесь появится тогглер «Пауза» и текущий статус. Обновите страницу через минуту.
+
+              {/* ШАГ 1 — BotFather (критично!) */}
+              <div className={`${isDark ? "bg-amber-500/10 border-amber-500/40" : "bg-amber-50 border-amber-300"} rounded-lg p-5 border`}>
+                <div className="flex items-start gap-3 mb-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm ${isDark ? "bg-amber-500 text-black" : "bg-amber-500 text-white"}`}>
+                    1
+                  </div>
+                  <div className="flex-1">
+                    <p className={`font-semibold text-base ${isDark ? "text-amber-300" : "text-amber-900"}`}>
+                      Включите Business Mode в @BotFather
+                    </p>
+                    <p className={`text-xs mt-0.5 ${isDark ? "text-amber-200/80" : "text-amber-800/80"}`}>
+                      Один раз для этого бота. Обязательный шаг — без него Telegram выдаст ошибку «этот бот не поддерживает Telegram для бизнеса».
+                    </p>
+                  </div>
+                </div>
+                <ol className={`space-y-1.5 text-sm list-decimal list-inside ${isDark ? "text-amber-100" : "text-amber-900"}`}>
+                  <li>В Telegram откройте чат с <span className="font-mono font-semibold">@BotFather</span></li>
+                  <li>Отправьте команду <span className="font-mono font-semibold">/mybots</span></li>
+                  <li>Выберите бота <span className="font-mono font-semibold">@{botInfo.username}</span></li>
+                  <li>Нажмите <span className="font-semibold">Bot Settings</span></li>
+                  <li>Нажмите <span className="font-semibold">Business Mode</span></li>
+                  <li>Нажмите <span className="font-semibold">Turn on</span></li>
+                </ol>
+              </div>
+
+              {/* ШАГ 2 — кнопка в дашборде */}
+              <div className={`${isDark ? "bg-white/5 border-white/10" : "bg-gray-50 border-gray-200"} rounded-lg p-5 border`}>
+                <div className="flex items-start gap-3 mb-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm ${isDark ? "bg-violet-500 text-white" : "bg-violet-600 text-white"}`}>
+                    2
+                  </div>
+                  <div className="flex-1">
+                    <p className={`font-semibold text-base ${textPrimary}`}>
+                      Подготовьте бота на стороне Staffix
+                    </p>
+                    <p className={`text-xs mt-0.5 ${textSecondary}`}>
+                      Одна кнопка. Мы настроим webhook Вашего бота чтобы он получал сообщения из личных чатов Telegram Business.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={enableBusinessFeature}
+                  disabled={tgBizEnabling || tgBizEnabled}
+                  className="w-full bg-gradient-to-r from-violet-600 to-purple-600 text-white py-2.5 px-4 rounded-xl font-medium text-sm hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+                >
+                  {tgBizEnabling
+                    ? "Подготавливаю бота…"
+                    : tgBizEnabled
+                      ? "✓ Готово — переходите к Шагу 3"
+                      : "Подготовить бота"}
+                </button>
+              </div>
+
+              {/* ШАГ 3 — подключение в TG */}
+              <div className={`${isDark ? "bg-white/5 border-white/10" : "bg-gray-50 border-gray-200"} rounded-lg p-5 border`}>
+                <div className="flex items-start gap-3 mb-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm ${isDark ? "bg-violet-500 text-white" : "bg-violet-600 text-white"}`}>
+                    3
+                  </div>
+                  <div className="flex-1">
+                    <p className={`font-semibold text-base ${textPrimary}`}>
+                      Подключите бота в Telegram
+                    </p>
+                    <p className={`text-xs mt-0.5 ${textSecondary}`}>
+                      Делаете один раз в приложении Telegram на телефоне.
+                    </p>
+                  </div>
+                </div>
+                <ol className={`space-y-1.5 text-sm list-decimal list-inside ${isDark ? "text-gray-200" : "text-gray-800"}`}>
+                  <li>Откройте Telegram → <span className="font-semibold">Settings</span> → <span className="font-semibold">Telegram Business</span></li>
+                  <li>Перейдите в раздел <span className="font-semibold">Chatbots</span></li>
+                  <li>Введите имя бота: <span className="font-mono font-semibold">@{botInfo.username}</span></li>
+                  <li>В разделе <span className="font-semibold">Access to Chats</span> выберите <span className="font-semibold">Selected Chats</span> и настройте:
+                    <div className={`ml-6 mt-1 text-xs ${textSecondary}`}>
+                      рекомендуем включить <span className="font-semibold">Non-Contacts</span> и <span className="font-semibold">New Chats</span>, отключить <span className="font-semibold">Contacts</span> — тогда AI будет отвечать только незнакомцам, а с друзьями и семьёй Вы общаетесь сами.
+                    </div>
+                  </li>
+                  <li>В разделе <span className="font-semibold">Permissions</span> включите <span className="font-semibold">Reply to Messages</span></li>
+                  <li>Сохраните настройки</li>
+                </ol>
+                <p className={`mt-4 text-xs ${textSecondary}`}>
+                  После подключения обновите эту страницу через минуту. Здесь появится зелёный статус «Активно» и тогглер «Пауза».
                 </p>
               </div>
             </div>
