@@ -59,30 +59,82 @@ export async function handleBusinessConnection(
   const ownerUserId = BigInt(conn.user.id);
   const ownerChatId = BigInt(conn.user_chat_id);
 
-  // Находим бизнес по совпадению owner Telegram id. Раньше владелец должен
-  // был запустить /start в нашем боте — там мы сохранили его ownerTelegramChatId.
+  // 1) Находим бизнес по botToken — TG прислал апдейт именно нашему боту.
   const business = await prisma.business.findFirst({
-    where: { ownerTelegramChatId: ownerUserId, botToken },
-    select: { id: true, name: true },
+    where: { botToken },
+    select: {
+      id: true,
+      name: true,
+      ownerTelegramChatId: true,
+    },
   });
 
   if (!business) {
-    console.warn(
-      `[TG Business] connection from user_id=${ownerUserId} but no Business matches ownerTelegramChatId. Asking owner to /start.`
-    );
-    await sendTelegramMessage(
-      botToken,
-      conn.user_chat_id,
-      "Чтобы я начал работать в ваших личных чатах, сначала запустите команду /start в этом боте — так я узнаю вас как владельца бизнеса."
-    );
+    console.warn(`[TG Business] botToken not linked to any business, ignoring`);
     return;
   }
 
-  // Сценарий отключения: TG прислал is_enabled=false. Сохраняем для аудита,
-  // но больше ничего делать не надо — webhook просто перестанет получать
-  // business_message от этого connection.
+  // 2) Определяем КТО подключился. Три сценария:
+  //    (a) owner match — user.id совпал с Business.ownerTelegramChatId → это владелец
+  //    (b) staff match — user.id совпал с Staff.telegramChatId → сотрудник этого бизнеса
+  //    (c) auto-claim owner — Business.ownerTelegramChatId ещё не был установлен
+  //        (владелец никогда не делал /start). Считаем первого подключившегося
+  //        владельцем и записываем его user.id как ownerTelegramChatId.
+  //    Ничего не подходит → просим человека сначала стать сотрудником + /start.
+  let staffId: string | null = null;
+  let matchType: "owner" | "staff" | "auto-claim-owner";
+  let displayName: string = conn.user.first_name;
+
+  if (business.ownerTelegramChatId === ownerUserId) {
+    matchType = "owner";
+  } else {
+    // Staff match
+    const staff = await prisma.staff.findFirst({
+      where: { businessId: business.id, telegramChatId: ownerUserId },
+      select: { id: true, name: true },
+    });
+    if (staff) {
+      staffId = staff.id;
+      matchType = "staff";
+      displayName = staff.name;
+    } else if (!business.ownerTelegramChatId) {
+      // Auto-claim: владелец никогда не делал /start, эту привязку делаем сейчас.
+      // Небольшой риск: любой человек знающий имя бота может подключить его
+      // первым и стать «владельцем». На практике: (i) знать имя бота = уже
+      // почти владелец, (ii) сообщения расходуют квоту бизнеса, невыгодно
+      // спамерам, (iii) при обнаружении реальный владелец может через /start
+      // перезаписать (в текущем коде — не может, но это исправимо через админку).
+      await prisma.business.update({
+        where: { id: business.id },
+        data: { ownerTelegramChatId: ownerUserId },
+      });
+      matchType = "auto-claim-owner";
+      console.log(
+        `[TG Business] auto-claimed ownerTelegramChatId=${ownerUserId} for business=${business.id} (was null)`
+      );
+    } else {
+      // Реальный конфликт — есть владелец, но подключается кто-то ещё
+      console.warn(
+        `[TG Business] connection from user_id=${ownerUserId} to business=${business.id} — not owner (${business.ownerTelegramChatId}), not staff. Rejecting.`
+      );
+      await sendTelegramMessage(
+        botToken,
+        conn.user_chat_id,
+        `Чтобы я работал в ваших личных чатах, попросите владельца бизнеса «${business.name}» добавить вас в команду в Staffix (Дашборд → Сотрудники), потом запустите /start в этом боте с этого же аккаунта. После этого повторите подключение в Telegram Business.`
+      );
+      return;
+    }
+  }
+
+  // 3) Upsert по (businessId, ownerUserId). Один человек = одна строка на бизнес.
+  //    connectionId TG может выдать новый при переподключении — обновляем.
   await prisma.telegramBusinessConnection.upsert({
-    where: { connectionId: conn.id },
+    where: {
+      businessId_ownerUserId: {
+        businessId: business.id,
+        ownerUserId,
+      },
+    },
     create: {
       connectionId: conn.id,
       ownerUserId,
@@ -90,26 +142,36 @@ export async function handleBusinessConnection(
       canReply: conn.can_reply,
       isEnabled: conn.is_enabled,
       businessId: business.id,
+      staffId,
       lastEventAt: new Date(conn.date * 1000),
     },
     update: {
+      connectionId: conn.id,
       canReply: conn.can_reply,
       isEnabled: conn.is_enabled,
       ownerChatId,
+      staffId,
       lastEventAt: new Date(conn.date * 1000),
     },
   });
 
-  // Уведомление владельцу в его @-боте: коротко, без эмодзи-парада.
+  // 4) Уведомление подключившемуся в его личный чат с ботом.
+  const roleLabel =
+    matchType === "staff"
+      ? "как сотрудник"
+      : matchType === "auto-claim-owner"
+        ? "как владелец (автоматически привязан)"
+        : "как владелец";
+
   const status = !conn.is_enabled
     ? "Подключение AI к личным чатам отключено."
     : !conn.can_reply
       ? "AI подключён к личным чатам, но без права отвечать. Чтобы я мог отвечать клиентам, в настройках Telegram Business → Chatbots отметьте «Бот может отправлять сообщения»."
-      : `AI подключён к вашим личным чатам ✓\n\nКлиенты, написавшие в личку, теперь получат ответ от AI-помощника бизнеса «${business.name}». Чтобы выбрать в каких чатах AI работает (с контактами, без, и т.д.), используйте настройки самого Telegram → Business → Chatbots.\n\nЧтобы временно поставить на паузу — зайдите в дашборд Staffix.`;
+      : `AI подключён к вашим личным чатам ✓ ${roleLabel}\n\nКлиенты, написавшие в личку, теперь получат ответ от AI-помощника бизнеса «${business.name}». Настройки того, в каких чатах AI работает (с контактами, без, и т.д.) — в самом Telegram → Business → Chatbots.\n\nПоставить на паузу можно в дашборде Staffix.`;
 
   await sendTelegramMessage(botToken, conn.user_chat_id, status);
   console.log(
-    `[TG Business] connection ${conn.id} updated for business=${business.id}, is_enabled=${conn.is_enabled}, can_reply=${conn.can_reply}`
+    `[TG Business] connection ${conn.id} for business=${business.id} match=${matchType} staff=${staffId ?? "-"} is_enabled=${conn.is_enabled} can_reply=${conn.can_reply} (${displayName})`
   );
 }
 

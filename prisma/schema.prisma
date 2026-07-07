@@ -212,10 +212,11 @@ model Business {
   channelConnections ChannelConnection[]
   channelClients     ChannelClient[]
 
-  // Telegram Business — бот в личных чатах владельца (см. TelegramBusinessConnection).
-  // Опционально: владелец сам подключает через TG Settings → Business → Chatbots.
-  // Один бизнес = одно подключение (один владельцев аккаунт у нас и есть Business).
-  tgBusinessConnection TelegramBusinessConnection?
+  // Telegram Business — бот в личных чатах владельца и/или сотрудников.
+  // Опционально: каждый (владелец + любой сотрудник с /start) сам подключает
+  // через TG Settings → Business → Chatbots. Один бизнес — несколько подключений
+  // (по одному на каждого подключившегося человека).
+  tgBusinessConnections TelegramBusinessConnection[]
 
   // CRM интеграции
   crmIntegrations CrmIntegration[]
@@ -423,6 +424,11 @@ model Staff {
   financeTransactions FinanceTransaction[]
   // Задачи назначенные на сотрудника (Task.assignedStaffId → SetNull при удалении)
   assignedTasks       Task[]               @relation("TaskAssignedStaff")
+
+  // Подключения бота к личному Telegram сотрудника (Telegram Business).
+  // У одного сотрудника максимум одно активное подключение — TG всё равно
+  // не позволит несколько ботов одному аккаунту в Business режиме.
+  tgBusinessConnections TelegramBusinessConnection[]
 
   @@index([businessId])
 }
@@ -1148,15 +1154,25 @@ model TelegramBusinessConnection {
   connectedAt DateTime  @default(now())
   lastEventAt DateTime?
 
-  // Привязка к бизнесу
-  businessId String   @unique
+  // Привязка к бизнесу — теперь МОЖНО несколько подключений на один бизнес,
+  // потому что владелец И сотрудники могут каждый подключить бота к своему
+  // личному Telegram. См. staffId ниже — различает владельца от сотрудника.
+  businessId String
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  // Если null — это подключение владельца (совпадение с Business.ownerTelegramChatId).
+  // Если задан — конкретный сотрудник подключил бота в свой TG (совпадение с
+  // Staff.telegramChatId). Нужно чтобы владелец в дашборде понимал кто и где.
+  staffId String?
+  staff   Staff?  @relation(fields: [staffId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([businessId, ownerUserId]) // один человек не может подключить дважды
   @@index([connectionId])
   @@index([ownerUserId])
+  @@index([staffId])
 }
 
 // Клиенты со всех каналов (унифицированные)

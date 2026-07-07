@@ -111,10 +111,12 @@ export async function GET() {
     };
   }
 
-  // 2) Проверяем текущее подключение (если есть в БД)
-  const conn = await prisma.telegramBusinessConnection.findUnique({
+  // 2) Проверяем текущие подключения (multi-owner: их может быть несколько —
+  //    владелец + сотрудники).
+  const conns = await prisma.telegramBusinessConnection.findMany({
     where: { businessId: business.id },
     select: {
+      id: true,
       connectionId: true,
       ownerUserId: true,
       canReply: true,
@@ -122,26 +124,39 @@ export async function GET() {
       pausedByOwner: true,
       connectedAt: true,
       lastEventAt: true,
+      staffId: true,
+      staff: { select: { name: true, role: true } },
     },
   });
-  result.connection = conn
+  result.connections = conns.map((c) => ({
+    id: c.id,
+    connectionId: c.connectionId,
+    connectedByUserId: c.ownerUserId.toString(),
+    canReply: c.canReply,
+    isEnabled: c.isEnabled,
+    pausedByOwner: c.pausedByOwner,
+    connectedAt: c.connectedAt.toISOString(),
+    lastEventAt: c.lastEventAt?.toISOString() ?? null,
+    role: c.staffId === null ? "owner" : "staff",
+    staff: c.staff ?? null,
+  }));
+
+  // Для обратной совместимости с текущим UI — оставляем плоский connection
+  // (первое найденное подключение владельца).
+  const ownerConn = conns.find((c) => c.staffId === null);
+  result.connection = ownerConn
     ? {
         exists: true,
-        connectionId: conn.connectionId,
-        // ID аккаунта который подключил бота через Telegram Business
-        connectedByUserId: conn.ownerUserId.toString(),
-        canReply: conn.canReply,
-        isEnabled: conn.isEnabled,
-        pausedByOwner: conn.pausedByOwner,
-        connectedAt: conn.connectedAt.toISOString(),
-        lastEventAt: conn.lastEventAt?.toISOString() ?? null,
-        // MATCH CHECK: если этот id ≠ ownerTelegramChatId, значит владелец
-        // сделал /start с одного аккаунта, а Telegram Business подключил с
-        // другого. TG будет присылать нам события, но handler откажется
-        // связывать connection с бизнесом.
+        connectionId: ownerConn.connectionId,
+        connectedByUserId: ownerConn.ownerUserId.toString(),
+        canReply: ownerConn.canReply,
+        isEnabled: ownerConn.isEnabled,
+        pausedByOwner: ownerConn.pausedByOwner,
+        connectedAt: ownerConn.connectedAt.toISOString(),
+        lastEventAt: ownerConn.lastEventAt?.toISOString() ?? null,
         userIdMatchesOwner:
           business.ownerTelegramChatId?.toString() ===
-          conn.ownerUserId.toString(),
+          ownerConn.ownerUserId.toString(),
       }
     : { exists: false };
 
@@ -158,31 +173,32 @@ export async function GET() {
   } else {
     diagnosis.push("✅ Шаг 2 выполнен — webhook подписан на business_* события.");
   }
-  if (!business.ownerTelegramChatId) {
+  if (!business.ownerTelegramChatId && conns.length === 0) {
     diagnosis.push(
-      "❌ Владелец не сделал /start в боте — Business.ownerTelegramChatId пустой. Владелец должен запустить /start в своём боте с того же аккаунта, с которого будет подключать Telegram Business."
+      "ℹ️ Владелец ещё ни разу не подключался. Первый подключившийся автоматически станет владельцем (auto-claim). Если это Ваш случай — просто подключите бота в Telegram Business с любого своего аккаунта, мы запомним."
     );
-  } else {
+  } else if (business.ownerTelegramChatId) {
     diagnosis.push(
-      "✅ Владелец делал /start — ownerTelegramChatId установлен."
+      "✅ Владелец делал /start или уже auto-claim — ownerTelegramChatId установлен."
     );
   }
-  if (conn) {
-    const owns =
-      business.ownerTelegramChatId?.toString() === conn.ownerUserId.toString();
-    if (owns) {
-      diagnosis.push("✅ TG прислал business_connection и он привязан к бизнесу.");
-    } else {
+
+  if (conns.length > 0) {
+    const ownerConnNow = conns.find((c) => c.staffId === null);
+    const staffConns = conns.filter((c) => c.staffId !== null);
+    if (ownerConnNow) {
       diagnosis.push(
-        `⚠️ TG прислал business_connection от аккаунта ${conn.ownerUserId} — но /start был с другого аккаунта (${business.ownerTelegramChatId}). Владелец должен подключать Telegram Business с ТОГО ЖЕ аккаунта, с которого делал /start.`
+        `✅ Подключение владельца активно (user_id ${ownerConnNow.ownerUserId}, ${ownerConnNow.isEnabled ? "enabled" : "disabled"}, ${ownerConnNow.canReply ? "canReply" : "no reply right"}).`
       );
     }
-  } else if (
-    webhookReady &&
-    business.ownerTelegramChatId
-  ) {
+    if (staffConns.length > 0) {
+      diagnosis.push(
+        `✅ Подключено сотрудников: ${staffConns.length}. Владелец может паузить каждого отдельно.`
+      );
+    }
+  } else if (webhookReady) {
     diagnosis.push(
-      "⏳ Всё готово, но business_connection от TG ещё не пришёл. Проверьте что в BotFather включён Secretary Mode и что бот действительно добавлен в Telegram → Settings → Telegram Business → Chatbots."
+      "⏳ Всё готово со стороны Staffix, но business_connection от TG ещё не пришёл. Проверьте: (1) в @BotFather → Bot Settings → Secretary Mode → Turn on выполнено; (2) в Telegram → Settings → Telegram Business → Chatbots введено имя бота и нажат ADD; (3) обновите эту страницу через 1 минуту."
     );
   }
   result.diagnosis = diagnosis;

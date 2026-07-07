@@ -68,33 +68,57 @@ export async function GET() {
 
   const businessId = await getOwnersBusinessId(session.user.id);
   if (!businessId) {
-    return NextResponse.json({ connected: false });
+    return NextResponse.json({ connected: false, connections: [] });
   }
 
-  const conn = await prisma.telegramBusinessConnection.findUnique({
+  // Возвращаем ВСЕ подключения бизнеса — владелец + сотрудники.
+  // Владельческое подключение отличается через staffId = null.
+  const conns = await prisma.telegramBusinessConnection.findMany({
     where: { businessId },
     select: {
+      id: true,
       connectionId: true,
+      ownerUserId: true,
       canReply: true,
       isEnabled: true,
       pausedByOwner: true,
       connectedAt: true,
       lastEventAt: true,
+      staffId: true,
+      staff: { select: { id: true, name: true, role: true } },
     },
+    orderBy: [{ staffId: "asc" }, { connectedAt: "asc" }], // владелец (null) первым
   });
 
-  if (!conn) {
-    return NextResponse.json({ connected: false });
-  }
+  // Оставляем `connected` boolean для обратной совместимости с фронтом —
+  // «есть хоть одно подключение» = true. UI при этом будет ходить по списку.
+  const anyConnected = conns.length > 0;
+  const ownerConn = conns.find((c) => c.staffId === null);
 
   return NextResponse.json({
-    connected: true,
-    connectionId: conn.connectionId,
-    canReply: conn.canReply,
-    isEnabled: conn.isEnabled,
-    pausedByOwner: conn.pausedByOwner,
-    connectedAt: conn.connectedAt,
-    lastEventAt: conn.lastEventAt,
+    connected: anyConnected,
+    // Плоские поля владельческого подключения — старый UI на них смотрит
+    connectionId: ownerConn?.connectionId,
+    canReply: ownerConn?.canReply,
+    isEnabled: ownerConn?.isEnabled,
+    pausedByOwner: ownerConn?.pausedByOwner,
+    connectedAt: ownerConn?.connectedAt,
+    lastEventAt: ownerConn?.lastEventAt,
+    // Полный список — новый UI будет отсюда рендерить
+    connections: conns.map((c) => ({
+      id: c.id,
+      connectionId: c.connectionId,
+      ownerUserId: c.ownerUserId.toString(),
+      canReply: c.canReply,
+      isEnabled: c.isEnabled,
+      pausedByOwner: c.pausedByOwner,
+      connectedAt: c.connectedAt,
+      lastEventAt: c.lastEventAt,
+      role: c.staffId === null ? "owner" : "staff",
+      staff: c.staff
+        ? { id: c.staff.id, name: c.staff.name, role: c.staff.role }
+        : null,
+    })),
   });
 }
 
@@ -107,6 +131,10 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as {
     paused?: boolean;
     action?: "enable";
+    // Опциональный id конкретного подключения (multi-owner). Если не задан —
+    // применяем к владельческому подключению (staffId=null) для обратной
+    // совместимости со старым UI.
+    connectionRowId?: string;
   } | null;
   if (!body) {
     return NextResponse.json({ error: "Bad body" }, { status: 400 });
@@ -127,19 +155,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, action: "enable" });
   }
 
-  // paused toggle (требует уже существующего подключения)
+  // paused toggle — на конкретное подключение (multi-owner) или на владельческое.
   if (typeof body.paused !== "boolean") {
     return NextResponse.json({ error: "Bad body: { paused: boolean } required" }, { status: 400 });
   }
-  const updated = await prisma.telegramBusinessConnection.update({
-    where: { businessId },
-    data: { pausedByOwner: body.paused },
-    select: { pausedByOwner: true },
-  }).catch(() => null);
 
-  if (!updated) {
+  // Если передали connectionRowId — паузим только это подключение (владелец
+  // может выключить конкретному сотруднику). Иначе — владельческое.
+  const target = body.connectionRowId
+    ? await prisma.telegramBusinessConnection.findFirst({
+        where: { id: body.connectionRowId, businessId },
+        select: { id: true },
+      })
+    : await prisma.telegramBusinessConnection.findFirst({
+        where: { businessId, staffId: null },
+        select: { id: true },
+      });
+
+  if (!target) {
     return NextResponse.json({ error: "No connection yet — connect bot in Telegram Business first" }, { status: 404 });
   }
+
+  const updated = await prisma.telegramBusinessConnection.update({
+    where: { id: target.id },
+    data: { pausedByOwner: body.paused },
+    select: { pausedByOwner: true },
+  });
 
   return NextResponse.json({ ok: true, pausedByOwner: updated.pausedByOwner });
 }
