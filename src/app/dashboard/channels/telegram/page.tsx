@@ -72,6 +72,26 @@ export default function TelegramChannelPage() {
     }
   };
 
+  // Диагностика — вызывается по кнопке когда «не подключается», показывает
+  // на каком именно шаге застряло (webhook / /start / mismatched account).
+  const [tgBizDiag, setTgBizDiag] = useState<{
+    diagnosis?: string[];
+    webhook?: { businessReady?: boolean; missingBusinessUpdates?: string[]; lastErrorMessage?: string | null };
+    business?: { hasOwnerTelegramChatId?: boolean };
+    connection?: { exists?: boolean; userIdMatchesOwner?: boolean; connectedByUserId?: string };
+  } | null>(null);
+  const [tgBizDiagLoading, setTgBizDiagLoading] = useState(false);
+  const runDiagnostic = async () => {
+    setTgBizDiagLoading(true);
+    try {
+      const r = await fetch("/api/telegram-business/diagnostic");
+      const data = await r.json();
+      setTgBizDiag(data);
+    } finally {
+      setTgBizDiagLoading(false);
+    }
+  };
+
   const togglePause = async () => {
     if (!tgBiz.connected) return;
     setTgBizPausing(true);
@@ -531,6 +551,47 @@ export default function TelegramChannelPage() {
                 <p className={`mt-4 text-xs ${textSecondary}`}>
                   После подключения обновите эту страницу через минуту. Здесь появится зелёный статус «Активно» и тогглер «Пауза».
                 </p>
+              </div>
+
+              {/* Диагностика — если что-то пошло не так, показываем где именно застряло */}
+              <div className={`${isDark ? "bg-white/5 border-white/10" : "bg-gray-50 border-gray-200"} rounded-lg p-5 border`}>
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <p className={`font-semibold text-base ${textPrimary}`}>
+                      Не подключается? Проверьте диагностику
+                    </p>
+                    <p className={`text-xs mt-0.5 ${textSecondary}`}>
+                      Покажет на каком шаге застряло: не нажали кнопку Шага 2, не сделали /start от нужного аккаунта, или Telegram не прислал события.
+                    </p>
+                  </div>
+                  <button
+                    onClick={runDiagnostic}
+                    disabled={tgBizDiagLoading}
+                    className={`${isDark ? "bg-white/10 hover:bg-white/20 text-white" : "bg-gray-200 hover:bg-gray-300 text-gray-800"} px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap disabled:opacity-50`}
+                  >
+                    {tgBizDiagLoading ? "Проверяю…" : "Проверить"}
+                  </button>
+                </div>
+                {tgBizDiag?.diagnosis && (
+                  <div className="space-y-1 text-sm mt-2">
+                    {tgBizDiag.diagnosis.map((line, idx) => (
+                      <p key={idx} className={`${textPrimary} leading-relaxed`}>
+                        {line}
+                      </p>
+                    ))}
+                    {tgBizDiag.webhook?.lastErrorMessage && (
+                      <p className={`mt-2 text-xs ${isDark ? "text-red-300" : "text-red-700"}`}>
+                        Последняя ошибка от Telegram: <span className="font-mono">{tgBizDiag.webhook.lastErrorMessage}</span>
+                      </p>
+                    )}
+                    {tgBizDiag.connection?.exists && tgBizDiag.connection.userIdMatchesOwner === false && (
+                      <div className={`mt-2 text-xs ${isDark ? "text-amber-200/90" : "text-amber-800"}`}>
+                        <p>Аккаунт из Telegram Business: <span className="font-mono">{tgBizDiag.connection.connectedByUserId}</span></p>
+                        <p className="mt-1">Что делать: с этого аккаунта запустите /start в вашем боте, тогда мы «увяжем» бизнес и Telegram Business.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ) : (
