@@ -211,7 +211,7 @@ export async function generateAIResponse(
       // cap, which keeps verbose multi-step replies bounded too. If a
       // specific business needs longer replies it goes via aiRules
       // override at the top of the prompt, not a global cap.
-      max_tokens: 300,
+      max_tokens: 800,
       system: systemBlocks,
       messages: recentMessages,
       tools: activeTools,
@@ -308,7 +308,7 @@ export async function generateAIResponse(
       try {
         response = await callClaudeWithRetry({
           model: "claude-haiku-4-5-20251001",
-          max_tokens: 300,
+          max_tokens: 800,
           system: systemBlocks,
           messages: recentMessages,
           tools: activeTools,
