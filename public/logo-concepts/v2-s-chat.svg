@@ -1,0 +1,36 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg2)"/>
+
+  <!-- S letter that morphs into a chat bubble at the top -->
+  <!-- Chat bubble shape (top of S) -->
+  <path d="M195 115 C195 95, 215 80, 245 80 L325 80 C355 80, 375 95, 375 115 L375 155 C375 175, 355 190, 325 190 L275 190 L250 215 L255 190 L245 190 C215 190, 195 175, 195 155 Z"
+        fill="white" opacity="0.95"/>
+
+  <!-- Three dots inside chat bubble -->
+  <circle cx="260" cy="135" r="10" fill="#3B82F6"/>
+  <circle cx="300" cy="135" r="10" fill="#6366F1"/>
+  <circle cx="340" cy="135" r="10" fill="#818CF8"/>
+
+  <!-- S-curve body continuing from chat bubble -->
+  <path d="M250 215 C230 230, 155 240, 155 290 C155 340, 200 365, 240 375 C280 385, 355 385, 355 345 C355 305, 280 305, 240 315 C200 325, 155 340, 155 290"
+        stroke="white" stroke-width="32" stroke-linecap="round" fill="none" opacity="0.0"/>
+
+  <!-- Clean S bottom half -->
+  <path d="M248 208 C220 230, 148 248, 148 300 C148 360, 220 388, 280 388 C340 388, 380 365, 380 338 C380 308, 340 295, 300 300 C260 305, 200 320, 200 345"
+        stroke="white" stroke-width="28" stroke-linecap="round" fill="none"/>
+
+  <!-- Small AI sparkle accents -->
+  <g fill="white" opacity="0.6">
+    <!-- Sparkle 1 -->
+    <path d="M400 240 L406 256 L422 262 L406 268 L400 284 L394 268 L378 262 L394 256 Z" />
+    <!-- Sparkle 2 -->
+    <path d="M130 380 L134 390 L144 394 L134 398 L130 408 L126 398 L116 394 L126 390 Z" />
+  </g>
+</svg>

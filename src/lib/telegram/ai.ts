@@ -204,14 +204,13 @@ export async function generateAIResponse(
     ];
 
     console.log(`[Webhook] Calling Claude API for business=${businessId}, salesMode=${salesMode}, stableLen=${systemPrompt.stable.length}, variableLen=${variableTail.length}`);
+    // thinking: disabled — на Sonnet 5 adaptive thinking по дефолту тратит
+    // токены на цепочки рассуждений. Для клиент-чата это оверкилл; выключаем.
+    // max_tokens: 1024 — компенсируем 30%-inflated токенайзер Sonnet 5.
     let response = await callClaudeWithRetry({
-      model: "claude-sonnet-4-5-20250929",
-      // 500 ≈ ~375 chars output — enough for the 1–3 sentence default in
-      // ai-memory.ts buildSystemPrompt. Tool-loop turns still get the same
-      // cap, which keeps verbose multi-step replies bounded too. If a
-      // specific business needs longer replies it goes via aiRules
-      // override at the top of the prompt, not a global cap.
-      max_tokens: 800,
+      model: "claude-sonnet-5",
+      max_tokens: 1024,
+      thinking: { type: "disabled" },
       system: systemBlocks,
       messages: recentMessages,
       tools: activeTools,

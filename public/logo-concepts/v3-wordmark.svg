@@ -1,0 +1,43 @@
+<svg width="800" height="200" viewBox="0 0 800 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="accent3" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4F46E5"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+
+  <!-- S - unique geometric -->
+  <path d="M30 140 C30 155, 42 165, 58 165 L82 165 C98 165, 110 155, 110 140 C110 125, 98 115, 82 115 L58 115 C42 115, 30 105, 30 90 C30 75, 42 65, 58 65 L82 65 C98 65, 110 75, 110 90"
+        stroke="#1E1B4B" stroke-width="16" stroke-linecap="round" fill="none"/>
+
+  <!-- t -->
+  <path d="M145 50 L145 145 C145 158, 153 165, 165 165"
+        stroke="#1E1B4B" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <line x1="125" y1="85" x2="165" y2="85" stroke="#1E1B4B" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- a -->
+  <path d="M220 165 L220 115 C220 98, 207 85, 195 85 C183 85, 175 95, 175 108 C175 121, 183 130, 195 130 L220 130"
+        stroke="#1E1B4B" stroke-width="14" stroke-linecap="round" fill="none"/>
+
+  <!-- f -->
+  <path d="M250 85 L250 165" stroke="#1E1B4B" stroke-width="14" stroke-linecap="round"/>
+  <path d="M250 65 C250 52, 258 45, 270 45" stroke="#1E1B4B" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <line x1="235" y1="85" x2="270" y2="85" stroke="#1E1B4B" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- f -->
+  <path d="M300 85 L300 165" stroke="#1E1B4B" stroke-width="14" stroke-linecap="round"/>
+  <path d="M300 65 C300 52, 308 45, 320 45" stroke="#1E1B4B" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <line x1="285" y1="85" x2="320" y2="85" stroke="#1E1B4B" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- i - with special dot -->
+  <line x1="355" y1="85" x2="355" y2="165" stroke="#1E1B4B" stroke-width="14" stroke-linecap="round"/>
+  <!-- AI-style diamond dot for i -->
+  <path d="M355 55 L362 65 L355 75 L348 65 Z" fill="url(#accent3)"/>
+
+  <!-- x - highlighted in brand color -->
+  <line x1="390" y1="85" x2="440" y2="165" stroke="url(#accent3)" stroke-width="16" stroke-linecap="round"/>
+  <line x1="440" y1="85" x2="390" y2="165" stroke="url(#accent3)" stroke-width="16" stroke-linecap="round"/>
+
+  <!-- Tagline -->
+  <text x="470" y="135" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="500" fill="#6B7280" letter-spacing="3">AI EMPLOYEE</text>
+</svg>

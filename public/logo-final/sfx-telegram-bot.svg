@@ -1,0 +1,25 @@
+<svg width="640" height="640" viewBox="0 0 640 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="640" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <circle cx="320" cy="320" r="320" fill="url(#bg)"/>
+  <svg x="60" y="222" width="520" height="196" viewBox="72 111 280 124">
+    <!-- S letter -->
+    <path d="M 112 115 C 104 115, 95 118, 91 122 C 86 126, 82 130, 79 134 C 77 137, 76 140, 76 143 L 76 157 C 77 161, 79 165, 82 169 C 86 174, 91 177, 97 180 C 102 182, 108 183, 115 184 L 135 184 C 139 185, 143 187, 146 190 C 149 193, 150 195, 150 197 C 150 199, 148 203, 144 206 C 141 207, 137 208, 132 209 L 86 209 L 86 229 L 141 229 C 147 228, 155 225, 160 221 C 165 217, 169 212, 171 207 C 173 202, 173 196, 173 189 C 172 185, 170 181, 167 177 C 163 173, 159 170, 155 168 C 151 166, 147 165, 143 164 L 113 163 C 109 162, 106 160, 103 157 C 101 155, 100 152, 100 148 L 100 145 C 101 142, 103 140, 106 138 C 108 137, 111 136, 118 136 L 173 135 L 174 121 C 175 119, 177 117, 179 115 L 171 115 Z" fill="white"/>
+    <!-- F letter body -->
+    <path d="M 181 115 L 234 115 L 249 136 L 204 136 L 204 164 L 220 164 L 220 186 L 204 186 L 204 229 L 181 229 Z" fill="white"/>
+    <!-- F-to-bullseye connector -->
+    <line x1="220" y1="175" x2="241" y2="175" stroke="white" stroke-width="5" stroke-linecap="round"/>
+    <!-- Bullseye outer ring -->
+    <circle cx="255" cy="175" r="14" fill="none" stroke="white" stroke-width="4.5"/>
+    <!-- Bullseye center dot -->
+    <circle cx="255" cy="175" r="4" fill="white"/>
+    <!-- X left stroke -->
+    <path d="M 243 115 L 266 115 L 344 229 L 321 229 Z" fill="white"/>
+    <!-- X right stroke -->
+    <path d="M 324 115 L 346 115 L 268 229 L 245 229 Z" fill="white"/>
+  </svg>
+</svg>

@@ -138,7 +138,7 @@ ${questions.slice(0, 200).map((q, i) => `${i + 1}. ${q}`).join("\n")}`;
 
   try {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+      model: "claude-sonnet-5",
       max_tokens: 2000,
       messages: [{ role: "user", content: prompt }],
     });

@@ -1,0 +1,38 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg6" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4F46E5"/>
+      <stop offset="50%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg6)"/>
+
+  <!-- Person head (top of S) — the "AI employee" -->
+  <circle cx="256" cy="140" r="48" fill="white" opacity="0.95"/>
+  <!-- Circuit pattern inside head -->
+  <circle cx="256" cy="140" r="32" fill="none" stroke="#6366F1" stroke-width="2" opacity="0.4"/>
+  <circle cx="244" cy="132" r="4" fill="#6366F1" opacity="0.6"/>
+  <circle cx="268" cy="132" r="4" fill="#6366F1" opacity="0.6"/>
+  <line x1="244" y1="132" x2="256" y2="148" stroke="#6366F1" stroke-width="2" opacity="0.4"/>
+  <line x1="268" y1="132" x2="256" y2="148" stroke="#6366F1" stroke-width="2" opacity="0.4"/>
+  <circle cx="256" cy="148" r="3" fill="#6366F1" opacity="0.5"/>
+
+  <!-- S-shaped body flowing down from head -->
+  <!-- Shoulders + S curve = body of AI employee -->
+  <path d="M208 175 C160 195, 135 230, 135 265 C135 310, 180 335, 230 340 C280 345, 380 350, 380 310"
+        stroke="white" stroke-width="30" stroke-linecap="round" fill="none" opacity="0.9"/>
+
+  <path d="M380 310 C380 270, 330 260, 280 265 C230 270, 135 290, 135 340 C135 380, 175 410, 230 420 L310 420"
+        stroke="white" stroke-width="30" stroke-linecap="round" fill="none" opacity="0.9"/>
+
+  <!-- "Digital" accent lines -->
+  <line x1="310" y1="420" x2="350" y2="420" stroke="white" stroke-width="8" stroke-linecap="round" opacity="0.5"/>
+  <line x1="360" y1="420" x2="380" y2="420" stroke="white" stroke-width="8" stroke-linecap="round" opacity="0.3"/>
+
+  <!-- Pulse/heartbeat line through the center -->
+  <path d="M180 300 L220 300 L235 275 L250 325 L265 285 L280 305 L330 305"
+        stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.4" fill="none"/>
+</svg>

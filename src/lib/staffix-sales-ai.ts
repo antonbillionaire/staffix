@@ -389,7 +389,7 @@ async function regeneratePoliteResponse(
   };
 
   const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-5-20250929",
+    model: "claude-sonnet-5",
     max_tokens: 1024,
     system: systemPrompt,
     messages: [...allMessages, correctionMessage],
@@ -540,7 +540,7 @@ export async function generateStaffixSalesResponse(
 
     // Call Claude with tools
     let response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+      model: "claude-sonnet-5",
       max_tokens: 1024,
       system: systemPrompt,
       messages,
@@ -582,7 +582,7 @@ export async function generateStaffixSalesResponse(
       allMessages.push({ role: "user", content: toolResults });
 
       response = await anthropic.messages.create({
-        model: "claude-sonnet-4-5-20250929",
+        model: "claude-sonnet-5",
         max_tokens: 1024,
         system: systemPrompt,
         messages: allMessages,

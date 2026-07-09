@@ -644,10 +644,17 @@ export async function generateChannelAIResponse(
       ? (biz.consultationsEnabled ? channelSalesPlusBookingTools : channelSalesTools)
       : channelBookingTools;
 
-    // Call Claude with appropriate tools (with retry on overload)
+    // Call Claude with appropriate tools (with retry on overload).
+    // thinking: disabled — на Sonnet 5 adaptive thinking включён по дефолту
+    // с effort=high. Для чат-бота это лишние токены на «размышления» — при
+    // ответе на «сколько стоит?» модель не должна тратить бюджет на цепочку
+    // рассуждений. Отключаем — поведение как у Sonnet 4.5.
+    // max_tokens: 1024 — на Sonnet 5 новый токенайзер даёт ~30% больше токенов
+    // на кириллице; бампаем с 800 чтобы не резать ответы про туры.
     let response = await callClaudeWithRetry({
-      model: "claude-sonnet-4-5-20250929",
-      max_tokens: 800,
+      model: "claude-sonnet-5",
+      max_tokens: 1024,
+      thinking: { type: "disabled" },
       system: systemPrompt,
       messages,
       tools,
@@ -966,14 +973,16 @@ export async function warmChannelCache(
   if (systemPrompt.length < 4096) return null;
 
   // Anthropic кэш раздельный по моделям. Мы используем ДВЕ модели в проде:
-  // - Sonnet 4.5 на главный ответ клиенту (первый вызов Claude)
+  // - Sonnet 5 на главный ответ клиенту (первый вызов Claude)
   // - Haiku 4.5 на tool-loop итерации (после того как бот вызвал инструмент)
-  // Поэтому греем оба кэша параллельно. Стоимость одного warm = 30K × $0.30/M
-  // = $0.009 для Sonnet, 30K × $0.10/M = $0.003 для Haiku. Оба вместе ~$0.012.
+  // Греем оба кэша параллельно. КРИТИЧНО: параметры warm-вызова должны
+  // побайтово совпадать с production main — если в проде thinking: disabled,
+  // здесь тоже. Иначе cache_key разный и warm-hit будет 0%.
   const [sonnetUsage] = await Promise.all([
     callClaudeWithRetry({
-      model: "claude-sonnet-4-5-20250929",
+      model: "claude-sonnet-5",
       max_tokens: 1,
+      thinking: { type: "disabled" },
       system: systemPrompt,
       messages: [{ role: "user" as const, content: "ping" }],
     }).then((r) => {

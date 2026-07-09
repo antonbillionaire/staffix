@@ -1,0 +1,58 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg5" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#1E293B"/>
+    </linearGradient>
+    <linearGradient id="flow5a" x1="140" y1="100" x2="370" y2="250" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="flow5b" x1="140" y1="260" x2="370" y2="420" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#EC4899"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Dark background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg5)"/>
+
+  <!-- S made of two flowing ribbons that interweave -->
+  <!-- Upper ribbon (blue to purple) -->
+  <path d="M340 105 C280 105, 145 105, 145 175 C145 235, 250 245, 310 250 C370 255, 370 255, 370 255"
+        stroke="url(#flow5a)" stroke-width="36" stroke-linecap="round" fill="none"/>
+
+  <!-- Lower ribbon (purple to pink) -->
+  <path d="M145 260 C145 260, 145 260, 200 262 C260 265, 370 275, 370 340 C370 410, 270 410, 180 410"
+        stroke="url(#flow5b)" stroke-width="36" stroke-linecap="round" fill="none"/>
+
+  <!-- Connection point in the middle - glowing node -->
+  <circle cx="256" cy="256" r="24" fill="#8B5CF6" opacity="0.3"/>
+  <circle cx="256" cy="256" r="14" fill="#A78BFA"/>
+  <circle cx="256" cy="256" r="6" fill="white"/>
+
+  <!-- Orbiting dots representing data flow -->
+  <!-- Top flow -->
+  <circle cx="340" cy="105" r="10" fill="#60A5FA"/>
+  <circle cx="240" cy="115" r="6" fill="#93C5FD" opacity="0.7"/>
+  <circle cx="180" cy="145" r="5" fill="#A5B4FC" opacity="0.5"/>
+
+  <!-- Bottom flow -->
+  <circle cx="180" cy="410" r="10" fill="#F472B6"/>
+  <circle cx="280" cy="400" r="6" fill="#F9A8D4" opacity="0.7"/>
+  <circle cx="340" cy="370" r="5" fill="#C084FC" opacity="0.5"/>
+
+  <!-- Subtle grid pattern in background -->
+  <g stroke="white" stroke-width="0.5" opacity="0.05">
+    <line x1="96" y1="128" x2="416" y2="128"/>
+    <line x1="96" y1="192" x2="416" y2="192"/>
+    <line x1="96" y1="256" x2="416" y2="256"/>
+    <line x1="96" y1="320" x2="416" y2="320"/>
+    <line x1="96" y1="384" x2="416" y2="384"/>
+    <line x1="128" y1="96" x2="128" y2="416"/>
+    <line x1="192" y1="96" x2="192" y2="416"/>
+    <line x1="256" y1="96" x2="256" y2="416"/>
+    <line x1="320" y1="96" x2="320" y2="416"/>
+    <line x1="384" y1="96" x2="384" y2="416"/>
+  </g>
+</svg>

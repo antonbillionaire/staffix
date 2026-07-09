@@ -1,0 +1,62 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg8" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1E1B4B"/>
+      <stop offset="100%" stop-color="#312E81"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg8)"/>
+
+  <!-- Human head silhouette made of chip/circuit -->
+  <!-- Head outline -->
+  <path d="M256 100 C200 100, 150 140, 145 200 C140 260, 155 290, 180 320 C190 335, 210 360, 210 380 L302 380 C302 360, 322 335, 332 320 C357 290, 372 260, 367 200 C362 140, 312 100, 256 100 Z"
+        fill="none" stroke="#818CF8" stroke-width="4" opacity="0.6"/>
+
+  <!-- CPU chip in the center of the head = brain = intelligence -->
+  <rect x="210" y="165" width="92" height="92" rx="12" fill="none" stroke="white" stroke-width="5"/>
+  <rect x="226" y="181" width="60" height="60" rx="6" fill="white" opacity="0.15"/>
+
+  <!-- "S" inside the chip -->
+  <path d="M268 198 L248 198 C241 198, 236 203, 236 210 C236 217, 241 222, 248 222 L264 222 C271 222, 276 227, 276 234 C276 241, 271 246, 264 246 L244 246"
+        stroke="white" stroke-width="6" stroke-linecap="round" fill="none"/>
+
+  <!-- Chip pins — extending from chip to head (connections) -->
+  <!-- Top pins -->
+  <line x1="235" y1="165" x2="235" y2="140" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <line x1="256" y1="165" x2="256" y2="130" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <line x1="277" y1="165" x2="277" y2="140" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <!-- Bottom pins -->
+  <line x1="235" y1="257" x2="235" y2="285" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <line x1="256" y1="257" x2="256" y2="295" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <line x1="277" y1="257" x2="277" y2="285" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <!-- Left pins -->
+  <line x1="210" y1="195" x2="180" y2="195" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <line x1="210" y1="220" x2="170" y2="220" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <line x1="210" y1="245" x2="180" y2="245" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <!-- Right pins -->
+  <line x1="302" y1="195" x2="332" y2="195" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <line x1="302" y1="220" x2="342" y2="220" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <line x1="302" y1="245" x2="332" y2="245" stroke="white" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Pin endpoints (nodes) -->
+  <circle cx="235" cy="140" r="4" fill="#A78BFA"/>
+  <circle cx="256" cy="130" r="4" fill="#A78BFA"/>
+  <circle cx="277" cy="140" r="4" fill="#A78BFA"/>
+  <circle cx="235" cy="285" r="4" fill="#A78BFA"/>
+  <circle cx="256" cy="295" r="4" fill="#A78BFA"/>
+  <circle cx="277" cy="285" r="4" fill="#A78BFA"/>
+  <circle cx="180" cy="195" r="4" fill="#A78BFA"/>
+  <circle cx="170" cy="220" r="4" fill="#A78BFA"/>
+  <circle cx="180" cy="245" r="4" fill="#A78BFA"/>
+  <circle cx="332" cy="195" r="4" fill="#A78BFA"/>
+  <circle cx="342" cy="220" r="4" fill="#A78BFA"/>
+  <circle cx="332" cy="245" r="4" fill="#A78BFA"/>
+
+  <!-- Shoulders / body hint -->
+  <path d="M210 380 C200 395, 150 410, 130 420 L382 420 C362 410, 312 395, 302 380"
+        stroke="#818CF8" stroke-width="4" fill="none" opacity="0.5"/>
+
+  <!-- Glow effect on chip -->
+  <rect x="226" y="181" width="60" height="60" rx="6" fill="#818CF8" opacity="0.08"/>
+</svg>

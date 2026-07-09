@@ -53,6 +53,7 @@ export async function GET(request: Request) {
   // Берём бизнесы у которых:
   //  1) подписка не suspended (нет смысла греть кэш для отключённых)
   //  2) есть подключённые каналы (IG/WA/FB) с активностью за 7 дней
+  //  3) у бизнеса СЕЙЧАС рабочие часы (по Business.timezone)
   const candidates = await prisma.business.findMany({
     where: {
       OR: [
@@ -63,6 +64,7 @@ export async function GET(request: Request) {
     select: {
       id: true,
       name: true,
+      timezone: true, // для фильтра «сейчас рабочие часы?»
       channelConnections: {
         where: { isConnected: true, channel: { in: ["instagram", "whatsapp", "facebook"] } },
         select: { channel: true },
@@ -74,22 +76,50 @@ export async function GET(request: Request) {
   const result = {
     candidates: candidates.length,
     warmed: 0,
-    skipped: 0,
+    skippedNoChannel: 0,
+    skippedNight: 0,  // сколько бизнесов пропущено потому что у них ночь
     errors: 0,
     durationMs: 0,
   };
+
+  // Локальный час бизнеса — простая проверка «сейчас рабочие часы?».
+  // Работаем 8:00-22:00 по Business.timezone. Ночью греть кэш бессмысленно —
+  // клиенты не пишут, а cache TTL 1 час всё равно истечёт к утру.
+  // При отсутствии timezone используем Asia/Tashkent как разумный default
+  // (основной рынок Staffix CIS).
+  function isBusinessHoursNow(tz: string | null): boolean {
+    const timezone = tz || "Asia/Tashkent";
+    try {
+      const hourStr = new Date().toLocaleString("en-US", {
+        timeZone: timezone,
+        hour12: false,
+        hour: "2-digit",
+      });
+      const hour = parseInt(hourStr, 10);
+      if (Number.isNaN(hour)) return true; // safe default — не пропускаем
+      return hour >= 8 && hour < 22;
+    } catch {
+      return true; // при ошибке парсинга TZ — греем на всякий случай
+    }
+  }
 
   // Прогрев последовательный, не параллельный — нам не критична скорость
   // (cron срабатывает раз в 30 мин, есть 5 минут maxDuration), а
   // последовательный код не выжигает rate limit Anthropic'а.
   for (const biz of candidates) {
+    // Пропускаем бизнесы у которых сейчас ночь по их локальному времени
+    if (!isBusinessHoursNow(biz.timezone)) {
+      result.skippedNight++;
+      continue;
+    }
+
     const channels = biz.channelConnections
       .map((c) => c.channel)
       .filter((ch): ch is (typeof SUPPORTED_CHANNELS)[number] =>
         SUPPORTED_CHANNELS.includes(ch as (typeof SUPPORTED_CHANNELS)[number])
       );
     if (channels.length === 0) {
-      result.skipped++;
+      result.skippedNoChannel++;
       continue;
     }
 
@@ -97,7 +127,7 @@ export async function GET(request: Request) {
       try {
         const usage = await warmChannelCache(biz.id, channel);
         if (usage) result.warmed++;
-        else result.skipped++;
+        else result.skippedNoChannel++;
       } catch (e) {
         result.errors++;
         console.error(`[cache-warmer] failed biz=${biz.id} channel=${channel}:`, e);

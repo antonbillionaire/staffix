@@ -315,7 +315,7 @@ export async function generateSupportReply(
     const MAX_ITERATIONS = 3;
     for (let i = 0; i < MAX_ITERATIONS; i++) {
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-5-20250929",
+        model: "claude-sonnet-5",
         max_tokens: 1024,
         system: SUPPORT_SYSTEM_PROMPT,
         tools: SUPPORT_TOOLS,

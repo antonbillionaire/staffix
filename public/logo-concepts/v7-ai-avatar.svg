@@ -1,0 +1,43 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg7" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4F46E5"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg7)"/>
+
+  <!-- AI Employee Avatar — geometric digital head -->
+  <!-- Head shape (rounded rectangle = screen/digital) -->
+  <rect x="156" y="95" width="200" height="220" rx="48" fill="white" opacity="0.95"/>
+
+  <!-- Eyes — two horizontal bars (like LED indicators / processing) -->
+  <rect x="200" y="175" width="40" height="12" rx="6" fill="#4F46E5"/>
+  <rect x="272" y="175" width="40" height="12" rx="6" fill="#4F46E5"/>
+
+  <!-- Smile — simple arc, friendly AI -->
+  <path d="M230 230 Q256 255, 282 230" stroke="#4F46E5" stroke-width="8" stroke-linecap="round" fill="none"/>
+
+  <!-- "Antenna" — small circle on top = AI signal / thinking -->
+  <circle cx="256" cy="72" r="14" fill="white"/>
+  <line x1="256" y1="86" x2="256" y2="95" stroke="white" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Body — simplified shoulders with circuit pattern -->
+  <path d="M148 340 C148 340, 148 330, 180 320 Q256 295, 332 320 C364 330, 364 340, 364 340 L364 390 C364 410, 348 420, 330 420 L182 420 C164 420, 148 410, 148 390 Z"
+        fill="white" opacity="0.9"/>
+
+  <!-- Circuit lines on body = automation -->
+  <line x1="220" y1="350" x2="220" y2="400" stroke="#4F46E5" stroke-width="3" opacity="0.4"/>
+  <line x1="256" y1="340" x2="256" y2="410" stroke="#4F46E5" stroke-width="3" opacity="0.4"/>
+  <line x1="292" y1="350" x2="292" y2="400" stroke="#4F46E5" stroke-width="3" opacity="0.4"/>
+  <line x1="200" y1="370" x2="312" y2="370" stroke="#4F46E5" stroke-width="3" opacity="0.4"/>
+  <line x1="200" y1="390" x2="312" y2="390" stroke="#4F46E5" stroke-width="3" opacity="0.4"/>
+
+  <!-- Circuit nodes on body -->
+  <circle cx="220" cy="370" r="5" fill="#4F46E5" opacity="0.5"/>
+  <circle cx="292" cy="370" r="5" fill="#4F46E5" opacity="0.5"/>
+  <circle cx="256" cy="390" r="5" fill="#4F46E5" opacity="0.5"/>
+  <circle cx="220" cy="390" r="5" fill="#7C3AED" opacity="0.4"/>
+  <circle cx="292" cy="390" r="5" fill="#7C3AED" opacity="0.4"/>
+</svg>

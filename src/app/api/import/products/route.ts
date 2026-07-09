@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
 
         const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
         const aiResponse = await anthropic.messages.create({
-          model: "claude-sonnet-4-5-20250929",
+          model: "claude-sonnet-5",
           max_tokens: 4096,
           system: "You extract product catalogs from HTML pages and output CSV. Always output ONLY CSV data with a header row, nothing else. Use semicolon (;) as delimiter. Columns: название;цена;категория;описание;ссылка. Extract product name, price (number only), category if visible, short description, and product page URL if available. If price is not found, put 0. Output in the same language as the source page.",
           messages: [{ role: "user", content: `Extract all products with prices from this website HTML and output as CSV (semicolon-separated). Source URL: ${importUrl}\n\n${cleanHtml}` }],
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
         // Use Claude to extract products from PDF text
         const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
         const aiResponse = await anthropic.messages.create({
-          model: "claude-sonnet-4-5-20250929",
+          model: "claude-sonnet-5",
           max_tokens: 4096,
           system: "You extract product/service catalogs from text and output CSV. Always output ONLY CSV data with a header row, nothing else. Use semicolon (;) as delimiter. Columns: название;цена;категория;описание. If price is not found, put 0. If category is not clear, leave empty. Output in the same language as the source text.",
           messages: [{ role: "user", content: `Extract all products/services with prices from this catalog text and output as CSV (semicolon-separated):\n\n${pdfText.slice(0, 30000)}` }],

@@ -30,7 +30,7 @@ export async function GET() {
     try {
       const anthropic = new Anthropic({ apiKey });
       const res = await anthropic.messages.create({
-        model: "claude-sonnet-4-5-20250929",
+        model: "claude-sonnet-5",
         max_tokens: 5,
         messages: [{ role: "user", content: "Hi" }],
       });

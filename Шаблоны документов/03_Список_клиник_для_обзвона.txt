@@ -1,0 +1,790 @@
+====================================================================================================
+ПОЛНЫЙ СПИСОК КЛИНИК ТАШКЕНТА ДЛЯ ОБЗВОНА - STAFFIX
+Всего: 703 клиник | Источники: clinics.uz, med24.uz, Excel база
+====================================================================================================
+
+Инструкция:
+1. Звони сверху вниз - начинай с приоритета A
+2. Перед звонком - зайди на САЙТ клиники (ссылка в таблице)
+3. Отмечай: В = встреча, П = перезвонить (дата), О = отказ
+4. Скрипт обзвона: 01_Скрипт_обзвона_клиники.txt
+
+СВОДКА:
+  A-1 СТОМАТОЛОГИЯ: 19 клиник
+  A-2 КОСМЕТОЛОГИЯ / ЭСТЕТИКА: 10 клиник
+  A-3 МНОГОПРОФИЛЬНЫЕ / ОБЩИЕ: 614 клиник
+  A-4 ГИНЕКОЛОГИЯ / ЖЕНСКИЕ: 2 клиник
+  A-5 ДЕТСКИЕ / ПЕДИАТРИЯ: 12 клиник
+  B-2 ЛОР: 12 клиник
+  B-3 КАРДИОЛОГИЯ: 5 клиник
+  B-4 ДИАГНОСТИКА: 20 клиник
+  B-5 НЕВРОЛОГИЯ: 6 клиник
+  B-6 РЕАБИЛИТАЦИЯ: 2 клиник
+  B-7 УРОЛОГИЯ: 1 клиник
+
+====================================================================================================
+ПРИОРИТЕТ A-1: СТОМАТОЛОГИЯ (19 клиник)
+Шаблон БЗ: БЗ_Стоматология.txt
+====================================================================================================
+
+1. Smile Eyes | +998-78-777-3-3 | https://smileeyes.uz/
+2. Darmon Dental | +998-78-777-3-3 | https://darmondental.uz/%D1%82%D0%B5%D1%80%D0%B0%D0%BF%D0%B5
+3. Medion Dental Care | +998-78-777-3-3 | https://medion.uz/ru
+4. Beautiful Smile | +998-71-277-16-49; +998-71-277-77-36 | https://www.klinika.uz/klinika/klinika-beautiful-smile-tashk
+5. Bobur Stom | +998-71-256-27-25 | https://medelement.com/companies/clinics/50746911563260737/s
+6. Chilanzar Dental Servis | +998-71-278-37-10; +998-71-278-47-79 | https://chds.uz/
+7. ChilDent | +998-71-230-55-87 | https://childent.uz/
+8. Denta | +998-90-024-04-20; +998-71-235-53-89 | https://www.denta-service.uz/
+9. Denta - стоматологическая клиника | +998-71-242-36-76 | https://www.denta-service.uz/
+10. Denta Max | +998-93-570-57-75 | https://med24.uz/klinika/denta-max
+11. Denta-Lor | +998-90-610-31-3 | https://med24.uz/uz/klinika/denta-lor
+12. Denta-Servis-FIiziomed | +998-71-245-23-56; +998-71-277-97-09 | https://www.denta-service.uz/
+13. Doctor Iroda 24/7 - stomatolog, uzi | - | http://iroda-stom.uz/
+14. Dynasty dental clinic | +998-78-122-2-2 | https://dynasty.dental/
+15. Jamoliddin Denta | +998-71-277-85-63; +998-90-906-44-42 | https://med24.uz/klinika/jamoliddin-denta
+16. Lor-Stom | +998-90-988-47-80; +998-97-705-93-83 | https://lormedical.uz/
+17. President Medical | +998-71-248-45-45 | https://med24.uz/klinika/president-medical
+18. Prima-Dent | +998-33-460-66-66; +998909512603 | https://yandex.ru/maps/org/prima_dent/218207733980/
+19. Ziyo nur stom | +998-99-940-13-69 | https://www.32top.uz/clinics/698/
+
+====================================================================================================
+ПРИОРИТЕТ A-2: КОСМЕТОЛОГИЯ / ЭСТЕТИКА (10 клиник)
+Шаблон БЗ: БЗ_Эстетическая_клиника.txt
+====================================================================================================
+
+1. DR.VAISOV Laser Aesthetic Dermatology | +998-78-777-3-3 | https://drvaisov.com/
+2. Medion Aesthetic & SPA | +998-78-777-3-3 | https://medion.uz/ru
+3. Dr.Skin | +998-71-256-2-56 | https://drskin.uz/
+4. Expert Aesthetics Clinic | +998-71-233-49-74 | https://www.expertaesthetics.uz/
+5. Harmony Aesthetic Clinic | +998-90-434-19-99 | https://yandex.ru/maps/org/harmony_aesthetic_clinic/82173759
+6. Laser Optica-Центр восстановления зрения | +998-71-271-44-67; +998-91-164-88-11 | https://medelement.com/companies/clinics/527978761562590932
+7. Nano Hair Clinic | +998-97-333-70-66 | https://nanohairclinic.uz/
+8. Perfect Hair | +998-95-198-14-0 | https://perfecthair.uz/
+9. Premium Aesthetics | +998-95-145-5-5 | https://med24.uz/klinika/premium-estetic
+10. Skin Clinic | +998-78-113-65-95 | https://makeupstore.uz/brand/1372197/
+
+====================================================================================================
+ПРИОРИТЕТ A-3: МНОГОПРОФИЛЬНЫЕ / ОБЩИЕ (614 клиник)
+Шаблон БЗ: БЗ_Многопрофильная_клиника.txt
+====================================================================================================
+
+1. HAYAT MEDICAL CENTRE | +998-78-777-3-3 | https://hayatmed.uz/
+2. Prof Med Service Endoxirurgiya markazi | +998-71-205-1-71 | https://profmed.uz/
+3. Ziyo Medline | +998-78-113-27-89 | https://med24.uz/uz/klinika/paeonnis
+4. Prof Med Service | +998-78-113-27-85 | https://profmed.uz/
+5. MDS Servis | +998-78-113-25-62; +998-93-547-00-83 | https://mds.uz/
+6. Ibrat Med | +998-71-205-58-18 | https://ibrat-med.uz/uz/
+7. ZILOLA MEDICAL | +998-99-790-10-30;  +998-99-794-10-30;  +998- | https://zilolamedicalservice.gl.uz/
+8. Darmon medicine | +998-77-319-75-55; +998-93-379-75-55 | https://darmonservis.uz/?lang+uz
+9. Darmon-Servis | +998-78-777-03-03; +998-78-777-41-07 | https://darmonservis.uz/?lang+uz
+10. Dr. Alisher's Clinic | +998-78-555-14-8 | https://alishermedical.com/index1
+11. Hilol Hospital | +998-71-205-57-98 | https://hilol-hospital.uz/uz/glavnaya-o%CA%BBzbek/
+12. Lab Medical | +998-55-516-60-4 | https://med24.uz/klinika/lab-medical
+13. Реацентр Ташкент | +998-71-205-57-41 | https://t.me/s/reacentertashkent?before+198
+14. Ватан тиббиёт маркази | +998-71-205-57-48 | https://vatantibbiyot.uz/
+15. FriendMed Clinic | +998-70-51-58-0 | https://yandex.ru/maps/org/friendmed_clinic/165731961937/
+16. МЕДСЕСТРА НА ДОМ | +998-77-016-03-03; +998-78-777-03-03 | https://onlaynhamshira.uz/ru/blog/medsestra-na-dom-tashkent
+17. Tannaz Clinic | +998-91-137-55-53 | https://yandex.ru/maps/org/tannaz/8749023963/
+18. РСНПМЦ эндокринологии Минздрава РУз (НИИ ЭНДО | +998-55-508-50-00; +998-95-479-80-00; +998931 | http://endomarkaz.uz/contacts/organization/9/
+19. Inject Medical | +998-77-322-3-3 | https://yandex.ru/maps/org/inject_medical_center/31038421878
+20. Shifo Nur | +998-71-221-13-13 | http://shifonurkoz.office.uz/
+21. DMD Family Hospital | +998-77-115-30-0 | https://med24.uz/uz/klinika/dmd-family-hospita
+22. AKFA MEDLINE | +998-78-777-3-3 | https://akfamedline.uz/
+23. Yashfaa clinic - Сохраним Здоровье Вместе | +998-71-205-1-75 | https://t.me/s/yashfaa_clinic?before+433
+24. Ezgu Niyat | +998-78-113-27-92; +998-90-128-18-   31 | https://ezguniyat.uz/uz/
+25. Dusel Medical | +998-78-777-03-03; +998-78-777-41-05 | https://med24.uz/klinika/dusel-medical-
+26. Fathulla Ota Med | +998-78-555-14-9 | https://fom-clinic.uz/
+27. Humo med center | +998-78-777-3-3 | https://yandex.ru/maps/org/khumo_med/53938096719/
+28. Impuls Medical Centre | +998-78-777-3-3 | https://impuls-med.uz/
+29. Siz Ona Bo’lasiz Eku Markazi | +998-71-202-9-0 | https://sizonabolasiz.uz/uz/
+30. Здоровая семья | +998-71-205-54-46 | https://med24.uz/klinika/zdorovaya-semya
+31. Best Medium Clinic | +998-78-777-3-3 | https://bestmedclinic.uz/
+32. Doctor Hasan Medical Center | +998-95-146-0-72 | https://doctorhasan.uz/uz/
+33. Fedorovich Klinikasi | +998-71-205-50-64 | https://fedorovich.uz/
+34. Immuno C - Чиланзар | +998-78-777-3-3 | https://td.uz/slider_vactination/slider_vactination.html
+35. Medion Innovation | +998-78-777-3-3 | https://medion.uz/ru
+36. Star Med Center | +998-78-777-3-3 | https://yandex.ru/maps/org/star_med_center/1792982531/
+37. ASR клиника | +998-78-113-26-65 | https://asrklinika.uz/
+38. Ayol Care | +998-78-777-3-3 | https://med24.uz/klinika/ayol-care-tsentr-zhenskogo-zdorovya
+39. Davr Fayz Medical | +998-78-777-3-3 | https://med24.uz/klinika/davr-fayz-medical
+40. Gavhar Clinic | +998-71-205-53-21 | https://gavharclinic.uz/
+41. Immunolab | +998-78-777-3-3 | https://med24.uz/klinika/immunolab
+42. Ko'ksaroy (Куксарой) - диагностический центр | +998-78-777-3-3 | http://kuksaroy.uz/
+43. Medilux Medical center | +998-78-129-18-18; +998-97-772-52-03 | https://www.klinika.uz/klinika/medilux-medical-center-tashke
+44. MShifo | +998-78-777-3-3 | https://www.klinika.uz/klinika/klinika-m-shifo-tashkent
+45. OSIYO - медицинский центр | +998-90-322-03-13; +998-97-700-37-66 | https://med24.uz/klinika/osiyo-meditsinskiy-tsentr
+46. Sog'lom Hayot | +998-78-777-3-3 | https://med24.uz/uz/klinika/sog-lom-hayot
+47. Yunusobod Medical Center | +998-71-205-58-20 | https://med24.uz/uz/klinika/yunusobod-medical-center
+48. Доктор Овчаров | +998-71-205-1-70 | https://doctorovcharov.uz/
+49. Центр реабилитации хронических заболеваний | +998-71-228-48-85 | https://medgid.uz/company/1937-reabilitacionnyj-centr-hronic
+50. Saba-Darmon | +998-78-777-3-3 | https://www.sabadarmon.uz/ru/
+51. Alfraganus University Hospital | +998-78-777-3-3 | https://www.afu.uz/
+52. CityMed | +998-78-777-3-3 | https://citymed.uz/
+53. Corall Medical | +998-78-777-3-3 | https://med24.uz/klinika/corall-medical
+54. Darmon Servis филиал | +998-78-777-03-03; +998-78-777-41-07 | https://darmonservis.uz/?lang+uz
+55. Doctor Mallaev Academic Hospital | +998-78-777-3-3 | https://med24.uz/uz/klinika/doctor-mallaev-academic-hospital
+56. FOMED | +998-78-777-3-3 | https://fo-med.uz/
+57. Global Medical Center | +998-78-777-3-3 | https://globalmed.uz/
+58. Medimax | +998-90-324-66-88; +998-71-264-13-00; +998-71 | https://medimax.uz/
+59. Medion 24/7 | +998-78-777-03-03; +998-78-140-00-   10 | https://medion.uz/ru
+60. Medion Family Hospital | +998-78-777-3-3 | https://medion.uz/uz
+61. MediSun | +998-78-777-3-3 | https://medisunhastanesi.com/ru/organizasyon/
+62. Medlans | +998-78-777-3-3 | https://www.klinika.uz/klinika/medlans-klinika-tashkent
+63. Ns Medical Ибн Сина филиал | +998-78-777-3-3 | https://nsmedical.uz/
+64. Ns Medical Кукча филиал | +998-78-777-3-3 | https://nsmedical.uz/
+65. Ns Medical Сергели филиал | +998-78-777-3-3 | https://nsmedical.uz/
+66. Ns Medical Учтепа филиал | +998-78-777-3-3 | https://nsmedical.uz/
+67. OFIYAT MED | +998-78-777-3-3 | https://med24.uz/uz/klinika/ofiyat-med
+68. Poytaxt Medical | +998-78-777-3-3 | https://poytaxtmed.uz/
+69. Samo Medical | +998-78-777-3-3 | https://med24.uz/klinika/samo-medical-24-7
+70. SBJ Medical | +998-78-777-03-03; +998-90-326-42-94 | https://sbjmedical.uz/ru
+71. Vitamed Medical | +998-78-777-03-03; +998-55-516-60-11 | https://www.vitamed.uz/ru/?mobile+N
+72. Клиника Доктора Максудовой | +998-78-777-3-3 | https://dmclinic.uz/
+73. Almazmed-Line - многопрофильный медицинский ц | +998-78-777-3-3 | https://www.almazmed.uz/
+74. Big Pharm | +998-78-113-27-82 | https://bp-med.uz/
+75. Clinic of EMU | +998-78-777-3-3 | https://clinic.emuni.uz/uz/asosiy/
+76. Emu Oq tepa filial | +998-78-777-3-3 | https://med24.uz/klinika/emu-clinic-aktepa
+77. iMed Clinic | +998-71-205-51-3 | https://www.imed-clinic.com/
+78. Kimyo University Hospital | +998-78-777-3-3 | https://kimyohospital.uz/uz
+79. Mediofarm Hospital | +998-78-777-3-3 | https://mediofarmeco.uz/
+80. Ns Medical Бунёдкор | +998-78-777-3-3 | https://nsmedical.uz/
+81. Nurshah | +998-78-777-3-3 | https://med24.uz/uz/klinika/nurshah
+82. Orzu Medical - Аккурганский филиал | +998-78-113-20-38 | https://orzumed.uz/
+83. Orzu Medical - Паркентский филиал | +998-78-113-20-38 | https://orzumed.uz/parkent/
+84. Sinomed MD International Hospital | +998-78-777-03-03; +998-55-516-60-15 | https://yandex.ru/maps/org/sinomed_md_international/19236932
+85. Viamed | +998-78-777-3-3 | https://www.vitamed.uz/ru/?mobile+N
+86. Viva med | +998-78-777-03-03; +998-55-516-60-02 | https://vivamed.uz/
+87. Yurak Markazi | +998-78-777-03-03; +998-55-516-60-14 | https://yurakmarkazi.uz/ru
+88. Здоровые дети - Паркентский филиал | +998-78-113-27-43 | https://www.klinika.uz/klinika/zdorovie-deti-yunusabad-filia
+89. Здоровые дети - Янгихаётский филиал | +998-78-113-27-43 | https://yandex.ru/maps/org/zdorovyye_deti/188910697952/
+90. Клиника Доктора Максудовой филиал | +998-78-777-3-3 | https://dmclinic.uz/
+91. Республиканский специализированный научно-пра | +998-99-353-76-96; +998-71-278-02-09; +998-71 | http://tbcenter.uz/
+92. Abclinic | +998-95-122-88-55 | https://abclinic.uz/
+93. Abdullaev Medical (Филиал Урикзор) | +998-93-382-54-3 | https://www.klinika.uz/klinika/abdullaev-medical-tashkent
+94. Aider med | - | https://www.aidermed.uz/
+95. Akmal med service | +998-99-816-0-88 | https://med24.uz/uz/klinika/akmal-med-service
+96. Alisher shifo med tashmi | +998-71-200-72-72 | https://yandex.uz/maps/org/18483495873/
+97. Alliance lab med | +998-33-334-77-11 | https://yandex.ru/maps/org/alliance_lab_med/78626709556/
+98. Allmed | +998-71-268-84-  48 | https://med24.uz/klinika/allmed
+99. Allo doctor | - | https://yandex.ru/maps/org/allo_doctor/33118486066/
+100. Altomedservis | +998-71-278-90-04; +998-71-278-79-09 | https://medgid.uz/company/813-altomedservis
+101. American Hospital & Fleboss | +998-95-122-3-3 | https://americanhospital.uz/
+102. Anfa Clinic | +998-99-115-25-25 | http://anfaclinic.uz/
+103. ANRO ULTRASOUND | +998-33-733-33-30; +998-94-703-33-30 | https://med24.uz/klinika/anro-ultrasound
+104. APICIS Med | +998-71-271-29-20; +998-98-809-40-03 | https://med24.uz/klinika/apicis-med
+105. Apolloniya Medical | +998-71-255-61-05; +998-71-255-24-59 | https://med24.uz/klinika/apolloniya-medical
+106. Ar-Gent | +998-95-196-86-41; +998-90-972-86-41 | https://med24.uz/uz/klinika/ar-gent
+107. Aram clinic | +998-95-144-77-88 | https://aram-clinic.uz/
+108. Ark Hospital 24/7 | - | https://med24.uz/klinika/ark-hospital
+109. As-Medline | - | https://med-line.uz/
+110. Asab Shifo Nur | +998-93-564-45-27 | https://medelement.com/companies/clinics/941840601530707471
+111. ASAD Kardiologiya Nevrologiya | +998-71-231-19-3 | https://med24.uz/uz/klinika/asad-kardilologiya-nevrologiya
+112. Ash shifo med | +998-87-811-11-3 | https://med24.uz/uz/klinika/ash-shifo-med
+113. Ashurov Clinic | +998-95-199-94-19 | https://yandex.ru/maps/org/ashurov_clinic/148698808135/
+114. Asr-Farm | +998-99-774-2-0 | https://med24.uz/klinika/asr-farm
+115. Assa Hospital | +998-95-650-80-80 | https://med24.uz/uz/klinika/assa-hospital
+116. Assihat Medical Clinic | +998-71-209-0-83 | https://medlink.uz/clinic/assihat-medical-center
+117. Assuta Medical Clinic | +998-99-662-6-6 | https://med24.uz/klinika/assuta-medical-clinic
+118. Astramed Clinic | +998-55-501-36-63 | https://www.astramed-clinic.com/
+119. ATLANT MED SERVICE | +998-71-230-49-   98; +998-71-277-27-   65; + | https://atlantmed.uz/
+120. ATRIA | +998-90-384-88-83 | https://yandex.ru/maps/org/tsentr_lazernoy_korrektsii_zreniy
+121. Aurum Clinik | +998-97-758-0-56 | https://yandex.ru/maps/org/aurum_clinik/81405470750/
+122. Aurum med | +998-93-738-75-77 | https://med24.uz/klinika/aurum-dent
+123. Avisa Med Servis | +998-71-293-94-24; +998-78-113-00-   57; +998 | https://www.klinika.uz/klinika/klinika-avisa-med-servis-tash
+124. AYA - Семейная клиника | +998-55-515-55-22 | https://ayaclinic.uz/
+125. Az-Med Clinic | - | https://www.klinika.uz/klinika/az-med-klinika-tashkent
+126. Biorise Клиника биохакинга | +998-78-113-83-11 | https://yandex.ru/maps/org/biorise/29026230353/
+127. BMP clinics | - | https://med24.uz/klinika/bmp-clinics
+128. Bolajon med | +998-95-170-87-89 | https://med24.uz/uz/klinika/bolajon-med
+129. Bravo Pharma | +998-95-146-21-46; +998-95-146-31-46 | https://bppl.co.in/our-global-presence/uzbekistan
+130. Bu-Dur | +998-95-196-35-59; +998-90-990-03-03 | https://medelement.com/companies/clinics/461270861562656886
+131. Case Nova | - | https://foreveryoungbbl.uz/case-nova.html
+132. Castlmed | - | https://ydoc.uz/tashkent/lpu/5443-klinika-castlmed/
+133. Cattleya | +998-71-233-42-25; +998-71-233-23-07 | https://cattleya.all.biz/
+134. Central Kardio Servis | +998-71-281-23-87 | https://med24.uz/klinika/central-kardio-servis
+135. Central med | - | https://med24.uz/uz/klinika/central-med
+136. Centromed | +998-77-276-77-70; +998-78-777-03-03; +998-99 | https://yandex.ru/maps/org/centromed/128530246647/
+137. Chilonzor Med Center | +998-95-197-77-74 | https://lor24.uz/uz/amaliyotlar/chilonzor-med-center-2/
+138. Chilonzor Tibbiy Ko'rik | +998-71-279-35-94; +998-93-500-77-50; +998-95 | https://med24.uz/uz/klinika/chilonzor-tibbiy-ko-rik
+139. Chinor Medical Center | +998-95-500-5-59 | https://www.chinormed.uz/
+140. Chiroy | +998-78-140-2-40 | https://med24.uz/klinika/chiroy
+141. City Doctor | +998-95-144-8-8 | https://citymed.uz/ru/specialists
+142. ClinicPro | +998-71-267-70-50 | https://clinicpro.uz/
+143. CM Clinic | - | https://mclinic.uz/
+144. Compass medical | +998-33-751-68-62 | https://compassmedical.uz/
+145. Complex Med Clinic | +998-95-434-10-10 | https://med24.uz/klinika/complex-med-center
+146. Cross Medical Center | - | https://yandex.ru/maps/org/cross_medical_center/9279785403/
+147. Crystal med service | +998-90-946-12-6 | https://medgid.uz/company/1144-crystal-med-service
+148. Darmon Nuri | +998-99-111-35-96 | https://med24.uz/klinika/darmon-nuri
+149. Davo klinika | +998-94-617-81-25 | https://www.kdavo.uz/
+150. Davr Med Servis | +998-90-316-33-97; +998-71-277-84-29 | https://company.medelement.com/%D0%BA%D0%BB%D0%B8%D0%BD%D0%B
+151. DDS Medical Center | +998-90-99-0-3 | https://yandex.ru/maps/org/dds_laboratoriya/167475101379/
+152. De Factum | - | https://defactum.uz/
+153. Deti Med | +998-95-145-15-50 | https://medgid.uz/company/1091-deti-med
+154. Dialab Medical Service | +998-99-892-82-88 | https://dialab.uz/ru
+155. Diason | +998-55-516-18-18; +998-55-516-11-00 | https://diason.uz/
+156. Dilfuza star med | +998-99-827-3-78 | https://yandex.ru/maps/org/star_med_center/1792982531/
+157. Dimed | +998-55-900-91-3 | https://dmed.uz/
+158. Diyora Medical Centre | +998-99-430-24-56 | https://med24.uz/uz/klinika/diyora-medical-centre
+159. DobroMed Clinic | +998-91-773-90-9 | https://dobromedclinic.uz/
+160. Doctor Ashurov | +998-95-166-99-99 | -
+161. Doctor D | +998-78-113-00-   57; +998-71-227-30-   32; + | https://doctord.uz/
+162. DOCTOR FARRUH | - | https://top.uz/company/doctor-farruh-ooo
+163. Doctor Gulnoza | +998-93-507-64-64 | https://yandex.ru/maps/org/doctor_gulnoza/88895066789/
+164. Doctor K medikal center | +998-55-903-3-3 | https://doctor-k.uz/
+165. Doctor Lotos | +998-99-277-88-88 | https://doctorlotos.uz/
+166. Doctor Sattorov | +998-95-195-42-21 | https://surgery.med.tma.uz/ru/about-us-ru/faculty-staff-ru/s
+167. Doctor To'lganoy Servis | +998-91-134-91-41 | https://www.klinika.uz/uz/klinika/klinika-doktor-tolganoy-se
+168. Doctor Vays (Доктор Вайс) | +998-95-60-61-37 | https://pharmaclick.uz/ru/company/staff/vays_elena_vladimiro
+169. Doctor-Z | +998-71-225-39-01; +998-90-916-99-29 | https://med24.uz/klinika/doctor-z
+170. Doktor A-med | - | https://med24.uz/klinika/doktor-a-med
+171. Doktor Allergolog | +998-71-277-27-58 | https://allergy.uz/
+172. Doktor Aybolit | +998-91-226-78-68 | https://med24.uz/uz/klinika/doktor-aybolit-aybolit
+173. Doktor M | - | https://mclinic.uz/
+174. Doktor Malik | +998-71-245-77-13 | https://med24.uz/klinika/doctor-malik
+175. Doktor Profi | +998-78-120-20-20; +998-78-120-02-00; +998-78 | https://med24.uz/klinika/doktor-profi-ooo
+176. Doktor Shahnoza Fayz | +998-71-215-58-85; +998-98-337-81-07; +998-97 | https://shahnozafayz.uz/
+177. Doktor Vohid | - | https://www.klinika.uz/klinika/klinika-al-vohid-shifo-tashke
+178. Doktor Yakubov стоматологическая клиника | +998-33-295-80-20 | https://med24.uz/klinika/doktor-yakubov-stomatologicheskaya-
+179. Doktor-Servis | +998-71-277-0-0 | https://doktor-servis.uz/
+180. Dr Avis Hospital | +998-77-253-77-99 | https://dravismed.com/
+181. Dr Shoira Medical | - | https://sprav.uz/company/5106-dr-shoira-medikal
+182. Dr. Sardor Medical | +998-88-100-22-24 | https://docme.uz/cy/clinics/Dr-Sardor-Medical/services-and-p
+183. Dr. Xonnazarov | +998-93-462-10-50 | https://doktornazarov.uz/
+184. Dunyo ko'z klinilasi | +998-88-240-0-40 | https://med24.uz/uz/klinika/dunyo-ko-z
+185. EBM clinic | +998-90-11-86-68 | https://www.ebmclinic.uz/
+186. Ekstramed | +998-71-249-15-08; +998-71-249-15-09; +998-71 | https://medelement.com/companies/clinics/908243981530547285
+187. Eliksir | +998-71-253-04-35; +998-71-253-04-36 | https://eliksir.uz/
+188. Elite clinic | +998-95-169-3-3 | https://med24.uz/klinika/elite-clinic
+189. ENDOKRIN-SHIFO | +998-93-600-13-69 | https://med24.uz/klinika/endokrin-shifo
+190. Erkatoymed | +998-77-315-20-20 | https://medgid.uz/company/1104-erkatoy-med
+191. Estimed | +998-71-271-23-07; +998-71-271-23-   07; +998 | https://estimed.uz/
+192. Estimed prime | +998-78-555-75-75 | https://estimed.uz/
+193. European Clinic | +998-70-744-44-61 | https://med24.uz/klinika/european-clinic
+194. Eurosun Healthcare | - | https://www.eurosunhealthcare.com/
+195. Evomed | +998-55-500-32-0 | https://medgid.uz/company/788-evomed
+196. Evromed | 998994850393 | https://euromedschool.uz/
+197. Expert Medical Clinic | +998-71-249-15-90 | https://expertmed.uz/ru
+198. Expert Medical Clinic - Pro Surgery | +998-55-514-55-55 | https://expertmed.uz/uz
+199. Family clinic | +998-95-198-00-30; +998-98-198-03-00 | https://med24.uz/klinika/family-clinic
+200. Family Doctors M | +998-94-112-14-12 | https://med24.uz/klinika/family-doctor-m
+201. Family Medical House | +998-71-249-33-30 | https://med24.uz/klinika/family-medical-house
+202. Family Sebzor Med | +998-97-411-9-80 | https://yandex.ru/maps/org/family_sebzor_med/122704398083/
+203. Faya Clinic | +998-77-103-22-55 | https://yandex.ru/maps/org/faya_clinic/125769127237/
+204. Fayz Medical House | - | https://yandex.ru/maps/org/fayz_medical_house/99877961380/
+205. Fayz Nova Medical | +998-99-896-43-44 | https://yandex.ru/maps/org/fayz_nova_medical/26807163503/
+206. Femina Medical | +998-93-387-88-33 | https://med24.uz/klinika/femina-medical
+207. Fidoiy | +998-71-264-23-62 | https://orginfo.uz/ru/organization/c0a25d153f34/
+208. Fiziomed | +998-90-185-46-60 | https://med24.uz/klinika/fiziomed
+209. Frank Medic + | +998-90-178-70-11 | https://med24.uz/klinika/frank-medic
+210. FX Real Medical | +998-97-708-15-16 | https://arzonapteka.uz/ru/pharmacy/uzbekistan/12425
+211. G'ulomjon Neyro Servis | +998-91-166-36-0 | https://myorg.uz/ru/company/uz/383365
+212. G'ulomjon Neyro Servis Бектемирский филиал | - | https://sprav.uz/company/1477-gulomjon-neyro-servis
+213. Gano Irt Medicus | - | https://gano.uz/ru/irt-medicus/
+214. Garmonia medical | +998-97-105-20-21 | https://medgid.uz/company/1015-garmonia-medical
+215. Gatling Med | +998-97-424-54-47 | https://gmed.uz/
+216. Gatling Med Учтепа филиал | - | https://gmed.uz/
+217. Genesis | - | https://genesis.uz/
+218. Global Med System | +998-71-289-43-3 | https://globalmed.uz/
+219. Glow Clinic | +998-93-644-60-0 | https://med24.uz/klinika/glow-clinic
+220. GMG Medical Centre | +998-71-233-9-99 | https://gmg-medical.uz/
+221. Gomeopatiya | +998-94-660-83-43 | https://www.klinika.uz/klinika/klinika-geomapatiya-tashkent
+222. Good Doctor Service | +998-95-198-39-39 | https://yandex.ru/maps/org/good_doctor_service/40598233439/
+223. GRAND medical clinic | +998-90-938-92-29 | https://grandmedical.uz/
+224. Green Lukas Clinic | +998-33-206-0-20 | https://www.greenlukas.uz/
+225. GREEN MED STAR | +998-90-187-41-73; +998-95-170-41-73; +998-93 | https://medelement.com/companies/clinics/219524381562654996
+226. Gregory Derm | +998-90-175-51-33; +998-71-207-51-33 | https://med24.uz/klinika/gregory-derm
+227. GS Medical | +998-95-171-5-5 | https://med24.uz/klinika/gs-medical
+228. Gulom Madaminbek | +998-71-222-52-47; +998-71-222-52-46; +998-71 | https://eliksir.uz/
+229. Hadicha Medical | - | https://med24.uz/klinika/hadicha-medical
+230. Hakim Sino | +998-95-476-40-40 | http://hakimsino.uz/
+231. Happy Life | +998-71-207-95-0 | https://happy-life.uz/
+232. Harmony Hospital | - | https://med24.uz/uz/klinika/harmony-hospital
+233. HasMed Clinics | - | https://www.klinika.uz/klinika/hasmed-clinics
+234. Health Vita Clinic | +998-99-916-8-90 | https://www.vitamed.uz/ru/?mobile+N
+235. Hello Doctor | +998-91-944-33-33 | https://yandex.ru/maps/org/hello_doctor/75267528874/
+236. Hilol med center | - | https://hilol-med.uz/
+237. Hongkong hospital | - | https://med24.uz/uz/klinika/hongkong-hospital
+238. HOREV Medical Center | +998-71-200-04-03; +998-71-236-37-   60; +998 | https://horevmedical.uz/
+239. House medical | +998-97-760-92-92 | https://yandex.ru/maps/org/house_medical/9448007628/
+240. Humson Buloq | +998-97-735-00-42; +998-93-399-60-00; +998-90 | https://humsonbuloq.uz/
+241. Huvaydo Medline | +998-98-126-61-99 | https://www.huvaydomedline.uz/
+242. Ibn-sino Medical | - | https://med24.uz/klinika/ibn-sino-medical
+243. ICLINIX Hayat Medical Centre | - | https://hayatmed.uz/
+244. Id Medical | +998-95-445-3-0 | https://med24.uz/klinika/id-medical
+245. Ideal Med Clinic | +998-90-37-56-66 | https://yandex.ru/maps/org/ideal_med/106221841792/
+246. Ihlos Doktor (Ихлос Доктор) | +998-71-230-30-95 | https://ihlos-doktor.uz/
+247. Imbir Hospital | +998-95-65-7-77 | https://med24.uz/klinika/imbir-hospital
+248. Immunogen Test | +998-71-207-08-14; +998-88-443-13-16 | https://pcr.uz/
+249. INDOMED (ERA med) | - | https://eramed.uz/
+250. Infarmmadad | +998-71-244-73-24; +998-71-244-49-02; +998-71 | https://yandex.ru/maps/org/infarmmadad/116862419502/
+251. Interclinic | +998-97-4-0-3 | http://intervention.uz/rus
+252. Intermed | +998-71-278-96-98 | https://interlab.uz/
+253. INTERMED Innovation | - | https://interlab.uz/
+254. Invivo | +998-71-230-22-12; +998 71 230 22 12 | https://medlink.uz/clinic/invivo-clinic
+255. Irodamed | +998-95-197-67-0 | https://medgid.uz/company/1170-irodamed
+256. Ishonch Tahlil Servis | +998-99-641-0-47 | https://med24.uz/uz/klinika/ishonch-tahlil-servis
+257. IXmed Clinic | - | https://med24.uz/klinika/ixmed-clinic
+258. Jacksoft MDS | +998-71-275-66-33 | https://jmds.uz/
+259. Jamshid-Javohir-Med-Servis | +998-91-190-4-24 | https://javohirmedical.com/services/
+260. Jasorat Biznes | +998-71-257-91-31 | https://medgid.uz/company/982-jasorat-biznes
+261. Jonier | +998-71-278-72-4 | https://med24.uz/klinika/jonier
+262. Jonim Bolam — семейная клиника | +998-90-330-97-91 | https://yandex.ru/maps/org/jonim_bolam/215291860537/
+263. Juramed | +998-90-334-44-48 | https://med24.uz/uz/klinika/juramed
+264. K Mediwell | +998-78-777-82-82 | https://www.kmediwell.uz/o-nas
+265. Kamilovs' clinic | +998-88-99-80-80 | https://www.kamilovsclinic.uz/
+266. Karalin Med Lux | +998-71-268-99-92; +998-90-900-88-68 | https://med24.uz/uz/klinika/karalin-med-lux-karalin-med-lyuk
+267. Karima tibbiyot markazi | +998-71-246-17-38 | https://medelement.com/uz/companies/clinics/9339594715322535
+268. Karimov clinic | +998-94-638-88-18 | https://ydoc.uz/tashkent/lpu/5565-klinika-karimov-clinic/
+269. Kasmed | +998-71-288-31-31 | https://kasmed.uz/
+270. Kid's Health | +998-98-155-47-17 | https://ydoc.uz/tashkent/lpu/5709-detskaya-klinika-kids-heal
+271. Kinder Med Plus | +998-97-754-10-1 | https://med24.uz/klinika/kinder-med-plus
+272. Klinika Said Hoji | - | https://med24.uz/klinika/klinika-saidhoji
+273. Korean bright - Центр альтернативной медицины | +998-95-837-88-15 | https://yandex.ru/maps/org/korean_bright_healing_center/1161
+274. KRIOMED | +998-93-540-52-0 | https://medgid.uz/company/770-kriomed
+275. La Sante Dr. Djohdy | +998-95-143-10-2 | https://med24.uz/klinika/la-sante-dr-djohdy
+276. Lanvin Clinic - Семейная клиника | - | https://med24.uz/klinika/lanvin-clinic
+277. Laylon | +998-71-221-68-48 | https://www.klinika.uz/klinika/centr-zdorovyya-zhenshin-layl
+278. Laylon Greenwich | +998-70-100-0-70 | https://yandex.ru/maps/org/laylon_greenwich/92908522178/
+279. Lekris clinic - Клиника лечения боли | +998-55-510-36-36 | https://lekris.uz/
+280. Levelmed | - | https://levelmed.uz/
+281. LIFE MEDIUM | - | https://med24.uz/klinika/life-medium-clinic
+282. Lux Med | +998-97-778-78-6 | https://med24.uz/klinika/lux-med
+283. M A MED-HOSPITAL | +998-97-455-50-22 | https://med24.uz/uz/klinika/m-a-med-hospital
+284. M-Clinic | +998-55-508-13-30 | https://mclinic.uz/
+285. Madaniyat med center | +998-70-122-50-50 | -
+286. Malham clinic | +998-77-352-8-80 | -
+287. Marg'uba Shifo | +998-71-573-67-2 | https://orginfo.uz/ru/organization/2e947c0250e6/
+288. Max Med Lab | +998-99-861-50-40; +998-97-766-79-01 | https://med24.uz/klinika/maxmedlab
+289. Max-Farm Clinic | +998-50-155-99-99 | http://maxfarm.uz/
+290. Max-Medikal Service | +998-71-294-5-85 | https://med24.uz/klinika/max-medikal-service
+291. MED ELITE | +998-33-800-3-90 | https://med24.uz/klinika/andromed-elite
+292. Med Fay Tem | +998-71-224-21-48; +998-90-356-60-15 | https://med24.uz/klinika/med-fay-tem
+293. Med Imperia | +998-99-30-63-33 | https://med24.uz/klinika/med-imperia
+294. Med klaster | +998-90-950-95-30; +998-99-420-03-03 | https://med24.uz/klinika/med-klaster
+295. Med Life Plus | - | https://med24.uz/klinika/med-life-plus
+296. Med One Doctor Abdulaziz Hoshimov Klinikasi | +998-94-92-33-55 | -
+297. Med Optimal Plus | +998-71-275-62-12; +998-93-379-11-99; +998-91 | https://med24.uz/klinika/med-optimal-plus-1408742352
+298. Med Profi Clinic | +998-77-22-92-29 | https://profmed.uz/
+299. MED-LINE SERVIS | - | https://med-line.uz/
+300. Medad Med | - | https://www.medadmed.uz/
+301. MEDANIS | +998-94-639-88-69 | https://med24.uz/klinika/medanis
+302. MEDAS | +998-90-321-94-95 | http://medas.uz/node/1
+303. Medassa | +998-55-502-12-22; +998-95-950-10-80 | https://med24.uz/klinika/asab-va-ruhiyat-1
+304. Medela | - | https://medela.uz/
+305. Medi Art | +998-99-171-38-38 | https://med24.uz/klinika/medi-art
+306. MEDIA-GINEKS | - | https://med24.uz/klinika/mediya-gineks
+307. Medical Intermed | +998-71-252-40-28; +998-71-256-63-13; +998-90 | https://interlab.uz/
+308. Medical Terra | +998-99-103-55-22 | https://medgid.uz/company/1055-medical-terra
+309. Medicana | - | https://medicana.uz/
+310. Medik-As - медицинский диагностический центр | +998-71-241-01-45; +998-71-241-01-55 | https://medikas.uz/
+311. MedInform | +998-95-360-21-12 | https://medinform.uz/
+312. Mediofarm (Учтепа) | +998-71-247-84-46; +998-93-502-30-20; +998-93 | https://mediofarmeco.uz/
+313. Mediofarm ЭКО | +998-78-777-3-3 | https://mediofarmeco.uz/
+314. MedioLife Clinic | +998-90-174-30-15; +998-97-719-40-87; +998-91 | https://med24.uz/klinika/mediolife-eko
+315. Mediritm | - | https://med24.uz/uz/klinika/mediritm
+316. Mediva | +998-71-253-95-55 | https://medivaclinic.net/
+317. Medivizio GBA | +998-71-238-99-53 | https://med24.uz/klinika/medivizio-gba
+318. Mediсana | +998-90-914-72-01; +998-71-241-05-96 | https://medicana.uz/
+319. MEDLINE | +998-71-253-83-35 | https://med-line.uz/
+320. Medlook | +998-71-221-71-77; +998-71-221-69-17 | https://www.klinika.uz/klinika/medlook-klinika-tashkent
+321. Medzone Hospital | +998-55-500-1-3 | https://medlink.uz/uz/clinic/medzone-hospital
+322. Mentol Medical | +998-95-505-51-51 | https://med24.uz/klinika/mentol-medical
+323. Metromed | +998-71-250-91-14 | https://med24.uz/klinika/metromed
+324. Mevazor Med | - | https://med24.uz/klinika/mevazor-med
+325. Mikromed | +998-87-888-8-66 | https://med24.uz/klinika/mikromed
+326. Miqdor | +998-71-221-68-99; +998-71-221-62-52 | https://med24.uz/klinika/miqdor
+327. MirMed Clinic | +998-95-113-3-3 | https://med24.uz/klinika/mirmed-clinic
+328. Mizoj Medical | +998-71-246-49-22 | https://yandex.ru/maps/org/mizoj_medical/201473872726/
+329. Monada-Amon | +998-71-283-40-35; +998-93-558-61-61; +998-94 | https://www.kliniki.uz/clinics/klinika-monada-amon-tashkent
+330. MONVITAL Medical Center | +998-55-507-0-7 | https://yandex.ru/maps/org/monvital/138054893080/
+331. Mr. Doctor Clinic | - | https://mrdoctor.uz/ru
+332. Mubina Medical Service | +998-71-258-27-71 | https://ihamkor.uz/ru/subject/6614eff4b967398b7a78dd9afeead9
+333. Muqarnas | +998-71-202-11-55; +998-97-762-11-55 | https://muqarnas.uz/
+334. Mymed | +998-95-650-30-30 | https://mymedclinic.taplink.ws/
+335. Nafis Med Esthetics | +998-93-596-35-56 | https://nafismed.uz/
+336. Najod-Shifo | +998-71-253-02-17; +998-71-280-54-60 | https://najodshifo.uz/
+337. NANO Medical Clinic | +998-55-500-5-50 | https://nanomedicalclinic.com/
+338. Nasiba Shifo | - | https://med24.uz/klinika/nasiba-shifo
+339. Nazarbek Klinic | +998-99-785-99-0 | https://nazarmed.uz/?lang+uz
+340. NBF MED | - | https://nbfmed.uz/
+341. NDC-Medic (Беруни) | +998-90-175-3-68 | https://ndcmedic.uz/
+342. NDC-Medic (Чиланзар) | +998-95-194-5-11 | https://www.klinika.uz/klinika/ndc-medic-najod-shifo-chilanz
+343. NEO clinic | +998-91-11-77-11 | http://neoclinic.tashkent.tilda.ws/
+344. Neo Life Clinic | +998-77-386-90-90 | http://neolife-clinic.com/qabul/ru
+345. Nephro Medicare | +998-94-851-35-56 | https://nephro-medicare.com/
+346. Nevro Servis | +998-95-197-03-30; +998-95-198-03-30 | https://www.klinika.uz/klinika/klinika-nevro-servis-tashkent
+347. Nevromaster | +998-71-257-05-64; +998-71-215-25-50 | https://yandex.ru/maps/org/nevro_master/42903718188/
+348. New Grand Medical Center | +998-99-733-90-70 | https://med24.uz/klinika/new-grand-medical-center
+349. New Medical Service | +998-55-503-25-30 | https://med24.uz/klinika/new-medical-service
+350. Nigora-shifo | +998-93-377-46-41 | https://med24.uz/uz/klinika/nigora-medical-star
+351. NIKAMED | +998-71-295-83-83 | https://med24.uz/klinika/nikamed
+352. Nikox va Oila | +998-98-363-91-91; +998-90-187-67-01 | https://med24.uz/klinika/nikox-va-oila
+353. Nini med clinic | +998-90-901-42-41 | https://nanomedicalclinic.com/
+354. Nor-Tibbiyot | +998-71-276-30-40; +998-71-276-40-50; +998-71 | https://med24.uz/uz/klinika/nor-tibbiyot
+355. Nora Medical | +998-71-263-8-99 | https://yandex.ru/maps/org/nora_medical/200573433917/
+356. NORAX | - | https://www.kliniki.uz/clinics/norax
+357. Novamed | +998-78-122-11-22 | https://novamed.uz/
+358. Nozimaxon-Muazzam | +998-97-131-36-86; +998-71-290-21-05 | https://www.klinika.uz/klinika/klinika-nozimaxon-muazzam-tas
+359. NSS Medical Center | - | https://nssmed.uz/
+360. Nurafshon Medical | - | https://ydoc.uz/tashkent/lpu/4505-klinika-nurafshon-medical/
+361. O'zbekiston | +998-71-244-30-10; +998-71-244-62-14 | http://champagne.uz/
+362. O'zkabel Shifoxonasi | +998-71-262-00-46; +998-71-262-00-47 | https://uzkabel.uz/
+363. Oftob MedLine | +998-93-532-20-20 | https://med24.uz/klinika/oftob-medline
+364. Oila Med | +998-95-193-28-28 | https://t.me/s/oila_med_klinika?before+11966
+365. Oila Tibbiy Markazi | +998-71-234-75-61; +998-71-234-27-58 | https://med24.uz/uz/klinika/oila-tibbiy-markazi
+366. Olam klinika | - | https://olam-klinika.uz/
+367. Olam klinika - Янгихаятский филиал | +998-95-144-99-55 | https://olam-klinika.uz/
+368. Omega Med | +998-71-262-78-0 | https://www.klinika.uz/klinika/klinika-omega-med-tashkent
+369. Omon Med | +998-93-612-45-27 | https://med24.uz/uz/klinika/omon-med
+370. OpenLab | +998-71-230-79-97 | https://med24.uz/klinika/openlab
+371. Optimed - офтальмологическая клиника | +998-71-227-20-3 | http://optimed.uz/
+372. Origin Medical Services | +998-93-68-66-86 | https://med24.uz/klinika/origin-medical-services
+373. Orzu-NasimaBonu | +998-78-113-20-38 | https://orzumed.uz/
+374. Osiyo life | +998-95-801-82-28 | https://yandex.ru/maps/org/osiyo/159728749330/
+375. Oz-Med | +998-71-269-22-47; +998-90-903-94-50 | https://med24.uz/klinika/oz-med
+376. Ozoda shifo med servis | - | https://med24.uz/uz/klinika/ozoda-shifo-med-ooo
+377. Perfect Medical Centere | +998-90-111-3-7 | https://perfectdc.uz/
+378. Phlebo Servis | +998-71-255-39-99; +998-94-607-23-79 | https://phleboservice.uz/
+379. PLATINUM ORTO | - | https://platinumorto.gl.uz/
+380. Podology Clinic | +998-90-932-33-55 | https://med24.uz/klinika/podology-clinic
+381. Premier Medical (Med Consultant) | - | https://sprav.uz/company/26510-premier-medical
+382. Premium medline | - | https://med24.uz/klinika/premium-medline
+383. Prime Medical Center (бывш. Guncha Med) | +998-78-113-13-43 | https://yandex.ru/maps/org/prime/191191835969/
+384. Proband Clinic | +998-33-136-36-63 | https://yandex.ru/maps/org/proband_clinic/212380867945/
+385. ProfiMed | +998-95-195-61-19 | https://profmed.uz/
+386. ProMed Clinic | +998-71-200-67-77 | https://promed-clinic.uz/ru
+387. Pulse Medical Center | - | https://pulsemedical.uz/
+388. PureMed Clinic | +998-99-621-98-8 | https://med24.uz/klinika/puremed
+389. Qalbi Nur Med | +998-97-434-90-96 | https://med24.uz/uz/klinika/qalbi-nur-med
+390. Qoratosh Sanavita | - | https://med24.uz/uz/klinika/qoratosh-sanavita
+391. Ra'no Fayz (RF-Med shifo servise) | +998-95-146-41-41 | -
+392. Ravnaq Med Servis | +998-71-295-86-68; +998-71-295-87-78 | https://med24.uz/uz/klinika/ravnaq-med-servis
+393. RAY MED KLINIKA | - | https://med24.uz/uz/klinika/ray-med-klinika
+394. Real Medical Tibbiyot Markazi | +998-97-241-3-3 | https://med24.uz/uz/klinika/real-medical-tibbiyot-markazi
+395. ReGen | +998-91-6-89-93 | https://regentashkent.uz/
+396. ReLive clinic | +998-77-233-0-3 | -
+397. Remedium clinic | +998-95-142-20-0 | https://med24.uz/klinika/remedium-clinic
+398. Respublika Sport-So'glomlashtirish Majmuasi | +998-71-262-93-63; +998-71-269-07-30 | https://davaktiv.uz/uz/corporate/company/VKOHHO
+399. Rustambek-Niyat | +998-97-604-65-7 | https://ydoc.uz/yangiyul/lpu/8081-klinika-rustambek-niyat-ru
+400. Rustamov's Clinic | +998-99-844-20-3 | https://med24.uz/klinika/rustamovs-clinic
+401. Safo Tibbiyot | +998-98-800-94-80 | https://safouz.uz/
+402. Saif ProFace | +998-88-430-70-00; +998-90-771-03-03 | https://www.saifproface.uz/
+403. Salomat Hayot | - | https://salomathayot.uz/uz/
+404. Salus Vita | +998-78-777-3-3 | https://med24.uz/klinika/salus-vita
+405. Saodat shifo | +998-99-363-58-96 | https://med24.uz/klinika/saodat-shifo
+406. Sardor-Vest | +998-71-278-75-86; +998-71-278-76-08; +998-90 | https://www.sardor-avto.uz/
+407. SAXOVATBU | +998-71-216-10-30 | https://med24.uz/uz/klinika/saxovatbu
+408. Sebzor Med Davo | +998-71-240-70-17 | https://yandex.ru/maps/org/sebzor_med_davo/50061887812/
+409. Sehhat Health Service | +998-71-252-40-85; +998-71-252-40-86; +998-71 | https://medelement.com/companies/clinics/705106461562841729
+410. Semmed | +998-95-967-87-87 | https://med24.uz/klinika/semmed
+411. Seoul Hospital | +998-90-35-6-1 | https://clindoc.uz/clinic/seoul-hospital
+412. Sevora | +998-97-411-33-30 | https://sevora.uz/
+413. Sharof tib service | +998-95-74-0-55 | https://safouz.uz/
+414. Shifo Dono | - | https://medelement.com/companies/clinics/813049301531482444/
+415. Shifo Nur Eksimer | +998-71-249-67-27; +998-71-249-67-28 | http://shifonurkoz.office.uz/
+416. Shifo Nur Koʻz | +99871-221-26-26; +998-71-221-30-00; +998-71- | http://shifonurkoz.office.uz/
+417. SHINE MED | - | https://med24.uz/klinika/shine-med
+418. Shox International Hospital | - | https://www.shox.hospital/
+419. Shox International Hospital — филиал Махтумку | +998-71-202-2-12 | https://www.shox.hospital/
+420. Shox Med Center | +998-71-202-02-12; +998-90-935-87-78; +998-95 | https://www.shox.hospital/
+421. Shox Reabilitatsiya | +998-55-512-11-83 | https://www.shox.hospital/
+422. Shuhrat Islom Shayx | +998-71-246-0-28 | http://oliymahad.uz/ru/
+423. Sifat Medical centre | +998-90-994-27-4 | https://med24.uz/klinika/sifat-medical-stom
+424. Sihat Oila | +998-71-231-99-92 | https://sihatoila.uz/
+425. Sihat va Farogat | +998-71-233-93-16; +998-71-239-99-32; +998-71 | https://sihatkoz.uz/eng
+426. Sino Professional Medical | +998-95-513-70-71 | https://med24.uz/klinika/sino-professional-medical
+427. Smart Doctor | +998-55-500-52-52 | https://medgid.uz/company/777-smart-doctor
+428. Smart Hospital | +998-55-517-3-3 | https://smart-hospital.uz/
+429. SMS med clinic | +998-88 200-00-15 | https://med24.uz/klinika/sms-med-clinic
+430. Sof Nafas | +998-55-520-98-0 | https://yandex.ru/maps/org/sof_nafas/134318408745/
+431. Sog'lom Avlod Uchun | +998-71-233-15-47; +998-71-232-00-82 | http://sau.uz/
+432. Sosh medical (Sayfulloh ota) | +998-95-114-30-3 | https://med24.uz/uz/klinika/sayfulloh-ota-shifo-sosh-medical
+433. Spine Center | +998-93-1-47-31 | https://spinecenter.uz/
+434. Spinemed | +998-71-233-99-33; +998-71-233-93-52 | https://med-tourism.uz/ru/chleny-assocziaczii/shirokoprofiln
+435. Star Med Service | +998-71-230-43-43; +998-71-230-42-42 | https://med24.uz/klinika/star-med-service
+436. Status Medical Plus | +998-71-237-8-48 | https://statusmedicalplus.uz/
+437. Status Medline | +998-91-10-11-12 | https://statusmedicalplus.uz/
+438. Stellaris | +998-71-236-70-07; +998-71-233-40-59 | https://med24.uz/klinika/stellaris
+439. Stimul Med Clinic | +998-90-353-27-68 | https://sprav.uz/company/6228-stimul-med-clinic
+440. Sultonhonim Med Service | +998-94-214-88-0 | https://yandex.uz/maps/org/sultonhonim_med_service/151349352
+441. Svoi Vrachi Clinic | +998-90-351-96-6 | https://med24.uz/klinika/svoi-vrachi
+442. THE FAMILY DOCTOR | - | https://med24.uz/klinika/the-family-doctor
+443. Toshkent Hospital | +998-55-519-50-50 | https://ydoc.uz/tashkent/lpu/4494-klinika-toshkent-hospital/
+444. Twins Medical Center | - | https://med24.uz/klinika/twins-medical-center
+445. TWO LINE - ЭКО клиника | - | https://yandex.ru/maps/org/two_line_fertility/237916996882/
+446. UMC | +998-71-237-11-69; +998-71-237-08-48 | https://mobi.uz/ru/
+447. Umid va Ishonch | +998-71-245-07-72; +998-71-245-07-42 | https://uzbekistan.spr.ru/tashkent/umid-va-ishonch.html
+448. UMT | +998-93-505-12-49; +998-71-291-70-57; +998-93 | https://umtradio.uz/about/
+449. Uni Medical Care | - | https://med24.uz/klinika/uni-medical-care
+450. Unionmeduz Clinic | +998-70-35-60-60 | https://clinic.emuni.uz/
+451. Universal Lider | +998-71-295-94-84; +998-93-587-49-95 | https://med24.uz/klinika/universal-lider
+452. Uro mediuss hospital | - | https://med24.uz/klinika/uro-mediuss-hospital
+453. Uro-Stone Med | +998-71-272-99-70; +998-95-193-40-04 | https://med24.uz/klinika/uro-stone-med-uzbeksko-koreyskiy-me
+454. Uromax med center | +998-91-791-70-0 | https://medgid.uz/company/930-uromax
+455. Uromediuss Hospital | +998-95-510-5-55 | https://med24.uz/klinika/uro-mediuss-hospital
+456. Vacctinel hadas | +998-94-647-25-21 | https://tovar.uz/uz/company/info/343
+457. Varikoz OFF Юнусабадский филиал | +998-99-939-03-30; +998-88-488-08-63 | https://varikozoff.uz/
+458. VertebroMed | +998-90-51-75-85 | https://med24.uz/klinika/vertebra-med-service
+459. Vita Alliance | +998-98-368-49-00; +998-98-142-41-45 | https://yandex.ru/maps/org/vita_alliance/31072653370/
+460. Vita Stimul Med | +998-71-216-49-26; +998-98-126-51-74; +998-98 | https://med24.uz/klinika/vita-stimul-med
+461. Vitakinesis Neo | - | https://med24.uz/klinika/vita-kinesis-neo
+462. Vitamed Servis | +998-71-223-80-13; +998-71-221-43-66 | https://www.vitamed.uz/ru/?mobile+N
+463. Walnut Tree Имплантологический Центр | - | https://med24.uz/klinika/walnut-tree-implantologicheskiy-tse
+464. Welcome clinic | +998-95-502-40-40 | https://welcome-clinic.uz/
+465. Xondamir Medical | +998-99 -200-17-7 | https://med24.uz/uz/klinika/xondamir-medical
+466. Xushnud shifo | +998-90-355-28-6 | https://med24.uz/uz/klinika/xushnud-shifo
+467. Yangi Darxon | +998-95-510-3-0 | https://domtut.uz/uz/nedvizhimost/zhiloj-kompleks-yangi-darx
+468. Yangi Hayot | +998-71-246-22-88 | https://yangi-hayot.uz/
+469. Yashnobod Medical | +998-90-610-31-3 | https://yandex.uz/maps/org/47643526519/
+470. Yassi-Dono | +998-71-212-87-48; +998-90-175-45-12; +998-90 | https://ydoc.uz/tashkent/lpu/5639-klinika-yassi-dono/
+471. Yuv Medical Service | +998-71-252-40-85; +998-71-252-40-86; +998-71 | https://www.klinika.uz/klinika/medicinskiy-centr-yuv-medical
+472. Zamona Sulton Med | +998-94-50-0-59 | https://yandex.ru/maps/org/zamona_sulton_med/66659656667/
+473. Zilola Health Med | - | https://med24.uz/klinika/zilola-health-med
+474. Ziyo Baxsh | +998-99-844-18-18 | https://med24.uz/uz/klinika/ziyo-baxsh
+475. Ziyoda Medical | +998-88-800-66-59 | https://med24.uz/uz/klinika/ziyoda-medical-filial-24y-kvarta
+476. АЗБУКА ЗДОРОВЬЯ | +998-71-245-78-10; +998-99-831-70-77 | https://azbuka-med.uz/ru/
+477. Академия народной медицины | +998-71-221-31-16 | https://uznj.uz/ru/republican/respublikanskij-nauchno-prakti
+478. Андролог и Я | +998-71-275-82-73; +998-99-313-13-63 | https://www.andrologi.uz/index.php/o-klinike-androlog-i-ya/%
+479. Аралия | +998-71-267-57-31; +998-90-189-10-38 | https://medgid.uz/company/1233-araliya
+480. Астма-Клиника Ш. Исмаилова | +998-90-930-33-47 | https://www.klinika.uz/klinika/ismailova-astma-klinika-tashk
+481. БАКТЕРИОЛОГИЧЕСКАЯ ЛАБОРАТОРИЯ | +998-71-253-79-79 | https://dermatology.uz/ru/bakteriologicheskaya-laboratoriya/
+482. Биоритм (Bioritm) | +998-95-144-40-33; +998-71-222-47-27 | https://bioritm.org/
+483. Борменталь | +998-71-150-16-61; +998-71-150-18-50 | https://med24.uz/klinika/bormental
+484. Городская инфекционная больница №3 | +998-71-250-95-13 | https://med24.uz/klinika/gorodskaya-infektsionnaya-bolnitsa-
+485. Городская инфекционная больница №5 | +998-71-245-73-53; +998-71-245-45-95 | https://yandex.ru/maps/org/gorodskaya_klinicheskaya_infektsi
+486. Городская клиническая больница Нуроний | - | https://med24.uz/klinika/gorodskaya-klinicheskaya-bolnitsa-n
+487. Городская клиническая больница №1 | +998-71-249-64-93; +998-71-249-37-67 | https://yandex.ru/maps/org/gorodskaya_klinicheskaya_bolnitsa
+488. Городская клиническая больница №2 | +998-71-255-06-25; +998-71-255-61-77 | https://med24.uz/klinika/gorodskaya-klinicheskaya-bolnitsa-2
+489. Городская клиническая больница №3 | +998-71-293-90-26; +998-71-291-76-64 | https://yandex.ru/maps/org/gorodskaya_klinicheskaya_bolnitsa
+490. Городская клиническая больница №5 | +998-71-264-20-43; +998-71-264-22-01 | https://yandex.ru/maps/org/gorodskaya_klinicheskaya_bolnitsa
+491. Городская клиническая больница №7 (бывш. 17-я | +998-71-224-89-33; +998-71-224-91-33; +998-71 | https://www.klinika.uz/klinika/gorodskaya-klinicheskaya-boly
+492. Городская клиническая инфекционная больница № | +998-71-240-34-61; +998-71-240-32-66 | https://yandex.ru/maps/org/gorodskaya_klinicheskaya_infektsi
+493. Городская клиническая туберкулезная больница  | +998-71-248-18-90; +998-71-248-16-72; +998-71 | https://yandex.ru/maps/org/gorodskaya_klinicheskaya_tuberkul
+494. Городской детский консультативно-диагностичес | +998-71-233-38-72; +998-71-233-50-53; +998-71 | https://medgid.uz/company/1555-gorodskoj-detskij-konsultativ
+495. Городской медицинский консультативный диагнос | +998-71-289-50-06; +998-71-289-50-05; +998-71 | https://med24.uz/klinika/gorodskoy-meditsinskiy-konsultativn
+496. Городской психоневрологический диспансер №2 | +998-71-294-74-65; +998-71-294-74-88; +998-71 | https://sprav.uz/company/5890-tashkentskij-gorodskoj-psihone
+497. Городской Родильный комплекс №1 | +998-71-257-11-60; +998-71-257-15-86 | https://yandex.ru/maps/org/rodilny_kompleks_1/82135520787/
+498. Городской родильный комплекс №5 | +998-71-291-59-62; +998-71-291-58-62 | https://yandex.ru/maps/org/gorodskoy_rodilny_kompleks_5/1898
+499. Городской родильный комплекс №7 | +998-71-273-2-91 | https://yandex.ru/maps/org/gorodskoy_rodilny_kompleks_7/1532
+500. Детская городская больница №1 | +998-71-224-54-46; +998-71-224-87-35; +998-71 | https://yandex.ru/maps/org/detskaya_gorodskaya_bolnitsa_1/13
+501. Детская городская инфекционная больница №2 | +998-71-294-62-85 | https://yandex.ru/maps/org/gorodskaya_detskaya_klinicheskaya
+502. Детская городская клиническая больница №3 (Бы | +998-71-247-30-19; +998-71-247-21-24 | https://med24.uz/klinika/detskaya-gorodskaya-klinicheskaya-b
+503. Детская городская клиническая больница №5 | +998-71-262-59-20; +998-71-262-54-62 | https://yandex.ru/maps/org/gorodskaya_detskaya_klinicheskaya
+504. Детская городская хирургическая клиническая б | +998-71-268-87-22; +998-71-268-87-23; +998-71 | https://yandex.ru/maps/org/gorodskaya_detskaya_khirurgichesk
+505. Детская инфекционная клиническая больница №4 | +998-71-241-91-54; +998-71-241-91-50 | https://yandex.ru/maps/org/detskaya_infektsionnaya_kliniches
+506. Детский городской кардиоревматологический цен | +998-71-242-94-04; +998-71-242-97-08 | https://med24.uz/klinika/detskiy-gorodskoy-kardiorevmatologi
+507. Детский костно-туберкулезный санаторий | +998-71-264-25-26; +998-71-264-25-42 | https://uznj.uz/ru/republican/detskij-kostno-tuberkuleznyj-s
+508. Детский национальный медицинский центр | +998-95-341-0-3 | https://bmtm.uz/ru/
+509. Доктор Рядом | +998-55-512-21-12 | https://med24.uz/klinika/doktor-ryadom-uz-doktor-ryadom
+510. Доктор Уктам | +998-71-246-77-11 | https://med24.uz/klinika/doktor-uktam-uz-doktor-uktam
+511. Зайтун Мед Тиб (Zaytun Med Tib) | +998-93-587-44-3 | https://med24.uz/klinika/zaytun-med-tib
+512. Здоровье Всем | +998-71-203-77-95 | https://www.spina.uz/
+513. Клиника Dr.Summit | +998-71-236-31-56; +998-71-233-57-85 | https://medelement.com/companies/clinics/832469661562759998
+514. Клиника НИИ эпидемиологии, микробиологии и ин | +998-71-243-36-05; +998-71-243-18-22 | https://uzinfectology.uz/
+515. Клиника ТашПМИ | +998-71-260-31-16 | https://clinic.tashpmi.uz/
+516. Клиническая больница скорой медицинской помощ | +998-71-275-17-08; +998-71-275-04-79; +998-71 | https://tcemc.uz/
+517. Консультативная поликлиника при Республиканск | +998-71-237-31-57; +998-71-237-38-44 | https://cardiocenter.uz/
+518. Кукча Мед (Kokcha med) | +998-90-996-5-60 | https://yandex.ru/maps/org/kokcha_med/218774107607/
+519. Личный Доктор | +998-99-808-6-66 | https://med24.uz/klinika/lichnyy-doktor-uz-lichniy-doktor
+520. Лор-24 | +998-71-251-54-59; +998-90-953-39-76 | https://lor24.uz/
+521. Медицинский центр Uzoq-Umr | +998-71-253-70-53; +998-91-135-80-   80 | https://yandex.ru/maps/org/uzoq_umr/44526155045/
+522. Медицинский центр акушерства и гинекологии | +998-71-263-78-49; +998-71-263-78-30 | https://uzaig.uz/
+523. Медицинский Центр Алексея Назарова | +998-71-286-10-01; +998-71-286-18-57 | https://doktornazarov.uz/
+524. Муборак клиника | +998-95-177-3-9 | https://yandex.ru/maps/org/klinika_muborak/13598152281/
+525. Национальный медицинский центр (Milliy Tibbiy | - | https://www.mtm.uz/
+526. Национальный центр реабилитации и протезирова | +998-71-235-00-33; +998-71-235-45-05; +998-71 | https://www.rehabilitation.uz/
+527. НИИ травматологии и ортопедии | +998-71-233-80-04; +998-71-233-10-30; +998995 | https://www.uzniito.uz/
+528. НУР-СТОМ PLUS | +998-71-253-52-6 | https://med24.uz/klinika/nur-stom-plus
+529. Перинатальный городской центр | +998-71-242-57-62; +998-71-242-94-08; +998-71 | https://uznj.uz/ru/republican/respublikanskij-perinatalnyj-t
+530. Поликлиника №66 | +998-99-370-90-57 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+30872
+531. Прогноз | - | https://pogoda.uz/
+532. Противотуберкулезный диспансер № 4 | +998-71-235-10-10; +998-71-235-13-01 | https://yandex.ru/maps/org/protivotuberkulezny_dispanser_4/5
+533. Психиатрическая городская больница | +998-71-291-18-14; +998-71-291-35-50; +998-71 | https://med24.uz/klinika/gorodskaya-klinicheskaya-psikhiatri
+534. Республиканская детская психоневрологическая  | +998-71-267-73-57; +998-71-267-73-50; +998-71 | https://uznj.uz/ru/republican/respublikanskaja-detskaja-psih
+535. Республиканская клиническая больница №1 | +998-71-233-3-66 | https://med24.uz/klinika/respublikanskaya-klinicheskaya-boln
+536. Республиканская кожно-венерологическая больни | +998-71-299-17-07; +998-71-299-78-42; +998-71 | https://dermatolog.uz/
+537. Республиканский научно-практический Центр Спо | +998-71-241-52-45 | https://sportmed.uz/
+538. Республиканский научно-специализированный алл | +998-78-150-6-65 | https://uznj.uz/ru/republican/respublikanskij-nauchno-spetsi
+539. Республиканский научный центр нейрохирургии | +998-71-264-96-30; +998-71-264-96-09; +998-71 | https://neuro.uz/
+540. Республиканский специализированный научно-пра | +998-71-224-96-59; +998-71-224-02-63 | https://nefro.uz/
+541. Республиканский специализированный центр микр | +998-95-146-48-58 | https://uznj.uz/ru/republican/respublikanskij-spetsializirov
+542. Республиканский специализированный центр хиру | +998-71-230-49-98; +998-71-230-45-60 | https://rscs.uz/ru
+543. Родильный комплекс №3 | +998-71-226-56-58; +998-71-240-35-66 | https://yandex.ru/maps/org/rodilny_kompleks_3/82202715457/
+544. Семейная поликлиника №1 | +998-71-254-08-03; +998-71-254-04-81; +998-71 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20328
+545. Семейная поликлиника №10 | +998-71-251-64-04; +998-71-251-64-65 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20341
+546. Семейная поликлиника №11 | +998-71-287-60-40; +998-71-287-52-29 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20348
+547. Семейная поликлиника №13 | +998-71-215-96-66 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+30083
+548. Семейная поликлиника №16 | +998-71-214-43-44; +998-71-214-52-50 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20320
+549. Семейная поликлиника №2 | +998-71-290-50-19 | https://yandex.ru/maps/org/semeynaya_poliklinika_2/555720220
+550. Семейная поликлиника №20 | +998-71-248-40-44; +998-71-248-40-32 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20353
+551. Семейная поликлиника №22 | +998-71-247-39-67; +998-71-247-39-68 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20353
+552. Семейная поликлиника №23 | +998-71271-47-10; +998-71-271-47-86; +998-71- | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20488
+553. Семейная поликлиника №26 | +998-71-243-39-66 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20490
+554. Семейная поликлиника №27 | +998-71-291-66-28 | https://med24.uz/klinika/semeynaya-poliklinika-27-yashnabads
+555. Семейная поликлиника №28 | +998-71-298-26-98 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20328
+556. Семейная поликлиника №29 | +998-99-290-57-22 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20328
+557. Семейная поликлиника №30 | +998-71-296-14-1 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+30082
+558. Семейная поликлиника №31 | +998-71-293-33-87; +998-71-293-17-97 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+30082
+559. Семейная поликлиника №32 | +998-71-291-5-25 | https://yandex.ru/maps/org/semeynaya_poliklinika_32/10921929
+560. Семейная поликлиника №33 | +998-71-279-99-6 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20319
+561. Семейная поликлиника №34 | +998-71-277-10-97; +998-71-277-05-57; +998-71 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20331
+562. Семейная поликлиника №35 | +998-71-216-90-07; +998-71-216-89-97; +998-71 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20348
+563. Семейная поликлиника №36 | +998-71-288-45-14; +998-71-273-92-95 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20320
+564. Семейная поликлиника №37 | +998-71-278-40-78 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20320
+565. Семейная поликлиника №39 | +998-71-279-36-35; +998-71-279-27-89 | https://med24.uz/klinika/semeynaya-poliklinika-39-chilanzars
+566. Семейная поликлиника №40 | +998-71-218-36-52 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20325
+567. Семейная поликлиника №41 | +998-71-243-32-17; +998-71-243-36-47 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20293
+568. Семейная поликлиника №43 | +998-71-278-16-19 | https://med24.uz/klinika/semeynaya-poliklinika-43-shaykhanta
+569. Семейная поликлиника №44 | +998-71-242-65-27; +998-71-242-63-11 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20326
+570. Семейная поликлиника №45 | +998-71-246-67-9 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20325
+571. Семейная поликлиника №47 | +998-78-150-55-01; +998-78-150-55-03 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20327
+572. Семейная поликлиника №48 | +998-71-244-32-20; +998-71-244-38-47; +998-71 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20322
+573. Семейная поликлиника №49 | +998-71-212-1-25 | https://med24.uz/klinika/semeynaya-poliklinika-49-yunusabads
+574. Семейная поликлиника №5 | +998-71-237-35-15; +998-71-237-35-21; +998-71 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20054
+575. Семейная поликлиника №50 | +998-71-235-81-01; +998-71-235-69-51 | https://med24.uz/klinika/semeynaya-poliklinika-50-yunusabads
+576. Семейная поликлиника №51 | +998-71-212-21-81; +998-71-212-29-88 | https://yandex.ru/maps/org/semeynaya_poliklinika_51/11789949
+577. Семейная поликлиника №52 | +998-71-224-53-97; +998-71-224-53-87; +998-71 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20324
+578. Семейная поликлиника №53 | +998-71-209-36-63; +998-71-234-00-03; +998-90 | https://yandex.ru/maps/org/semeynaya_poliklinika_53/10379420
+579. Семейная поликлиника №54 | +998-71-224-87-22; +998-71-224-88-25 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20474
+580. Семейная поликлиника №55 | +998-71-223-49-9 | https://med24.uz/klinika/semeynaya-poliklinika-55-yunusabads
+581. Семейная поликлиника №56 | +998-71-234-54-81; +998-71-234-54-96 | https://med24.uz/klinika/semeynaya-poliklinika-56-yunusabads
+582. Семейная поликлиника №58 | +998-71-255-18-00; +998-71-255-18-01; +998-71 | https://med24.uz/klinika/semeynaya-poliklinika-58-yakkasaray
+583. Семейная поликлиника №59 | +998-71-253-08-19; +998-71-253-08-13; +998-71 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20364
+584. Семейная поликлиника №60 | +998-71-255-66-61 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20340
+585. Семейная поликлиника №61 | +998-71-231-85-41 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+30521
+586. Семейная поликлиника №65 | +998-55-503-4-92 | https://yandex.ru/maps/org/poliklinika_65/237404726254/
+587. Семейная поликлиника №68 | - | https://orginfo.uz/ru/organization/d7daf45b4264/
+588. Семейная поликлиника №7 | +998-71-262-63-43 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20340
+589. Семейная поликлиника №72 | - | https://zvoni.uz/
+590. Семейная поликлиника №8 | +998-71-265-72-69 | https://med24.uz/klinika/semeynaya-poliklinika-8-mirzo-ulugb
+591. Семейная поликлиника №9 | +998-71-268-92-97 | https://yandex.ru/maps/org/semeynaya_poliklinika_9/180491292
+592. Ташкентская городская лечебно-реабилитационна | +998-71-289-31-70; +998-71-289-21-51; +998-71 | https://reg.ssv.uz/Home/HospitalDetailInfo?hospitalINN+20054
+593. Ташкентская Международная Клиника | +998-71-291-01-42; +998-71-291-07-26; +998-71 | https://www.tashclinic.org/
+594. Ташкентский городской подростковый диспансер | +998-71-235-11-60 | https://sprav.uz/company/5665-tashkentskij-gorodskoj-podrost
+595. Ташкентский городской центр фтизиатрии и пуль | +998-71-288-23-17; +998-71-288-23-18 | http://tbcenter.uz/
+596. Ташкентский центр Норбекова | +998-71-276-44-59; +998-71-276-28-89 | https://med24.uz/klinika/tashkentskiy-tsentr-norbekova
+597. Тиббиёт олами | +998-99-88-70-30 | https://olam-klinika.uz/
+598. Фарход Мадад Шифо | +998-95-512-28-88 | https://fmsclinic.uz/ru
+599. Центр Восточного Здоровья | +998-71-268-50-55 | https://www.klinika.uz/klinika/centr-vostochnogo-zdorovyya-t
+600. Центр ВРТ ЭКО | - | https://med24.uz/klinika/tsentr-vrt-eko-uz-art-ivf-markazi
+601. Центр детской Гематологии, Онкологии и клинич | +998-71-203-11-3 | https://childhoi.uz/
+602. Центр диагностики матери и ребёнка | +998-99-103-8-8 | https://yandex.ru/maps/org/tsentr_diagnostiki_materi_i_rebyo
+603. Центр репродуктивной медицины | - | https://ivf.uz/
+604. Центр Томатис | +998-97-404-5-6 | https://www.tomatis.com/ru/professional/uzbekistan/tashkent/
+605. Центральная диагностическая правительственная | +998-71-236-29-54; +998-71-236-08-84 | https://apgmu.uz/
+606. Центральная железнодорожная поликлиника | +998-71-299-99-53; +998-71-299-99-49 | https://poliklinika.uz/
+607. Центральная клиническая больница №1 | +998-71-264-81-05; +998-71-264-05-11 | https://www.klinika.uz/klinika/centralynaya-klinicheskaya-bo
+608. Центральная клиническая железнодорожная больн | - | https://jd-klinika.uz/
+609. Центральная многопрофильная поликлиника Мираб | +998-71-256-17-24 | https://yandex.ru/maps/org/tsentralnaya_mnogoprofilnaya_poli
+610. Центральная многопрофильная поликлиника Текст | - | https://yandex.ru/maps/org/tsentralnaya_mnogoprofilnaya_poli
+611. Центральный военный клинический госпиталь | +998-71-262-42-41 | https://yandex.ru/maps/org/tsentralny_voyenny_gospital_minis
+612. Центральный госпиталь МВД | +998-71-228-88-36 | https://sprav.uz/company/5667-centralnyj-gospital-mvd-respub
+613. Чиланзар мед | +998-71-277-96-69 | https://yandex.ru/maps/org/chilanzar_med/82567218294/
+614. Чиноз Дорул Шифо | +998-99-786-56-1 | https://med24.uz/klinika/chinoz-dorul-shifo-uz-chinoz-dorul-
+
+====================================================================================================
+ПРИОРИТЕТ A-4: ГИНЕКОЛОГИЯ / ЖЕНСКИЕ (2 клиник)
+Шаблон БЗ: БЗ_Гинекология.txt
+====================================================================================================
+
+1. Women's Life Clinic | +998-71-205-50-54 | https://womenslife.uz/
+2. Ns Medical Ayollar Klinikasi | +998-78-777-3-3 | https://nsmedical.uz/uz/
+
+====================================================================================================
+ПРИОРИТЕТ A-5: ДЕТСКИЕ / ПЕДИАТРИЯ (12 клиник)
+Шаблон БЗ: БЗ_Детская_клиника.txt
+====================================================================================================
+
+1. Hayat KIDS | +998-78-777-3-3 | https://hayatmed.uz/nashi-vozmozhnosti/hayat-kids.htm
+2. About Child | - | https://medgid.uz/company/1020-about-child
+3. Baby Born Центр ЭКО | - | https://babybornclinic.uz/
+4. Baby Fly Clinic | +998-33-40-22-20 | https://yandex.ru/maps/org/baby_fly_clinic/91104447773/
+5. Baby Iftixor | +998-90-996-17-92 | -
+6. Baby med | +998-95-169-62-15 | https://www.babymed.uz/
+7. Baby Orto Med | - | https://med24.uz/klinika/baby-orto-med
+8. De Factum Kids | +998-55-508-20-20 | https://kids.defactum.uz/
+9. Kids Doctor | +998-94-7-30-3 | https://med24.uz/klinika/kids-doctor
+10. Kids Lab | +998-97-781-23-83 | https://med24.uz/klinika/kids-lab
+11. Neuro Kids | +998-97-763-87-77 | https://neurokids.uz/
+12. Verum Kids | +998-95-888-3-3 | https://med24.uz/klinika/verum-kids
+
+====================================================================================================
+ПРИОРИТЕТ B-2: ЛОР (12 клиник)
+Шаблон БЗ: БЗ_ЛОР_клиника.txt
+====================================================================================================
+
+1. Nova LOR | +998-98-127-70-43 | https://yandex.ru/maps/org/nova_lor/175504995719/
+2. LORMED SERVIS (бывш U-Clinic) | +998-78-777-03-03; +998-55-516-60-08 | https://lormedical.uz/
+3. DIGNUS LOR klinika | - | https://med24.uz/klinika/dignus-lor-klinika
+4. Doctor Lor Service | +998-71-225-90-76 | https://lormedical.uz/
+5. Dr.Juraev LOR klinika 24/7 | +998-95-195-0-5 | https://lor24.uz/uz/lor-markazi-lor-klinika-lor-tsentr-lor24
+6. Exclusive Lor-Gin | +998-71-296-15-44 | https://med24.uz/klinika/exclusive-lor-gin
+7. Lola Lor medical | +998-99-959-93-0 | https://lormedical.uz/
+8. LOR BOR | +998-97-702-52-85 | https://lormedical.uz/
+9. LOR CLINIC 24/7 | - | https://lor24.uz/
+10. LOR MAMA | +998-71-200-25-22 | https://med24.uz/klinika/lor-mama
+11. Med Lor 24/7 | +998-95-177-9-7 | https://lor24.uz/
+12. Круглосуточно лор 24/7-Lor Tashkent | - | https://lor24.uz/
+
+====================================================================================================
+ПРИОРИТЕТ B-3: КАРДИОЛОГИЯ (5 клиник)
+Шаблон БЗ: БЗ_Кардиология.txt
+====================================================================================================
+
+1. Cardio star plus | +998-71-279-22-30 | https://med24.uz/klinika/cardio-star-plus
+2. CardioLife | +998-90-904-75-65 | https://cardiolife.uz/
+3. CardioMed | +998-71-200-32-33 | https://med24.uz/klinika/cardiomed
+4. Neo med cardio | +998-99-307-3-0 | https://yandex.ru/maps/org/neo_med_cardio/153944674298/
+5. NEURO CARDIO MEDIC | - | https://med24.uz/klinika/neuro-cardio-medic
+
+====================================================================================================
+ПРИОРИТЕТ B-4: ДИАГНОСТИКА (20 клиник)
+Шаблон БЗ: БЗ_Диагностический_центр.txt
+====================================================================================================
+
+1. Karasu Alfa Diagnostic | +998-71-205-54-90 | https://alfa-diagnostic.uz/
+2. Baxodir Shifo Diagnostika | +998-90-372-54-18 | https://med24.uz/klinika/baxodir-shifo-diagnostika
+3. Bravo Medical Laboratory | +998-95-196-44-55 | -
+4. Darmon Diagnostika Servis | +998-71-217-47-0 | https://darmonservis.uz/?lang+uz
+5. Diamed Diagnostic Medicine | +998-93-599-96-31; +998-78-113-73-03 | https://med24.uz/klinika/diamed-diagnostic-medicine
+6. Dr.Islamov’s Clinic diagnostic center | +998-33-800-47-77 | https://med24.uz/uz/klinika/dr-islamov-s-clinic-diagnostic-c
+7. Havas Tibbiy Diagnostika (Havas Med) | +998-95-324-30-3 | https://med24.uz/uz/klinika/havas-tibbiy-diagnostika-havas-m
+8. Healthful Diagnostics | - | https://med24.uz/klinika/healthful-diagnostics-2021610648
+9. Hi-tech laboratories | +998-71-295-0-14 | https://hitechlab.uz/
+10. Kamola Diagnostic Medicine | +998-55-511-18-18 | https://med24.uz/klinika/kamola-diagnostic-medicine
+11. My Diagnostic Center | - | https://med24.uz/klinika/my-diagnostic
+12. Neo Lab Diagnostics | +998-71-249-66-99 | https://medelement.com/companies/clinics/294428911531145301/
+13. Nova diagnostic | +998-95-485-5-5 | https://med24.uz/klinika/nova-diagnostic
+14. NUMA Diagnostics | +998-55-777-77-77 | https://medgid.uz/company/1419-numa-diagnostics
+15. Poytaxt med diagnostika | +998-71-276-96-3 | https://poytaxtmed.uz/
+16. Premium Diagnostics | +998-71-247-84-46; +998-93-381-60-60 | https://med24.uz/klinika/premium-diagnostics
+17. Saba Darmon Diagnostics | - | https://www.sabadarmon.uz/ru/
+18. Xalos xaymed diagnostics | +998-99-816-33-36 | https://med24.uz/klinika/xalos-xaymed
+19. Yangihayot Med Diagnostic Center | +998-95-500-13-3 | https://med24.uz/uz/klinika/yangi-hayot-diagnostic-med-clini
+20. Клиника Alfa Diagnostic | +998-71-296-99-44; +998-71-294-77-08 | https://alfa-diagnostic.uz/
+
+====================================================================================================
+ПРИОРИТЕТ B-5: НЕВРОЛОГИЯ (6 клиник)
+====================================================================================================
+
+1. Intermed Neuro | +998-71-252-40-28; +998-71-256-63-13 | https://interlab.uz/
+2. Neuro vita | - | https://yandex.ru/maps/org/neuro_vita/150975005982/
+3. NeuroConcilium | +998-95-363-0-1 | https://medlink.uz/clinic/neuroconcilium
+4. Neurofax - B | +998-71-275-28-18 | https://med24.uz/klinika/neurofax-b
+5. NeurON Medical Centre | - | http://neuronmed.uz/
+6. Spectra Neurology | +998-71-269-24-60; +998-71-269-24-61; +998-71 | https://med24.uz/uz/klinika/spectra-neurology
+
+====================================================================================================
+ПРИОРИТЕТ B-6: РЕАБИЛИТАЦИЯ (2 клиник)
+Шаблон БЗ: БЗ_Реабилитационный_центр.txt
+====================================================================================================
+
+1. Revma Center Clinic (Ревмацентр) | +998-78-113-22-58 | https://med24.uz/klinika/revma-center
+2. Hoffman's Rehabilitaion Clinic | +998-71-254-38-05; +998-90-316-91-70; +998-94 | https://orginfo.uz/organization/e83415099e73/
+
+====================================================================================================
+ПРИОРИТЕТ B-7: УРОЛОГИЯ (1 клиник)
+====================================================================================================
+
+1. Tashkent Medical Park by Urologic Complex | +998-78-777-03-03; +998-55-516-60-13 | https://urologic.uz/

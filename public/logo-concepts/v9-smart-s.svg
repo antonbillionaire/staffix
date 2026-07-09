@@ -1,0 +1,48 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg9" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4F46E5"/>
+      <stop offset="100%" stop-color="#6D28D9"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg9)"/>
+
+  <!-- Clean, bold S made of circuit traces -->
+  <!-- Main S path — thick, modern, geometric -->
+  <path d="M330 145 L215 145 C180 145, 152 173, 152 208 C152 243, 180 271, 215 271 L297 271 C332 271, 360 299, 360 334 C360 369, 332 397, 297 397 L182 397"
+        stroke="white" stroke-width="42" stroke-linecap="round" fill="none"/>
+
+  <!-- Circuit board traces branching from the S -->
+  <!-- Top-right: from start of S -->
+  <line x1="330" y1="145" x2="380" y2="145" stroke="white" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  <line x1="380" y1="145" x2="380" y2="105" stroke="white" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  <circle cx="380" cy="105" r="8" fill="white" opacity="0.5"/>
+
+  <line x1="330" y1="145" x2="330" y2="100" stroke="white" stroke-width="6" stroke-linecap="round" opacity="0.4"/>
+  <circle cx="330" cy="100" r="6" fill="white" opacity="0.4"/>
+
+  <!-- Left: from curve -->
+  <line x1="152" y1="208" x2="115" y2="208" stroke="white" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  <line x1="115" y1="208" x2="115" y2="170" stroke="white" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  <circle cx="115" cy="170" r="8" fill="white" opacity="0.5"/>
+
+  <!-- Right: from middle -->
+  <line x1="360" y1="334" x2="400" y2="334" stroke="white" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  <line x1="400" y1="334" x2="400" y2="375" stroke="white" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  <circle cx="400" cy="375" r="8" fill="white" opacity="0.5"/>
+
+  <!-- Bottom-left: from end of S -->
+  <line x1="182" y1="397" x2="135" y2="397" stroke="white" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  <line x1="135" y1="397" x2="135" y2="435" stroke="white" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  <circle cx="135" cy="435" r="8" fill="white" opacity="0.5"/>
+
+  <line x1="182" y1="397" x2="182" y2="435" stroke="white" stroke-width="6" stroke-linecap="round" opacity="0.4"/>
+  <circle cx="182" cy="435" r="6" fill="white" opacity="0.4"/>
+
+  <!-- Circuit junction dots on the S itself -->
+  <circle cx="215" cy="145" r="6" fill="#4F46E5" opacity="0.8"/>
+  <circle cx="215" cy="271" r="6" fill="#4F46E5" opacity="0.8"/>
+  <circle cx="297" cy="271" r="6" fill="#4F46E5" opacity="0.8"/>
+  <circle cx="297" cy="397" r="6" fill="#4F46E5" opacity="0.8"/>
+</svg>

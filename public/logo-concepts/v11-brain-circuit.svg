@@ -1,0 +1,77 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg11" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0C0A1D"/>
+      <stop offset="100%" stop-color="#1A1438"/>
+    </linearGradient>
+    <linearGradient id="brainGrad11" x1="140" y1="80" x2="370" y2="380" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#818CF8"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+    <linearGradient id="pulse11" x1="180" y1="150" x2="340" y2="350" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#C084FC"/>
+      <stop offset="50%" stop-color="#818CF8"/>
+      <stop offset="100%" stop-color="#60A5FA"/>
+    </linearGradient>
+  </defs>
+  <!-- Dark premium background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg11)"/>
+
+  <!-- Brain outline — elegant, anatomical but stylized -->
+  <!-- Left hemisphere -->
+  <path d="M252 105 C220 105, 175 115, 155 150 C135 185, 130 210, 135 240 C125 245, 115 265, 118 290 C121 315, 135 330, 150 340 C148 365, 165 385, 190 390 C200 395, 230 395, 252 390"
+        stroke="url(#brainGrad11)" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <!-- Right hemisphere -->
+  <path d="M260 105 C292 105, 337 115, 357 150 C377 185, 382 210, 377 240 C387 245, 397 265, 394 290 C391 315, 377 330, 362 340 C364 365, 347 385, 322 390 C312 395, 282 395, 260 390"
+        stroke="url(#brainGrad11)" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <!-- Center divide -->
+  <line x1="256" y1="105" x2="256" y2="390" stroke="#6366F1" stroke-width="2" opacity="0.3"/>
+
+  <!-- Internal brain folds — subtle, premium -->
+  <path d="M180 160 C200 175, 230 165, 248 170" stroke="#818CF8" stroke-width="2" opacity="0.25" fill="none"/>
+  <path d="M264 170 C282 165, 312 175, 332 160" stroke="#818CF8" stroke-width="2" opacity="0.25" fill="none"/>
+  <path d="M148 235 C170 220, 200 230, 245 225" stroke="#818CF8" stroke-width="2" opacity="0.2" fill="none"/>
+  <path d="M267 225 C312 230, 342 220, 364 235" stroke="#818CF8" stroke-width="2" opacity="0.2" fill="none"/>
+  <path d="M155 310 C180 295, 210 305, 248 300" stroke="#818CF8" stroke-width="2" opacity="0.2" fill="none"/>
+  <path d="M264 300 C302 305, 332 295, 357 310" stroke="#818CF8" stroke-width="2" opacity="0.2" fill="none"/>
+
+  <!-- INTERNAL ACTIVITY — circuit paths firing inside brain -->
+  <!-- Main neural pathway 1 (top-left to center) -->
+  <path d="M180 145 L210 180 L240 165 L256 200" stroke="url(#pulse11)" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+  <!-- Pathway 2 (right side) -->
+  <path d="M340 150 L310 185 L330 210 L300 240" stroke="url(#pulse11)" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+  <!-- Pathway 3 (bottom cross) -->
+  <path d="M170 280 L200 260 L256 270 L310 255 L345 275" stroke="url(#pulse11)" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
+  <!-- Pathway 4 (vertical center) -->
+  <path d="M256 200 L240 240 L270 270 L250 310 L256 350" stroke="url(#pulse11)" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- Active nodes — firing neurons (glowing dots) -->
+  <circle cx="180" cy="145" r="6" fill="#C084FC" opacity="0.9"/>
+  <circle cx="180" cy="145" r="12" fill="#C084FC" opacity="0.2"/>
+  <circle cx="256" cy="200" r="7" fill="#818CF8" opacity="0.9"/>
+  <circle cx="256" cy="200" r="14" fill="#818CF8" opacity="0.15"/>
+  <circle cx="340" cy="150" r="5" fill="#60A5FA" opacity="0.9"/>
+  <circle cx="340" cy="150" r="10" fill="#60A5FA" opacity="0.2"/>
+  <circle cx="300" cy="240" r="5" fill="#A78BFA" opacity="0.8"/>
+  <circle cx="300" cy="240" r="10" fill="#A78BFA" opacity="0.15"/>
+  <circle cx="200" cy="260" r="5" fill="#C084FC" opacity="0.8"/>
+  <circle cx="170" cy="280" r="5" fill="#818CF8" opacity="0.7"/>
+  <circle cx="345" cy="275" r="5" fill="#60A5FA" opacity="0.7"/>
+  <circle cx="256" cy="270" r="6" fill="#A78BFA" opacity="0.9"/>
+  <circle cx="256" cy="270" r="12" fill="#A78BFA" opacity="0.15"/>
+  <circle cx="256" cy="350" r="5" fill="#818CF8" opacity="0.8"/>
+  <circle cx="250" cy="310" r="4" fill="#C084FC" opacity="0.7"/>
+
+  <!-- Small sparks — rapid processing -->
+  <circle cx="195" cy="195" r="2.5" fill="white" opacity="0.6"/>
+  <circle cx="320" cy="195" r="2" fill="white" opacity="0.5"/>
+  <circle cx="225" cy="290" r="2.5" fill="white" opacity="0.5"/>
+  <circle cx="285" cy="330" r="2" fill="white" opacity="0.4"/>
+  <circle cx="335" cy="310" r="2" fill="white" opacity="0.4"/>
+  <circle cx="175" cy="330" r="2" fill="white" opacity="0.4"/>
+
+  <!-- STAFFIX text — clean, modern, below brain -->
+  <text x="256" y="448" text-anchor="middle" font-family="'SF Pro Display', 'Inter', system-ui, sans-serif" font-size="40" font-weight="600" letter-spacing="8" fill="white" opacity="0.9">STAFFIX</text>
+  <!-- Subtle underline accent -->
+  <line x1="180" y1="460" x2="332" y2="460" stroke="url(#pulse11)" stroke-width="2" opacity="0.4"/>
+</svg>
