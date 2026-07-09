@@ -98,6 +98,9 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     const documentType = (formData.get("type") as string) || "other";
+    // Опциональное описание от владельца — что это за файл, когда пригодится.
+    // Если пусто — потом сгенерируем autoDescription через Haiku (см. ниже).
+    const ownerDescription = ((formData.get("description") as string) || "").trim() || null;
 
     if (!file) {
       return NextResponse.json(
@@ -249,7 +252,8 @@ export async function POST(request: NextRequest) {
       parseError = errorMessage;
     }
 
-    // Create document record
+    // Create document record — description от владельца сохраняем сразу,
+    // autoDescription пока null (заполним следующим шагом через Haiku).
     const document = await prisma.document.create({
       data: {
         name: file.name,
@@ -260,6 +264,7 @@ export async function POST(request: NextRequest) {
         businessId: business.id,
         extractedText: extractedText,
         parsed: extractedText !== null && extractedText.length > 0,
+        description: ownerDescription,
       },
     });
 
@@ -270,9 +275,31 @@ export async function POST(request: NextRequest) {
       await markBusinessConversationsForRefresh(business.id);
     }
 
+    // Auto-description для матчера. Генерим ТОЛЬКО если владелец не заполнил
+    // описание сам И файл распарсился. Делаем инлайн (не fire-and-forget) —
+    // формдата уже принята, endpoint долгий, лишние 500-800ms не критичны.
+    // Матчер не сможет работать с этим файлом пока хотя бы одного описания
+    // нет — так что важно закрыть этот gap до возврата ответа.
+    let autoDescription: string | null = null;
+    if (!ownerDescription && document.parsed && extractedText) {
+      try {
+        const { generateAutoDescription } = await import("@/lib/document-matcher");
+        autoDescription = await generateAutoDescription(file.name, extractedText);
+        if (autoDescription) {
+          await prisma.document.update({
+            where: { id: document.id },
+            data: { autoDescription },
+          });
+          console.log(`[Document Upload] autoDescription generated for ${document.id}: "${autoDescription}"`);
+        }
+      } catch (e) {
+        console.warn(`[Document Upload] autoDescription failed for ${document.id}:`, e);
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      document,
+      document: { ...document, autoDescription },
       parsing: {
         success: extractedText !== null && extractedText.length > 0,
         textLength: extractedText?.length || 0,

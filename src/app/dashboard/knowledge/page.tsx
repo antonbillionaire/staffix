@@ -37,6 +37,10 @@ interface Document {
   mimeType?: string;
   size: number;
   createdAt: string;
+  // Описание для lazy-loading матчера (июль 2026, экономия токенов):
+  // description — короткая аннотация от владельца, autoDescription — сгенерированный fallback.
+  description?: string | null;
+  autoDescription?: string | null;
 }
 
 type Tab = "personality" | "faq" | "documents";
@@ -87,6 +91,12 @@ export default function KnowledgeBasePage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  // Описание для следующей загрузки (одно поле сверху over всех файлов batch'а).
+  const [pendingUploadDescription, setPendingUploadDescription] = useState("");
+  // Inline-редактирование description существующих документов.
+  const [editingDocId, setEditingDocId] = useState<string | null>(null);
+  const [editingDocDesc, setEditingDocDesc] = useState("");
+  const [savingDocDesc, setSavingDocDesc] = useState(false);
 
   // Theme
   const bgCard = isDark ? "bg-[#12122a]" : "bg-white";
@@ -261,6 +271,12 @@ export default function KnowledgeBasePage() {
         const fd = new FormData();
         fd.append("file", file);
         fd.append("type", "other");
+        // Владелец мог задать одно общее описание для загружаемой партии.
+        // Оно попадает в поле description на каждый файл; если пусто —
+        // сервер сгенерирует autoDescription через Haiku автоматически.
+        if (pendingUploadDescription.trim()) {
+          fd.append("description", pendingUploadDescription.trim());
+        }
 
         const res = await fetch("/api/documents/upload", {
           method: "POST",
@@ -281,8 +297,31 @@ export default function KnowledgeBasePage() {
     }
 
     setUploading(false);
+    setPendingUploadDescription(""); // очищаем после batch'а
     if (fileInputRef.current) fileInputRef.current.value = "";
     e.target.value = "";
+  };
+
+  // Сохранить редактированное описание существующего документа.
+  const saveDocDescription = async (id: string) => {
+    setSavingDocDesc(true);
+    try {
+      const res = await fetch(`/api/documents/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: editingDocDesc }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, ...data.document } : d)));
+        setEditingDocId(null);
+        setEditingDocDesc("");
+      }
+    } catch (e) {
+      console.error("Save doc description error:", e);
+    } finally {
+      setSavingDocDesc(false);
+    }
   };
 
   const deleteDocument = async (id: string) => {
@@ -750,6 +789,28 @@ export default function KnowledgeBasePage() {
             </div>
           )}
 
+          {/* Описание для следующей загрузки. AI использует его чтобы решать,
+              когда именно грузить этот файл в контекст. Если оставить пустым —
+              описание сгенерируется автоматически. */}
+          <div className={`${bgCard} rounded-xl border ${borderColor} p-4`}>
+            <label className={`block text-sm font-medium ${textPrimary} mb-1`}>
+              Описание файла (для следующей загрузки)
+            </label>
+            <p className={`text-xs ${textSecondary} mb-2`}>
+              Одна фраза о том, что это за файл и когда пригодится боту.
+              Например: «Программы туров на лето 2026 — цены и даты вылета».
+              Если оставить пустым, описание сгенерирует AI.
+            </p>
+            <input
+              type="text"
+              value={pendingUploadDescription}
+              onChange={(e) => setPendingUploadDescription(e.target.value)}
+              placeholder="Опционально — но с описанием бот экономит токены"
+              maxLength={500}
+              className={`w-full px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-sm focus:outline-none focus:ring-2 focus:ring-purple-500`}
+            />
+          </div>
+
           <div className={`${bgCard} rounded-xl border ${borderColor} overflow-hidden`}>
             {documents.length === 0 ? (
               <div className="p-8 text-center">
@@ -759,22 +820,79 @@ export default function KnowledgeBasePage() {
               </div>
             ) : (
               <div className={`divide-y ${isDark ? "divide-white/5" : "divide-gray-100"}`}>
-                {documents.map((doc) => (
-                  <div key={doc.id} className={`flex items-center justify-between p-4 ${isDark ? "hover:bg-white/5" : "hover:bg-gray-50"} transition-colors`}>
-                    <div className="flex items-center gap-3">
-                      {getFileIcon(doc.mimeType, doc.name)}
-                      <div>
-                        <p className={`font-medium ${textPrimary}`}>{doc.name}</p>
-                        <p className={`text-xs ${textSecondary}`}>
-                          {formatFileSize(doc.size)} • {new Date(doc.createdAt).toLocaleDateString("ru-RU")}
-                        </p>
+                {documents.map((doc) => {
+                  const currentDesc = doc.description || doc.autoDescription || "";
+                  const isAuto = !doc.description && !!doc.autoDescription;
+                  const isEditing = editingDocId === doc.id;
+                  return (
+                    <div key={doc.id} className={`p-4 ${isDark ? "hover:bg-white/5" : "hover:bg-gray-50"} transition-colors`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                          <div className="mt-0.5">{getFileIcon(doc.mimeType, doc.name)}</div>
+                          <div className="min-w-0 flex-1">
+                            <p className={`font-medium ${textPrimary}`}>{doc.name}</p>
+                            <p className={`text-xs ${textSecondary}`}>
+                              {formatFileSize(doc.size)} • {new Date(doc.createdAt).toLocaleDateString("ru-RU")}
+                            </p>
+
+                            {/* Описание документа для AI-матчера (lazy loading) */}
+                            {isEditing ? (
+                              <div className="mt-2 space-y-2">
+                                <textarea
+                                  value={editingDocDesc}
+                                  onChange={(e) => setEditingDocDesc(e.target.value)}
+                                  rows={2}
+                                  maxLength={500}
+                                  placeholder="Например: Программы туров на лето — цены и даты"
+                                  className={`w-full px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none`}
+                                />
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => saveDocDescription(doc.id)}
+                                    disabled={savingDocDesc}
+                                    className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:opacity-90 disabled:opacity-50"
+                                  >
+                                    {savingDocDesc ? "Сохранение…" : "Сохранить"}
+                                  </button>
+                                  <button
+                                    onClick={() => { setEditingDocId(null); setEditingDocDesc(""); }}
+                                    className={`text-xs ${textSecondary} px-3 py-1.5 rounded-lg hover:${textPrimary}`}
+                                  >
+                                    Отмена
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mt-1.5">
+                                {currentDesc ? (
+                                  <p className={`text-xs ${textSecondary} italic`}>
+                                    {isAuto && <span className="opacity-70">AI: </span>}
+                                    {currentDesc}
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-orange-400/80 italic">Без описания — AI не сможет отличить его от других файлов</p>
+                                )}
+                                <button
+                                  onClick={() => { setEditingDocId(doc.id); setEditingDocDesc(doc.description || ""); }}
+                                  className="text-xs text-blue-500 hover:underline mt-1"
+                                >
+                                  {doc.description ? "Изменить описание" : "Добавить описание"}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => deleteDocument(doc.id)}
+                          className={`${textSecondary} hover:text-red-500 p-2 transition-colors shrink-0`}
+                          title="Удалить документ"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
-                    <button onClick={() => deleteDocument(doc.id)} className={`${textSecondary} hover:text-red-500 p-2 transition-colors`}>
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
