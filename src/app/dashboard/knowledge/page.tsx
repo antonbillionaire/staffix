@@ -324,6 +324,29 @@ export default function KnowledgeBasePage() {
     }
   };
 
+  // Триггерит AI-генерацию описания для старых файлов, где ни description,
+  // ни autoDescription не заполнены. На новых загрузках autoDescription
+  // генерится автоматически в upload endpoint.
+  const [generatingDescId, setGeneratingDescId] = useState<string | null>(null);
+  const generateAiDescription = async (id: string) => {
+    setGeneratingDescId(id);
+    try {
+      const res = await fetch(`/api/documents/${id}/auto-description`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, ...data.document } : d)));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "AI не смог сгенерировать описание");
+      }
+    } catch (e) {
+      console.error("AI description generate error:", e);
+      alert("Ошибка связи с сервером");
+    } finally {
+      setGeneratingDescId(null);
+    }
+  };
+
   const deleteDocument = async (id: string) => {
     if (!confirm(t("faqPage.deleteDocumentConfirm"))) return;
     try {
@@ -872,12 +895,55 @@ export default function KnowledgeBasePage() {
                                 ) : (
                                   <p className="text-xs text-orange-400/80 italic">Без описания — AI не сможет отличить его от других файлов</p>
                                 )}
-                                <button
-                                  onClick={() => { setEditingDocId(doc.id); setEditingDocDesc(doc.description || ""); }}
-                                  className="text-xs text-blue-500 hover:underline mt-1"
-                                >
-                                  {doc.description ? "Изменить описание" : "Добавить описание"}
-                                </button>
+                                <div className="flex items-center gap-3 mt-1">
+                                  <button
+                                    onClick={() => { setEditingDocId(doc.id); setEditingDocDesc(doc.description || ""); }}
+                                    className="text-xs text-blue-500 hover:underline"
+                                  >
+                                    {doc.description ? "Изменить описание" : "Написать вручную"}
+                                  </button>
+                                  {/* AI-генерация: показываем если нет ни owner description, ни autoDescription */}
+                                  {!doc.description && !doc.autoDescription && (
+                                    <button
+                                      onClick={() => generateAiDescription(doc.id)}
+                                      disabled={generatingDescId === doc.id}
+                                      className="text-xs text-purple-500 hover:underline disabled:opacity-50 flex items-center gap-1"
+                                    >
+                                      {generatingDescId === doc.id ? (
+                                        <>
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                          AI пишет…
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Sparkles className="h-3 w-3" />
+                                          AI сгенерирует
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+                                  {/* Кнопка перегенерации если есть только autoDescription (не owner-written) */}
+                                  {!doc.description && doc.autoDescription && (
+                                    <button
+                                      onClick={() => generateAiDescription(doc.id)}
+                                      disabled={generatingDescId === doc.id}
+                                      className="text-xs text-purple-500/80 hover:underline disabled:opacity-50 flex items-center gap-1"
+                                      title="Перегенерировать AI-описание"
+                                    >
+                                      {generatingDescId === doc.id ? (
+                                        <>
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                          Пишем…
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Sparkles className="h-3 w-3" />
+                                          Пересоздать AI
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </div>
