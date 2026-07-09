@@ -43,7 +43,7 @@ interface SalesClientContext {
 export function buildSalesSystemPrompt(
   business: SalesBusinessContext,
   client: SalesClientContext | null
-): { stable: string; variable: string } {
+): { stable: string; docs: string; variable: string } {
   const toneMap: Record<string, string> = {
     friendly: "Общайся дружелюбно и тепло. Создавай ощущение живого помощника-консультанта, а не робота.",
     professional: "Общайся профессионально и вежливо. Конкретно и чётко отвечай на вопросы.",
@@ -210,22 +210,10 @@ ${business.categories && business.categories.length > 0
 - НЕ говори "я передал менеджеру" БЕЗ вызова notify_manager — это критическая ошибка
 `;
 
-  // Сначала справочные документы (фоновая информация)
-  if (business.documents && business.documents.length > 0) {
-    const docs = business.documents.filter((d) => d.extractedText);
-    if (docs.length > 0) {
-      prompt += `\n\n## СПРАВОЧНЫЕ ДОКУМЕНТЫ (фоновая информация — могут содержать устаревшие данные):\n`;
-      for (const doc of docs) {
-        const text = doc.extractedText!.length > 4000
-          ? doc.extractedText!.substring(0, 4000) + "..."
-          : doc.extractedText!;
-        prompt += `\n### ${doc.name}:\n${text}\n`;
-      }
-    }
-  }
-
-  // FAQ — приоритетный источник, ставим ПОСЛЕ документов чтобы Claude
-  // воспринимал его как "более свежее" и приоритетное.
+  // Документы вынесены из stable-блока в отдельный docs-блок (см. return ниже).
+  // Так lazy-loading матчер может менять набор докcов без потери 1h-кэша stable.
+  //
+  // FAQ — приоритетный источник, идёт в стабильную часть.
   if (business.faqs && business.faqs.length > 0) {
     prompt += `\n\n## ⭐ FAQ — АКТУАЛЬНАЯ ИНФОРМАЦИЯ ОТ ВЛАДЕЛЬЦА (главный источник правды):\n`;
     for (const faq of business.faqs) {
@@ -234,7 +222,7 @@ ${business.categories && business.categories.length > 0
     prompt += `
 🔑 ПРИОРИТЕТ ФАКТОВ (КРИТИЧНО):
 - FAQ выше — самый свежий источник, владелец обновляет его вручную при изменении цен/дат/правил/наличия.
-- Справочные документы — фоновая информация, может содержать устаревшие данные (старые прайс-листы, прошлогодние программы, цены прошлого сезона).
+- Справочные документы (будут ниже отдельным блоком) — фоновая информация, может содержать устаревшие данные (старые прайс-листы, прошлогодние программы, цены прошлого сезона).
 - Если FAQ и документ говорят разное про одну и ту же вещь (цена тура, дата вылета, наличие услуги/товара) — ВСЕГДА используй FAQ. Документ молчаливо игнорируй в этом конкретном пункте.
 - Если в FAQ написано "продажа закрыта на 08.06" а в документе цена для 08.06 — НЕ предлагай 08.06 клиенту, FAQ перебивает.
 - Если клиент спрашивает про факт, которого нет в FAQ, но есть в документе — можно использовать документ, но с оговоркой "по нашим данным" и предложением уточнить у менеджера если данные критичны.
@@ -243,6 +231,21 @@ ${business.categories && business.categories.length > 0
 
   // ── Здесь заканчивается стабильный (кэшируемый) префикс ──
   const stable = prompt;
+
+  // Docs-блок отдельно: кэшируется независимо от stable с TTL 5m. Формируется
+  // из business.documents — которые вызывающий уже отфильтровал через матчер.
+  let docs = "";
+  if (business.documents && business.documents.length > 0) {
+    const withText = business.documents.filter((d) => d.extractedText);
+    if (withText.length > 0) {
+      const parts = withText.map((d) => {
+        const t = d.extractedText!;
+        const trimmed = t.length > 4000 ? t.substring(0, 4000) + "..." : t;
+        return `### ${d.name}:\n${trimmed}`;
+      });
+      docs = `## СПРАВОЧНЫЕ ДОКУМЕНТЫ (фоновая информация — могут содержать устаревшие данные):\n${parts.join("\n\n")}`;
+    }
+  }
 
   // Дальше — переменный хвост: клиентский контекст. Меняется на каждого клиента.
   let variable = "";
@@ -276,7 +279,7 @@ ${business.categories && business.categories.length > 0
 НЕ вываливай весь каталог сразу — сначала узнай что ищет.`;
   }
 
-  return { stable, variable };
+  return { stable, docs, variable };
 }
 
 /**

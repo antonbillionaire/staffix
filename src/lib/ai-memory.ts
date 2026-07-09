@@ -82,7 +82,13 @@ interface BusinessContext {
   }>;
   staff: Array<{ id: string; name: string; role: string | null }>;
   faqs: Array<{ question: string; answer: string }>;
-  documents: Array<{ name: string; extractedText: string | null }>;
+  documents: Array<{
+    id: string;
+    name: string;
+    extractedText: string | null;
+    description: string | null;
+    autoDescription: string | null;
+  }>;
   country: string;
   dashboardMode: string;
   consultationsEnabled: boolean;
@@ -209,7 +215,13 @@ export async function buildBusinessContext(
           faqs: { select: { question: true, answer: true } },
           documents: {
             where: { parsed: true },
-            select: { name: true, extractedText: true }
+            select: {
+              id: true,
+              name: true,
+              extractedText: true,
+              description: true,
+              autoDescription: true,
+            }
           },
           loyaltyPrograms: {
             where: { enabled: true },
@@ -228,7 +240,13 @@ export async function buildBusinessContext(
           faqs: { select: { question: true, answer: true } },
           documents: {
             where: { parsed: true },
-            select: { name: true, extractedText: true }
+            select: {
+              id: true,
+              name: true,
+              extractedText: true,
+              description: true,
+              autoDescription: true,
+            }
           },
         },
       });
@@ -362,10 +380,22 @@ import { ANTI_PROBE_USER_BOT } from "@/lib/security-prompts";
  * стоило ~$0.10 вместо ~$0.005. Это была главная причина дрейфа $11/день
  * на одного клиента.
  */
+/**
+ * Строит system prompt для TG-бота в трёх кэшируемых блоках.
+ *
+ *   stable  — базовая часть без справочных документов. TTL 1h. Стабильна
+ *             от вызова к вызову; cache-warmer держит её горячей.
+ *   docs    — блок «Справочные документы: …». TTL 5m. Формируется из
+ *             ПОДМНОЖЕСТВА документов, выбранного матчером под запрос клиента
+ *             (см. src/lib/document-matcher.ts). Если docSubset не передан —
+ *             в блок попадают все parsed-документы (fallback).
+ *   variable — клиентский контекст. TTL 5m. Меняется от клиента к клиенту.
+ */
 export function buildSystemPrompt(
   business: BusinessContext,
-  client: ClientContext | null
-): { stable: string; variable: string } {
+  client: ClientContext | null,
+  docSubset?: BusinessContext["documents"]
+): { stable: string; docs: string; variable: string } {
   const toneMap: Record<string, string> = {
     friendly: "Общайся дружелюбно и тепло, используй эмодзи умеренно.",
     professional: "Общайся профессионально и вежливо, без лишних эмоций.",
@@ -476,22 +506,6 @@ ${
 4. Если несколько мастеров подходят и клиент не выбрал — спроси клиента "К кому записать: <имя1> или <имя2>?"
 5. Только если клиент явно сказал "к любому свободному" или в бизнесе один мастер — можно не передавать staff_id
 
-## Справочные документы (фоновая информация — могут содержать устаревшие данные):
-${
-  business.documents.length > 0
-    ? business.documents
-        .filter((d) => d.extractedText)
-        .slice(0, 5)
-        .map((d) => {
-          const text = d.extractedText!.length > 4000
-            ? d.extractedText!.substring(0, 4000) + "..."
-            : d.extractedText!;
-          return `### ${d.name}:\n${text}`;
-        })
-        .join("\n\n")
-    : "(документы не загружены)"
-}
-
 ## ⭐ FAQ — АКТУАЛЬНАЯ ИНФОРМАЦИЯ ОТ ВЛАДЕЛЬЦА (главный источник правды):
 ${
   business.faqs.length > 0
@@ -501,7 +515,7 @@ ${
 
 🔑 ПРИОРИТЕТ ФАКТОВ (КРИТИЧНО):
 - FAQ выше — самый свежий источник, владелец обновляет его вручную при изменении цен/дат/правил.
-- Справочные документы — фоновая информация, может содержать устаревшие данные (старые прайс-листы, прошлогодние программы туров и т.п.).
+- Справочные документы (будут ниже, отдельным блоком) — фоновая информация, может содержать устаревшие данные (старые прайс-листы, прошлогодние программы туров и т.п.).
 - Если FAQ и документ говорят разное про одну и ту же вещь (например цена тура, дата вылета, наличие услуги) — ВСЕГДА используй FAQ. Документ молчаливо игнорируй в этом конкретном пункте.
 - Если в FAQ написано "продажа закрыта на 08.06" а в документе цена для 08.06 — НЕ предлагай 08.06 клиенту, FAQ перебивает.
 - Если клиент спрашивает про факт, которого нет в FAQ, но есть в документе — можно использовать документ, но с оговоркой "по нашим данным" и предложением уточнить у менеджера если данные критичны.
@@ -579,6 +593,23 @@ ${toneMap[business.aiTone || "friendly"] || toneMap.friendly}
   // ── Здесь заканчивается стабильный (кэшируемый) префикс ──
   const stable = prompt;
 
+  // Блок docs — отдельный cache-entry с TTL 5m. Формируется из docSubset
+  // если передан (lazy-loading путь), иначе из всех parsed-документов
+  // (fallback, поведение до июля 2026).
+  const docsSource = docSubset ?? business.documents;
+  const docsWithText = docsSource.filter((d) => d.extractedText);
+  let docs = "";
+  if (docsWithText.length > 0) {
+    // Ограничиваем каждый документ 4000 символами и берём максимум 5 —
+    // те же лимиты что были у inline-версии в stable до этого рефакторинга.
+    const parts = docsWithText.slice(0, 5).map((d) => {
+      const t = d.extractedText!;
+      const trimmed = t.length > 4000 ? t.substring(0, 4000) + "..." : t;
+      return `### ${d.name}:\n${trimmed}`;
+    });
+    docs = `## Справочные документы (фоновая информация — могут содержать устаревшие данные):\n${parts.join("\n\n")}`;
+  }
+
   // Дальше — переменный хвост: клиентский контекст. Меняется на каждого
   // клиента и иногда — внутри одного диалога (когда summary обновляется).
   let variable = "";
@@ -648,7 +679,7 @@ ${toneMap[business.aiTone || "friendly"] || toneMap.friendly}
     }
   }
 
-  return { stable, variable };
+  return { stable, docs, variable };
 }
 
 // ========================================

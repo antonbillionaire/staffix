@@ -31,6 +31,7 @@ import {
 
 import Anthropic from "@anthropic-ai/sdk";
 import { callClaudeWithRetry, logClaudeUsage } from "@/lib/claude-retry";
+import { pickRelevantDocuments } from "@/lib/document-matcher";
 // Anti-probe boundary — prepended to every WA/IG/FB user-bot system prompt
 // so it has the highest LLM attention weight.
 import { ANTI_PROBE_USER_BOT } from "@/lib/security-prompts";
@@ -143,7 +144,19 @@ async function loadBusinessProfile(businessId: string) {
       products: { select: { name: true, description: true, price: true, category: true, stock: true }, take: 300 },
       faqs: { select: { question: true, answer: true }, take: 20 },
       staff: { select: { id: true, name: true, role: true }, take: 10 },
-      documents: { where: { parsed: true }, select: { name: true, extractedText: true }, take: 10 },
+      // id + description/autoDescription — для lazy-loading матчера
+      // (см. src/lib/document-matcher.ts)
+      documents: {
+        where: { parsed: true },
+        select: {
+          id: true,
+          name: true,
+          extractedText: true,
+          description: true,
+          autoDescription: true,
+        },
+        take: 10,
+      },
     },
   });
 }
@@ -245,31 +258,15 @@ ${biz.aiRules}
     prompt += `\n\nВАЖНО про мастеров: при create_booking ВСЕГДА передавай staff_id если в бизнесе больше одного мастера. Определи нужного мастера: (1) клиент назвал имя — найди ID; (2) клиент назвал специализацию — найди мастера с подходящей ролью; (3) услуга подразумевает специалиста (например "Терапевт первичный приём" → мастер с ролью "Терапевт") — выбери его; (4) если несколько подходят — спроси клиента; (5) только если клиент сказал "к любому" — можно не передавать.`;
   }
 
-  // Add knowledge base documents with chunking (total limit 50000 chars).
-  // FAQ ставится ПОСЛЕ документов и помечается как приоритетный источник —
-  // без этого Claude часто отдаёт предпочтение длинным структурированным
-  // документам, даже когда FAQ содержит более свежую информацию.
-  const MAX_DOCS_TOTAL_CHARS = 50000;
-  const docsWithText = biz.documents.filter((d) => d.extractedText && d.extractedText.length > 0);
-  if (docsWithText.length > 0) {
-    const docParts: string[] = [];
-    let totalChars = 0;
-    for (const d of docsWithText) {
-      const fullText = d.extractedText!;
-      const remaining = MAX_DOCS_TOTAL_CHARS - totalChars;
-      if (remaining <= 0) break;
-      const text = fullText.length > remaining ? fullText.substring(0, remaining) + "..." : fullText;
-      docParts.push(`### ${d.name}:\n${text}`);
-      totalChars += text.length;
-    }
-    prompt += `\n\nСправочные документы (фоновая информация — могут содержать устаревшие данные):\n${docParts.join("\n\n")}`;
-  }
-
+  // FAQ — свежие данные от владельца. Документы — фоновая справка, идёт в
+  // конец промпта (см. renderChannelDocsBlock ниже) и попадает в ОТДЕЛЬНЫЙ
+  // cache-блок с коротким TTL, чтобы lazy-loading матчера мог варьировать
+  // набор документов без потери 1h-кэша основной части промпта.
   if (faqList) {
     prompt += `\n\n⭐ FAQ — АКТУАЛЬНАЯ ИНФОРМАЦИЯ ОТ ВЛАДЕЛЬЦА (главный источник правды):\n${faqList}`;
     prompt += `\n\n🔑 ПРИОРИТЕТ ФАКТОВ (КРИТИЧНО):
 - FAQ выше — самый свежий источник, владелец обновляет его вручную при изменении цен/дат/правил.
-- Справочные документы — фоновая информация, может содержать устаревшие данные (старые прайс-листы, прошлогодние программы туров и т.п.).
+- Справочные документы (будут ниже) — фоновая информация, может содержать устаревшие данные (старые прайс-листы, прошлогодние программы туров и т.п.).
 - Если FAQ и документ говорят разное про одну и ту же вещь (например цена тура, дата вылета, наличие услуги) — ВСЕГДА используй FAQ. Документ молчаливо игнорируй в этом конкретном пункте.
 - Если в FAQ написано "продажа закрыта на 08.06" а в документе цена для 08.06 — НЕ предлагай 08.06 клиенту, FAQ перебивает.
 - Если клиент спрашивает про факт, которого нет в FAQ, но есть в документе — можно использовать документ, но с оговоркой "по нашим данным" и предложением уточнить у менеджера если данные критичны.`;
@@ -321,7 +318,74 @@ ${biz.aiRules}
   const today = new Date().toISOString().split("T")[0];
   prompt += `\n\nСегодняшняя дата: ${today}. Используй инструменты для работы с записями.`;
 
+  // Docs section в самом конце — так его можно отделить в отдельный cache-блок
+  // (см. buildChannelSystemPromptParts). Тут — full-fat версия для warmer'а
+  // и как fallback когда матчер не отработал.
+  const docsBlock = renderChannelDocsBlock(biz.documents);
+  if (docsBlock) prompt += `\n\n${docsBlock}`;
+
   return prompt;
+}
+
+/**
+ * Формирует блок «Справочные документы: …» из списка Document-descriptor'ов.
+ * Возвращает пустую строку если documents пуст или ни у одного нет parsed-текста.
+ *
+ * MAX_DOCS_TOTAL_CHARS = 50000 — тот же лимит что был у старой inline-версии,
+ * защищает от разросшихся файлов клиента (в проде видели PDF на 200KB).
+ */
+function renderChannelDocsBlock(
+  docs: Array<{ name: string; extractedText: string | null }>
+): string {
+  const MAX_DOCS_TOTAL_CHARS = 50000;
+  const withText = docs.filter((d) => d.extractedText && d.extractedText.length > 0);
+  if (withText.length === 0) return "";
+
+  const parts: string[] = [];
+  let totalChars = 0;
+  for (const d of withText) {
+    const remaining = MAX_DOCS_TOTAL_CHARS - totalChars;
+    if (remaining <= 0) break;
+    const full = d.extractedText!;
+    const text = full.length > remaining ? full.substring(0, remaining) + "..." : full;
+    parts.push(`### ${d.name}:\n${text}`);
+    totalChars += text.length;
+  }
+  return `Справочные документы (фоновая информация — могут содержать устаревшие данные):\n${parts.join("\n\n")}`;
+}
+
+/**
+ * Разбивает channel system prompt на два независимо-кэшируемых блока для
+ * lazy document loading (июль 2026).
+ *
+ *   base — стабильная часть (роль бота, услуги, товары, FAQ, инструкции).
+ *          Кэшируется на 1h. При смене документов НЕ меняется, cache-hit
+ *          сохраняется.
+ *   docs — блок «Справочные документы: …». Формируется из ПОДМНОЖЕСТВА
+ *          документов, выбранных матчером под конкретный запрос клиента.
+ *          Кэшируется на 5m — при повторе того же запроса cache-hit, при
+ *          смене темы дешёвый write.
+ *
+ * Если docSubset не передан → docs формируется из всех parsed-документов
+ * (fallback режим, поведение как у buildChannelSystemPrompt).
+ * Если docSubset пустой массив → docs = "" (nothing to inject).
+ */
+export function buildChannelSystemPromptParts(
+  biz: NonNullable<Awaited<ReturnType<typeof loadBusinessProfile>>>,
+  channel: string,
+  docSubset?: Array<{ name: string; extractedText: string | null }>
+): { base: string; docs: string } {
+  const full = buildChannelSystemPrompt(biz, channel);
+  // buildChannelSystemPrompt всегда завершает docsBlock в конце (если docs есть).
+  // Мы аккуратно отрезаем его: находим «Справочные документы (фоновая…» — это
+  // единственный маркер этого блока в prompt.
+  const marker = "\n\nСправочные документы (фоновая информация";
+  const idx = full.indexOf(marker);
+  const base = idx === -1 ? full : full.substring(0, idx);
+
+  const docsSource = docSubset === undefined ? biz.documents : docSubset;
+  const docs = renderChannelDocsBlock(docsSource);
+  return { base, docs };
 }
 
 /**
@@ -547,7 +611,27 @@ export async function generateChannelAIResponse(
       },
     }).catch((e) => console.error("[CRM] message_received dispatch error:", e));
 
-    let systemPrompt = buildChannelSystemPrompt(biz, channel);
+    // Lazy document loading (июль 2026): матчер выбирает ТОЛЬКО релевантные
+    // документы для текущего вопроса клиента. Ужимает 20-30K токенов «фоновой
+    // справки» до 3-5K релевантной. Матчер сам делает fallback на все docs
+    // при любой ошибке — качество не роняем.
+    //
+    // Разбиваем system prompt на ДВА независимо-кэшируемых блока:
+    //   systemBase  — стабильная часть (роль, услуги, товары, FAQ, инструкции).
+    //                 Кэшируется на 1h — при варьирующемся выборе документов
+    //                 продолжает cache-hit'иться.
+    //   systemDocs  — блок «Справочные документы» только с выбранными файлами.
+    //                 Кэшируется на 5m — при повторе того же запроса hit,
+    //                 при смене темы дешёвый write.
+    const pickedDocs = await pickRelevantDocuments(userMessage, biz.documents);
+    if (pickedDocs.length !== biz.documents.length) {
+      console.log(
+        `[Channel AI] doc matcher: ${biz.documents.length} → ${pickedDocs.length} for biz=${businessId}`
+      );
+    }
+    const parts = buildChannelSystemPromptParts(biz, channel, pickedDocs);
+    let systemBase = parts.base;
+    const systemDocs = parts.docs;
 
     // AI Learning: load client context and corrections (non-blocking on failure)
     try {
@@ -557,10 +641,10 @@ export async function generateChannelAIResponse(
         loadActiveCorrections(businessId).catch(() => ""),
       ]);
       if (clientContext) {
-        systemPrompt += "\n\n" + buildClientContextBlock(clientContext);
+        systemBase += "\n\n" + buildClientContextBlock(clientContext);
       }
       if (corrections) {
-        systemPrompt += "\n\n" + corrections;
+        systemBase += "\n\n" + corrections;
       }
     } catch (memErr) {
       console.error("[Channel AI] Memory load error (non-fatal):", memErr);
@@ -607,7 +691,7 @@ export async function generateChannelAIResponse(
     }
 
     if (refreshSoftWarning) {
-      systemPrompt += `\n\n⚠️ ВНИМАНИЕ — БАЗА ЗНАНИЙ ОБНОВЛЕНА (правило приоритета фактов)
+      systemBase += `\n\n⚠️ ВНИМАНИЕ — БАЗА ЗНАНИЙ ОБНОВЛЕНА (правило приоритета фактов)
 База знаний этого бизнеса (FAQ / услуги / товары / документы) только что была изменена владельцем. Это перебивает любую информацию, которую ты помнишь о ценах, датах, услугах или остатках товаров.
 
 ИСТОЧНИК ИСТИНЫ для фактов о бизнесе — ТОЛЬКО разделы текущего системного промпта выше:
@@ -651,11 +735,28 @@ export async function generateChannelAIResponse(
     // рассуждений. Отключаем — поведение как у Sonnet 4.5.
     // max_tokens: 1024 — на Sonnet 5 новый токенайзер даёт ~30% больше токенов
     // на кириллице; бампаем с 800 чтобы не резать ответы про туры.
+    //
+    // system: массив с двумя cache-блоками — base на 1h (стабильно), docs на
+    // 5m (варьируется при lazy-loading). Если docs пуст — один блок.
+    const systemBlocks: Anthropic.TextBlockParam[] = [
+      {
+        type: "text",
+        text: systemBase,
+        cache_control: { type: "ephemeral", ttl: "1h" },
+      },
+    ];
+    if (systemDocs) {
+      systemBlocks.push({
+        type: "text",
+        text: systemDocs,
+        cache_control: { type: "ephemeral", ttl: "5m" },
+      });
+    }
     let response = await callClaudeWithRetry({
       model: "claude-sonnet-5",
       max_tokens: 1024,
       thinking: { type: "disabled" },
-      system: systemPrompt,
+      system: systemBlocks,
       messages,
       tools,
     });
@@ -724,7 +825,11 @@ export async function generateChannelAIResponse(
         response = await callClaudeWithRetry({
           model: "claude-haiku-4-5-20251001",
           max_tokens: 800,
-          system: systemPrompt,
+          // Haiku кэш ОТДЕЛЬНЫЙ от Sonnet-кэша. Передаём те же split-блоки:
+          // base кэшируется на 1h (cache-warmer уже прогревает Haiku), docs
+          // (если есть) на 5m. Побайтовая совместимость с warmer'ом
+          // критична — иначе cache_key разъезжается и warm-hit падает.
+          system: systemBlocks,
           messages,
           tools,
         });
@@ -968,22 +1073,34 @@ export async function warmChannelCache(
   const biz = await loadBusinessProfile(businessId);
   if (!biz) return null;
 
-  const systemPrompt = buildChannelSystemPrompt(biz, channel);
-  // Если префикс короткий — кэширование не сэкономит, не зовём Claude.
-  if (systemPrompt.length < 4096) return null;
+  // Warmer греет ТОЛЬКО базовый блок (1h TTL). Docs-блок в проде варьируется
+  // от запроса к запросу через lazy-loading (см. pickRelevantDocuments), греть
+  // его бессмысленно — cache_key будет другой на реальном трафике.
+  // Пустой массив docSubset → docs = "" → в warmer уходит только base.
+  const parts = buildChannelSystemPromptParts(biz, channel, []);
+  if (parts.base.length < 4096) return null;
+
+  // Побитово-идентичные cache-блоки production'а. КРИТИЧНО: если поля
+  // (thinking / cache_control / модель / max_tokens) не совпадают —
+  // cache_key разный, warm-hit = 0%.
+  const systemBlocks: Anthropic.TextBlockParam[] = [
+    {
+      type: "text",
+      text: parts.base,
+      cache_control: { type: "ephemeral", ttl: "1h" },
+    },
+  ];
 
   // Anthropic кэш раздельный по моделям. Мы используем ДВЕ модели в проде:
   // - Sonnet 5 на главный ответ клиенту (первый вызов Claude)
   // - Haiku 4.5 на tool-loop итерации (после того как бот вызвал инструмент)
-  // Греем оба кэша параллельно. КРИТИЧНО: параметры warm-вызова должны
-  // побайтово совпадать с production main — если в проде thinking: disabled,
-  // здесь тоже. Иначе cache_key разный и warm-hit будет 0%.
+  // Греем оба кэша параллельно.
   const [sonnetUsage] = await Promise.all([
     callClaudeWithRetry({
       model: "claude-sonnet-5",
       max_tokens: 1,
       thinking: { type: "disabled" },
-      system: systemPrompt,
+      system: systemBlocks,
       messages: [{ role: "user" as const, content: "ping" }],
     }).then((r) => {
       logClaudeUsage(`warm/${channel}/sonnet`, r.usage, { biz: businessId });
@@ -995,7 +1112,7 @@ export async function warmChannelCache(
     callClaudeWithRetry({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 1,
-      system: systemPrompt,
+      system: systemBlocks,
       messages: [{ role: "user" as const, content: "ping" }],
     }).then((r) => {
       logClaudeUsage(`warm/${channel}/haiku`, r.usage, { biz: businessId });

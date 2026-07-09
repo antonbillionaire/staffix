@@ -30,7 +30,13 @@ function makeBiz(overrides: Record<string, unknown> = {}) {
     staff: [
       { id: "staff-1", name: "Алия", role: "Мастер" },
     ],
-    documents: [] as Array<{ name: string; extractedText: string | null }>,
+    documents: [] as Array<{
+      id: string;
+      name: string;
+      extractedText: string | null;
+      description: string | null;
+      autoDescription: string | null;
+    }>,
     ...overrides,
   };
 }

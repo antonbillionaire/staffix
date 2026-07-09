@@ -37,6 +37,7 @@ import {
 } from "@/lib/ai-routing";
 import { getOrCreateConversation, saveMessage } from "./conversation";
 import { handleToolCall, buildFallbackFromToolResults } from "./tools";
+import { pickRelevantDocuments, type DocDescriptor } from "@/lib/document-matcher";
 
 export interface AIResponseWithMedia {
   text: string;
@@ -76,9 +77,25 @@ export async function generateAIResponse(
     const salesMode = isSalesMode(businessContext.businessType, businessContext.dashboardMode);
     console.log(`[Webhook] Mode: ${salesMode ? "sales" : "service"}, type=${businessContext.businessType}`);
 
-    // 4. Строим системный промпт — обе функции теперь возвращают
-    // { stable, variable } для split-кэширования (1h на префикс, 5m на хвост).
-    let systemPrompt: { stable: string; variable: string };
+    // 4. Lazy document matcher (июль 2026): выбирает нужные документы под запрос.
+    //    Пул docs = businessContext.documents (уже с description/autoDescription).
+    //    Матчер возвращает подмножество; в промпт идёт только оно.
+    //    При ошибке / малом числе документов возвращает весь пул → поведение как раньше.
+    const docPool: DocDescriptor[] = businessContext.documents.map((d) => ({
+      id: d.id,
+      name: d.name,
+      description: d.description,
+      autoDescription: d.autoDescription,
+      extractedText: d.extractedText,
+    }));
+    const pickedDocs = await pickRelevantDocuments(userMessage, docPool);
+    if (pickedDocs.length !== docPool.length) {
+      console.log(`[Webhook] doc matcher: ${docPool.length} → ${pickedDocs.length} for business=${businessId}`);
+    }
+
+    // 5. Строим системный промпт — обе функции возвращают
+    //    { stable, docs, variable }: stable кэшируется на 1h, docs и variable на 5m.
+    let systemPrompt: { stable: string; docs: string; variable: string };
     if (salesMode) {
       const salesClientCtx = clientContext
         ? {
@@ -93,10 +110,9 @@ export async function generateAIResponse(
       const { getAvailableCategories } = await import("@/lib/sales-tools");
       const categories = await getAvailableCategories(businessId);
       const totalProducts = await prisma.product.count({ where: { businessId, isActive: true } });
-      const documents = await prisma.document.findMany({
-        where: { businessId, parsed: true },
-        select: { name: true, extractedText: true },
-      });
+
+      // Sales prompt получает уже отфильтрованный набор документов через матчер.
+      const documentsForSales = pickedDocs.map((d) => ({ name: d.name, extractedText: d.extractedText }));
 
       systemPrompt = buildSalesSystemPrompt(
         {
@@ -111,7 +127,7 @@ export async function generateAIResponse(
           language: businessContext.language || "ru",
           categories,
           totalProducts,
-          documents,
+          documents: documentsForSales,
           faqs: businessContext.faqs,
           consultationsEnabled: businessContext.consultationsEnabled,
           services: businessContext.services,
@@ -120,7 +136,14 @@ export async function generateAIResponse(
         salesClientCtx
       );
     } else {
-      systemPrompt = buildSystemPrompt(businessContext, clientContext);
+      // Service mode: buildSystemPrompt принимает docSubset — передаём выбранные.
+      systemPrompt = buildSystemPrompt(businessContext, clientContext, pickedDocs.map((d) => ({
+        id: d.id,
+        name: d.name,
+        extractedText: d.extractedText,
+        description: d.description,
+        autoDescription: d.autoDescription,
+      })));
     }
 
     // 5. Получаем историю разговора
@@ -196,8 +219,16 @@ export async function generateAIResponse(
     // переменный хвост, рядом с клиентским контекстом. Стабильный префикс
     // остаётся неизменным от вызова к вызову — Anthropic держит его в кэше.
     const variableTail = systemPrompt.variable + systemHint + refreshNotice + routingPromptSection;
+    // Порядок cache-блоков: stable(1h) → docs(5m) → variable(5m). Порядок важен
+    // потому что каждый последующий cache_key = hash(всех предыдущих + этого).
+    // stable первым — он самый стабильный. docs перед variable — их набор
+    // меняется по темам (штук 5-10 у бизнеса), variable по клиентам (много).
+    // Больше hit'ов если реже-меняющееся идёт раньше.
     const systemBlocks = [
       { type: "text" as const, text: systemPrompt.stable, cache_control: { type: "ephemeral" as const, ttl: "1h" as const } },
+      ...(systemPrompt.docs.trim()
+        ? [{ type: "text" as const, text: systemPrompt.docs, cache_control: { type: "ephemeral" as const, ttl: "5m" as const } }]
+        : []),
       ...(variableTail.trim()
         ? [{ type: "text" as const, text: variableTail, cache_control: { type: "ephemeral" as const, ttl: "5m" as const } }]
         : []),

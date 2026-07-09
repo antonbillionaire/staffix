@@ -622,6 +622,20 @@ model Document {
   extractedText String? // текст из документа
   parsed        Boolean @default(false) // был ли распарсен AI
 
+  // Описание для lazy loading (июль 2026, cost-optimization).
+  // description — от владельца, короткий текст «о чём этот файл» для AI-матчера.
+  // Владелец пишет ~50-150 символов: «Программы туров, цены на лето 2026»,
+  // «Правила отмены и возврата», «Список отелей в Батуми». По этой строке AI
+  // решает при каждом запросе клиента: грузить этот документ в промпт или нет.
+  //
+  // autoDescription — сгенерирован нами через Haiku 4.5 автоматически после
+  // загрузки документа, если владелец не заполнил description. Fallback.
+  //
+  // Если оба пустые — документ считается «недоописанным» и попадает в fallback
+  // (грузим на всякий случай, чтобы бот не потерял информацию).
+  description     String? @db.Text
+  autoDescription String? @db.Text
+
   businessId String
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
