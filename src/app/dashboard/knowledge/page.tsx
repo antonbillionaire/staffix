@@ -893,7 +893,9 @@ export default function KnowledgeBasePage() {
                                     {currentDesc}
                                   </p>
                                 ) : (
-                                  <p className="text-xs text-orange-400/80 italic">Без описания — AI не сможет отличить его от других файлов</p>
+                                  <p className="text-xs text-orange-400/80 italic">
+                                    Без описания файл грузится в каждый ответ (дорого). С описанием — только когда клиент спрашивает по теме.
+                                  </p>
                                 )}
                                 <div className="flex items-center gap-3 mt-1">
                                   <button
