@@ -38,6 +38,8 @@ import {
 import { getOrCreateConversation, saveMessage } from "./conversation";
 import { handleToolCall, buildFallbackFromToolResults } from "./tools";
 import { pickRelevantDocuments, type DocDescriptor } from "@/lib/document-matcher";
+import { pickMainModel } from "@/lib/complexity-classifier";
+import type Anthropic from "@anthropic-ai/sdk";
 
 export interface AIResponseWithMedia {
   text: string;
@@ -234,19 +236,28 @@ export async function generateAIResponse(
         : []),
     ];
 
-    console.log(`[Webhook] Calling Claude API for business=${businessId}, salesMode=${salesMode}, stableLen=${systemPrompt.stable.length}, variableLen=${variableTail.length}`);
+    // Hybrid routing: SIMPLE → Haiku 4.5, COMPLEX → Sonnet 5. Только для
+    // бизнесов из AI_HYBRID_BUSINESS_IDS. Для остальных всегда Sonnet 5.
+    const mainModel = await pickMainModel(businessId, userMessage);
+    console.log(
+      `[Webhook] Calling Claude API for business=${businessId}, salesMode=${salesMode}, stableLen=${systemPrompt.stable.length}, docsLen=${systemPrompt.docs.length}, variableLen=${variableTail.length}, model=${mainModel.model}, complexity=${mainModel.complexity}`
+    );
     // thinking: disabled — на Sonnet 5 adaptive thinking по дефолту тратит
     // токены на цепочки рассуждений. Для клиент-чата это оверкилл; выключаем.
+    // Для Haiku thinking не применяется (Sonnet/Opus-only feature).
     // max_tokens: 1024 — компенсируем 30%-inflated токенайзер Sonnet 5.
-    let response = await callClaudeWithRetry({
-      model: "claude-sonnet-5",
+    const mainParams: Anthropic.MessageCreateParamsNonStreaming = {
+      model: mainModel.model,
       max_tokens: 1024,
-      thinking: { type: "disabled" },
       system: systemBlocks,
       messages: recentMessages,
       tools: activeTools,
-    });
-    logClaudeUsage("tg/main", response.usage, { biz: businessId, tg: telegramId, sales: salesMode ? 1 : 0 });
+    };
+    if (mainModel.model === "claude-sonnet-5") {
+      mainParams.thinking = { type: "disabled" };
+    }
+    let response = await callClaudeWithRetry(mainParams);
+    logClaudeUsage(`tg/main/${mainModel.complexity}`, response.usage, { biz: businessId, tg: telegramId, sales: salesMode ? 1 : 0, model: mainModel.model });
     console.log(`[Webhook] Claude response: stop_reason=${response.stop_reason}`);
 
     // 7. Цикл tool_use (до 5 итераций)

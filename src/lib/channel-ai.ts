@@ -32,6 +32,7 @@ import {
 import Anthropic from "@anthropic-ai/sdk";
 import { callClaudeWithRetry, logClaudeUsage } from "@/lib/claude-retry";
 import { pickRelevantDocuments } from "@/lib/document-matcher";
+import { pickMainModel } from "@/lib/complexity-classifier";
 // Anti-probe boundary — prepended to every WA/IG/FB user-bot system prompt
 // so it has the highest LLM attention weight.
 import { ANTI_PROBE_USER_BOT } from "@/lib/security-prompts";
@@ -728,11 +729,20 @@ export async function generateChannelAIResponse(
       ? (biz.consultationsEnabled ? channelSalesPlusBookingTools : channelSalesTools)
       : channelBookingTools;
 
+    // Hybrid model routing (июль 2026): SIMPLE запросы → Haiku 4.5,
+    // COMPLEX → Sonnet 5. Только для бизнесов из AI_HYBRID_BUSINESS_IDS
+    // (A/B тестируем на Right Flight). Для остальных — всегда Sonnet 5.
+    const mainModel = await pickMainModel(businessId, userMessage);
+    console.log(
+      `[Channel AI] model=${mainModel.model} complexity=${mainModel.complexity} biz=${businessId}`
+    );
+
     // Call Claude with appropriate tools (with retry on overload).
     // thinking: disabled — на Sonnet 5 adaptive thinking включён по дефолту
     // с effort=high. Для чат-бота это лишние токены на «размышления» — при
     // ответе на «сколько стоит?» модель не должна тратить бюджет на цепочку
     // рассуждений. Отключаем — поведение как у Sonnet 4.5.
+    // Для Haiku параметр thinking не применяется — SDK его проигнорирует.
     // max_tokens: 1024 — на Sonnet 5 новый токенайзер даёт ~30% больше токенов
     // на кириллице; бампаем с 800 чтобы не резать ответы про туры.
     //
@@ -752,15 +762,20 @@ export async function generateChannelAIResponse(
         cache_control: { type: "ephemeral", ttl: "5m" },
       });
     }
-    let response = await callClaudeWithRetry({
-      model: "claude-sonnet-5",
+    // Параметр thinking — только для Sonnet 5. Haiku 4.5 его не поддерживает
+    // (по докам это Sonnet/Opus-only feature); если передать — Anthropic 400.
+    const mainParams: Anthropic.MessageCreateParamsNonStreaming = {
+      model: mainModel.model,
       max_tokens: 1024,
-      thinking: { type: "disabled" },
       system: systemBlocks,
       messages,
       tools,
-    });
-    logClaudeUsage(`${channel}/main`, response.usage, { biz: businessId, client: clientId });
+    };
+    if (mainModel.model === "claude-sonnet-5") {
+      mainParams.thinking = { type: "disabled" };
+    }
+    let response = await callClaudeWithRetry(mainParams);
+    logClaudeUsage(`${channel}/main/${mainModel.complexity}`, response.usage, { biz: businessId, client: clientId, model: mainModel.model });
 
     // Tool loop — process tool_use responses (max 5 iterations)
     let iterations = 0;
