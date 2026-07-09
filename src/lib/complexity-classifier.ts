@@ -100,12 +100,19 @@ export async function classifyMessageComplexity(
 
 /**
  * Читает AI_HYBRID_BUSINESS_IDS из env и говорит, включён ли hybrid routing
- * для конкретного бизнеса. Если env не задан — hybrid off глобально.
+ * для конкретного бизнеса.
+ *
+ * Значения переменной:
+ *   не задано              → hybrid OFF глобально (safe default)
+ *   "*"                    → hybrid ON для ВСЕХ бизнесов
+ *   "id1,id2,id3"          → hybrid ON только для перечисленных
  */
 export function isHybridEnabledForBusiness(businessId: string): boolean {
   const ids = process.env.AI_HYBRID_BUSINESS_IDS;
   if (!ids) return false;
-  const list = ids.split(",").map((s) => s.trim()).filter(Boolean);
+  const trimmed = ids.trim();
+  if (trimmed === "*") return true;
+  const list = trimmed.split(",").map((s) => s.trim()).filter(Boolean);
   return list.includes(businessId);
 }
 
