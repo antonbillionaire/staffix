@@ -820,15 +820,15 @@ export default function KnowledgeBasePage() {
               Описание файла (для следующей загрузки)
             </label>
             <p className={`text-xs ${textSecondary} mb-2`}>
-              Одна фраза о том, что это за файл и когда пригодится боту.
+              Одна фраза о том, что это за файл — AI использует её, чтобы быстрее определять, когда отвечать клиентам из этого документа.
               Например: «Программы туров на лето 2026 — цены и даты вылета».
-              Если оставить пустым, описание сгенерирует AI.
+              Если оставить пустым, описание сгенерирует AI сам.
             </p>
             <input
               type="text"
               value={pendingUploadDescription}
               onChange={(e) => setPendingUploadDescription(e.target.value)}
-              placeholder="Опционально — но с описанием бот экономит токены"
+              placeholder="Например: правила отмены и возврата"
               maxLength={500}
               className={`w-full px-3 py-2 ${inputBg} border ${inputBorder} rounded-lg ${textPrimary} text-sm focus:outline-none focus:ring-2 focus:ring-purple-500`}
             />
@@ -894,7 +894,7 @@ export default function KnowledgeBasePage() {
                                   </p>
                                 ) : (
                                   <p className="text-xs text-orange-400/80 italic">
-                                    Без описания файл грузится в каждый ответ (дорого). С описанием — только когда клиент спрашивает по теме.
+                                    Добавьте описание — так AI сможет быстро определять, что отвечать вашим клиентам.
                                   </p>
                                 )}
                                 <div className="flex items-center gap-3 mt-1">
