@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Staffix
 
-## Getting Started
+AI-сотрудник для малого и среднего бизнеса. Берёт на себя рутину фронт-офиса: отвечает клиентам в Telegram / WhatsApp / Instagram / Facebook, ведёт запись, работает с каталогом товаров, обновляет CRM, эскалирует сложные диалоги владельцу.
 
-First, run the development server:
+Официальный сайт: [staffix.io](https://staffix.io)
+Юр. лицо: K-Bridge Co., Ltd. (South Korea)
+Целевой рынок: СНГ (Казахстан, Узбекистан, Россия)
+
+## Что делает
+
+- **AI-бот на 4 канала** — общий движок для TG / WA / IG / FB, включая Telegram Business API (личные чаты владельца).
+- **Два режима работы**: *Service mode* (услуги, записи, календарь) и *Sales mode* (товары, заказы, доставка).
+- **AI Memory** — бот помнит клиента, его предпочтения, историю визитов и стиль общения.
+- **Автоматизации** — напоминания за 24ч и 2ч до записи, запрос отзыва, реактивация «спящих» клиентов.
+- **CRM** — клиенты, задачи, сделки, лиды, интеграции (webhook / Bitrix24 / amoCRM / Google Sheets).
+- **Партнёрская программа** — реферальные ссылки, 20% комиссия, автоматические выплаты.
+- **Sales-бот Staffix** («Виктор») — собственный AI-менеджер продаж для лидов на сам Staffix.
+
+## Стек
+
+- **Framework**: Next.js 16 (App Router) + React 19 + TypeScript
+- **Styling**: Tailwind CSS 4
+- **ORM**: Prisma 6 + PostgreSQL (Railway)
+- **Auth**: NextAuth v5 (Credentials + Google OAuth)
+- **AI**: Anthropic Claude (Sonnet 5 + Haiku 4.5, hybrid routing)
+- **Speech-to-text**: Groq Whisper (fallback OpenAI Whisper)
+- **Email**: Resend
+- **Файлы**: Vercel Blob
+- **Мониторинг**: Sentry
+- **Платежи**: PayPro Global
+- **Hosting**: Vercel Pro
+- **Тесты**: Vitest
+
+## Запуск локально
+
+Требования: Node.js 20+, npm, доступ к PostgreSQL (можно к prod-БД в Railway или к локальной).
 
 ```bash
+git clone https://github.com/antonbillionaire/staffix.git
+cd staffix
+npm install
+cp .env.example .env.local
+# заполнить .env.local актуальными значениями (DATABASE_URL, ANTHROPIC_API_KEY, ...)
+npx prisma generate
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Открыть [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Не выполнять локально `prisma db push`** — схема управляется миграциями, накатываемыми в `vercel.json` build-скрипте (`prisma migrate deploy`).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deployment
 
-## Learn More
+- Пуш в `main` → автоматический деплой на Vercel
+- Миграции применяются в build-скрипте: `prisma migrate deploy`
+- Cron jobs описаны в `vercel.json` (см. Vercel Cron)
+- Секреты — только через Vercel Environment Variables
 
-To learn more about Next.js, take a look at the following resources:
+## Тесты
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm test        # Vitest, unit-тесты в src/lib/__tests__
+npx tsc --noEmit -p tsconfig.json  # проверка типов
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Контекст для AI-разработчиков
 
-## Deploy on Vercel
+Обязательные правила, архитектурные решения, продуктовые ограничения и полный контекст проекта — в [`.claude/CLAUDE.md`](.claude/CLAUDE.md). Читать перед любым изменением кода.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Контакты
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Владелец: Антон Мельников — anton.v.melnikov@gmail.com
+Support: support@staffix.io
