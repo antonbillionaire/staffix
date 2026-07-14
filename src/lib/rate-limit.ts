@@ -15,16 +15,26 @@ interface RateLimitResult {
   retryAfterSeconds: number;
 }
 
+type FailMode = "open" | "closed";
+
 /**
  * Проверяет rate limit для ключа (IP-based).
  * @param key       уникальный ключ, напр. "login:1.2.3.4"
  * @param max       максимум попыток
  * @param windowMin размер окна в минутах
+ * @param failMode  поведение при недоступности БД:
+ *   - "open" (по умолчанию, обратная совместимость): разрешить запрос —
+ *     для не-критичных мест (webhooks клиентов, chat widget), где потеря
+ *     rate limit во время лага БД лучше чем блокировка легитимных запросов.
+ *   - "closed": отказать запросу — обязателен для auth-эндпоинтов
+ *     (forgot/reset), где fail-open даёт злоумышленнику окно безлимитного
+ *     подбора кодов/паролей во время инцидента БД.
  */
 export async function rateLimit(
   key: string,
   max: number,
-  windowMin: number
+  windowMin: number,
+  failMode: FailMode = "open"
 ): Promise<RateLimitResult> {
   const now = new Date();
   const resetAt = new Date(now.getTime() + windowMin * 60 * 1000);
@@ -60,8 +70,16 @@ export async function rateLimit(
       remaining: max - existing.attempts - 1,
       retryAfterSeconds: 0,
     };
-  } catch {
-    // Если БД недоступна — разрешаем запрос (fail open)
+  } catch (err) {
+    if (failMode === "closed") {
+      console.error(
+        `[rate-limit] DB failure, failing CLOSED for key=${key}:`,
+        err instanceof Error ? err.message : String(err)
+      );
+      // Отдаём 60 сек retry — чтобы не спамить попытки в момент лага
+      return { allowed: false, remaining: 0, retryAfterSeconds: 60 };
+    }
+    // Fail-open: не-критичные эндпоинты
     return { allowed: true, remaining: 1, retryAfterSeconds: 0 };
   }
 }

@@ -2,17 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { Resend } from "resend";
+import { randomInt } from "crypto";
+import bcrypt from "bcryptjs";
 
 const FROM_EMAIL = process.env.FROM_EMAIL || "Staffix <noreply@staffix.io>";
 
+/**
+ * Генерирует криптостойкий 6-значный код.
+ * Раньше был Math.random() — предсказуемый, детерминированный от времени.
+ * crypto.randomInt берёт энтропию из ядра ОС (unpredictable).
+ */
 function generateCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return String(randomInt(100000, 1000000));
 }
 
 export async function POST(request: NextRequest) {
   try {
     const ip = getClientIp(request);
-    const { allowed, retryAfterSeconds } = await rateLimit(`forgot:${ip}`, 3, 15);
+    // failMode: "closed" — во время лага БД НЕ отключаем защиту от brute-force.
+    // Fail-open здесь позволил бы злоумышленнику подбирать 6-значный код
+    // безлимитно в момент инцидента (10-15 сек хватит на миллион попыток).
+    const { allowed, retryAfterSeconds } = await rateLimit(`forgot:${ip}`, 3, 15, "closed");
     if (!allowed) {
       return NextResponse.json(
         { error: `Слишком много попыток. Попробуйте через ${Math.ceil(retryAfterSeconds / 60)} мин.` },
@@ -33,10 +43,14 @@ export async function POST(request: NextRequest) {
     }
 
     const code = generateCode();
+    // Хешируем код bcrypt'ом перед сохранением. Если дамп БД утечёт —
+    // атакующий увидит хеш, а не сам код. Bruteforce хеша bcrypt(cost=10)
+    // на 6-значном числе занимает миллионы CPU-часов.
+    const codeHash = await bcrypt.hash(code, 10);
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        resetPasswordToken: code,
+        resetPasswordToken: codeHash,
         resetPasswordExpires: new Date(Date.now() + 15 * 60 * 1000),
       },
     });

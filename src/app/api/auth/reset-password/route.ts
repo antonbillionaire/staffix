@@ -6,9 +6,14 @@ import { rateLimit, getClientIp } from "@/lib/rate-limit";
 export async function POST(request: NextRequest) {
   try {
     const ip = getClientIp(request);
-    const { allowed } = await rateLimit(`reset:${ip}`, 5, 15);
+    // failMode: "closed" — во время лага БД НЕ разрешаем безлимитный подбор
+    // 6-значного кода восстановления. Fail-open здесь = полный компромисс аккаунта.
+    const { allowed, retryAfterSeconds } = await rateLimit(`reset:${ip}`, 5, 15, "closed");
     if (!allowed) {
-      return NextResponse.json({ error: "Слишком много попыток" }, { status: 429 });
+      return NextResponse.json(
+        { error: `Слишком много попыток. Попробуйте через ${Math.ceil(retryAfterSeconds / 60)} мин.` },
+        { status: 429 }
+      );
     }
 
     const { email, code, newPassword } = await request.json();
@@ -23,14 +28,25 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
 
+    // Единый generic-error для всех failure modes (пользователь / токен / срок /
+    // неверный код). Атакующему не даём различить причину отказа.
+    const genericError = { error: "Неверный или просроченный код" };
+
     if (
       !user ||
       !user.resetPasswordToken ||
       !user.resetPasswordExpires ||
-      user.resetPasswordToken !== code ||
       user.resetPasswordExpires < new Date()
     ) {
-      return NextResponse.json({ error: "Неверный или просроченный код" }, { status: 400 });
+      return NextResponse.json(genericError, { status: 400 });
+    }
+
+    // bcrypt.compare — константное время, устраняет timing-side channel атаку.
+    // Раньше было user.resetPasswordToken !== code — обычное сравнение строк
+    // с разным временем ответа в зависимости от где разошлись символы.
+    const codeValid = await bcrypt.compare(String(code), user.resetPasswordToken);
+    if (!codeValid) {
+      return NextResponse.json(genericError, { status: 400 });
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
