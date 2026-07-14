@@ -21,6 +21,7 @@ import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { markWebhookProcessed } from "@/lib/webhook-dedup";
 import { checkSubscriptionLimit, incrementMessageCount } from "@/lib/subscription-check";
 import { stripMarkdown } from "@/lib/strip-markdown";
+import { classifyEmojiMessage } from "@/lib/emoji-classifier";
 
 const META_API_BASE = "https://graph.facebook.com/v21.0";
 
@@ -148,6 +149,69 @@ export async function POST(request: Request) {
       if (!(await markWebhookProcessed(messageId))) continue;
 
       console.log(`[IG Webhook] DM from ${sender.id} to account ${accountId}: "${messageText.slice(0, 50)}"`);
+
+      // Emoji-only shortcut (июль 2026): не гоняем AI на "👍", "❤️", "🙏" и т.п.
+      // - positive → шаблон "Спасибо!" (без AI, ~$0 вместо ~$0.008/turn)
+      // - negative → шаблон "Спасибо. Передам менеджеру." + эскалация в дашборд/TG
+      // - neutral (незнакомые эмодзи) → тихо пропускаем, не отвечаем
+      // - not_emoji_only → обычный AI-путь
+      const emojiClass = classifyEmojiMessage(messageText);
+      if (emojiClass !== "not_emoji_only") {
+        const biz = await prisma.business.findFirst({
+          where: {
+            OR: [
+              { igBusinessAccountId: accountId, igActive: true },
+              { fbPageId: accountId, igActive: true },
+            ],
+          },
+          select: { id: true, fbPageAccessToken: true, fbPageId: true },
+        });
+        if (!biz?.fbPageAccessToken || !biz.fbPageId) {
+          console.log(`[IG Webhook] emoji-only ${emojiClass} → biz not found or no token`);
+          continue;
+        }
+        const pgToken = await getPageAccessToken(biz.fbPageId, biz.fbPageAccessToken).catch(
+          () => biz.fbPageAccessToken!
+        );
+
+        if (emojiClass === "positive") {
+          await sendIGMessage(biz.fbPageId, pgToken, sender.id, "Спасибо!").catch((err) =>
+            console.error("[IG Webhook] emoji-positive send failed:", err)
+          );
+          console.log(`[IG Webhook] emoji-only positive → "Спасибо!" biz=${biz.id}`);
+        } else if (emojiClass === "negative") {
+          await sendIGMessage(
+            biz.fbPageId,
+            pgToken,
+            sender.id,
+            "Спасибо. Передам менеджеру."
+          ).catch((err) => console.error("[IG Webhook] emoji-negative send failed:", err));
+          // Эскалация: notification (в дашборд + TG владельца) + задача в /tasks
+          try {
+            const { notifyManagerByTelegram } = await import("@/lib/sales-tools");
+            await notifyManagerByTelegram(
+              biz.id,
+              BigInt(0),
+              `Негативная эмодзи-реакция клиента в Instagram: "${messageText.slice(0, 100)}"`,
+              undefined,
+              "urgent"
+            );
+            const { createEscalationTask } = await import("@/lib/tasks");
+            await createEscalationTask({
+              businessId: biz.id,
+              reason: `Негативная эмодзи-реакция клиента: "${messageText.slice(0, 100)}"`,
+              urgency: "urgent",
+            });
+            console.log(`[IG Webhook] emoji-only negative → template + escalated biz=${biz.id}`);
+          } catch (e) {
+            console.error("[IG Webhook] emoji-negative escalation failed:", e);
+          }
+        } else {
+          // neutral — тихо, не отвечаем и AI не зовём
+          console.log(`[IG Webhook] emoji-only neutral → ignored biz=${biz.id}`);
+        }
+        continue;
+      }
 
       try {
         await processIGMessage(accountId, sender.id, messageText);
