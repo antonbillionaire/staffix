@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
 import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
+import { safeExternalFetch, SafeFetchError } from "@/lib/safe-fetch";
 
 async function getUserBusiness(): Promise<string | null> {
   const session = await auth();
@@ -77,15 +78,9 @@ export async function POST(request: NextRequest) {
     // URL import: fetch website page, extract products with AI
     if (importUrl && !csvText) {
       try {
-        const url = new URL(importUrl);
-        if (!["http:", "https:"].includes(url.protocol)) {
-          return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
-        }
-
-        const pageRes = await fetch(importUrl, {
-          headers: { "User-Agent": "Mozilla/5.0 (compatible; Staffix/1.0)" },
-          signal: AbortSignal.timeout(15000),
-        });
+        // safeExternalFetch: SSRF-защита — резолвит DNS, блокирует приватные IP,
+        // проверяет каждый редирект отдельно. Реализация в src/lib/safe-fetch.ts.
+        const pageRes = await safeExternalFetch(importUrl);
         if (!pageRes.ok) {
           return NextResponse.json({ error: `Failed to fetch page: ${pageRes.status}` }, { status: 400 });
         }
@@ -123,9 +118,27 @@ export async function POST(request: NextRequest) {
         console.log(`[URL Import] Extracted ${csvText.split("\n").length - 1} products from ${importUrl}`);
       } catch (urlErr) {
         console.error("[URL Import] Error:", urlErr);
+        // SafeFetchError с понятным сообщением для владельца бизнеса
+        if (urlErr instanceof SafeFetchError) {
+          const userMessage =
+            urlErr.code === "blocked_host"
+              ? "Этот адрес недоступен из внешней сети. Загрузите каталог через CSV/Excel/PDF."
+              : urlErr.code === "blocked_protocol"
+              ? "Разрешены только http/https ссылки."
+              : urlErr.code === "dns_failed"
+              ? "Сайт не найден. Проверьте адрес."
+              : urlErr.code === "too_large"
+              ? "Страница слишком большая. Попробуйте конкретный раздел каталога."
+              : urlErr.code === "redirect_loop"
+              ? "Слишком много переадресаций на сайте."
+              : "Не удалось загрузить страницу. Попробуйте CSV/Excel.";
+          return NextResponse.json({ error: userMessage }, { status: 400 });
+        }
         const msg = urlErr instanceof Error ? urlErr.message : "Unknown error";
         return NextResponse.json({
-          error: msg.includes("timeout") ? "Website took too long to respond. Try a different URL." : "Failed to import from URL. Try CSV/Excel.",
+          error: msg.includes("timeout") || (msg.includes("aborted"))
+            ? "Website took too long to respond. Try a different URL."
+            : "Failed to import from URL. Try CSV/Excel.",
         }, { status: 500 });
       }
     }
