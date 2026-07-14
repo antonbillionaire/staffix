@@ -97,10 +97,13 @@ export default function WhatsAppChannelPage() {
             setBusinessId(data.business.id || "");
             setConnected(!!data.business.waActive && !!data.business.waPhoneNumberId);
             setPhoneNumber(data.business.waPhoneNumberId || "");
+            // Секретные поля (accessToken, verifyToken) — не заполняем из GET
+            // (сервер шлёт "***", а не реальные значения). Пустое поле
+            // означает "не менять" — backend guard игнорирует пустое и "***".
             setManualSettings({
               phoneNumberId: data.business.waPhoneNumberId || "",
               accessToken: "",
-              verifyToken: data.business.waVerifyToken || "",
+              verifyToken: "",
               active: data.business.waActive || false,
             });
           }
@@ -557,10 +560,13 @@ export default function WhatsAppChannelPage() {
                     type="password"
                     value={manualSettings.accessToken}
                     onChange={(e) => setManualSettings({ ...manualSettings, accessToken: e.target.value })}
-                    placeholder="EAAxxxxxxxx..."
+                    placeholder={connected ? "Оставьте пустым если не меняете" : "EAAxxxxxxxx..."}
                     className={`w-full ${isDark ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200 text-gray-900"} border rounded-xl px-4 py-3 placeholder-gray-500 text-sm focus:outline-none focus:border-green-500/50`}
                   />
-                  <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"} mt-1`}>{t("channels.wa.accessTokenNote")}</p>
+                  <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"} mt-1`}>
+                    {t("channels.wa.accessTokenNote")}
+                    {connected && " В целях безопасности текущий токен не показываем. Оставьте поле пустым, чтобы сохранить его как есть."}
+                  </p>
                 </div>
                 <div>
                   <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1.5`}>{t("channels.wa.verifyTokenLabel")}</label>
@@ -568,9 +574,14 @@ export default function WhatsAppChannelPage() {
                     type="text"
                     value={manualSettings.verifyToken}
                     onChange={(e) => setManualSettings({ ...manualSettings, verifyToken: e.target.value })}
-                    placeholder="my_secret_token_2025"
+                    placeholder={connected ? "Оставьте пустым если не меняете" : "my_secret_token_2025"}
                     className={`w-full ${isDark ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200 text-gray-900"} border rounded-xl px-4 py-3 placeholder-gray-500 text-sm focus:outline-none focus:border-green-500/50`}
                   />
+                  {connected && (
+                    <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"} mt-1`}>
+                      В целях безопасности текущий verify token не показываем. Настроенный ранее токен работает — оставьте поле пустым.
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-3">

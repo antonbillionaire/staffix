@@ -151,8 +151,11 @@ export default function TelegramChannelPage() {
         if (res.ok) {
           const data = await res.json();
           if (data.business) {
-            if (data.business.botToken) {
-              setToken(data.business.botToken);
+            // hasBotToken — новый флаг из /api/business GET (июль 2026, security fix).
+            // Раньше читали data.business.botToken напрямую — теперь сервер шлёт "***".
+            // Никогда не заполняем state токеном из GET (в state держим только то, что
+            // пользователь только что ввёл руками).
+            if (data.business.hasBotToken || data.business.botToken) {
               setBotInfo({
                 connected: data.business.botActive || false,
                 username: data.business.botUsername || "",
@@ -409,6 +412,9 @@ export default function TelegramChannelPage() {
                 placeholder="123456789:ABCdefGHIjklMNOpqrSTUvwxYZ"
                 className={`w-full px-4 py-3 ${isDark ? "bg-white/5 border-white/10 text-white" : "bg-gray-50 border-gray-200 text-gray-900"} border rounded-xl placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm`}
               />
+              <p className={`mt-2 text-xs ${textSecondary}`}>
+                В целях безопасности мы не показываем текущий токен. Если забыли его — откройте <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">@BotFather</a>, выберите вашего бота и нажмите <span className="font-mono">/token</span>.
+              </p>
             </div>
 
             <button
