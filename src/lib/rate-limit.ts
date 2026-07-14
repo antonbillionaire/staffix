@@ -1,6 +1,20 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest } from "next/server";
 
+/**
+ * Извлекает клиентский IP из HTTP-заголовков.
+ *
+ * ⚠️  Работает БЕЗОПАСНО только на Vercel: Vercel ingress перезаписывает
+ * `x-forwarded-for` / `x-real-ip` реальным IP клиента, игнорируя любые
+ * клиентские значения. На других платформах (AWS Amplify, Cloudflare
+ * Workers, self-hosted Node) эти заголовки могут содержать подделанные
+ * данные — rate limit сломается (attacker подставит фейковый IP для
+ * обхода лимитов).
+ *
+ * При смене хостинга обязательно проверить платформенный контракт по
+ * `x-forwarded-for` и при необходимости использовать trusted proxy
+ * headers конкретной платформы или встроенный ingress-parsing.
+ */
 export function getClientIp(request: NextRequest | Request): string {
   const forwarded =
     request.headers.get("x-forwarded-for") ||

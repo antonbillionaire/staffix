@@ -44,6 +44,14 @@
 - Каждый непубличный API route обязан проверять authentication на сервере.
 - Каждый API route, работающий с данными бизнеса, обязан проверять authorization и tenant ownership на сервере.
 - Public routes допустимы только для явно определённых webhook, auth, cron или public-flow сценариев и обязаны иметь соответствующую защиту.
+- Auth-эндпоинты (login, forgot-password, reset-password, register) обязаны использовать `rateLimit(..., "closed")` — fail-open во время лага БД даёт злоумышленнику окно безлимитного подбора. Не-auth-эндпоинты могут остаться на default fail-open.
+- Пользовательские URL (импорт по ссылке, webhook URL и т.п.) обязаны загружаться через `safeExternalFetch()` из `src/lib/safe-fetch.ts`, а не через `fetch()` напрямую — это защита от SSRF (private IPs, cloud metadata endpoints, DNS rebinding, редиректы на internal).
+
+### Secrets in API responses
+- Секреты каналов (`botToken`, `webhookSecret`, `waAccessToken`, `waVerifyToken`, `fbPageAccessToken`, `fbVerifyToken`, `metaUserAccessToken`, `metaAppSecret`, любые API-токены сторонних CRM/платёжек) НИКОГДА не возвращаются в response API — ни в GET, ни в PUT/POST.
+- Вместо значения возвращать `"***"` + булевый флаг `hasXxxToken: boolean` для UI-логики «подключено / не подключено».
+- Write-эндпоинты (PUT/POST) обязаны игнорировать `"***"` во входящих значениях (это наш placeholder — не запись). Пустая строка → `null` (владелец очистил поле).
+- Хеш-подписи (X-Hub-Signature, computed HMAC) — не секреты, можно логировать для диагностики.
 
 ### Webhooks, cron, retry and idempotency
 - До обработки webhook проверять подпись или секрет, если провайдер поддерживает такую проверку.
