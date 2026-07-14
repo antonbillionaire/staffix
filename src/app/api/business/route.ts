@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { randomBytes } from "crypto";
 import { isAdmin } from "@/lib/admin";
+import { encrypt } from "@/lib/crypto";
 
 // GET - получить данные бизнеса текущего пользователя
 export async function GET() {
@@ -284,12 +285,13 @@ export async function PUT(request: Request) {
         );
       }
 
-      // Сохраняем данные бота и webhook secret для верификации
-      updateData.botToken = botToken;
+      // Сохраняем данные бота и webhook secret для верификации.
+      // Токены шифруются envelope encryption — см. src/lib/crypto.ts
+      updateData.botToken = encrypt(botToken);
       updateData.botUsername = validation.username;
       updateData.botActive = true;
       if (webhookResult.webhookSecret) {
-        updateData.webhookSecret = webhookResult.webhookSecret;
+        updateData.webhookSecret = encrypt(webhookResult.webhookSecret);
       }
     }
 

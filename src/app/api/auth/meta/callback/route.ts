@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { encrypt } from "@/lib/crypto";
 import {
   exchangeCodeForLongLivedToken,
   getMetaUserId,
@@ -91,11 +92,12 @@ export async function GET(request: NextRequest) {
     // Multiple pages → redirect to selection UI
     if (pages.length > 1) {
       // Save user-level token only (fbActive stays false → business NOT "connected")
+      // Токен шифруется — см. src/lib/crypto.ts
       await prisma.business.update({
         where: { id: businessId },
         data: {
           metaUserId,
-          metaUserAccessToken: accessToken,
+          metaUserAccessToken: encrypt(accessToken),
           metaTokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
         },
       });
@@ -115,15 +117,15 @@ export async function GET(request: NextRequest) {
     await subscribePageWebhooks(page.id, page.access_token, "messages,messaging_postbacks,messaging_handovers,feed");
     await subscribePageWebhooks(page.id, page.access_token, "leadgen");
 
-    // 4. Save to database
+    // 4. Save to database. Токены каналов шифруются envelope encryption.
     const updateData: Record<string, unknown> = {
       // Meta OAuth
       metaUserId,
-      metaUserAccessToken: accessToken,
+      metaUserAccessToken: encrypt(accessToken),
       metaTokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
       // Facebook Messenger
       fbPageId: page.id,
-      fbPageAccessToken: page.access_token,
+      fbPageAccessToken: encrypt(page.access_token),
       fbActive: true,
     };
 

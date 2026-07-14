@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { encrypt } from "@/lib/crypto";
 import {
   subscribeWABA,
   registerWAPhoneNumber,
@@ -137,14 +138,14 @@ export async function POST(request: NextRequest) {
       const registered = await registerWAPhoneNumber(phoneNumberId, accessToken);
       console.log("[WA Signup] Registered phone:", phoneNumberId, "result:", registered);
 
-      // Save to Business
+      // Save to Business (токены шифруем — см. src/lib/crypto.ts)
       const tokenExpiry = new Date(Date.now() + 5184000 * 1000); // ~60 days
       await prisma.business.update({
         where: { id: businessId },
         data: {
           waPhoneNumberId: phoneNumberId,
-          waAccessToken: accessToken,
-          waVerifyToken: `staffix_wa_${businessId.slice(0, 8)}`,
+          waAccessToken: encrypt(accessToken),
+          waVerifyToken: encrypt(`staffix_wa_${businessId.slice(0, 8)}`),
           waActive: true,
         },
       });
@@ -232,8 +233,8 @@ export async function POST(request: NextRequest) {
           where: { id: businessId },
           data: {
             waPhoneNumberId: phone.id,
-            waAccessToken: accessToken,
-            waVerifyToken: `staffix_wa_${businessId.slice(0, 8)}`,
+            waAccessToken: encrypt(accessToken),
+            waVerifyToken: encrypt(`staffix_wa_${businessId.slice(0, 8)}`),
             waActive: true,
           },
         });
@@ -264,10 +265,10 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Multiple phones — return list
+      // Multiple phones — return list (токен шифруется даже при промежуточном сохранении)
       await prisma.business.update({
         where: { id: businessId },
-        data: { waAccessToken: accessToken },
+        data: { waAccessToken: encrypt(accessToken) },
       });
 
       const wabaName = await getWABAName(discoveredWabaId, accessToken);

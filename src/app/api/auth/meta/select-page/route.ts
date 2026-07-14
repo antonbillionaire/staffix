@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { getUserPages, subscribePageWebhooks } from "@/lib/meta-oauth";
+import { encrypt, decrypt } from "@/lib/crypto";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -38,8 +39,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Re-fetch pages server-side (token never left the server)
-    const pages = await getUserPages(business.metaUserAccessToken);
+    // Re-fetch pages server-side (token never left the server).
+    // decrypt() — envelope encryption; passthrough для plaintext (backwards compat).
+    const decryptedToken = decrypt(business.metaUserAccessToken);
+    if (!decryptedToken) {
+      return NextResponse.json({ error: "Meta token empty" }, { status: 404 });
+    }
+    const pages = await getUserPages(decryptedToken);
     const page = pages.find((p) => p.id === pageId);
 
     if (!page) {
@@ -62,10 +68,10 @@ export async function POST(request: NextRequest) {
     );
     await subscribePageWebhooks(page.id, page.access_token, "leadgen");
 
-    // Save to Business table
+    // Save to Business table. Token шифруется envelope encryption.
     const updateData: Record<string, unknown> = {
       fbPageId: page.id,
-      fbPageAccessToken: page.access_token,
+      fbPageAccessToken: encrypt(page.access_token),
       fbActive: true,
     };
 

@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { refreshLongLivedToken, getUserPages } from "@/lib/meta-oauth";
 import { cleanupWebhookDedup } from "@/lib/webhook-dedup";
+import { encrypt, decrypt } from "@/lib/crypto";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -40,16 +41,27 @@ export async function GET(request: Request) {
   for (const biz of businesses) {
     if (!biz.metaUserAccessToken) continue;
 
-    const result = await refreshLongLivedToken(biz.metaUserAccessToken);
+    // decrypt() — envelope encryption; passthrough для plaintext (backwards compat)
+    let currentToken: string | null;
+    try {
+      currentToken = decrypt(biz.metaUserAccessToken);
+    } catch (e) {
+      console.error(`Meta token decrypt failed for business ${biz.id}:`, e);
+      failed++;
+      continue;
+    }
+    if (!currentToken) continue;
+
+    const result = await refreshLongLivedToken(currentToken);
     if (!result) {
       failed++;
       console.error(`Meta token refresh failed for business ${biz.id}`);
       continue;
     }
 
-    // New user token → get fresh page token
+    // New user token → get fresh page token. Токены шифруются перед сохранением.
     const updateData: Record<string, unknown> = {
-      metaUserAccessToken: result.accessToken,
+      metaUserAccessToken: encrypt(result.accessToken),
       metaTokenExpiresAt: new Date(Date.now() + result.expiresIn * 1000),
     };
 
@@ -59,7 +71,7 @@ export async function GET(request: Request) {
         const pages = await getUserPages(result.accessToken);
         const page = pages.find((p) => p.id === biz.fbPageId);
         if (page) {
-          updateData.fbPageAccessToken = page.access_token;
+          updateData.fbPageAccessToken = encrypt(page.access_token);
           // Also refresh Instagram data if IG account is linked
           if (page.instagram_business_account) {
             updateData.igBusinessAccountId = page.instagram_business_account.id;
