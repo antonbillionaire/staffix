@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { decrypt } from "@/lib/crypto";
 
 const META_API = "https://graph.facebook.com/v21.0";
 
@@ -24,7 +25,10 @@ async function getBusinessForUser(): Promise<{
   });
 
   if (!business?.fbPageAccessToken) return null;
-  return { id: business.id, fbPageAccessToken: business.fbPageAccessToken, igBusinessAccountId: business.igBusinessAccountId };
+  // decrypt() — envelope encryption; passthrough для plaintext.
+  // Все 4 callers ниже используют business.fbPageAccessToken напрямую в fetch — здесь decrypt один раз.
+  const decryptedToken = decrypt(business.fbPageAccessToken) || business.fbPageAccessToken;
+  return { id: business.id, fbPageAccessToken: decryptedToken, igBusinessAccountId: business.igBusinessAccountId };
 }
 
 // GET /api/instagram/comments — list recent comments on business posts

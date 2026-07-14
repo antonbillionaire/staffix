@@ -4,6 +4,7 @@
  */
 
 import { stripMarkdown } from "@/lib/strip-markdown";
+import { decrypt } from "@/lib/crypto";
 
 const WA_API_VERSION = "v21.0";
 const WA_API_BASE = `https://graph.facebook.com/${WA_API_VERSION}`;
@@ -18,6 +19,9 @@ export async function sendWAMessage(
   text: string
 ): Promise<boolean> {
   try {
+    // decrypt() — envelope encryption; passthrough для plaintext (backwards compat).
+    // Callsite'ы передают Business.waAccessToken как есть, без decrypt'а.
+    const token = decrypt(accessToken) || accessToken;
     // Strip Markdown — WhatsApp интерпретирует одиночные * как жирный,
     // а звёздочек у Claude в ответах хватает. Клиенту лучше plain-text.
     const cleanText = stripMarkdown(text);
@@ -29,7 +33,7 @@ export async function sendWAMessage(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           messaging_product: "whatsapp",

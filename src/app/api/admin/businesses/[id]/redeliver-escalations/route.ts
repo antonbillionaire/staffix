@@ -44,6 +44,12 @@ export async function POST(
     if (!business.botToken) {
       return NextResponse.json({ error: "У бизнеса не подключён Telegram-бот" }, { status: 400 });
     }
+    // decrypt() — envelope encryption; passthrough для plaintext
+    if (business.botToken) {
+      const { decrypt } = await import("@/lib/crypto");
+      business.botToken = decrypt(business.botToken) || business.botToken;
+    }
+
     if (!business.ownerTelegramChatId) {
       return NextResponse.json(
         {

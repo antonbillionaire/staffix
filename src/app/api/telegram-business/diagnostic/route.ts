@@ -74,9 +74,12 @@ export async function GET() {
   // 1) Спрашиваем у Telegram текущий webhook state
   let webhookInfo: TelegramWebhookInfo | null = null;
   if (business.botToken) {
+    // decrypt() — envelope encryption; passthrough для plaintext
+    const { decrypt } = await import("@/lib/crypto");
+    const token = decrypt(business.botToken) || business.botToken;
     try {
       const r = await fetch(
-        `https://api.telegram.org/bot${business.botToken}/getWebhookInfo`
+        `https://api.telegram.org/bot${token}/getWebhookInfo`
       );
       const data = await r.json();
       if (data.ok) {

@@ -156,8 +156,11 @@ export async function GET(
     const tgProbe: TgProbe = { botMe: { ok: false }, ownerChat: null };
 
     if (business.botToken) {
+      // decrypt() — envelope encryption; passthrough для plaintext
+      const { decrypt } = await import("@/lib/crypto");
+      const token = decrypt(business.botToken) || business.botToken;
       try {
-        const meRes = await fetch(`https://api.telegram.org/bot${business.botToken}/getMe`);
+        const meRes = await fetch(`https://api.telegram.org/bot${token}/getMe`);
         const meBody = await meRes.json().catch(() => ({}));
         tgProbe.botMe = meRes.ok
           ? { ok: true, result: meBody.result }
@@ -169,7 +172,7 @@ export async function GET(
       if (business.ownerTelegramChatId) {
         try {
           const chatRes = await fetch(
-            `https://api.telegram.org/bot${business.botToken}/getChat?chat_id=${business.ownerTelegramChatId}`
+            `https://api.telegram.org/bot${token}/getChat?chat_id=${business.ownerTelegramChatId}`
           );
           const chatBody = await chatRes.json().catch(() => ({}));
           tgProbe.ownerChat = chatRes.ok

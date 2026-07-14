@@ -107,8 +107,11 @@ export async function POST(
       `Если вы видите это — настройка корректна. Эскалации клиентов и срочные запросы будут приходить сюда же.\n\n` +
       `(отправлено админом Staffix через тест-кнопку)`;
 
+    // decrypt() — envelope encryption; passthrough для plaintext
+    const { decrypt } = await import("@/lib/crypto");
+    const token = decrypt(business.botToken) || business.botToken;
     const tgRes = await fetch(
-      `https://api.telegram.org/bot${business.botToken}/sendMessage`,
+      `https://api.telegram.org/bot${token}/sendMessage`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

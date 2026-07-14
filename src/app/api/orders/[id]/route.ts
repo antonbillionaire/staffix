@@ -103,6 +103,11 @@ async function notifyClientOrderStatus(
   });
   if (!business) return;
 
+  // decrypt() — envelope encryption; passthrough для plaintext.
+  // sendWAMessage сам decrypts свой token, но inline TG-fetch — нет.
+  const { decrypt } = await import("@/lib/crypto");
+  if (business.botToken) business.botToken = decrypt(business.botToken) || business.botToken;
+
   const message =
     `${statusText}\n\n` +
     `🛒 Заказ #${updatedOrder.orderNumber} | ${updatedOrder.totalPrice.toLocaleString("ru-RU")}\n` +
@@ -159,5 +164,8 @@ async function getPageAccessToken(businessId: string): Promise<string | null> {
     where: { id: businessId },
     select: { fbPageAccessToken: true },
   });
-  return business?.fbPageAccessToken || null;
+  if (!business?.fbPageAccessToken) return null;
+  // decrypt() — envelope encryption; passthrough для plaintext
+  const { decrypt } = await import("@/lib/crypto");
+  return decrypt(business.fbPageAccessToken) || business.fbPageAccessToken;
 }

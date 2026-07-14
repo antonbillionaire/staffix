@@ -1196,6 +1196,14 @@ async function notifyNewOrder(
       return;
     }
 
+    // decrypt() — envelope encryption; passthrough для plaintext (backwards compat).
+    // Расшифровываем один раз при загрузке — inline fetch'и ниже используют .botToken как есть.
+    const { decrypt } = await import("./crypto");
+    business.botToken = decrypt(business.botToken) || business.botToken;
+    if (business.waAccessToken) {
+      business.waAccessToken = decrypt(business.waAccessToken) || business.waAccessToken;
+    }
+
     const itemsList = items
       .map((i) => `• ${i.name} × ${i.quantity} = ${(i.price * i.quantity).toLocaleString("ru-RU")}`)
       .join("\n");
@@ -1351,6 +1359,12 @@ export async function notifyManagerByTelegram(
     if (!business) {
       console.error(`${tag} FAIL: business not found`);
       return { success: false, error: "Бизнес не найден" };
+    }
+
+    // decrypt() — envelope encryption; passthrough для plaintext
+    if (business.botToken) {
+      const { decrypt } = await import("./crypto");
+      business.botToken = decrypt(business.botToken) || business.botToken;
     }
 
     const isUrgent = urgency === "urgent";

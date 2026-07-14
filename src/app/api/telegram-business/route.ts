@@ -36,9 +36,14 @@ async function reregisterWebhook(businessId: string): Promise<boolean> {
   });
   if (!business?.botToken || !business?.webhookSecret) return false;
 
+  // decrypt() — envelope encryption; passthrough для plaintext
+  const { decrypt } = await import("@/lib/crypto");
+  const token = decrypt(business.botToken) || business.botToken;
+  const secret = decrypt(business.webhookSecret) || business.webhookSecret;
+
   const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://www.staffix.io"}/api/telegram/webhook?businessId=${businessId}`;
   const response = await fetch(
-    `https://api.telegram.org/bot${business.botToken}/setWebhook`,
+    `https://api.telegram.org/bot${token}/setWebhook`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -52,7 +57,7 @@ async function reregisterWebhook(businessId: string): Promise<boolean> {
           "edited_business_message",
           "deleted_business_messages",
         ],
-        secret_token: business.webhookSecret,
+        secret_token: secret,
       }),
     }
   );

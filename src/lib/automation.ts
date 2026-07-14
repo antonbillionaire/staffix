@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { sendSubscriptionReminder } from "@/lib/email";
+import { decrypt } from "@/lib/crypto";
 
 // ===========================================
 // TIMEZONE HELPERS
@@ -118,6 +119,8 @@ export async function sendAutomationMessage(
   buttons?: { text: string; callback_data: string }[][]
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    // decrypt() — envelope encryption; passthrough для plaintext
+    const token = decrypt(botToken) || botToken;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -134,7 +137,7 @@ export async function sendAutomationMessage(
     }
 
     const response = await fetch(
-      `https://api.telegram.org/bot${botToken}/sendMessage`,
+      `https://api.telegram.org/bot${token}/sendMessage`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

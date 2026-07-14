@@ -55,15 +55,20 @@ export async function GET(request: Request) {
     return new Response("Bad Request", { status: 400 });
   }
 
-  // Scenario B: per-business verification
+  // Scenario B: per-business verification.
+  // decrypt() — envelope encryption; passthrough для plaintext
   if (businessId) {
     try {
       const business = await prisma.business.findUnique({
         where: { id: businessId },
         select: { fbVerifyToken: true },
       });
-      if (business?.fbVerifyToken && business.fbVerifyToken === token) {
-        return new Response(challenge, { status: 200 });
+      if (business?.fbVerifyToken) {
+        const { decrypt } = await import("@/lib/crypto");
+        const expected = decrypt(business.fbVerifyToken) || business.fbVerifyToken;
+        if (expected === token) {
+          return new Response(challenge, { status: 200 });
+        }
       }
     } catch {}
     return new Response("Forbidden", { status: 403 });

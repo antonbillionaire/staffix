@@ -77,6 +77,9 @@ export async function POST(request: NextRequest) {
     } | null = null;
     let botToken: string | null = null;
 
+    // decrypt() — envelope encryption; passthrough для plaintext (backwards compat).
+    // Расшифровываем ОДИН РАЗ при загрузке — все downstream reads работают с plaintext.
+    const { decrypt } = await import("@/lib/crypto");
     if (businessId) {
       const foundBusiness = await prisma.business.findUnique({
         where: { id: businessId },
@@ -86,11 +89,13 @@ export async function POST(request: NextRequest) {
         business = {
           id: foundBusiness.id,
           name: foundBusiness.name,
-          botToken: foundBusiness.botToken,
-          webhookSecret: foundBusiness.webhookSecret,
+          botToken: decrypt(foundBusiness.botToken) || foundBusiness.botToken,
+          webhookSecret: foundBusiness.webhookSecret
+            ? (decrypt(foundBusiness.webhookSecret) || foundBusiness.webhookSecret)
+            : null,
           ownerTelegramChatId: foundBusiness.ownerTelegramChatId,
         };
-        botToken = foundBusiness.botToken;
+        botToken = business.botToken;
       }
     } else if (legacyToken) {
       const foundBusiness = await findBusinessByBotToken(legacyToken);
@@ -103,11 +108,13 @@ export async function POST(request: NextRequest) {
           business = {
             id: fullBusiness.id,
             name: fullBusiness.name,
-            botToken: fullBusiness.botToken,
-            webhookSecret: fullBusiness.webhookSecret,
+            botToken: decrypt(fullBusiness.botToken) || fullBusiness.botToken,
+            webhookSecret: fullBusiness.webhookSecret
+              ? (decrypt(fullBusiness.webhookSecret) || fullBusiness.webhookSecret)
+              : null,
             ownerTelegramChatId: fullBusiness.ownerTelegramChatId,
           };
-          botToken = fullBusiness.botToken;
+          botToken = business.botToken;
         }
       }
     }
@@ -126,7 +133,8 @@ export async function POST(request: NextRequest) {
 
     const rawBody = await request.text();
 
-    // Верификация secret_token (Telegram шлёт его в X-Telegram-Bot-Api-Secret-Token)
+    // Верификация secret_token (Telegram шлёт его в X-Telegram-Bot-Api-Secret-Token).
+    // business.webhookSecret уже расшифрован при загрузке выше — сравниваем напрямую.
     const receivedToken = request.headers.get("x-telegram-bot-api-secret-token");
     if (!business.webhookSecret) {
       console.error(

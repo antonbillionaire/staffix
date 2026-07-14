@@ -4,6 +4,7 @@
  */
 
 import { stripMarkdown } from "@/lib/strip-markdown";
+import { decrypt } from "@/lib/crypto";
 
 const FB_API_VERSION = "v21.0";
 const FB_API_BASE = `https://graph.facebook.com/${FB_API_VERSION}`;
@@ -20,13 +21,17 @@ export async function getPageAccessToken(
   pageId: string,
   systemUserToken: string
 ): Promise<string> {
-  const cacheKey = `${pageId}:${systemUserToken.slice(-10)}`;
+  // decrypt() — envelope encryption; passthrough для plaintext (backwards compat).
+  // Кэшируем по plaintext-токену чтобы одна и та же зашифрованная строка
+  // (одна и та же логическая учётка) попадала в один cache-slot.
+  const decryptedInput = decrypt(systemUserToken) || systemUserToken;
+  const cacheKey = `${pageId}:${decryptedInput.slice(-10)}`;
   const cached = pageTokenCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.token;
 
   try {
     const res = await fetch(
-      `${FB_API_BASE}/${pageId}?fields=access_token&access_token=${systemUserToken}`
+      `${FB_API_BASE}/${pageId}?fields=access_token&access_token=${decryptedInput}`
     );
     const data = await res.json();
     if (data.access_token) {
@@ -57,8 +62,12 @@ export async function sendFBMessage(
     const cleanText = stripMarkdown(text);
     if (!cleanText) return true;
     const chunks = splitMessage(cleanText, 2000); // FB limit 2000 chars
-    // Resolve page access token if we have pageId (System User tokens need this)
-    const token = pageId ? await getPageAccessToken(pageId, pageAccessToken) : pageAccessToken;
+    // Resolve page access token if we have pageId (System User tokens need this).
+    // getPageAccessToken() уже decrypts input. Для прямого случая (pageId нет)
+    // decrypts здесь.
+    const token = pageId
+      ? await getPageAccessToken(pageId, pageAccessToken)
+      : (decrypt(pageAccessToken) || pageAccessToken);
     const endpoint = pageId ? `${FB_API_BASE}/${pageId}/messages` : `${FB_API_BASE}/me/messages`;
     for (const chunk of chunks) {
       const res = await fetch(`${endpoint}?access_token=${token}`, {

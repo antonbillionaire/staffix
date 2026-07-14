@@ -37,14 +37,19 @@ export async function GET(request: Request) {
   }
 
   // Legacy: per-business verification via ?businessId=xxx
+  // decrypt() — envelope encryption; passthrough для plaintext
   if (businessId) {
     try {
       const business = await prisma.business.findUnique({
         where: { id: businessId },
         select: { waVerifyToken: true },
       });
-      if (business?.waVerifyToken && business.waVerifyToken === token) {
-        return new Response(challenge, { status: 200 });
+      if (business?.waVerifyToken) {
+        const { decrypt } = await import("@/lib/crypto");
+        const expected = decrypt(business.waVerifyToken) || business.waVerifyToken;
+        if (expected === token) {
+          return new Response(challenge, { status: 200 });
+        }
       }
     } catch {}
     return new Response("Forbidden", { status: 403 });
@@ -102,7 +107,13 @@ export async function POST(request: Request) {
       where: businessId ? { id: businessId } : { waPhoneNumberId: msg.phoneNumberId, waActive: true },
       select: { waAccessToken: true },
     });
-    const token = bizForToken?.waAccessToken || process.env.WHATSAPP_ACCESS_TOKEN;
+    // decrypt() — envelope encryption; passthrough для plaintext
+    let dbToken: string | null = null;
+    if (bizForToken?.waAccessToken) {
+      const { decrypt } = await import("@/lib/crypto");
+      dbToken = decrypt(bizForToken.waAccessToken) || bizForToken.waAccessToken;
+    }
+    const token = dbToken || process.env.WHATSAPP_ACCESS_TOKEN;
     if (token) {
       try {
         const { downloadWAMedia, transcribeAudio } = await import("@/lib/voice-ai");
@@ -178,9 +189,14 @@ async function processWAMessage(
 
     if (!business?.waActive || !business.waPhoneNumberId) return;
 
+    // decrypt() — envelope encryption; passthrough для plaintext
+    let dbToken: string | null = business.waAccessToken;
+    if (dbToken) {
+      const { decrypt } = await import("@/lib/crypto");
+      dbToken = decrypt(dbToken) || dbToken;
+    }
     // Prefer System User token (never expires), fall back to business token
     const envToken = process.env.WHATSAPP_ACCESS_TOKEN;
-    const dbToken = business.waAccessToken;
     const waToken = envToken || dbToken;
     if (!waToken) return;
     console.log(`[WA Webhook] Token source: ${envToken ? 'ENV' : 'DB'}, len=${waToken.length}`);

@@ -7,6 +7,7 @@
 import { prisma } from "./prisma";
 import { sendWAMessage } from "./whatsapp-utils";
 import { sendFBMessage } from "./facebook-utils";
+import { decrypt } from "./crypto";
 
 // ========================================
 // TELEGRAM HELPER
@@ -18,8 +19,11 @@ export async function sendTelegramMsg(
   text: string
 ): Promise<boolean> {
   try {
+    // decrypt() — envelope encryption; passthrough для plaintext (backwards compat).
+    // Все callsite'ы передают Business.botToken как есть, без decrypt'а.
+    const token = decrypt(botToken) || botToken;
     const response = await fetch(
-      `https://api.telegram.org/bot${botToken}/sendMessage`,
+      `https://api.telegram.org/bot${token}/sendMessage`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -125,6 +129,9 @@ export async function notifyWarehouseOrderConfirmed(
       select: { botToken: true },
     });
     if (!business?.botToken) return;
+
+    // decrypt() — envelope encryption; passthrough для plaintext
+    business.botToken = decrypt(business.botToken) || business.botToken;
 
     // operator + warehouse + admin: оператор обрабатывает подтверждённые заказы,
     // склад собирает (если роль есть в команде), админ контролирует.

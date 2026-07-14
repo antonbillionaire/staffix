@@ -183,6 +183,12 @@ export async function executeRouteToSpecialist(params: {
       select: { botToken: true, ownerTelegramChatId: true, name: true },
     });
 
+    // decrypt() — envelope encryption; passthrough для plaintext
+    if (business?.botToken) {
+      const { decrypt } = await import("@/lib/crypto");
+      business.botToken = decrypt(business.botToken) || business.botToken;
+    }
+
     // Проверяем текущее назначение клиента
     const existing = await prisma.client.findUnique({
       where: {

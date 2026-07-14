@@ -214,6 +214,12 @@ export async function handleCallbackQuery(
       },
     });
     if (business) {
+      // decrypt() — envelope encryption; passthrough для plaintext
+      const { decrypt } = await import("@/lib/crypto");
+      if (business.botToken) business.botToken = decrypt(business.botToken) || business.botToken;
+      if (business.waAccessToken) business.waAccessToken = decrypt(business.waAccessToken) || business.waAccessToken;
+      if (business.fbPageAccessToken) business.fbPageAccessToken = decrypt(business.fbPageAccessToken) || business.fbPageAccessToken;
+
       const clientMsg =
         `${statusText}\n\n` +
         `🛒 Заказ #${order.orderNumber} | ${order.totalPrice.toLocaleString("ru-RU")}\n` +

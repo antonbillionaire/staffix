@@ -28,8 +28,11 @@ const META_API_BASE = "https://graph.facebook.com/v21.0";
 // Fetch Instagram user's name by IG-scoped ID (works for DMs and comments)
 async function fetchIGUserName(igScopedId: string, accessToken: string): Promise<string | undefined> {
   try {
+    // decrypt() — envelope encryption; passthrough для plaintext
+    const { decrypt } = await import("@/lib/crypto");
+    const token = decrypt(accessToken) || accessToken;
     const res = await fetch(
-      `${META_API_BASE}/${igScopedId}?fields=name,username&access_token=${accessToken}`
+      `${META_API_BASE}/${igScopedId}?fields=name,username&access_token=${token}`
     );
     if (!res.ok) return undefined;
     const data = await res.json();
@@ -470,6 +473,9 @@ async function sendIGMessage(
   recipientId: string,
   text: string
 ): Promise<boolean> {
+  // decrypt() — envelope encryption; passthrough для plaintext
+  const { decrypt } = await import("@/lib/crypto");
+  const token = decrypt(accessToken) || accessToken;
   // Strip Markdown — Instagram DM показывает **звёзды** буквально
   const cleanText = stripMarkdown(text);
   if (!cleanText) return true;
@@ -480,7 +486,7 @@ async function sendIGMessage(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           recipient: { id: recipientId },

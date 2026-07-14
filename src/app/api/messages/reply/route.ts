@@ -219,12 +219,15 @@ async function sendWhatsAppText(
   text: string
 ): Promise<boolean> {
   try {
+    // decrypt() — envelope encryption; passthrough для plaintext
+    const { decrypt } = await import("@/lib/crypto");
+    const token = decrypt(accessToken) || accessToken;
     const cleanPhone = recipientPhone.replace(/[\s\-\(\)]/g, "");
     const res = await fetch(`${META_API_BASE}/${phoneNumberId}/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",

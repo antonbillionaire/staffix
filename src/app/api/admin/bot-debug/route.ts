@@ -50,11 +50,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Business not found for this bot", username: cleanUsername }, { status: 404 });
   }
 
-  // 2. Check webhook status via Telegram API
+  // 2. Check webhook status via Telegram API.
+  // decrypt() — envelope encryption; passthrough для plaintext
   let webhookInfo = null;
   if (business.botToken) {
     try {
-      const res = await fetch(`https://api.telegram.org/bot${business.botToken}/getWebhookInfo`);
+      const { decrypt } = await import("@/lib/crypto");
+      const token = decrypt(business.botToken) || business.botToken;
+      const res = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
       webhookInfo = await res.json();
     } catch (e) {
       webhookInfo = { error: String(e) };

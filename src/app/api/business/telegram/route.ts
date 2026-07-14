@@ -20,10 +20,13 @@ export async function DELETE() {
       return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
     }
 
-    // Delete webhook from Telegram before clearing the token
+    // Delete webhook from Telegram before clearing the token.
+    // decrypt() — envelope encryption; passthrough для plaintext
     if (business.botToken) {
       try {
-        await fetch(`https://api.telegram.org/bot${business.botToken}/deleteWebhook`, {
+        const { decrypt } = await import("@/lib/crypto");
+        const token = decrypt(business.botToken) || business.botToken;
+        await fetch(`https://api.telegram.org/bot${token}/deleteWebhook`, {
           method: "POST",
         });
       } catch {

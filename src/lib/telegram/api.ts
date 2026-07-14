@@ -13,6 +13,16 @@
  */
 
 import { stripMarkdown } from "@/lib/strip-markdown";
+import { decrypt } from "@/lib/crypto";
+
+/**
+ * Централизованный decrypt для botToken. Callsite'ы этого модуля передают
+ * значение из Business.botToken как есть; функция сама разбирается —
+ * envelope encryption (`v1:...`) → расшифровка, plaintext → passthrough.
+ */
+function resolveBotToken(botToken: string): string {
+  return decrypt(botToken) || botToken;
+}
 
 // Внутренний тип "обычного" Message от Telegram. Используется и для
 // update.message, и для update.business_message — структура одинаковая, отличается
@@ -133,6 +143,7 @@ export async function sendTelegramMessage(
   businessConnectionId?: string
 ): Promise<boolean> {
   try {
+    const token = resolveBotToken(botToken);
     const cleanText = stripMarkdown(text);
     if (!cleanText) return true;
 
@@ -140,7 +151,7 @@ export async function sendTelegramMessage(
     let ok = true;
     for (const chunk of chunks) {
       const response = await fetch(
-        `https://api.telegram.org/bot${botToken}/sendMessage`,
+        `https://api.telegram.org/bot${token}/sendMessage`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -167,8 +178,9 @@ export async function sendTelegramPhoto(
   caption?: string
 ): Promise<boolean> {
   try {
+    const token = resolveBotToken(botToken);
     const response = await fetch(
-      `https://api.telegram.org/bot${botToken}/sendPhoto`,
+      `https://api.telegram.org/bot${token}/sendPhoto`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -194,8 +206,9 @@ export async function sendTelegramMessageWithButtons(
   buttons: { text: string; url: string }[][]
 ): Promise<boolean> {
   try {
+    const token = resolveBotToken(botToken);
     const response = await fetch(
-      `https://api.telegram.org/bot${botToken}/sendMessage`,
+      `https://api.telegram.org/bot${token}/sendMessage`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -219,7 +232,8 @@ export async function sendTypingAction(
   chatId: number
 ): Promise<void> {
   try {
-    await fetch(`https://api.telegram.org/bot${botToken}/sendChatAction`, {
+    const token = resolveBotToken(botToken);
+    await fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -238,7 +252,8 @@ export async function answerCallbackQuery(
   text?: string
 ): Promise<void> {
   try {
-    await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+    const token = resolveBotToken(botToken);
+    await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -258,7 +273,8 @@ export async function editMessageText(
   text: string
 ): Promise<void> {
   try {
-    await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
+    const token = resolveBotToken(botToken);
+    await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

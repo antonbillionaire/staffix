@@ -58,13 +58,16 @@ async function notifyOwnerAboutInsights(
   // 2) Telegram владельцу (если настроен)
   if (business.botToken && business.ownerTelegramChatId) {
     try {
+      // decrypt() — envelope encryption; passthrough для plaintext
+      const { decrypt } = await import("@/lib/crypto");
+      const token = decrypt(business.botToken) || business.botToken;
       const text =
         `💡 AI-сотрудник ${business.name}: новые подсказки\n\n` +
         `За эту неделю я заметил ${newCount} ${newCount === 1 ? "вопрос" : "паттерн(ов)"}, на которые я не смог ответить — нужно ваше внимание.\n\n` +
         `Откройте в дашборде:\n${appUrl}/dashboard/insights`;
 
       const tgRes = await fetch(
-        `https://api.telegram.org/bot${business.botToken}/sendMessage`,
+        `https://api.telegram.org/bot${token}/sendMessage`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
