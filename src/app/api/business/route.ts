@@ -58,20 +58,35 @@ export async function GET() {
       }),
     ]);
 
-    // Маскируем токены, которые фронт НЕ показывает пользователю и не передаёт обратно.
-    // Это защищает на случай XSS/перехвата кэша браузера.
-    // НЕ маскируем: botToken (Telegram page показывает), webhookSecret (Integrations page),
-    // waVerifyToken (WhatsApp page показывает), payproSubscriptionId (UI логика кнопок отмены).
+    // Маскируем ВСЕ секретные токены (июль 2026 P0 security fix).
+    // Раньше в GET утекали botToken/webhookSecret/waVerifyToken в браузер владельца:
+    // XSS или заражённое расширение Chrome → злоумышленник забирает токен и
+    // захватывает бот/канал. Теперь возвращаем только "***" + has-value флаги,
+    // чтобы фронт мог показать «подключён / не подключён» без реального значения.
+    //
+    // Владельцы бизнеса теряют возможность скопировать токен из UI. Взамен —
+    // подсказка «токен можно посмотреть в @BotFather» (для Telegram) и
+    // кнопка «Заменить» (без чтения текущего).
     return NextResponse.json({
       business: {
         ...business,
-        // Long-lived Meta user-token — нужен только серверу для refresh page tokens
+        // Все токены каналов — маскированы
+        botToken: business.botToken ? "***" : null,
+        webhookSecret: business.webhookSecret ? "***" : null,
         metaUserAccessToken: business.metaUserAccessToken ? "***" : null,
-        // Page access tokens — серверные, фронт работает с ними только при ручной настройке (отправляет, не получает)
         waAccessToken: business.waAccessToken ? "***" : null,
+        waVerifyToken: business.waVerifyToken ? "***" : null,
         fbPageAccessToken: business.fbPageAccessToken ? "***" : null,
-        // FB verify token — серверный (используется при handshake Meta webhook)
         fbVerifyToken: business.fbVerifyToken ? "***" : null,
+        // has-value флаги: фронт использует их для «подключено ✅ / не подключено»,
+        // без чтения самого токена
+        hasBotToken: !!business.botToken,
+        hasWebhookSecret: !!business.webhookSecret,
+        hasWaAccessToken: !!business.waAccessToken,
+        hasWaVerifyToken: !!business.waVerifyToken,
+        hasFbPageAccessToken: !!business.fbPageAccessToken,
+        hasFbVerifyToken: !!business.fbVerifyToken,
+        hasMetaUserAccessToken: !!business.metaUserAccessToken,
       },
       stats: { bookingsToday, totalClients },
       isAdmin: isAdmin(session?.user?.email),
@@ -220,14 +235,19 @@ export async function PUT(request: Request) {
     if (deliveryFreeFrom !== undefined) updateData.deliveryFreeFrom = deliveryFreeFrom ? (parseInt(deliveryFreeFrom, 10) || null) : null;
     if (deliveryZones !== undefined) updateData.deliveryZones = deliveryZones || null;
 
-    // WhatsApp — validate phone number ID format if activating
+    // Guard: если фронт прислал "***" (наш маскированный placeholder из GET) —
+    // это значит поле не редактировалось. НЕ перезаписываем реальный токен
+    // маскированной строкой. Пустая строка "" → null (владелец очистил поле).
+    const isMasked = (v: unknown): boolean => v === "***";
+
+    // WhatsApp
     if (waPhoneNumberId !== undefined) updateData.waPhoneNumberId = waPhoneNumberId || null;
-    if (waAccessToken !== undefined) updateData.waAccessToken = waAccessToken || null;
-    if (waVerifyToken !== undefined) updateData.waVerifyToken = waVerifyToken || null;
+    if (waAccessToken !== undefined && !isMasked(waAccessToken)) updateData.waAccessToken = waAccessToken || null;
+    if (waVerifyToken !== undefined && !isMasked(waVerifyToken)) updateData.waVerifyToken = waVerifyToken || null;
     if (waActive !== undefined) {
       // Validate required fields before activating
       const phoneId = waPhoneNumberId ?? existingBusiness.waPhoneNumberId;
-      const token = waAccessToken ?? existingBusiness.waAccessToken;
+      const token = !isMasked(waAccessToken) ? (waAccessToken ?? existingBusiness.waAccessToken) : existingBusiness.waAccessToken;
       if (waActive && (!phoneId || !token)) {
         return NextResponse.json(
           { error: "WhatsApp Phone Number ID and Access Token are required to activate" },
@@ -239,12 +259,13 @@ export async function PUT(request: Request) {
 
     // Facebook Messenger
     if (fbPageId !== undefined) updateData.fbPageId = fbPageId || null;
-    if (fbPageAccessToken !== undefined) updateData.fbPageAccessToken = fbPageAccessToken || null;
-    if (fbVerifyToken !== undefined) updateData.fbVerifyToken = fbVerifyToken || null;
+    if (fbPageAccessToken !== undefined && !isMasked(fbPageAccessToken)) updateData.fbPageAccessToken = fbPageAccessToken || null;
+    if (fbVerifyToken !== undefined && !isMasked(fbVerifyToken)) updateData.fbVerifyToken = fbVerifyToken || null;
     if (fbActive !== undefined) updateData.fbActive = Boolean(fbActive);
 
-    // Если передан токен бота - валидируем и регистрируем/перерегистрируем webhook
-    if (botToken) {
+    // Если передан токен бота - валидируем и регистрируем/перерегистрируем webhook.
+    // isMasked-guard: если фронт вернул "***" (не редактировали) — не трогаем.
+    if (botToken && !isMasked(botToken)) {
       // Валидация токена
       const validation = await validateBotToken(botToken);
       if (!validation.valid) {
