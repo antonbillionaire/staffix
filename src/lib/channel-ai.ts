@@ -240,6 +240,20 @@ ${biz.aiRules}
 
 Твоя задача — вежливо и точно отвечать на вопросы клиентов, помогать с записью и информацией об услугах. Общайся ${tone} тоном.
 
+## ⚠️ ПРАВИЛО КОНТАКТА КЛИЕНТА (критично — лиды теряются без телефона)
+ЗАПРЕЩЕНО обещать «менеджер свяжется», «менеджер расскажет», «мы перезвоним», «оставим заявку», «передам менеджеру», «специалист ответит», «сотрудник вернётся к вам» — ПОКА не получил от клиента номер телефона.
+
+Если клиент проявил интерес («расскажите подробнее», «интересно», «хочу узнать», «как записаться», «а какие цены», «хочу с человеком поговорить», «дайте больше информации», просто «старт» или короткое подтверждение) — СНАЧАЛА одной короткой фразой попроси номер:
+- Пример: «Подскажите, пожалуйста, ваш номер телефона и удобное время — наш менеджер свяжется и всё подробно расскажет.»
+- Или: «Оставьте, пожалуйста, номер — перезвоним и ответим на все вопросы.»
+
+ТОЛЬКО после того как клиент дал номер — можешь сказать «передал менеджеру, свяжется в удобное время».
+
+Исключения (можно эскалировать сразу без номера через notify_manager):
+- Клиент открыто жалуется, ругается, требует человека прямо сейчас — тогда эскалируй, менеджер ответит в том же канале (IG DM / TG / WA).
+- Клиент явно отказался давать номер («не хочу оставлять телефон», «пишите тут»).
+- Клиент прямо ответил в текущий чат что уже есть контакт (например «пишите на этот же telegram»).
+
 ## ПРАВИЛА ВЕЖЛИВОСТИ (всегда, независимо от тона):
 - ВСЕГДА обращайся к клиенту на "Вы". НИКОГДА не переходи на "ты", даже если клиент сам пишет на "ты".
 - ВСЕГДА начинай первое сообщение с "Здравствуйте" или "Добрый день/вечер". НИКОГДА не используй "Привет", "Эй", "Хай", "Здорово", "Слышь" как приветствие.
@@ -981,9 +995,36 @@ export async function generateChannelAIResponse(
 
     if (shouldNotifyCh) {
       const trigger = newContactProvidedCh ? "new-contact" : "handoff-promise";
+
+      // Знаем ли мы телефон клиента (текущий + ранее сохранённый)?
+      // Для handoff-promise без телефона — предупреждаем менеджера что нужно
+      // ответить в DM, а не звонить в пустоту (см. AY 15 июля 2026 — Capital Academy
+      // теряла контакты потому что бот обещал но номер не спрашивал).
+      let existingClientPhone: string | null = null;
+      try {
+        const existingClient = await prisma.channelClient.findFirst({
+          where: {
+            businessId,
+            OR: [
+              { instagramId: clientId },
+              { fbPsid: clientId },
+              { whatsappPhone: clientId },
+            ],
+          },
+          select: { phone: true },
+        });
+        existingClientPhone = existingClient?.phone ?? null;
+      } catch {
+        // не критично для эскалации
+      }
+
+      const hasPhone = !!(extractedPhoneCh || existingClientPhone);
+      const missingPhoneForHandoff = trigger === "handoff-promise" && !hasPhone;
+
       console.warn(
-        `[Channel AI] SAFETY NET: ${trigger} — invoking notify_manager. business=${businessId} channel=${channel}`
+        `[Channel AI] SAFETY NET: ${trigger} — invoking notify_manager. business=${businessId} channel=${channel} hasPhone=${hasPhone} missingPhone=${missingPhoneForHandoff}`
       );
+
       try {
         const { notifyManagerByTelegram } = await import("@/lib/sales-tools");
 
@@ -997,14 +1038,31 @@ export async function generateChannelAIResponse(
         const contextLines: string[] = [`Канал: ${channel}`];
         if (prevAssistantTurn) contextLines.push(`Бот ранее: ${prevAssistantTurn}`);
         contextLines.push(`Клиент: ${userMessage.slice(0, 400)}`);
-        if (extractedPhoneCh) contextLines.push(`Телефон: ${extractedPhoneCh}`);
+        if (extractedPhoneCh) {
+          contextLines.push(`Телефон: ${extractedPhoneCh}`);
+        } else if (existingClientPhone) {
+          contextLines.push(`Телефон (ранее): ${existingClientPhone}`);
+        }
 
-        const label = newContactProvidedCh
-          ? "[новый контакт от клиента]"
-          : "[авто-эскалация после обещания бота]";
+        let label: string;
+        if (newContactProvidedCh) {
+          label = "[новый контакт от клиента]";
+        } else if (missingPhoneForHandoff) {
+          label =
+            "⚠️ [БЕЗ ТЕЛЕФОНА] Бот пообещал что менеджер свяжется, но НЕ собрал номер клиента.\n" +
+            "Ответьте клиенту в " +
+            (channel === "instagram" ? "Instagram DM"
+              : channel === "whatsapp" ? "WhatsApp"
+              : channel === "facebook" ? "Facebook Messenger"
+              : "канале") +
+            " — запросите телефон, потом позвоните.";
+        } else {
+          label = "[авто-эскалация после обещания бота]";
+        }
         const reason = `${label}\n${contextLines.join("\n")}`;
 
-        await notifyManagerByTelegram(businessId, BigInt(0), reason, clientName, "normal");
+        const urgency = missingPhoneForHandoff ? "urgent" : "normal";
+        await notifyManagerByTelegram(businessId, BigInt(0), reason, clientName, urgency);
       } catch (e) {
         console.error("[Channel AI] SAFETY NET notify_manager failed:", e);
       }

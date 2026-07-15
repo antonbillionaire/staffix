@@ -465,8 +465,27 @@ export async function generateAIResponse(
 
     if (shouldNotify) {
       const trigger = newContactProvided ? "new-contact" : "handoff-promise";
+
+      // Знаем ли мы телефон клиента (текущий + ранее сохранённый)? Для
+      // handoff-promise БЕЗ телефона — предупреждаем менеджера чтобы ответил
+      // клиенту в TG, а не звонил в пустоту. См. AY 15 июля — Capital Academy
+      // терял контакты потому что бот обещал но номер не спрашивал.
+      let existingClientPhone: string | null = null;
+      try {
+        const existingClient = await prisma.client.findUnique({
+          where: { businessId_telegramId: { businessId, telegramId } },
+          select: { phone: true },
+        });
+        existingClientPhone = existingClient?.phone ?? null;
+      } catch {
+        // не критично для эскалации
+      }
+
+      const hasPhone = !!(extractedPhoneEarly || existingClientPhone);
+      const missingPhoneForHandoff = trigger === "handoff-promise" && !hasPhone;
+
       console.warn(
-        `[Webhook] SAFETY NET: ${trigger} — invoking notify_manager. business=${businessId}`
+        `[Webhook] SAFETY NET: ${trigger} — invoking notify_manager. business=${businessId} hasPhone=${hasPhone} missingPhone=${missingPhoneForHandoff}`
       );
       try {
         // Контекст: предыдущее сообщение бота + текущее клиента + телефон.
@@ -478,14 +497,26 @@ export async function generateAIResponse(
         const contextLines: string[] = [];
         if (prevAssistantTurn) contextLines.push(`Бот ранее: ${prevAssistantTurn}`);
         contextLines.push(`Клиент: ${userMessage.slice(0, 400)}`);
-        if (extractedPhoneEarly) contextLines.push(`Телефон: ${extractedPhoneEarly}`);
+        if (extractedPhoneEarly) {
+          contextLines.push(`Телефон: ${extractedPhoneEarly}`);
+        } else if (existingClientPhone) {
+          contextLines.push(`Телефон (ранее): ${existingClientPhone}`);
+        }
 
-        const label = newContactProvided
-          ? "[новый контакт от клиента]"
-          : "[авто-эскалация после обещания бота]";
+        let label: string;
+        if (newContactProvided) {
+          label = "[новый контакт от клиента]";
+        } else if (missingPhoneForHandoff) {
+          label =
+            "⚠️ [БЕЗ ТЕЛЕФОНА] Бот пообещал что менеджер свяжется, но НЕ собрал номер клиента.\n" +
+            "Ответьте клиенту в Telegram — запросите телефон, потом позвоните.";
+        } else {
+          label = "[авто-эскалация после обещания бота]";
+        }
         const reason = `${label}\n${contextLines.join("\n")}`;
 
-        await notifyManagerByTelegram(businessId, telegramId, reason, userName, "normal");
+        const urgency = missingPhoneForHandoff ? "urgent" : "normal";
+        await notifyManagerByTelegram(businessId, telegramId, reason, userName, urgency);
         console.log(`[Webhook] SAFETY NET: notify_manager fired (${trigger}) for business=${businessId}`);
       } catch (e) {
         console.error("[Webhook] SAFETY NET notify_manager failed:", e);
