@@ -60,6 +60,19 @@ interface Stats {
     closedDeals: number;
     conversion: { leadToBooked: number; bookedToDone: number; doneToClient: number; leadToClient: number };
   };
+  // NEW (июль 2026)
+  messagesByHour?: { hour: number; count: number }[];
+  topConversations?: {
+    id: string;
+    clientName: string;
+    clientPhone: string | null;
+    channel: string;
+    messageCount: number;
+    lastActivityAt: string;
+  }[];
+  heavyConversationsCount?: number;
+  heavyConversationsThreshold?: number;
+  leadsByChannel?: { channel: string; count: number }[];
 }
 
 export default function StatisticsPage() {
@@ -380,6 +393,183 @@ export default function StatisticsPage() {
           </div>
         </div>
       </div>
+
+      {/* Heavy conversations alert — предупреждаем если есть диалоги >30 сообщений
+          (бот может тратить лишние сообщения из подписки — стоит проверить)
+          NEW июль 2026 по запросу Антона */}
+      {stats.heavyConversationsCount !== undefined && stats.heavyConversationsCount > 0 && (
+        <div className={`rounded-xl border p-4 flex items-start gap-3 ${
+          isDark
+            ? "bg-orange-500/10 border-orange-500/30"
+            : "bg-orange-50 border-orange-200"
+        }`}>
+          <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+            <BarChart3 className="h-5 w-5 text-orange-500" />
+          </div>
+          <div className="flex-1">
+            <p className={`font-semibold ${textPrimary}`}>
+              Внимание — «дорогие» диалоги ({stats.heavyConversationsCount})
+            </p>
+            <p className={`text-sm ${textSecondary} mt-1`}>
+              У вас {stats.heavyConversationsCount} {stats.heavyConversationsCount === 1 ? "диалог" : "диалога"} с {stats.heavyConversationsThreshold || 30}+ сообщений.
+              Это может значить что бот застрял или клиент задаёт вопросы, на которые бот не может ответить.
+              Проверьте их ниже в «Топ диалогов по сообщениям».
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Загруженность по часам — messagesByHour.
+          NEW июль 2026: показывает в какие часы (по timezone бизнеса) бот больше
+          всего работает. Полезно для понимания когда клиенты пишут — можно
+          настроить working hours / приоритизировать эскалации. */}
+      {stats.messagesByHour && stats.messagesByHour.length > 0 && (() => {
+        const maxHourCount = Math.max(...stats.messagesByHour.map((h) => h.count));
+        if (maxHourCount === 0) return null; // нет данных за период → не рендерим
+        return (
+          <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-lg font-semibold ${textPrimary}`}>Загруженность по часам</h3>
+              <span className={`text-xs ${textSecondary}`}>в часовом поясе бизнеса</span>
+            </div>
+            <div className="h-40 sm:h-48 flex items-end gap-0.5 sm:gap-1">
+              {stats.messagesByHour.map((h) => {
+                const height = maxHourCount > 0 ? (h.count / maxHourCount) * 100 : 0;
+                // Подсвечиваем «рабочие» часы 8-22 сильнее, ночные — приглушённо
+                const isBusinessHour = h.hour >= 8 && h.hour < 22;
+                return (
+                  <div key={h.hour} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                    <div
+                      className={`w-full rounded-t relative ${
+                        isBusinessHour
+                          ? "bg-gradient-to-t from-purple-600 to-purple-400"
+                          : "bg-gradient-to-t from-purple-800/50 to-purple-500/40"
+                      }`}
+                      style={{ height: `${height}%`, minHeight: h.count > 0 ? "3px" : "1px" }}
+                      title={`${h.hour}:00 — ${h.count} сообщ.`}
+                    />
+                    {(h.hour % 3 === 0) && (
+                      <span className={`text-[10px] ${textSecondary}`}>
+                        {h.hour.toString().padStart(2, "0")}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <p className={`text-xs ${textSecondary} mt-3`}>
+              Час пик: <span className={`font-medium ${textPrimary}`}>
+                {(() => {
+                  const peak = [...(stats.messagesByHour || [])].sort((a, b) => b.count - a.count)[0];
+                  return peak && peak.count > 0 ? `${peak.hour}:00 — ${peak.count} сообщ.` : "нет данных";
+                })()}
+              </span>
+            </p>
+          </div>
+        );
+      })()}
+
+      {/* Топ диалогов по сообщениям — topConversations.
+          NEW июль 2026: топ-20 диалогов отсортированные по количеству сообщений.
+          Полезно для (1) видеть «дорогих» клиентов, (2) находить где бот застрял,
+          (3) понимать какие темы требуют много общения. */}
+      {stats.topConversations && stats.topConversations.length > 0 && (
+        <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className={`text-lg font-semibold ${textPrimary}`}>Топ диалогов по сообщениям</h3>
+            <span className={`text-xs ${textSecondary}`}>
+              Порог: {stats.heavyConversationsThreshold || 30}+ сообщений
+            </span>
+          </div>
+          <div className="space-y-2">
+            {stats.topConversations.slice(0, 10).map((c) => {
+              const isHeavy = c.messageCount >= (stats.heavyConversationsThreshold || 30);
+              const channelColor: Record<string, string> = {
+                telegram: "text-blue-500 bg-blue-500/10",
+                whatsapp: "text-green-500 bg-green-500/10",
+                instagram: "text-pink-500 bg-pink-500/10",
+                facebook: "text-blue-600 bg-blue-600/10",
+              };
+              const channelBadge = channelColor[c.channel] || "text-gray-500 bg-gray-500/10";
+              return (
+                <div
+                  key={c.id}
+                  className={`flex items-center gap-3 p-3 rounded-lg ${
+                    isDark ? "bg-white/[0.02] hover:bg-white/5" : "bg-gray-50 hover:bg-gray-100"
+                  } transition-colors ${
+                    isHeavy ? (isDark ? "border border-orange-500/30" : "border border-orange-200") : ""
+                  }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className={`text-sm font-medium ${textPrimary} truncate`}>{c.clientName}</p>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase ${channelBadge}`}>
+                        {c.channel}
+                      </span>
+                      {isHeavy && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-500">
+                          дорогой
+                        </span>
+                      )}
+                    </div>
+                    {c.clientPhone && (
+                      <p className={`text-xs ${textSecondary} mt-0.5`}>{c.clientPhone}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-lg font-bold ${textPrimary}`}>{c.messageCount}</p>
+                    <p className={`text-[10px] ${textSecondary}`}>сообщ.</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Лиды по каналам — leadsByChannel.
+          NEW июль 2026: разбивка эскалаций к менеджеру по источнику канала. */}
+      {stats.leadsByChannel && stats.leadsByChannel.length > 0 && (() => {
+        const totalLeads = stats.leadsByChannel!.reduce((sum, l) => sum + l.count, 0);
+        if (totalLeads === 0) return null;
+        return (
+          <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
+            <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>
+              Лиды по каналам
+            </h3>
+            <div className="space-y-3">
+              {stats.leadsByChannel!.map((l) => {
+                const sharePct = totalLeads > 0
+                  ? Math.round((l.count / totalLeads) * 1000) / 10
+                  : 0;
+                const channelMeta: Record<string, { label: string; color: string }> = {
+                  telegram: { label: "Telegram", color: "bg-blue-500" },
+                  whatsapp: { label: "WhatsApp", color: "bg-green-500" },
+                  instagram: { label: "Instagram", color: "bg-pink-500" },
+                  facebook: { label: "Facebook", color: "bg-blue-600" },
+                };
+                const meta = channelMeta[l.channel] || { label: l.channel, color: "bg-gray-500" };
+                return (
+                  <div key={l.channel}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-sm font-medium ${textPrimary}`}>{meta.label}</span>
+                      <span className={`text-sm ${textSecondary}`}>
+                        {l.count} <span className={`ml-1 font-medium ${textPrimary}`}>{sharePct}%</span>
+                      </span>
+                    </div>
+                    <div className={`h-2 rounded-full ${isDark ? "bg-white/10" : "bg-gray-100"}`}>
+                      <div
+                        className={`h-full rounded-full ${meta.color} transition-all`}
+                        style={{ width: `${sharePct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Conversion */}
       <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>

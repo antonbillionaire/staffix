@@ -599,6 +599,162 @@ export async function GET(request: NextRequest) {
     const prevClientsCombined =
       prevTgConversations.length + prevChannelClientKeys.size;
 
+    // ═══════════════════════════════════════════════════════════════════
+    // NEW METRICS (июль 2026, по запросу Антона):
+    //   - messagesByHour: загруженность по часам (24 корзины)
+    //   - topConversations: топ 20 самых «болтливых» диалогов
+    //   - heavyConversationsCount: сколько диалогов превысили порог
+    //   - leadsByChannel: разбивка эскалаций по каналам
+    // ═══════════════════════════════════════════════════════════════════
+
+    const HEAVY_CONV_THRESHOLD = 30; // сообщений в одном диалоге → диалог «тяжёлый»
+
+    // Хелпер: часовое ведро в timezone бизнеса. По умолчанию Asia/Tashkent
+    // (основной рынок CIS), но берём Business.timezone если владелец выставил.
+    const businessTz = (business as { timezone?: string | null }).timezone || "Asia/Tashkent";
+    const getHourInTz = (date: Date): number => {
+      try {
+        const hourStr = date.toLocaleString("en-US", {
+          timeZone: businessTz,
+          hour: "2-digit",
+          hour12: false,
+        });
+        const h = parseInt(hourStr, 10);
+        return Number.isFinite(h) && h >= 0 && h < 24 ? h : date.getUTCHours();
+      } catch {
+        return date.getUTCHours();
+      }
+    };
+
+    // messagesByHour — 24 корзины по часам в timezone бизнеса.
+    // TG: считаем каждое Message.createdAt (точно).
+    // Channel: используем conv.updatedAt (приближение — все сообщения диалога
+    // «падают» на час последней активности; лучше чем ничего пока history
+    // не хранит per-message timestamps).
+    const messagesByHourMap = new Map<number, number>();
+    for (let h = 0; h < 24; h++) messagesByHourMap.set(h, 0);
+    tgMessages.forEach((msg) => {
+      const h = getHourInTz(msg.createdAt);
+      messagesByHourMap.set(h, (messagesByHourMap.get(h) || 0) + 1);
+    });
+    channelConversationsInPeriod.forEach((conv) => {
+      const h = getHourInTz(conv.updatedAt);
+      messagesByHourMap.set(h, (messagesByHourMap.get(h) || 0) + (conv.messageCount || 0));
+    });
+    const messagesByHour = Array.from(messagesByHourMap.entries())
+      .map(([hour, count]) => ({ hour, count }))
+      .sort((a, b) => a.hour - b.hour);
+
+    // topConversations — топ 20 самых «болтливых» диалогов по messageCount.
+    // Полезно чтобы владелец видел где бот тратит много сообщений (частый
+    // повод для проверки: возможно бот застрял в цикле или клиент вопросы
+    // задаёт которые бот не может закрыть).
+    // TG Conversation НЕ имеет прямой FK на Client — только по clientTelegramId.
+    // Достаём conversations + подсчёт сообщений, потом клиентов отдельно
+    // одним batch-запросом (in-clause по telegramId).
+    const [tgConvsRaw, chTopConvs] = await Promise.all([
+      prisma.conversation.findMany({
+        where: {
+          businessId: business.id,
+          updatedAt: { gte: startDate },
+        },
+        include: {
+          messages: { select: { id: true } },
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 60, // берём чуть больше чем нужно, после count-sort режем
+      }),
+      prisma.channelConversation.findMany({
+        where: {
+          businessId: business.id,
+          updatedAt: { gte: startDate },
+        },
+        select: {
+          id: true,
+          channel: true,
+          clientName: true,
+          clientId: true,
+          messageCount: true,
+          updatedAt: true,
+        },
+        orderBy: { messageCount: "desc" },
+        take: 40,
+      }),
+    ]);
+
+    // Batch: имена клиентов по telegramId (одним запросом)
+    const tgClientIds = tgConvsRaw.map((c) => c.clientTelegramId);
+    const tgClientsById = new Map<string, { name: string | null; phone: string | null }>();
+    if (tgClientIds.length > 0) {
+      const clientsWithInfo = await prisma.client.findMany({
+        where: {
+          businessId: business.id,
+          telegramId: { in: tgClientIds },
+        },
+        select: { telegramId: true, name: true, phone: true },
+      });
+      for (const c of clientsWithInfo) {
+        tgClientsById.set(c.telegramId.toString(), { name: c.name, phone: c.phone });
+      }
+    }
+
+    const combinedTopConvs = [
+      ...tgConvsRaw.map((c) => {
+        const info = tgClientsById.get(c.clientTelegramId.toString());
+        return {
+          id: c.id,
+          clientName:
+            (c.clientName as string | null) ||
+            info?.name ||
+            `TG …${c.clientTelegramId.toString().slice(-4)}`,
+          clientPhone: info?.phone || null,
+          channel: "telegram",
+          messageCount: c.messages.length,
+          lastActivityAt: c.updatedAt.toISOString(),
+        };
+      }),
+      ...chTopConvs.map((c) => ({
+        id: c.id,
+        clientName: c.clientName || `${c.channel} …${(c.clientId || "").slice(-4)}`,
+        clientPhone: null as string | null,
+        channel: c.channel,
+        messageCount: c.messageCount || 0,
+        lastActivityAt: c.updatedAt.toISOString(),
+      })),
+    ]
+      .filter((c) => c.messageCount > 0)
+      .sort((a, b) => b.messageCount - a.messageCount);
+
+    const topConversations = combinedTopConvs.slice(0, 20);
+    const heavyConversationsCount = combinedTopConvs.filter(
+      (c) => c.messageCount >= HEAVY_CONV_THRESHOLD
+    ).length;
+
+    // leadsByChannel — разбивка эскалаций (Notification manager_escalation) по каналам.
+    // Определяем канал по content notification'а (в reason есть строка "Канал: X"
+    // для channel-safety-net, а TG-эскалации — по отсутствию этой метки).
+    // Fallback категория "unknown" для старых уведомлений.
+    const leadsRaw = await prisma.notification.findMany({
+      where: {
+        businessId: business.id,
+        type: "manager_escalation",
+        createdAt: { gte: startDate },
+      },
+      select: { message: true },
+    });
+    const leadsByChannelMap = new Map<string, number>();
+    leadsRaw.forEach((n) => {
+      const msg = n.message || "";
+      let ch = "telegram"; // default assumption — most escalations are TG side
+      if (/Канал:\s*instagram/i.test(msg)) ch = "instagram";
+      else if (/Канал:\s*whatsapp/i.test(msg)) ch = "whatsapp";
+      else if (/Канал:\s*facebook/i.test(msg)) ch = "facebook";
+      leadsByChannelMap.set(ch, (leadsByChannelMap.get(ch) || 0) + 1);
+    });
+    const leadsByChannel = Array.from(leadsByChannelMap.entries())
+      .map(([channel, count]) => ({ channel, count }))
+      .sort((a, b) => b.count - a.count);
+
     return NextResponse.json({
       dashboardMode: business.dashboardMode || "service",
       totalMessages,
@@ -636,6 +792,12 @@ export async function GET(request: NextRequest) {
       popularProducts,
       // Deal pipeline funnel
       dealFunnel,
+      // NEW (июль 2026): загруженность по часам + топ диалогов + heavy alert + leads breakdown
+      messagesByHour,
+      topConversations,
+      heavyConversationsCount,
+      heavyConversationsThreshold: HEAVY_CONV_THRESHOLD,
+      leadsByChannel,
     });
   } catch (error) {
     console.error("Statistics error:", error);
