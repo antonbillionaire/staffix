@@ -868,11 +868,81 @@ export async function generateChannelAIResponse(
       }).catch((e) => console.error("[Channel AI] Token tracking error:", e));
     }
 
-    // Extract final text response
-    const textBlocks = response.content.filter((block) => block.type === "text");
-    let replyText = textBlocks.length > 0 && textBlocks[0].type === "text"
-      ? textBlocks[0].text
-      : "Извините, не удалось сформировать ответ. Пожалуйста, попробуйте ещё раз.";
+    // Extract final text response.
+    // Фильтруем non-empty text blocks (Claude иногда возвращает `text: ""`).
+    // Если ничего не вытащили — идём в recovery-цикл ниже.
+    const collectText = (r: Anthropic.Message): string => {
+      const parts: string[] = [];
+      for (const block of r.content) {
+        if (block.type === "text" && block.text && block.text.trim()) {
+          parts.push(block.text);
+        }
+      }
+      return parts.join("\n\n").trim();
+    };
+
+    let replyText = collectText(response);
+    let isFallback = false;
+
+    // Recovery: если по итогам main+tool-loop нет текста, делаем ЕЩЁ ОДИН вызов
+    // без tools + с явным push'ем «ответь клиенту текстом». Это защищает от
+    // сценариев когда Claude застрял в tool-loop до max iterations и последний
+    // response — только tool_use без text, ИЛИ когда API упал внутри цикла.
+    if (!replyText) {
+      const reason =
+        response.stop_reason === "tool_use"
+          ? `tool_loop_exhausted (iterations=${iterations}/${maxIterations})`
+          : `empty_text (stop=${response.stop_reason})`;
+      console.warn(
+        `[Channel AI] EMPTY RESPONSE — attempting recovery. reason=${reason} biz=${businessId} channel=${channel}`
+      );
+
+      try {
+        // Sonnet 5, без tools — Claude обязан вернуть текст.
+        // messages уже содержит user turn + [tool_use, tool_result]* — добавляем
+        // финальный user-nudge чтобы модель точно сгенерировала ответ клиенту.
+        const recoveryMessages: Anthropic.MessageParam[] = [
+          ...messages,
+          {
+            role: "user" as const,
+            content:
+              "Пожалуйста, ответь клиенту простым текстом одним-двумя предложениями. " +
+              "Не вызывай инструменты. Используй уже собранную информацию из контекста.",
+          },
+        ];
+        const recovery = await callClaudeWithRetry({
+          model: "claude-sonnet-5",
+          max_tokens: 400,
+          thinking: { type: "disabled" },
+          system: systemBlocks,
+          messages: recoveryMessages,
+          // tools намеренно опущены — форсируем текст.
+        });
+        logClaudeUsage(`${channel}/recovery`, recovery.usage, {
+          biz: businessId,
+          client: clientId,
+          orig_reason: reason,
+        });
+        replyText = collectText(recovery);
+        if (replyText) {
+          console.log(`[Channel AI] RECOVERY succeeded: "${replyText.slice(0, 80)}"`);
+        }
+      } catch (recoveryErr) {
+        console.error(`[Channel AI] RECOVERY failed:`, recoveryErr);
+      }
+    }
+
+    // Финальный fallback — если даже recovery не помогла. НЕЙТРАЛЬНАЯ формулировка,
+    // не апологетическая «не удалось» (та фраза раньше сохранялась в историю и
+    // Claude начинал её повторять). Плюс помечаем isFallback=true чтобы НЕ
+    // сохранять её в conversation history — не заражаем диалог.
+    if (!replyText) {
+      replyText = "Секундочку, я уточню детали. Задайте, пожалуйста, вопрос по нашим услугам ещё раз.";
+      isFallback = true;
+      console.error(
+        `[Channel AI] FALLBACK reached — no text after recovery. biz=${businessId} channel=${channel} stop_reason=${response.stop_reason} iters=${iterations}`
+      );
+    }
 
     // SAFETY NET: два триггера для гарантированной эскалации к владельцу:
     //  1) Бот в тексте обещал «передам менеджеру» / «свяжемся» — regex.
@@ -984,13 +1054,26 @@ export async function generateChannelAIResponse(
     }
 
     // Save only text messages to history (not tool_use/tool_result blocks)
-    // Strip "— staffix.io" signature from history so Claude doesn't copy it
+    // Strip "— staffix.io" signature from history so Claude doesn't copy it.
+    //
+    // Если replyText — фолбэк (recovery не сработала, ответ клиенту нейтральный
+    // «уточню детали»), НЕ сохраняем этот ответ бота в историю. Иначе Claude
+    // при следующем turn'e видит его в контексте и может начать копировать
+    // «уточню детали» / «извините» вместо реальных ответов. User-turn сохраняем —
+    // это факт что клиент писал (важно для message counter'а и для контекста).
     const replyForHistory = replyText.replace(/\n\n— staffix\.io$/g, "").trim();
-    const updatedHistory = ([
+    const historyEntries: HistoryMessage[] = [
       ...history,
       { role: "user" as const, content: userMessage },
-      { role: "assistant" as const, content: replyForHistory },
-    ] as HistoryMessage[]).slice(-40); // keep last 40 messages
+    ];
+    if (!isFallback) {
+      historyEntries.push({ role: "assistant" as const, content: replyForHistory });
+    } else {
+      console.warn(
+        `[Channel AI] FALLBACK detected — NOT saving assistant reply to history. conv=${conv.id}`
+      );
+    }
+    const updatedHistory = historyEntries.slice(-40); // keep last 40 messages
 
     try {
       await prisma.channelConversation.update({

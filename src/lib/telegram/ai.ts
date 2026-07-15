@@ -362,16 +362,75 @@ export async function generateAIResponse(
       }
     }
 
-    // 8. Финальный текстовый ответ
-    const textBlocks = response.content.filter((block) => block.type === "text");
-    let assistantMessage: string;
-    if (textBlocks.length > 0 && textBlocks[0].type === "text") {
-      assistantMessage = textBlocks[0].text;
-    } else if (lastToolResults.length > 0) {
-      console.log("[Webhook] No text blocks in response, building from tool results");
+    // 8. Финальный текстовый ответ.
+    // Фильтруем NON-EMPTY text-блоки (Claude иногда шлёт `text: ""`).
+    // Если ничего — recovery-вызов Sonnet без tools + explicit user-nudge.
+    // Если и recovery пусто → buildFallbackFromToolResults → нейтральный фолбэк.
+    const collectText = (r: Anthropic.Message): string => {
+      const parts: string[] = [];
+      for (const block of r.content) {
+        if (block.type === "text" && block.text && block.text.trim()) {
+          parts.push(block.text);
+        }
+      }
+      return parts.join("\n\n").trim();
+    };
+
+    let assistantMessage = collectText(response);
+    let assistantIsFallback = false;
+
+    // Recovery: если пусто — форсируем текст ещё одним вызовом Sonnet без tools.
+    // Защита от tool-loop, дошедшего до maxIterations, и от API-ошибок в цикле,
+    // после которых response остаётся с только-tool_use блоками.
+    if (!assistantMessage) {
+      const reason =
+        response.stop_reason === "tool_use"
+          ? `tool_loop_exhausted (iterations=${iterations}/${maxIterations})`
+          : `empty_text (stop=${response.stop_reason})`;
+      console.warn(`[Webhook] EMPTY RESPONSE — recovery attempt. reason=${reason} biz=${businessId} tg=${telegramId}`);
+
+      try {
+        const recoveryMessages = [
+          ...recentMessages,
+          {
+            role: "user" as const,
+            content:
+              "Пожалуйста, ответь клиенту простым текстом одним-двумя предложениями. " +
+              "Не вызывай инструменты. Используй уже собранную информацию из контекста.",
+          },
+        ];
+        const recovery = await callClaudeWithRetry({
+          model: "claude-sonnet-5",
+          max_tokens: 400,
+          thinking: { type: "disabled" },
+          system: systemBlocks,
+          messages: recoveryMessages,
+          // tools намеренно опущены — форсируем текст
+        });
+        logClaudeUsage("tg/recovery", recovery.usage, { biz: businessId, tg: telegramId, orig_reason: reason });
+        assistantMessage = collectText(recovery);
+        if (assistantMessage) {
+          console.log(`[Webhook] RECOVERY succeeded: "${assistantMessage.slice(0, 80)}"`);
+        }
+      } catch (recoveryErr) {
+        console.error(`[Webhook] RECOVERY failed:`, recoveryErr);
+      }
+    }
+
+    // Второй эшелон: если recovery не помогла — пробуем собрать текст из tool_results
+    // (например «Заказ 123 оформлен» из результата create_order).
+    if (!assistantMessage && lastToolResults.length > 0) {
+      console.log("[Webhook] No text after recovery, building from tool results");
       assistantMessage = buildFallbackFromToolResults(lastToolResults, salesMode);
-    } else {
-      assistantMessage = "Чем ещё могу помочь?";
+    }
+
+    // Финальный fallback — нейтральный, помечен isFallback чтоб не заражать историю
+    if (!assistantMessage) {
+      assistantMessage = "Секундочку, я уточню. Задайте, пожалуйста, вопрос по нашим услугам ещё раз.";
+      assistantIsFallback = true;
+      console.error(
+        `[Webhook] FALLBACK reached — no text and no tool results. biz=${businessId} tg=${telegramId} stop=${response.stop_reason}`
+      );
     }
 
     // 8.5 SAFETY NET: если бот в этом обороте обещал «передал менеджеру» ИЛИ
@@ -433,9 +492,16 @@ export async function generateAIResponse(
       }
     }
 
-    // 9. Сохраняем в БД
+    // 9. Сохраняем в БД. User-turn — всегда. Assistant-turn — только если это
+    // РЕАЛЬНЫЙ ответ бота, а не финальный fallback («уточню детали»). Иначе
+    // Claude при следующем turn'e увидит fallback в истории и начнёт его копировать
+    // как валидный шаблон ответа — заражает диалог.
     await saveMessage(conversation.id, "user", userMessage);
-    await saveMessage(conversation.id, "assistant", assistantMessage);
+    if (!assistantIsFallback) {
+      await saveMessage(conversation.id, "assistant", assistantMessage);
+    } else {
+      console.warn(`[Webhook] FALLBACK — not saving assistant reply to history. conv=${conversation.id}`);
+    }
 
     // 10. Счётчик сообщений в разговоре
     await updateConversationMessageCount(conversation.id);
