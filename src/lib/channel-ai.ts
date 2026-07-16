@@ -974,8 +974,10 @@ export async function generateChannelAIResponse(
     const extractedPhoneCh = extractPhone(userMessage);
 
     // Был ли у клиента телефон до этого сообщения? Смотрим в ChannelClient.
-    let channelClientHadPhoneBefore = false;
-    if (extractedPhoneCh) {
+    // (Смотрим ВСЕГДА — не только когда клиент прислал телефон в этом turn'e —
+    //  чтобы hard-code guard ниже мог решить: перехватывать промис или нет.)
+    let channelClientPhoneOnRecord: string | null = null;
+    try {
       const existing = await prisma.channelClient.findFirst({
         where: {
           businessId,
@@ -987,40 +989,51 @@ export async function generateChannelAIResponse(
         },
         select: { phone: true },
       });
-      channelClientHadPhoneBefore = !!existing?.phone;
+      channelClientPhoneOnRecord = existing?.phone ?? null;
+    } catch {
+      // не критично
     }
+    const channelClientHadPhoneBefore = !!channelClientPhoneOnRecord;
     const newContactProvidedCh = !!extractedPhoneCh && !channelClientHadPhoneBefore;
+    const hasPhoneNowCh = !!(extractedPhoneCh || channelClientPhoneOnRecord);
+    const botPromisedCh = promisedForwardingRegex.test(replyText);
 
-    const shouldNotifyCh = !calledNotifyManagerCh && (
+    // ⚠️ HARD-CODE GUARD (июль 2026, AY 16 июля):
+    // Промпт-правило (fabc9fe) уменьшает частоту протечек, но не убирает их.
+    // Если бот ВСЁ ЖЕ пообещал «менеджер свяжется», НЕ вызвал notify_manager
+    // (значит это не осознанная эскалация клиента-жалобщика), И у нас нет
+    // телефона — ПЕРЕХВАТЫВАЕМ ответ. Клиент видит просьбу дать номер вместо
+    // ложного обещания. Эскалацию не отправляем — менеджер отработает когда
+    // телефон реально придёт (тогда сработает newContactProvidedCh trigger).
+    //
+    // Это защита от потери лидов: без guard'а бот говорил «свяжемся», клиент
+    // ждал, но менеджеру нечем было связаться. С guard'ом клиент видит нормальный
+    // запрос телефона.
+    let promiseIntercepted = false;
+    if (botPromisedCh && !calledNotifyManagerCh && !hasPhoneNowCh) {
+      console.warn(
+        `[Channel AI] HARD-CODE GUARD: prompt leaked promise without phone — intercepting. business=${businessId} channel=${channel}`
+      );
+      replyText =
+        "Отлично! Чтобы менеджер мог с Вами связаться и всё подробно рассказать — " +
+        "подскажите, пожалуйста, Ваш номер телефона и удобное время для звонка.";
+      promiseIntercepted = true;
+    }
+
+    const shouldNotifyCh = !calledNotifyManagerCh && !promiseIntercepted && (
       promisedForwardingRegex.test(replyText) || newContactProvidedCh
     );
 
     if (shouldNotifyCh) {
       const trigger = newContactProvidedCh ? "new-contact" : "handoff-promise";
 
-      // Знаем ли мы телефон клиента (текущий + ранее сохранённый)?
-      // Для handoff-promise без телефона — предупреждаем менеджера что нужно
-      // ответить в DM, а не звонить в пустоту (см. AY 15 июля 2026 — Capital Academy
-      // теряла контакты потому что бот обещал но номер не спрашивал).
-      let existingClientPhone: string | null = null;
-      try {
-        const existingClient = await prisma.channelClient.findFirst({
-          where: {
-            businessId,
-            OR: [
-              { instagramId: clientId },
-              { fbPsid: clientId },
-              { whatsappPhone: clientId },
-            ],
-          },
-          select: { phone: true },
-        });
-        existingClientPhone = existingClient?.phone ?? null;
-      } catch {
-        // не критично для эскалации
-      }
-
-      const hasPhone = !!(extractedPhoneCh || existingClientPhone);
+      // Данные телефона взяли выше (channelClientPhoneOnRecord + extractedPhoneCh
+      // + hasPhoneNowCh) — не дублируем запрос. После добавления HARD-CODE GUARD
+      // ветка handoff-promise без телефона фактически не должна доходить сюда
+      // (guard перехватил бы), но оставляем защитную логику на случай race
+      // conditions или неожиданных путей.
+      const existingClientPhone = channelClientPhoneOnRecord;
+      const hasPhone = hasPhoneNowCh;
       const missingPhoneForHandoff = trigger === "handoff-promise" && !hasPhone;
 
       console.warn(

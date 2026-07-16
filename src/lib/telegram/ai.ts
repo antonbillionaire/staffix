@@ -447,41 +447,54 @@ export async function generateAIResponse(
     const calledNotifyManager = calledToolNames.includes("notify_manager");
     const extractedPhoneEarly = extractPhone(userMessage);
 
-    // Был ли у клиента телефон ДО этого сообщения — отличаем "только что дал контакт"
-    // от "давно у нас в базе с телефоном" чтобы не спамить владельца.
-    let clientHadPhoneBefore = false;
-    if (extractedPhoneEarly) {
+    // Смотрим ЛЮБОЙ сохранённый телефон клиента (не только когда пришёл в этом
+    // turn'e) — нужно для hard-code guard ниже. Раньше проверяли только когда
+    // extractedPhoneEarly !== null, из-за чего guard не мог решить перехватывать
+    // ли обещание для клиентов у которых номер уже был в базе.
+    let clientPhoneOnRecord: string | null = null;
+    try {
       const existing = await prisma.client.findUnique({
         where: { businessId_telegramId: { businessId, telegramId } },
         select: { phone: true },
       });
-      clientHadPhoneBefore = !!existing?.phone;
+      clientPhoneOnRecord = existing?.phone ?? null;
+    } catch {
+      // не критично
     }
+    const clientHadPhoneBefore = !!clientPhoneOnRecord;
     const newContactProvided = !!extractedPhoneEarly && !clientHadPhoneBefore;
+    const hasPhoneNowTg = !!(extractedPhoneEarly || clientPhoneOnRecord);
+    const botPromisedTg = promisedForwardingRegex.test(assistantMessage);
 
-    const shouldNotify = !calledNotifyManager && (
+    // ⚠️ HARD-CODE GUARD (июль 2026, AY 16 июля): промпт-правило может протечь.
+    // Если бот пообещал «менеджер свяжется» БЕЗ телефона и не вызвал
+    // notify_manager сам — ПЕРЕХВАТЫВАЕМ ответ. Клиент видит запрос номера,
+    // эскалация не отправляется (менеджер отработает когда телефон реально
+    // придёт через newContactProvided trigger).
+    let promiseInterceptedTg = false;
+    if (botPromisedTg && !calledNotifyManager && !hasPhoneNowTg) {
+      console.warn(
+        `[Webhook] HARD-CODE GUARD: prompt leaked promise without phone — intercepting. business=${businessId}`
+      );
+      assistantMessage =
+        "Отлично! Чтобы менеджер мог с Вами связаться и всё подробно рассказать — " +
+        "подскажите, пожалуйста, Ваш номер телефона и удобное время для звонка.";
+      promiseInterceptedTg = true;
+    }
+
+    const shouldNotify = !calledNotifyManager && !promiseInterceptedTg && (
       promisedForwardingRegex.test(assistantMessage) || newContactProvided
     );
 
     if (shouldNotify) {
       const trigger = newContactProvided ? "new-contact" : "handoff-promise";
 
-      // Знаем ли мы телефон клиента (текущий + ранее сохранённый)? Для
-      // handoff-promise БЕЗ телефона — предупреждаем менеджера чтобы ответил
-      // клиенту в TG, а не звонил в пустоту. См. AY 15 июля — Capital Academy
-      // терял контакты потому что бот обещал но номер не спрашивал.
-      let existingClientPhone: string | null = null;
-      try {
-        const existingClient = await prisma.client.findUnique({
-          where: { businessId_telegramId: { businessId, telegramId } },
-          select: { phone: true },
-        });
-        existingClientPhone = existingClient?.phone ?? null;
-      } catch {
-        // не критично для эскалации
-      }
-
-      const hasPhone = !!(extractedPhoneEarly || existingClientPhone);
+      // Телефон уже подтянули выше (clientPhoneOnRecord + hasPhoneNowTg).
+      // После добавления HARD-CODE GUARD ветка handoff-promise без телефона
+      // фактически не должна доходить сюда — guard перехватил бы. Оставляем
+      // защитную логику ниже на случай race conditions.
+      const existingClientPhone = clientPhoneOnRecord;
+      const hasPhone = hasPhoneNowTg;
       const missingPhoneForHandoff = trigger === "handoff-promise" && !hasPhone;
 
       console.warn(
