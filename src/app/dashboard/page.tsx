@@ -78,7 +78,7 @@ export default function DashboardPage() {
     status: string;
     dueAt: string | null;
     createdBy: string | null;
-    client: { id: string; name: string | null; phone: string | null } | null;
+    client: { id: string; name: string | null; phone: string | null; telegramUsername: string | null } | null;
     // NEW: канал + ID клиента в канале для построения ссылки на переписку
     clientChannel: string | null;
     clientChannelId: string | null;
@@ -430,6 +430,9 @@ export default function DashboardPage() {
                           className={`${textMuted} hover:text-blue-400 truncate`}
                         >
                           {task.client.name || task.client.phone || "клиент"}
+                          {task.client.telegramUsername && (
+                            <span className="ml-1 opacity-70">@{task.client.telegramUsername}</span>
+                          )}
                         </Link>
                       )}
                       {/* NEW: прямая ссылка на переписку в /dashboard/messages */}

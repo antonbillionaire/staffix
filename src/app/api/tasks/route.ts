@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       clientIds.length
         ? prisma.client.findMany({
             where: { id: { in: clientIds } },
-            select: { id: true, name: true, phone: true },
+            select: { id: true, name: true, phone: true, telegramUsername: true },
           })
         : Promise.resolve([]),
       staffIds.length

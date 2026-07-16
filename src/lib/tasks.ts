@@ -26,6 +26,10 @@ export async function createEscalationTask(params: {
     let clientId: string | null = null;
     let resolvedClientName = params.clientName?.trim() || "клиент";
 
+    // Для TG подтягиваем ещё @username — чтобы в заголовке задачи было
+    // видно куда именно писать («связаться с @ann_matveeva»), а не просто
+    // «связаться с клиентом» без опознавательных знаков.
+    let telegramUsername: string | null = null;
     if (params.clientTelegramId) {
       const client = await prisma.client.findUnique({
         where: {
@@ -34,11 +38,12 @@ export async function createEscalationTask(params: {
             telegramId: params.clientTelegramId,
           },
         },
-        select: { id: true, name: true, assignedStaffId: true },
+        select: { id: true, name: true, telegramUsername: true, assignedStaffId: true },
       });
       if (client) {
         clientId = client.id;
         if (client.name) resolvedClientName = client.name;
+        if (client.telegramUsername) telegramUsername = client.telegramUsername;
       }
     }
 
@@ -62,7 +67,8 @@ export async function createEscalationTask(params: {
       dueAt.setHours(dueAt.getHours() + 4);
     }
 
-    // Заголовок с меткой канала — сразу видно откуда клиент
+    // Заголовок с меткой канала — сразу видно откуда клиент.
+    // Для TG приклеиваем @username в скобках если он известен.
     const channelLabel: Record<string, string> = {
       telegram: "TG",
       whatsapp: "WA",
@@ -70,9 +76,12 @@ export async function createEscalationTask(params: {
       facebook: "FB",
     };
     const chLabel = params.clientChannel ? channelLabel[params.clientChannel] : null;
+    const nameWithHandle = telegramUsername
+      ? `${resolvedClientName} (@${telegramUsername})`
+      : resolvedClientName;
     const title = chLabel
-      ? `Связаться с клиентом (${chLabel}): ${resolvedClientName}`
-      : `Связаться с клиентом: ${resolvedClientName}`;
+      ? `Связаться с клиентом (${chLabel}): ${nameWithHandle}`
+      : `Связаться с клиентом: ${nameWithHandle}`;
 
     await prisma.task.create({
       data: {
