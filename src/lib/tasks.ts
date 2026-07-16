@@ -13,6 +13,11 @@ import { prisma } from "./prisma";
 export async function createEscalationTask(params: {
   businessId: string;
   clientTelegramId?: bigint;
+  // Канал и ID клиента в канале — нужны чтобы из задачи сделать прямую ссылку
+  // на переписку в /dashboard/messages. Для TG передаём "telegram" + str(chatId).
+  // Для WA/IG/FB — соответствующий channel + clientId из ChannelClient.
+  clientChannel?: string;
+  clientChannelId?: string;
   clientName?: string;
   reason: string;
   urgency?: string | null;
@@ -57,13 +62,27 @@ export async function createEscalationTask(params: {
       dueAt.setHours(dueAt.getHours() + 4);
     }
 
+    // Заголовок с меткой канала — сразу видно откуда клиент
+    const channelLabel: Record<string, string> = {
+      telegram: "TG",
+      whatsapp: "WA",
+      instagram: "IG",
+      facebook: "FB",
+    };
+    const chLabel = params.clientChannel ? channelLabel[params.clientChannel] : null;
+    const title = chLabel
+      ? `Связаться с клиентом (${chLabel}): ${resolvedClientName}`
+      : `Связаться с клиентом: ${resolvedClientName}`;
+
     await prisma.task.create({
       data: {
         businessId: params.businessId,
         clientId,
         assignedStaffId,
-        title: `Связаться с клиентом: ${resolvedClientName}`,
-        description: params.reason.slice(0, 1000),
+        clientChannel: params.clientChannel || null,
+        clientChannelId: params.clientChannelId || null,
+        title,
+        description: params.reason.slice(0, 2000), // подняли лимит с 1000 — контекст стал богаче
         priority: isUrgent ? "high" : "normal",
         dueAt,
         createdBy: "ai",

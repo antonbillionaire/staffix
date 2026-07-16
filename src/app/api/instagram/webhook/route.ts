@@ -202,7 +202,9 @@ export async function POST(request: Request) {
             const { createEscalationTask } = await import("@/lib/tasks");
             await createEscalationTask({
               businessId: biz.id,
-              reason: `Негативная эмодзи-реакция клиента: "${messageText.slice(0, 100)}"`,
+              clientChannel: "instagram",
+              clientChannelId: sender.id,
+              reason: `Негативная эмодзи-реакция клиента в Instagram DM: "${messageText.slice(0, 100)}"\n\nОтветьте клиенту в IG DM — узнайте что случилось.`,
               urgency: "urgent",
             });
             console.log(`[IG Webhook] emoji-only negative → template + escalated biz=${biz.id}`);

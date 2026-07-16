@@ -928,6 +928,14 @@ model Task {
   clientId String?
   client   Client? @relation("TaskClient", fields: [clientId], references: [id], onDelete: SetNull)
 
+  // Для эскалаций от бота (июль 2026) — сохраняем канал и ID клиента в канале,
+  // чтобы из задачи можно было построить прямую ссылку на переписку в дашборде.
+  // Nullable — ручные задачи и старые задачи их не имеют.
+  //   clientChannel:   telegram | whatsapp | instagram | facebook
+  //   clientChannelId: TG username/chatId, IG scoped ID, WA phone, FB PSID
+  clientChannel   String?
+  clientChannelId String?
+
   title       String // "Перезвонить Ивану", "Подготовить КП"
   description String? @db.Text
 

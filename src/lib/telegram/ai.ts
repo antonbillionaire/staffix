@@ -518,6 +518,21 @@ export async function generateAIResponse(
         const urgency = missingPhoneForHandoff ? "urgent" : "normal";
         await notifyManagerByTelegram(businessId, telegramId, reason, userName, urgency);
         console.log(`[Webhook] SAFETY NET: notify_manager fired (${trigger}) for business=${businessId}`);
+
+        // Также создаём Task чтобы менеджер видел эту эскалацию в дашборде,
+        // не только в TG-пуше. См. AY 16 июля 2026 — Right Flight: эскалаций
+        // много в статистике, но в /dashboard задач мало потому что safety-net
+        // раньше писал только Notification, не Task.
+        const { createEscalationTask } = await import("@/lib/tasks");
+        createEscalationTask({
+          businessId,
+          clientTelegramId: telegramId,
+          clientChannel: "telegram",
+          clientChannelId: telegramId.toString(),
+          clientName: userName,
+          reason,
+          urgency,
+        }).catch(() => {});
       } catch (e) {
         console.error("[Webhook] SAFETY NET notify_manager failed:", e);
       }

@@ -1611,6 +1611,8 @@ export async function executeSalesTool(
         createEscalationTask({
           businessId,
           clientTelegramId: telegramId > BigInt(0) ? telegramId : undefined,
+          clientChannel: "telegram",
+          clientChannelId: telegramId.toString(),
           clientName: toolInput.client_name as string | undefined,
           reason: (toolInput.reason as string) || "AI попросил человека",
           urgency: toolInput.urgency as string | undefined,

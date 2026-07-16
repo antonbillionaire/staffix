@@ -567,6 +567,8 @@ async function handleChannelToolCall(
         createEscalationTask({
           businessId,
           clientName: toolInput.client_name,
+          clientChannel: channel,
+          clientChannelId: clientId,
           reason: toolInput.reason || "AI попросил человека",
           urgency: toolInput.urgency,
         }).catch(() => {});
@@ -1063,6 +1065,20 @@ export async function generateChannelAIResponse(
 
         const urgency = missingPhoneForHandoff ? "urgent" : "normal";
         await notifyManagerByTelegram(businessId, BigInt(0), reason, clientName, urgency);
+
+        // Также создаём Task чтобы менеджер видел эту эскалацию в дашборде,
+        // не только в TG-пуше (июль 2026 — раньше safety-net'ы генерировали
+        // Notification, но НЕ Task; поэтому в /dashboard задач было мало
+        // по сравнению с реальным потоком эскалаций).
+        const { createEscalationTask } = await import("@/lib/tasks");
+        createEscalationTask({
+          businessId,
+          clientChannel: channel,
+          clientChannelId: clientId,
+          clientName,
+          reason,
+          urgency,
+        }).catch(() => {});
       } catch (e) {
         console.error("[Channel AI] SAFETY NET notify_manager failed:", e);
       }

@@ -163,6 +163,25 @@ export default function MessagesPage() {
     return () => clearInterval(interval);
   }, [fetchConversations]);
 
+  // Auto-select переписки по URL параметрам ?clientId=X&channel=Y — используется
+  // для прямых переходов из карточки задачи в дашборде (июль 2026, AY 16 июля).
+  // Отработает один раз при первой загрузке; если параметров нет — ничего не делает.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const urlClientId = url.searchParams.get("clientId");
+    const urlChannel = url.searchParams.get("channel");
+    if (urlClientId && urlChannel && !selectedClient) {
+      // Ждём короткий момент чтобы conversations успели подтянуться,
+      // потом принудительно открываем нужный диалог.
+      const t = setTimeout(() => {
+        fetchMessages(urlClientId, urlChannel);
+      }, 300);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const fetchMessages = async (clientId: string, channel: string) => {
     setLoadingMessages(true);
     setSelectedClient(clientId);

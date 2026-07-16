@@ -79,12 +79,17 @@ export default function DashboardPage() {
     dueAt: string | null;
     createdBy: string | null;
     client: { id: string; name: string | null; phone: string | null } | null;
+    // NEW: канал + ID клиента в канале для построения ссылки на переписку
+    clientChannel: string | null;
+    clientChannelId: string | null;
   }>>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
 
   const refreshTasks = async () => {
     try {
-      const res = await fetch("/api/tasks?status=pending&limit=10");
+      // Лимит 20 — увеличили с 10 после AY 16 июля (у Right Flight эскалаций
+      // больше чем задач влезало в старый лимит, часть уходила «за экран»).
+      const res = await fetch("/api/tasks?status=pending&limit=20");
       if (res.ok) {
         const data = await res.json();
         setTasks(data.tasks || []);
@@ -416,9 +421,9 @@ export default function DashboardPage() {
                       )}
                     </div>
                     {task.description && (
-                      <p className={`text-xs ${textSecondary} mt-1 line-clamp-2`}>{task.description}</p>
+                      <p className={`text-xs ${textSecondary} mt-1 whitespace-pre-line line-clamp-4`}>{task.description}</p>
                     )}
-                    <div className="flex items-center gap-3 mt-1 text-xs">
+                    <div className="flex items-center gap-3 mt-2 text-xs flex-wrap">
                       {task.client && (
                         <Link
                           href={`/dashboard/customers/${task.client.id}`}
@@ -427,6 +432,31 @@ export default function DashboardPage() {
                           {task.client.name || task.client.phone || "клиент"}
                         </Link>
                       )}
+                      {/* NEW: прямая ссылка на переписку в /dashboard/messages */}
+                      {task.clientChannel && task.clientChannelId && (
+                        <Link
+                          href={`/dashboard/messages?clientId=${encodeURIComponent(task.clientChannelId)}&channel=${encodeURIComponent(task.clientChannel)}`}
+                          className={`inline-flex items-center gap-1 hover:text-blue-400 ${textMuted}`}
+                        >
+                          <MessageSquare className="h-3 w-3" />
+                          Открыть диалог
+                        </Link>
+                      )}
+                      {/* NEW: плашка канала — сразу видно откуда клиент */}
+                      {task.clientChannel && (() => {
+                        const chBadge: Record<string, string> = {
+                          telegram: isDark ? "bg-blue-500/20 text-blue-300" : "bg-blue-100 text-blue-700",
+                          whatsapp: isDark ? "bg-green-500/20 text-green-300" : "bg-green-100 text-green-700",
+                          instagram: isDark ? "bg-pink-500/20 text-pink-300" : "bg-pink-100 text-pink-700",
+                          facebook: isDark ? "bg-blue-600/20 text-blue-300" : "bg-blue-100 text-blue-800",
+                        };
+                        const cls = chBadge[task.clientChannel] || (isDark ? "bg-gray-500/20 text-gray-300" : "bg-gray-100 text-gray-700");
+                        return (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase ${cls}`}>
+                            {task.clientChannel}
+                          </span>
+                        );
+                      })()}
                       {dueLabel && (
                         <span className={isOverdue ? "text-orange-400" : textMuted}>
                           <Clock className="h-3 w-3 inline mr-1" />

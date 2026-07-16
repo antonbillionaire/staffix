@@ -133,6 +133,8 @@ export async function handleToolCall(
         createEscalationTask({
           businessId,
           clientTelegramId: telegramId,
+          clientChannel: "telegram",
+          clientChannelId: telegramId.toString(),
           clientName: toolInput.client_name,
           reason: toolInput.reason || "AI попросил человека",
           urgency: toolInput.urgency,
