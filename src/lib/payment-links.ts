@@ -1,5 +1,5 @@
 /**
- * Payment Link Generator for Payme, Click, Kaspi
+ * Payment Link Generator for Payme, Click
  * Генерация ссылок на оплату без API регистрации.
  * Деньги идут напрямую на счёт владельца.
  */
@@ -8,7 +8,6 @@ interface BusinessPaymentConfig {
   paymeId?: string | null;
   clickServiceId?: string | null;
   clickMerchantId?: string | null;
-  kaspiPayLink?: string | null;
 }
 
 /**
@@ -81,13 +80,6 @@ export function getPaymentButtons(
     });
   }
 
-  if (business.kaspiPayLink) {
-    buttons.push({
-      text: "💳 Kaspi Pay",
-      url: business.kaspiPayLink,
-    });
-  }
-
   if (buttons.length === 0) return [];
 
   // Telegram inline keyboard: массив строк, каждая строка — массив кнопок
@@ -99,14 +91,3 @@ export function getPaymentButtons(
   return rows;
 }
 
-/**
- * Текст для Kaspi Pay (без динамической ссылки)
- * Возвращает строку которую бот добавит к сообщению об оплате
- */
-export function getKaspiPayText(
-  kaspiPayLink: string,
-  amountSum: number,
-  orderNumber: string | number
-): string {
-  return `💳 <b>Kaspi Pay:</b> ${kaspiPayLink}\nСумма: <b>${amountSum.toLocaleString("ru-RU")} тнг</b> | Заказ #${orderNumber}`;
-}

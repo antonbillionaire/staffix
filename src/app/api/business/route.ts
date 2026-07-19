@@ -186,7 +186,7 @@ export async function PUT(request: Request) {
     }
 
     const data = await request.json();
-    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, botLogo, timezone, ownerTelegramUsername, paymeId, clickServiceId, clickMerchantId, kaspiPayLink, waPhoneNumberId, waAccessToken, waVerifyToken, waActive, fbPageId, fbPageAccessToken, fbVerifyToken, fbActive, businessTypes, language, deliveryEnabled, deliveryTimeFrom, deliveryTimeTo, deliveryFee, deliveryFreeFrom, deliveryZones, consultationsEnabled, leadAssignmentMode } = data;
+    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, botLogo, timezone, ownerTelegramUsername, paymeId, clickServiceId, clickMerchantId, waPhoneNumberId, waAccessToken, waVerifyToken, waActive, fbPageId, fbPageAccessToken, fbVerifyToken, fbActive, businessTypes, language, deliveryEnabled, deliveryTimeFrom, deliveryTimeTo, deliveryFee, deliveryFreeFrom, deliveryZones, consultationsEnabled, leadAssignmentMode } = data;
 
     // Найти бизнес пользователя
     const existingBusiness = await prisma.business.findFirst({
@@ -216,7 +216,6 @@ export async function PUT(request: Request) {
     if (paymeId !== undefined) updateData.paymeId = paymeId || null;
     if (clickServiceId !== undefined) updateData.clickServiceId = clickServiceId || null;
     if (clickMerchantId !== undefined) updateData.clickMerchantId = clickMerchantId || null;
-    if (kaspiPayLink !== undefined) updateData.kaspiPayLink = kaspiPayLink || null;
 
     // Business types, language, delivery
     if (businessTypes !== undefined) updateData.businessTypes = businessTypes;

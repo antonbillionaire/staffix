@@ -1224,7 +1224,6 @@ async function notifyNewOrder(
         paymeId: true,
         clickServiceId: true,
         clickMerchantId: true,
-        kaspiPayLink: true,
         country: true,
       },
     });
@@ -1331,7 +1330,6 @@ async function notifyNewOrder(
           paymeId: business.paymeId,
           clickServiceId: business.clickServiceId,
           clickMerchantId: business.clickMerchantId,
-          kaspiPayLink: business.kaspiPayLink,
         },
         order.totalPrice,
         order.orderNumber

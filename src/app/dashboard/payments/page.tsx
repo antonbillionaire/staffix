@@ -15,7 +15,6 @@ export default function PaymentsPage() {
     paymeId: "",
     clickServiceId: "",
     clickMerchantId: "",
-    kaspiPayLink: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -32,7 +31,6 @@ export default function PaymentsPage() {
               paymeId: data.business.paymeId || "",
               clickServiceId: data.business.clickServiceId || "",
               clickMerchantId: data.business.clickMerchantId || "",
-              kaspiPayLink: data.business.kaspiPayLink || "",
             });
           }
         }
@@ -87,7 +85,7 @@ export default function PaymentsPage() {
             </h3>
             <p className="text-sm text-gray-600 leading-relaxed">
               Staffix только помогает <strong>настроить</strong> кнопки оплаты в боте.
-              Все платежи проходят <strong>напрямую</strong> через платёжного оператора (Payme, Click, Kaspi) —
+              Все платежи проходят <strong>напрямую</strong> через платёжного оператора (Payme, Click) —
               без посредников и без участия Staffix.
             </p>
           </div>
@@ -109,7 +107,7 @@ export default function PaymentsPage() {
           </div>
           <div>
             <h2 className="text-lg font-semibold text-white">Приём оплаты</h2>
-            <p className="text-sm text-gray-400">Payme, Click, Kaspi — клиент платит прямо в Telegram</p>
+            <p className="text-sm text-gray-400">Payme, Click — клиент платит прямо в Telegram</p>
           </div>
         </div>
 
@@ -169,25 +167,6 @@ export default function PaymentsPage() {
           </p>
         </div>
 
-        {/* Kaspi */}
-        <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-base">🔴</span>
-            <label className="text-sm font-semibold text-white">Kaspi Pay</label>
-          </div>
-          <label className="block text-xs text-gray-400 mb-1.5">Ссылка для оплаты</label>
-          <input
-            type="url"
-            value={paymentSettings.kaspiPayLink}
-            onChange={(e) => setPaymentSettings({ ...paymentSettings, kaspiPayLink: e.target.value })}
-            placeholder="https://kaspi.kz/pay/..."
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-red-500/50 transition-colors"
-          />
-          <p className="text-xs text-gray-500 mt-1.5">
-            Ваша персональная ссылка Kaspi для получения оплаты
-          </p>
-        </div>
-
         <button
           onClick={handleSave}
           disabled={saving}
@@ -217,7 +196,7 @@ export default function PaymentsPage() {
           </li>
           <li className="flex gap-3">
             <span className="flex-shrink-0 w-6 h-6 bg-white/10 text-white rounded-lg flex items-center justify-center text-xs font-bold">3</span>
-            <span>Клиент нажимает кнопку и оплачивает напрямую через Payme/Click/Kaspi</span>
+            <span>Клиент нажимает кнопку и оплачивает напрямую через Payme/Click</span>
           </li>
           <li className="flex gap-3">
             <span className="flex-shrink-0 w-6 h-6 bg-white/10 text-white rounded-lg flex items-center justify-center text-xs font-bold">4</span>
