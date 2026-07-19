@@ -243,8 +243,12 @@ export async function PUT(request: Request) {
 
     // WhatsApp
     if (waPhoneNumberId !== undefined) updateData.waPhoneNumberId = waPhoneNumberId || null;
-    if (waAccessToken !== undefined && !isMasked(waAccessToken)) updateData.waAccessToken = waAccessToken || null;
-    if (waVerifyToken !== undefined && !isMasked(waVerifyToken)) updateData.waVerifyToken = waVerifyToken || null;
+    if (waAccessToken !== undefined && !isMasked(waAccessToken)) {
+      updateData.waAccessToken = waAccessToken ? encrypt(waAccessToken) : null;
+    }
+    if (waVerifyToken !== undefined && !isMasked(waVerifyToken)) {
+      updateData.waVerifyToken = waVerifyToken ? encrypt(waVerifyToken) : null;
+    }
     if (waActive !== undefined) {
       // Validate required fields before activating
       const phoneId = waPhoneNumberId ?? existingBusiness.waPhoneNumberId;
@@ -260,8 +264,12 @@ export async function PUT(request: Request) {
 
     // Facebook Messenger
     if (fbPageId !== undefined) updateData.fbPageId = fbPageId || null;
-    if (fbPageAccessToken !== undefined && !isMasked(fbPageAccessToken)) updateData.fbPageAccessToken = fbPageAccessToken || null;
-    if (fbVerifyToken !== undefined && !isMasked(fbVerifyToken)) updateData.fbVerifyToken = fbVerifyToken || null;
+    if (fbPageAccessToken !== undefined && !isMasked(fbPageAccessToken)) {
+      updateData.fbPageAccessToken = fbPageAccessToken ? encrypt(fbPageAccessToken) : null;
+    }
+    if (fbVerifyToken !== undefined && !isMasked(fbVerifyToken)) {
+      updateData.fbVerifyToken = fbVerifyToken ? encrypt(fbVerifyToken) : null;
+    }
     if (fbActive !== undefined) updateData.fbActive = Boolean(fbActive);
 
     // Если передан токен бота - валидируем и регистрируем/перерегистрируем webhook.

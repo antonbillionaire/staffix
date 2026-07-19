@@ -925,33 +925,81 @@ export async function createOrder(
     });
     const orderNumber = (lastOrder?.orderNumber ?? 1000) + 1;
 
-    // Создаём заказ
-    const order = await prisma.order.create({
-      data: {
-        businessId,
-        orderNumber,
-        clientName,
-        clientPhone: clientPhone || null,
-        clientAddress: clientAddress || null,
-        clientTelegramId: telegramId,
-        clientChannel: channel || (telegramId > BigInt(0) ? "telegram" : null),
-        clientChannelId: channelClientId || null,
-        clientNotes: notes || null,
-        totalPrice: finalPrice,
-        paymentMethod: paymentMethod || null,
-        staffId: assignedStaffId,
-        status: "new",
-        items: {
-          create: orderItemsData.map((item) => ({
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
+    // Атомарно создаём заказ + декрементим остатки в одной транзакции.
+    // Для каждого товара с ограниченным stock используем updateMany с условием
+    // stock >= quantity — если между findMany и этой транзакцией другой заказ
+    // "съел" остаток, count === 0 → бросаем OUT_OF_STOCK и rollback'аем весь заказ.
+    // Иначе получили бы отрицательный stock (два параллельных заказа проходят
+    // проверку до create, оба декрементят — конфликт).
+    let order: Awaited<ReturnType<typeof prisma.order.create>> & {
+      items: Array<{ id: string; name: string; price: number; quantity: number; productId: string | null }>;
+    };
+    const stockUpdates: Array<{ productId: string; previousStock: number; newStock: number; quantity: number; productName: string }> = [];
+    try {
+      order = await prisma.$transaction(async (tx) => {
+        const created = await tx.order.create({
+          data: {
+            businessId,
+            orderNumber,
+            clientName,
+            clientPhone: clientPhone || null,
+            clientAddress: clientAddress || null,
+            clientTelegramId: telegramId,
+            clientChannel: channel || (telegramId > BigInt(0) ? "telegram" : null),
+            clientChannelId: channelClientId || null,
+            clientNotes: notes || null,
+            totalPrice: finalPrice,
+            paymentMethod: paymentMethod || null,
+            staffId: assignedStaffId,
+            status: "new",
+            items: {
+              create: orderItemsData.map((item) => ({
+                name: item.name,
+                price: item.price,
+                quantity: item.quantity,
+                productId: item.productId,
+              })),
+            },
+          },
+          include: { items: true },
+        });
+
+        for (const item of created.items) {
+          if (!item.productId) continue;
+          const product = products.find((p) => p.id === item.productId);
+          if (!product || product.stock === null) continue;
+
+          const previousStock = product.stock;
+          const conditional = await tx.product.updateMany({
+            where: { id: item.productId, stock: { gte: item.quantity } },
+            data: { stock: { decrement: item.quantity } },
+          });
+          if (conditional.count === 0) {
+            throw new Error(`OUT_OF_STOCK:${product.name}`);
+          }
+          const newStock = previousStock - item.quantity;
+          stockUpdates.push({
             productId: item.productId,
-          })),
-        },
-      },
-      include: { items: true },
-    });
+            previousStock,
+            newStock,
+            quantity: item.quantity,
+            productName: product.name,
+          });
+        }
+
+        return created;
+      });
+    } catch (txError) {
+      const msg = txError instanceof Error ? txError.message : String(txError);
+      if (msg.startsWith("OUT_OF_STOCK:")) {
+        const name = msg.slice("OUT_OF_STOCK:".length);
+        return {
+          success: false,
+          error: `Товар "${name}" разобрали пока мы формировали заказ. Проверьте наличие и попробуйте ещё раз.`,
+        };
+      }
+      throw txError;
+    }
 
     // Auto-promote in deal pipeline: order created = paid client.
     // dealValue picks up the order total (only if higher than what's already
@@ -961,35 +1009,25 @@ export async function createOrder(
       promoteDealStageByTelegram(businessId, telegramId, "client", finalPrice).catch(() => {});
     }
 
-    // Уменьшаем stock для товаров с ограниченным наличием + уведомляем о низком остатке
-    for (const item of order.items) {
-      if (item.productId) {
-        const product = products.find((p) => p.id === item.productId);
-        if (product && product.stock !== null) {
-          const previousStock = product.stock;
-          const updated = await prisma.product.update({
-            where: { id: item.productId },
-            data: { stock: { decrement: item.quantity } },
-          });
-          // Log stock change
-          prisma.stockLog.create({
-            data: {
-              productId: item.productId,
-              previousStock,
-              newStock: updated.stock,
-              change: -item.quantity,
-              reason: "order",
-              orderId: order.id,
-            },
-          }).catch(() => {});
-          // Low stock notification
-          if (updated.stock !== null && updated.stock <= LOW_STOCK_THRESHOLD && updated.stock >= 0) {
-            const stockMsg = updated.stock === 0
-              ? `<b>Товар закончился!</b>\n"${product.name}" — остаток: 0 шт.`
-              : `<b>Мало на складе!</b>\n"${product.name}" — осталось: ${updated.stock} шт.`;
-            sendOwnerNotification(businessId, stockMsg).catch(() => {});
-          }
-        }
+    // Post-transaction: логируем stock-изменения + уведомляем о низком остатке.
+    // Вынесено из транзакции — это не должно её растягивать/фейлить (fire-and-forget).
+    for (const s of stockUpdates) {
+      prisma.stockLog.create({
+        data: {
+          productId: s.productId,
+          previousStock: s.previousStock,
+          newStock: s.newStock,
+          change: -s.quantity,
+          reason: "order",
+          orderId: order.id,
+        },
+      }).catch((e) => console.error("stockLog create failed:", e));
+
+      if (s.newStock <= LOW_STOCK_THRESHOLD && s.newStock >= 0) {
+        const stockMsg = s.newStock === 0
+          ? `<b>Товар закончился!</b>\n"${s.productName}" — остаток: 0 шт.`
+          : `<b>Мало на складе!</b>\n"${s.productName}" — осталось: ${s.newStock} шт.`;
+        sendOwnerNotification(businessId, stockMsg).catch(() => {});
       }
     }
 
