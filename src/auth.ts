@@ -7,6 +7,18 @@ import bcrypt from "bcryptjs";
 import { notifyNewRegistration } from "@/lib/admin-notify";
 import { sendPartnerNewReferralEmail } from "@/lib/email";
 import { normalizeEmail } from "@/lib/partner-helpers";
+import { rateLimit } from "@/lib/rate-limit";
+
+// Извлекаем IP из request headers для rate-limit'а.
+// В NextAuth v5 authorize(credentials, request) получает Request с headers.
+function extractClientIp(request: Request | undefined): string {
+  if (!request) return "unknown";
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
+  return "unknown";
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   // Session: JWT with 14-day persistence (survives browser close)
@@ -38,12 +50,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Email и пароль обязательны");
         }
 
         const emailLower = (credentials.email as string).toLowerCase().trim();
+
+        // Rate-limit по IP (30/15min — комфортно для офиса за NAT) и по email
+        // (5/15min — таргетированный брутфорс на конкретный аккаунт).
+        // fail-closed: во время лага БД не открываем окно безлимитного подбора.
+        const ip = extractClientIp(request);
+        const [ipCheck, emailCheck] = await Promise.all([
+          rateLimit(`nextauth:ip:${ip}`, 30, 15, "closed"),
+          rateLimit(`nextauth:email:${emailLower}`, 5, 15, "closed"),
+        ]);
+        if (!ipCheck.allowed || !emailCheck.allowed) {
+          throw new Error("Слишком много попыток входа. Попробуйте через 15 минут");
+        }
         const user = await prisma.user.findUnique({
           where: { email: emailLower },
         });

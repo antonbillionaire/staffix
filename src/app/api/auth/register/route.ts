@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   try {
     // Rate limiting: 3 регистрации за 60 минут с одного IP
     const ip = getClientIp(request);
-    const { allowed, retryAfterSeconds } = await rateLimit(`register:${ip}`, 3, 60);
+    const { allowed, retryAfterSeconds } = await rateLimit(`register:${ip}`, 3, 60, "closed");
     if (!allowed) {
       return NextResponse.json(
         { error: `Слишком много попыток регистрации. Попробуйте через ${Math.ceil(retryAfterSeconds / 60)} мин.` },

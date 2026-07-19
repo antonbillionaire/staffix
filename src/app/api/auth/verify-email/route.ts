@@ -16,8 +16,8 @@ export async function POST(request: NextRequest) {
 
     // Rate limit: 10 attempts per 5 minutes per IP + per email
     const ip = getClientIp(request);
-    const { allowed: ipAllowed } = await rateLimit(`verify:${ip}`, 10, 5);
-    const { allowed: emailAllowed } = email ? await rateLimit(`verify:email:${email.toLowerCase()}`, 10, 5) : { allowed: true };
+    const { allowed: ipAllowed } = await rateLimit(`verify:${ip}`, 10, 5, "closed");
+    const { allowed: emailAllowed } = email ? await rateLimit(`verify:email:${email.toLowerCase()}`, 10, 5, "closed") : { allowed: true };
     if (!ipAllowed || !emailAllowed) {
       return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
     }
