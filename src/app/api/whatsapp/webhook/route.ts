@@ -184,10 +184,19 @@ async function processWAMessage(
         waPhoneNumberId: true,
         waAccessToken: true,
         waActive: true,
+        botActive: true,
       },
     });
 
     if (!business?.waActive || !business.waPhoneNumberId) return;
+
+    // Owner paused the bot from dashboard — respect that on WA the same way
+    // it (should) work on all channels. Return without replying; Meta stops
+    // retrying on 200 OK from POST above.
+    if (!business.botActive) {
+      console.log(`[WA Webhook] Bot paused (botActive=false) for business ${businessId} — skipping AI reply`);
+      return;
+    }
 
     // decrypt() — envelope encryption; passthrough для plaintext
     let dbToken: string | null = business.waAccessToken;

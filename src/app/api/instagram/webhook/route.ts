@@ -284,8 +284,17 @@ async function processIGMessage(
       id: true,
       fbPageId: true,
       fbPageAccessToken: true,
+      botActive: true,
     },
   });
+
+  // Owner paused the bot from dashboard — do not reply from the customer bot.
+  // We do NOT fall through to the Staffix sales bot here: the business exists
+  // and is a paying customer, just paused. Silent 200 OK is the right response.
+  if (business && !business.botActive) {
+    console.log(`[IG Webhook] Bot paused (botActive=false) for business ${business.id} — skipping AI reply`);
+    return;
+  }
 
   // Use customer's per-Page token first (long-lived, no expiration when
   // generated from a long-lived user token). Env token only as fallback —
@@ -375,8 +384,15 @@ async function processIGComment(
       id: true,
       fbPageId: true,
       fbPageAccessToken: true,
+      botActive: true,
     },
   });
+
+  // Owner paused the bot — don't auto-reply to comments either.
+  if (business && !business.botActive) {
+    console.log(`[IG Webhook] Bot paused (botActive=false) for business ${business.id} — skipping comment reply`);
+    return;
+  }
 
   if (!business || !business.fbPageAccessToken) {
     // Fall back to Staffix sales bot for comments on @staffixio

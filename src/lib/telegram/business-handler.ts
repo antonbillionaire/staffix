@@ -221,6 +221,16 @@ export async function handleBusinessMessage(
     return;
   }
 
+  // Owner paused the bot globally from dashboard — respect that here as well.
+  const bizGlobal = await prisma.business.findUnique({
+    where: { id: connection.businessId },
+    select: { botActive: true },
+  });
+  if (bizGlobal && !bizGlobal.botActive) {
+    console.log(`[TG Business] Bot paused (botActive=false) for biz=${connection.businessId} — skipping`);
+    return;
+  }
+
   // Гейт по подписке — те же лимиты что и для основного бота
   const { allowed } = await checkSubscriptionLimit(connection.businessId);
   if (!allowed) {

@@ -224,8 +224,15 @@ async function processBusinessFBMessage(
       select: {
         fbPageAccessToken: true,
         fbActive: true,
+        botActive: true,
       },
     });
+
+    // Owner paused the bot from dashboard — respect it here too.
+    if (business && !business.botActive) {
+      console.log(`[FB Webhook] Bot paused (botActive=false) for business ${businessId} — skipping AI reply`);
+      return;
+    }
 
     if (!business?.fbActive) return;
 

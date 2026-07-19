@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
       botToken: string;
       webhookSecret: string | null;
       ownerTelegramChatId: bigint | null;
+      botActive: boolean;
     } | null = null;
     let botToken: string | null = null;
 
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
     if (businessId) {
       const foundBusiness = await prisma.business.findUnique({
         where: { id: businessId },
-        select: { id: true, name: true, botToken: true, webhookSecret: true, ownerTelegramChatId: true },
+        select: { id: true, name: true, botToken: true, webhookSecret: true, ownerTelegramChatId: true, botActive: true },
       });
       if (foundBusiness?.botToken) {
         business = {
@@ -94,6 +95,7 @@ export async function POST(request: NextRequest) {
             ? (decrypt(foundBusiness.webhookSecret) || foundBusiness.webhookSecret)
             : null,
           ownerTelegramChatId: foundBusiness.ownerTelegramChatId,
+          botActive: foundBusiness.botActive,
         };
         botToken = business.botToken;
       }
@@ -102,7 +104,7 @@ export async function POST(request: NextRequest) {
       if (foundBusiness) {
         const fullBusiness = await prisma.business.findUnique({
           where: { id: foundBusiness.id },
-          select: { id: true, name: true, botToken: true, webhookSecret: true, ownerTelegramChatId: true },
+          select: { id: true, name: true, botToken: true, webhookSecret: true, ownerTelegramChatId: true, botActive: true },
         });
         if (fullBusiness?.botToken) {
           business = {
@@ -113,6 +115,7 @@ export async function POST(request: NextRequest) {
               ? (decrypt(fullBusiness.webhookSecret) || fullBusiness.webhookSecret)
               : null,
             ownerTelegramChatId: fullBusiness.ownerTelegramChatId,
+            botActive: fullBusiness.botActive,
           };
           botToken = business.botToken;
         }
@@ -124,6 +127,15 @@ export async function POST(request: NextRequest) {
     }
 
     catchBotToken = botToken;
+
+    // Owner paused the bot from dashboard — return 200 OK so Telegram stops
+    // retrying, but do not process the update. Automations already respected
+    // botActive; incoming webhooks did not — this closes that gap for all
+    // four channels (TG here, WA/IG/FB in their respective webhooks).
+    if (!business.botActive) {
+      console.log(`[TG Webhook] Bot paused (botActive=false) for business ${business.id} — skipping update`);
+      return NextResponse.json({ ok: true });
+    }
 
     // Rate limiting — защита от flood
     const rlResult = await rateLimit(`tg-webhook:${business.id}`, 30, 1);
