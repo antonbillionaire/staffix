@@ -145,6 +145,7 @@ export async function POST(request: NextRequest) {
         data: {
           waPhoneNumberId: phoneNumberId,
           waAccessToken: encrypt(accessToken),
+          waTokenExpiresAt: tokenExpiry,
           waVerifyToken: encrypt(`staffix_wa_${businessId.slice(0, 8)}`),
           waActive: true,
         },
@@ -234,6 +235,7 @@ export async function POST(request: NextRequest) {
           data: {
             waPhoneNumberId: phone.id,
             waAccessToken: encrypt(accessToken),
+            waTokenExpiresAt: tokenExpiry,
             waVerifyToken: encrypt(`staffix_wa_${businessId.slice(0, 8)}`),
             waActive: true,
           },
@@ -268,7 +270,10 @@ export async function POST(request: NextRequest) {
       // Multiple phones — return list (токен шифруется даже при промежуточном сохранении)
       await prisma.business.update({
         where: { id: businessId },
-        data: { waAccessToken: encrypt(accessToken) },
+        data: {
+          waAccessToken: encrypt(accessToken),
+          waTokenExpiresAt: new Date(Date.now() + 5184000 * 1000),
+        },
       });
 
       const wabaName = await getWABAName(discoveredWabaId, accessToken);

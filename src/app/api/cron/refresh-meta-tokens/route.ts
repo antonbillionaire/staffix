@@ -22,11 +22,18 @@ export async function GET(request: Request) {
 
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  // Find businesses with Meta tokens expiring within 7 days
+  // Find businesses with Meta tokens expiring within 7 days.
+  // OR includes `metaTokenExpiresAt: null` — businesses migrated from an older
+  // schema or entered via manual OAuth may have the timestamp missing; without
+  // the null branch we would silently skip refresh and their IG/FB would die
+  // ~60 days after connection.
   const businesses = await prisma.business.findMany({
     where: {
       metaUserAccessToken: { not: null },
-      metaTokenExpiresAt: { lt: sevenDaysFromNow },
+      OR: [
+        { metaTokenExpiresAt: null },
+        { metaTokenExpiresAt: { lt: sevenDaysFromNow } },
+      ],
     },
     select: {
       id: true,
@@ -98,16 +105,74 @@ export async function GET(request: Request) {
 
   console.log(`Meta token refresh: ${refreshed} refreshed, ${failed} failed, ${businesses.length} total`);
 
+  // ─── WhatsApp Cloud API token refresh ────────────────────────────────────
+  // WA tokens live ~60 days too and use the same fb_exchange_token endpoint.
+  // Businesses connected before this migration have waTokenExpiresAt=null —
+  // refresh them proactively so they don't silently expire.
+  const waBusinesses = await prisma.business.findMany({
+    where: {
+      waAccessToken: { not: null },
+      waActive: true,
+      OR: [
+        { waTokenExpiresAt: null },
+        { waTokenExpiresAt: { lt: sevenDaysFromNow } },
+      ],
+    },
+    select: {
+      id: true,
+      waAccessToken: true,
+    },
+  });
+
+  let waRefreshed = 0;
+  let waFailed = 0;
+
+  for (const biz of waBusinesses) {
+    if (!biz.waAccessToken) continue;
+
+    let currentToken: string | null;
+    try {
+      currentToken = decrypt(biz.waAccessToken);
+    } catch (e) {
+      console.error(`WA token decrypt failed for business ${biz.id}:`, e);
+      waFailed++;
+      continue;
+    }
+    if (!currentToken) continue;
+
+    const result = await refreshLongLivedToken(currentToken);
+    if (!result) {
+      waFailed++;
+      console.error(`WA token refresh failed for business ${biz.id}`);
+      continue;
+    }
+
+    await prisma.business.update({
+      where: { id: biz.id },
+      data: {
+        waAccessToken: encrypt(result.accessToken),
+        waTokenExpiresAt: new Date(Date.now() + result.expiresIn * 1000),
+      },
+    });
+
+    waRefreshed++;
+  }
+
+  console.log(`WA token refresh: ${waRefreshed} refreshed, ${waFailed} failed, ${waBusinesses.length} total`);
+
+  const totalFailed = failed + waFailed;
+  const totalCount = businesses.length + waBusinesses.length;
+
   // Alert on failures via email
-  if (failed > 0 && process.env.RESEND_API_KEY) {
+  if (totalFailed > 0 && process.env.RESEND_API_KEY) {
     try {
       const { Resend } = await import("resend");
       const resend = new Resend(process.env.RESEND_API_KEY);
       await resend.emails.send({
         from: "Staffix Alerts <alerts@staffix.io>",
         to: process.env.ADMIN_EMAIL || "admin@staffix.io",
-        subject: `⚠️ Meta token refresh failed: ${failed}/${businesses.length}`,
-        text: `Failed to refresh ${failed} out of ${businesses.length} Meta tokens.\n\nCheck Vercel logs for details.\n\nThis is an automated alert from Staffix cron.`,
+        subject: `⚠️ Token refresh failed: ${totalFailed}/${totalCount}`,
+        text: `Meta: ${failed}/${businesses.length} failed.\nWhatsApp: ${waFailed}/${waBusinesses.length} failed.\n\nCheck Vercel logs for details.\n\nThis is an automated alert from Staffix cron.`,
       });
     } catch (emailErr) {
       console.error("Failed to send alert email:", emailErr);
@@ -124,9 +189,8 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
-    refreshed,
-    failed,
-    total: businesses.length,
+    meta: { refreshed, failed, total: businesses.length },
+    whatsapp: { refreshed: waRefreshed, failed: waFailed, total: waBusinesses.length },
     dedupCleaned,
   });
 }

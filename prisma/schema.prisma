@@ -152,10 +152,11 @@ model Business {
   clickMerchantId String? // Click Merchant ID
 
   // WhatsApp Business API (прямое подключение от Meta)
-  waPhoneNumberId String? // Meta Phone Number ID
-  waAccessToken   String? // Meta User/System Access Token
-  waVerifyToken   String? // Random secret для верификации webhook
-  waActive        Boolean @default(false)
+  waPhoneNumberId    String?   // Meta Phone Number ID
+  waAccessToken      String?   // Meta User/System Access Token
+  waTokenExpiresAt   DateTime? // Когда истекает waAccessToken (~60 дней). Refresh cron продлевает.
+  waVerifyToken      String?   // Random secret для верификации webhook
+  waActive           Boolean   @default(false)
 
   // Facebook Messenger (прямое подключение страницы)
   fbPageId          String? // Facebook Page ID
