@@ -373,7 +373,30 @@ export async function POST(request: NextRequest) {
 
       // Refund
       case IPN_TYPES.ORDER_REFUNDED: {
-        if (!business.subscription) break;
+        // Если refund касается пакета сообщений (packId) — НЕ трогаем подписку.
+        // Пакеты — one-time покупки, refund одного пакета не должен ломать активный план.
+        if (ipn.packId) {
+          console.log(`PayPro: Message pack ${ipn.packId} refunded for business ${business.id}, order ${ipn.orderId} — subscription untouched`);
+          cancelPartnerEarningForOrder(ipn.orderId, "refund").catch((err) =>
+            console.error("Partner commission cancel failed:", err)
+          );
+          break;
+        }
+
+        // Refund подписки: сбрасываем ТОЛЬКО если refund относится к текущей активной подписке.
+        // Иначе (refund старого orderId после смены плана) — активная подписка не должна пострадать.
+        if (!business.subscription) {
+          console.warn(`PayPro: Refund for business ${business.id}, order ${ipn.orderId} — no active subscription, skipping`);
+          break;
+        }
+        if (business.subscription.payproOrderId && business.subscription.payproOrderId !== ipn.orderId) {
+          console.warn(`PayPro: Refund order ${ipn.orderId} does not match active subscription order ${business.subscription.payproOrderId} for business ${business.id} — subscription untouched`);
+          // Партнёрскую комиссию всё равно отменяем — это правильно по refund'у именно этого orderId.
+          cancelPartnerEarningForOrder(ipn.orderId, "refund").catch((err) =>
+            console.error("Partner commission cancel failed:", err)
+          );
+          break;
+        }
 
         await prisma.subscription.update({
           where: { id: business.subscription.id },
@@ -385,7 +408,7 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        console.log(`PayPro: Refund processed for business ${business.id}`);
+        console.log(`PayPro: Refund processed for business ${business.id}, subscription reset to trial`);
 
         // Отменить партнёрскую комиссию по этому orderId (если есть и не paid).
         cancelPartnerEarningForOrder(ipn.orderId, "refund").catch((err) =>
@@ -396,7 +419,26 @@ export async function POST(request: NextRequest) {
 
       // Chargeback — same as refund, deactivate subscription
       case IPN_TYPES.ORDER_CHARGED_BACK: {
-        if (!business.subscription) break;
+        // Chargeback пакета — не ломаем подписку.
+        if (ipn.packId) {
+          console.log(`PayPro: Message pack ${ipn.packId} chargeback for business ${business.id}, order ${ipn.orderId} — subscription untouched`);
+          cancelPartnerEarningForOrder(ipn.orderId, "chargeback").catch((err) =>
+            console.error("Partner commission cancel failed:", err)
+          );
+          break;
+        }
+
+        if (!business.subscription) {
+          console.warn(`PayPro: Chargeback for business ${business.id}, order ${ipn.orderId} — no active subscription, skipping`);
+          break;
+        }
+        if (business.subscription.payproOrderId && business.subscription.payproOrderId !== ipn.orderId) {
+          console.warn(`PayPro: Chargeback order ${ipn.orderId} does not match active subscription order ${business.subscription.payproOrderId} for business ${business.id} — subscription untouched`);
+          cancelPartnerEarningForOrder(ipn.orderId, "chargeback").catch((err) =>
+            console.error("Partner commission cancel failed:", err)
+          );
+          break;
+        }
 
         await prisma.subscription.update({
           where: { id: business.subscription.id },
@@ -408,7 +450,7 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        console.log(`PayPro: Chargeback for business ${business.id}`);
+        console.log(`PayPro: Chargeback for business ${business.id}, subscription reset to trial`);
 
         cancelPartnerEarningForOrder(ipn.orderId, "chargeback").catch((err) =>
           console.error("Partner commission cancel failed:", err)

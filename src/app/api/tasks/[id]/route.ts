@@ -67,7 +67,30 @@ export async function PATCH(
       }
     }
     if (body.assignedStaffId !== undefined) {
-      updateData.assignedStaffId = body.assignedStaffId || null;
+      const staffId = body.assignedStaffId || null;
+      if (staffId) {
+        const staffExists = await prisma.staff.findFirst({
+          where: { id: staffId, businessId: business.id },
+          select: { id: true },
+        });
+        if (!staffExists) {
+          return NextResponse.json({ error: "Сотрудник не найден" }, { status: 400 });
+        }
+      }
+      updateData.assignedStaffId = staffId;
+    }
+    if (body.clientId !== undefined) {
+      const clientId = body.clientId || null;
+      if (clientId) {
+        const clientExists = await prisma.client.findFirst({
+          where: { id: clientId, businessId: business.id },
+          select: { id: true },
+        });
+        if (!clientExists) {
+          return NextResponse.json({ error: "Клиент не найден" }, { status: 400 });
+        }
+      }
+      updateData.clientId = clientId;
     }
     if (body.status !== undefined) {
       if (!(VALID_STATUSES as readonly string[]).includes(body.status)) {
