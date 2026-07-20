@@ -518,6 +518,93 @@ export async function createBooking(
       staffName = staff.name;
     }
 
+    // B8: Cooldown / несовместимости услуг (медицинский риск).
+    // ServiceIncompatibility в схеме была декоративная — правило "нельзя
+    // массаж лица 14 дней после ботокса" висело в UI и в промпте, но AI мог
+    // забыть проверить. Теперь блокируем создание booking в коде, до
+    // самой транзакции — независимо от того что сказал/забыл LLM.
+    // Проверка применима только для клиентов у которых есть история
+    // визитов (по telegramId ИЛИ по phone). Anonymous walk-ins не имеют
+    // истории — их пропускаем.
+    if (serviceId && (clientTelegramId || clientPhone)) {
+      // Найти все правила несовместимости где текущая услуга — целевая (serviceB)
+      // (или через bidirectional — где она серия A).
+      const rules = await prisma.serviceIncompatibility.findMany({
+        where: {
+          businessId,
+          OR: [
+            { serviceBId: serviceId },
+            ...([{ serviceAId: serviceId, bidirectional: true }] as const),
+          ],
+        },
+        select: {
+          cooldownDays: true,
+          reason: true,
+          serviceAId: true,
+          serviceBId: true,
+          bidirectional: true,
+          serviceA: { select: { id: true, name: true } },
+        },
+      });
+
+      if (rules.length > 0) {
+        // Собираем "конфликтующие" serviceId для этой брони.
+        // Для каждого правила serviceB=current → конфликтует serviceA.
+        // Для bidirectional serviceA=current → конфликтует serviceB (если задан).
+        const conflictServiceIds = new Set<string>();
+        const conflictReasonByServiceId = new Map<string, { reason: string | null; cooldownDays: number; conflictName: string }>();
+        for (const r of rules) {
+          const isBSideMatch = r.serviceBId === serviceId;
+          const isASideMatch = r.serviceAId === serviceId && r.bidirectional;
+          const conflictId = isBSideMatch ? r.serviceAId : (isASideMatch ? r.serviceBId : null);
+          const conflictName = isBSideMatch ? r.serviceA.name : ""; // serviceB name отдельным запросом, если понадобится
+          if (conflictId) {
+            conflictServiceIds.add(conflictId);
+            conflictReasonByServiceId.set(conflictId, {
+              reason: r.reason,
+              cooldownDays: r.cooldownDays,
+              conflictName,
+            });
+          }
+        }
+
+        if (conflictServiceIds.size > 0) {
+          const maxCooldown = Math.max(...rules.map((r) => r.cooldownDays));
+          const cooldownStart = new Date(bookingDate.getTime() - maxCooldown * 24 * 60 * 60 * 1000);
+
+          const recentIncompatible = await prisma.booking.findFirst({
+            where: {
+              businessId,
+              serviceId: { in: Array.from(conflictServiceIds) },
+              status: { in: ["confirmed", "completed"] },
+              date: { gte: cooldownStart, lte: bookingDate },
+              OR: [
+                ...(clientTelegramId ? [{ clientTelegramId }] : []),
+                ...(clientPhone ? [{ clientPhone }] : []),
+              ],
+            },
+            orderBy: { date: "desc" },
+            select: { date: true, serviceId: true, service: { select: { name: true } } },
+          });
+
+          if (recentIncompatible && recentIncompatible.serviceId) {
+            const info = conflictReasonByServiceId.get(recentIncompatible.serviceId);
+            const conflictService = recentIncompatible.service?.name || info?.conflictName || "предыдущая услуга";
+            const cooldownDays = info?.cooldownDays ?? maxCooldown;
+            const nextOk = new Date(recentIncompatible.date.getTime() + cooldownDays * 24 * 60 * 60 * 1000);
+            const nextOkStr = nextOk.toISOString().slice(0, 10);
+            const explanation = info?.reason
+              ? info.reason
+              : `После услуги «${conflictService}» нужно подождать ${cooldownDays} дн. Ближайшая доступная дата: ${nextOkStr}`;
+            return {
+              success: false,
+              error: `Не могу записать: несовместимо с недавним визитом. ${explanation}`,
+            };
+          }
+        }
+      }
+    }
+
     // Verify the slot and create booking atomically to prevent double-booking
     const slotEnd = new Date(bookingDate);
     slotEnd.setMinutes(slotEnd.getMinutes() + serviceDuration);
