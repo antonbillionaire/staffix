@@ -201,7 +201,7 @@ export async function PUT(request: Request) {
     }
 
     const data = await request.json();
-    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, timezone, ownerTelegramUsername, paymeId, clickServiceId, clickMerchantId, waPhoneNumberId, waAccessToken, waVerifyToken, waActive, fbPageId, fbPageAccessToken, fbVerifyToken, fbActive, fbAdAccountId, businessTypes, language, deliveryEnabled, deliveryTimeFrom, deliveryTimeTo, deliveryFee, deliveryFreeFrom, deliveryZones, consultationsEnabled, leadAssignmentMode } = data;
+    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, timezone, ownerTelegramUsername, paymeId, clickServiceId, clickMerchantId, waPhoneNumberId, waAccessToken, waVerifyToken, waActive, fbPageId, fbPageAccessToken, fbVerifyToken, fbActive, fbAdAccountId, businessTypes, language, deliveryEnabled, deliveryTimeFrom, deliveryTimeTo, deliveryFee, deliveryFreeFrom, deliveryZones, consultationsEnabled, leadAssignmentMode, widgetColor, widgetPosition, widgetIcon, widgetCustomImageUrl, widgetGreeting } = data;
 
     // Найти бизнес пользователя
     const existingBusiness = await prisma.business.findFirst({
@@ -291,6 +291,31 @@ export async function PUT(request: Request) {
     if (fbAdAccountId !== undefined) {
       const raw = (fbAdAccountId || "").trim();
       updateData.fbAdAccountId = raw ? raw.replace(/^act_/, "") : null;
+    }
+
+    // Sprint Widget (21 июля) — кастомизация виджета для сайта клиента.
+    // Валидируем hex-цвет, position enum, icon enum. Custom image — только
+    // URL (загрузка идёт через /api/upload/image → возвращает Vercel Blob URL).
+    if (widgetColor !== undefined) {
+      const c = (widgetColor || "").trim();
+      updateData.widgetColor = c && /^#[0-9a-f]{6}$/i.test(c) ? c : null;
+    }
+    if (widgetPosition !== undefined) {
+      updateData.widgetPosition = widgetPosition === "bl" ? "bl" : "br";
+    }
+    if (widgetIcon !== undefined) {
+      const validIcons = ["chat", "dots", "sparkle", "wave", "custom"];
+      updateData.widgetIcon = validIcons.includes(widgetIcon) ? widgetIcon : "chat";
+    }
+    if (widgetCustomImageUrl !== undefined) {
+      const u = (widgetCustomImageUrl || "").trim();
+      // Только https URL. Ожидаем Vercel Blob (public.blob.vercel-storage.com)
+      // или пусто. Никаких http/data:/javascript: — виджет отрендерит это в img src.
+      updateData.widgetCustomImageUrl = u && /^https:\/\//i.test(u) ? u : null;
+    }
+    if (widgetGreeting !== undefined) {
+      const g = (widgetGreeting || "").trim();
+      updateData.widgetGreeting = g ? g.slice(0, 200) : null;
     }
 
     // Если передан токен бота - валидируем и регистрируем/перерегистрируем webhook.

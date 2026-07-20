@@ -32,6 +32,8 @@ interface WidgetConfig {
   theme: {
     color: string;
     position: "br" | "bl";
+    icon: "chat" | "dots" | "sparkle" | "wave" | "custom";
+    customImageUrl: string | null;
     greeting: string;
   };
 }
@@ -98,6 +100,11 @@ export async function GET(
       igActive: true,
       fbPageId: true,
       fbActive: true,
+      widgetColor: true,
+      widgetPosition: true,
+      widgetIcon: true,
+      widgetCustomImageUrl: true,
+      widgetGreeting: true,
     },
   });
 
@@ -152,16 +159,26 @@ export async function GET(
     });
   }
 
+  // Sprint Widget: применяем настройки владельца, с дефолтами на пустое.
+  // icon="custom" валиден только если реально задан customImageUrl —
+  // иначе откатываемся к "chat" (защита от «сохранил custom → удалил
+  // картинку → виджет ломается»).
+  const iconRaw = biz.widgetIcon as WidgetConfig["theme"]["icon"];
+  const icon =
+    iconRaw === "custom" && !biz.widgetCustomImageUrl ? "chat" : iconRaw;
+
   const config: WidgetConfig = {
     businessId: biz.id,
     name: biz.name,
     channels,
     theme: {
-      // TODO(widget-customization): пока фиксированный blue-purple gradient.
-      // Позже — добавить Business.widgetColor + widgetPosition в схему.
-      color: "#2563eb",
-      position: "br",
-      greeting: "Здравствуйте! Напишите нам в удобный мессенджер:",
+      color: biz.widgetColor || "#2563eb",
+      position: biz.widgetPosition === "bl" ? "bl" : "br",
+      icon,
+      customImageUrl: icon === "custom" ? biz.widgetCustomImageUrl : null,
+      greeting:
+        biz.widgetGreeting ||
+        "Здравствуйте! Напишите нам в удобный мессенджер:",
     },
   };
 

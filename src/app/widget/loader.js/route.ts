@@ -64,25 +64,51 @@ const WIDGET_SCRIPT = `(function(){
       console.warn('[Staffix Widget] config load failed:', err);
     });
 
+  // Preset trigger icons. 'custom' обрабатывается отдельно (рендерим <img>).
+  var TRIGGER_ICONS = {
+    chat: '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>',
+    dots: '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM7 11.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm5 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm5 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>',
+    sparkle: '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.5 5.5L19 9l-5.5 1.5L12 16l-1.5-5.5L5 9l5.5-1.5L12 2zm7 12l.8 2.7L22 17.5l-2.2.8L19 21l-.8-2.7L16 17.5l2.2-.8L19 14zM5 15l.6 2.4L8 18l-2.4.6L5 21l-.6-2.4L2 18l2.4-.6L5 15z"/></svg>',
+    wave: '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M23 11.01L18 11c-.55 0-1 .45-1 1s.45 1 1 1l5 .01c.55 0 1-.45 1-1s-.45-1-1-1zm-2.24 5.66l-4.24-2.65c-.62-.39-1.44-.19-1.79.44-.28.51-.13 1.15.36 1.48l4.19 2.65c.62.39 1.43.2 1.79-.44.28-.51.13-1.16-.31-1.48zm-4.4-8.79l4.24-2.65c.44-.32.59-.97.31-1.48-.36-.64-1.17-.83-1.79-.44l-4.19 2.65c-.49.33-.64.97-.36 1.48.35.63 1.17.83 1.79.44zM9 14c1.66 0 3-1.34 3-3S10.66 8 9 8s-3 1.34-3 3 1.34 3 3 3zm3 3H6c-2.21 0-4 1.79-4 4h14c0-2.21-1.79-4-4-4z"/></svg>',
+  };
+
+  function renderTriggerContent(cfg) {
+    if (cfg.theme.icon === 'custom' && cfg.theme.customImageUrl) {
+      // Кастомная картинка — квадрат внутри круглой кнопки, обрезаем в круг
+      return '<img src="' + escAttr(cfg.theme.customImageUrl) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />';
+    }
+    return TRIGGER_ICONS[cfg.theme.icon] || TRIGGER_ICONS.chat;
+  }
+
+  function escAttr(s) {
+    // Минимальный escape для значений внутри атрибутов, чтобы кастомный URL
+    // не сломал HTML. Для src достаточно " и <.
+    return String(s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  }
+
   function renderWidget(cfg) {
     var position = cfg.theme.position === 'bl' ? 'left:20px;' : 'right:20px;';
     var color = cfg.theme.color || '#2563eb';
+    var hasCustomImg = cfg.theme.icon === 'custom' && cfg.theme.customImageUrl;
 
     var container = document.createElement('div');
     container.id = '__staffix-widget';
     container.style.cssText = 'position:fixed;bottom:20px;' + position + 'z-index:2147483647;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;';
 
-    // Кнопка-триггер (пузырь чата)
+    // Кнопка-триггер. Для custom-image убираем background — картинка сама
+    // становится содержимым кнопки.
     var btn = document.createElement('button');
     btn.setAttribute('aria-label', 'Открыть чат');
-    btn.style.cssText = 'width:60px;height:60px;border-radius:50%;background:' + color + ';border:none;box-shadow:0 4px 12px rgba(0,0,0,0.15);cursor:pointer;display:flex;align-items:center;justify-content:center;color:white;transition:transform .15s;';
+    var btnBg = hasCustomImg ? 'transparent' : color;
+    btn.style.cssText = 'width:60px;height:60px;border-radius:50%;background:' + btnBg + ';border:none;box-shadow:0 4px 12px rgba(0,0,0,0.15);cursor:pointer;display:flex;align-items:center;justify-content:center;color:white;transition:transform .15s;padding:0;overflow:hidden;';
     btn.onmouseover = function(){ btn.style.transform = 'scale(1.08)'; };
     btn.onmouseout = function(){ btn.style.transform = 'scale(1)'; };
-    btn.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>';
+    btn.innerHTML = renderTriggerContent(cfg);
 
     // Панель с каналами (скрыта по умолчанию)
     var panel = document.createElement('div');
-    panel.style.cssText = 'position:absolute;bottom:76px;' + (cfg.theme.position === 'bl' ? 'left:0;' : 'right:0;') + 'width:300px;background:white;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.18);padding:16px;display:none;';
+    var panelSide = cfg.theme.position === 'bl' ? 'left:0;' : 'right:0;';
+    panel.style.cssText = 'position:absolute;bottom:76px;' + panelSide + 'width:300px;background:white;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.18);padding:16px;display:none;';
 
     var header = document.createElement('div');
     header.style.cssText = 'font-size:15px;font-weight:600;color:#111;margin-bottom:4px;';

@@ -2,11 +2,10 @@
 
 /**
  * Дашборд-страница «Виджет для сайта» (Sprint Widget, 21 июля 2026).
- * Показывает готовый snippet, превью, список подключённых каналов и
- * пошаговые инструкции установки на WordPress / Tilda / Wix / чистый HTML.
+ * Кастомизация виджета + live preview + copy snippet + инструкции.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
 import {
   Code,
@@ -18,6 +17,13 @@ import {
   Send,
   Instagram,
   Facebook,
+  Upload,
+  MessageSquare,
+  MoreHorizontal,
+  Sparkles,
+  Hand,
+  Image as ImageIcon,
+  Save,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -31,8 +37,24 @@ interface WidgetConfig {
   businessId: string;
   name: string;
   channels: WidgetChannel[];
-  theme: { color: string; position: string; greeting: string };
+  theme: {
+    color: string;
+    position: string;
+    icon: string;
+    customImageUrl: string | null;
+    greeting: string;
+  };
 }
+
+type IconId = "chat" | "dots" | "sparkle" | "wave" | "custom";
+type Position = "br" | "bl";
+
+const ICON_OPTIONS: { id: IconId; label: string; icon: typeof MessageSquare }[] = [
+  { id: "chat", label: "Чат", icon: MessageSquare },
+  { id: "dots", label: "Три точки", icon: MoreHorizontal },
+  { id: "sparkle", label: "Искры", icon: Sparkles },
+  { id: "wave", label: "Приветствие", icon: Hand },
+];
 
 export default function WidgetPage() {
   const { theme } = useTheme();
@@ -42,29 +64,50 @@ export default function WidgetPage() {
   const textPrimary = isDark ? "text-white" : "text-gray-900";
   const textSecondary = isDark ? "text-gray-400" : "text-gray-600";
   const codeBg = isDark ? "bg-black/50" : "bg-gray-50";
+  const inputBg = isDark ? "bg-[#0a0a1a]" : "bg-white";
 
   const [config, setConfig] = useState<WidgetConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [origin, setOrigin] = useState("https://staffix.io");
 
+  // Форма кастомизации (draft state, ещё не сохранён)
+  const [color, setColor] = useState("#2563eb");
+  const [position, setPosition] = useState<Position>("br");
+  const [icon, setIcon] = useState<IconId>("chat");
+  const [customImageUrl, setCustomImageUrl] = useState("");
+  const [greeting, setGreeting] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const loadConfig = useCallback(async (businessId?: string) => {
+    const id = businessId;
+    if (!id) return;
+    const res = await fetch(`/api/widget/${id}/config`);
+    if (!res.ok) return;
+    const cfg: WidgetConfig = await res.json();
+    setConfig(cfg);
+    setColor(cfg.theme.color);
+    setPosition((cfg.theme.position as Position) || "br");
+    setIcon((cfg.theme.icon as IconId) || "chat");
+    setCustomImageUrl(cfg.theme.customImageUrl || "");
+    setGreeting(cfg.theme.greeting || "");
+  }, []);
+
   useEffect(() => {
     if (typeof window !== "undefined") setOrigin(window.location.origin);
     fetch("/api/business")
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (!d?.business?.id) {
-          setLoading(false);
-          return;
-        }
-        // Дёргаем публичный config сами — так владелец видит ровно то что увидят
-        // посетители его сайта (без спец. авторизации).
-        return fetch(`/api/widget/${d.business.id}/config`)
-          .then((r) => (r.ok ? r.json() : null))
-          .then((cfg) => setConfig(cfg));
+      .then(async (d) => {
+        if (!d?.business?.id) return;
+        await loadConfig(d.business.id);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [loadConfig]);
 
   const snippet = config
     ? `<script async src="${origin}/widget/loader.js" data-business-id="${config.businessId}"></script>`
@@ -75,6 +118,62 @@ export default function WidgetPage() {
     navigator.clipboard.writeText(snippet);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleUpload = async (file: File) => {
+    if (file.size > 2 * 1024 * 1024) {
+      setSaveError("Файл слишком большой (макс 2 МБ)");
+      return;
+    }
+    setUploading(true);
+    setSaveError(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/upload/image", { method: "POST", body: form });
+      if (!res.ok) {
+        setSaveError((await res.json())?.error || "Ошибка загрузки");
+        return;
+      }
+      const { url } = await res.json();
+      setCustomImageUrl(url);
+      setIcon("custom");
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Ошибка загрузки");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setSaveError(null);
+    setSaved(false);
+    try {
+      const res = await fetch("/api/business", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          widgetColor: color,
+          widgetPosition: position,
+          widgetIcon: icon,
+          widgetCustomImageUrl: icon === "custom" ? customImageUrl : "",
+          widgetGreeting: greeting,
+        }),
+      });
+      if (!res.ok) {
+        setSaveError((await res.json())?.error || "Не удалось сохранить");
+        return;
+      }
+      // Обновим локальный конфиг чтобы snippet ссылался на актуальный businessId
+      if (config) await loadConfig(config.businessId);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Ошибка сохранения");
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -88,17 +187,15 @@ export default function WidgetPage() {
   const hasChannels = config && config.channels.length > 0;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-4xl mx-auto">
+    <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
       <div>
         <h1 className={`text-2xl font-bold ${textPrimary}`}>Виджет для сайта</h1>
         <p className={textSecondary}>
-          Разместите плавающую кнопку на своём сайте — посетитель одним кликом
-          попадёт в переписку с вашим AI-сотрудником через Telegram / WhatsApp /
-          Instagram / Messenger.
+          Плавающая кнопка на вашем сайте → посетитель попадает в бота через
+          Telegram / WhatsApp / Instagram / Messenger.
         </p>
       </div>
 
-      {/* Warning: нет активных каналов */}
       {!hasChannels && (
         <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-500/10 flex items-start gap-3">
           <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
@@ -107,7 +204,7 @@ export default function WidgetPage() {
               Ни один канал не подключён
             </p>
             <p className={`text-sm ${textSecondary} mt-1`}>
-              Виджет ничего не покажет, пока вы не подключите хотя бы один
+              Виджет ничего не покажет, пока не подключите хотя бы один
               мессенджер.{" "}
               <Link href="/dashboard/channels" className="text-blue-500 underline">
                 Открыть настройки каналов
@@ -117,40 +214,212 @@ export default function WidgetPage() {
         </div>
       )}
 
-      {/* Список подключённых каналов */}
-      {hasChannels && (
-        <div className={`${cardBg} border ${borderColor} rounded-xl p-5`}>
-          <h3 className={`text-lg font-semibold ${textPrimary} mb-3`}>
-            Что увидит посетитель
-          </h3>
-          <p className={`text-sm ${textSecondary} mb-4`}>
-            В виджете будут доступны эти каналы (те что вы уже подключили):
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {config!.channels.map((ch) => (
-              <a
-                key={ch.type}
-                href={ch.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${borderColor} ${codeBg} text-sm ${textPrimary} hover:opacity-80`}
-              >
-                {ch.type === "telegram" && <Send className="h-4 w-4 text-sky-500" />}
-                {ch.type === "instagram" && <Instagram className="h-4 w-4 text-pink-500" />}
-                {ch.type === "messenger" && <Facebook className="h-4 w-4 text-blue-500" />}
-                {ch.type === "whatsapp" && <span className="w-4 h-4 text-green-500 font-bold text-xs flex items-center justify-center">W</span>}
-                {ch.label}
-                <ExternalLink className="h-3 w-3 opacity-50" />
-              </a>
-            ))}
+      {/* Кастомизация + live preview в две колонки */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+        {/* Форма */}
+        <div className={`${cardBg} border ${borderColor} rounded-xl p-5 space-y-5`}>
+          <h3 className={`text-lg font-semibold ${textPrimary}`}>Настройки виджета</h3>
+
+          {/* Позиция */}
+          <div>
+            <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
+              Положение на сайте
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["br", "bl"] as Position[]).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPosition(p)}
+                  className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                    position === p
+                      ? "border-blue-500 bg-blue-500/10 text-blue-500"
+                      : `${borderColor} ${textSecondary} hover:${textPrimary}`
+                  }`}
+                >
+                  {p === "br" ? "↘ Справа-снизу" : "↙ Слева-снизу"}
+                </button>
+              ))}
+            </div>
           </div>
-          <p className={`text-xs ${textSecondary} mt-3`}>
-            {config!.channels.length < 4
-              ? `Подключите остальные каналы в разделе «Каналы» — они автоматически появятся в виджете без переустановки.`
-              : `Все четыре канала подключены.`}
+
+          {/* Цвет */}
+          <div>
+            <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
+              Цвет кнопки
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="h-10 w-14 rounded-lg cursor-pointer border-0"
+              />
+              <input
+                type="text"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                pattern="^#[0-9a-fA-F]{6}$"
+                className={`flex-1 px-3 py-2 rounded-lg border ${borderColor} ${inputBg} ${textPrimary} text-sm font-mono`}
+              />
+              <div className="flex gap-1">
+                {["#2563eb", "#7c3aed", "#059669", "#dc2626", "#0891b2", "#f59e0b"].map((preset) => (
+                  <button
+                    key={preset}
+                    onClick={() => setColor(preset)}
+                    style={{ background: preset }}
+                    className="h-8 w-8 rounded-full border border-white/20 hover:scale-110 transition-transform"
+                    aria-label={`Цвет ${preset}`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Иконка */}
+          <div>
+            <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
+              Иконка на кнопке
+            </label>
+            <div className="grid grid-cols-5 gap-2">
+              {ICON_OPTIONS.map((opt) => {
+                const Icon = opt.icon;
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => setIcon(opt.id)}
+                    className={`aspect-square flex flex-col items-center justify-center gap-1 rounded-lg border transition-colors ${
+                      icon === opt.id
+                        ? "border-blue-500 bg-blue-500/10"
+                        : `${borderColor} hover:border-blue-500/50`
+                    }`}
+                    title={opt.label}
+                  >
+                    <Icon className={`h-5 w-5 ${icon === opt.id ? "text-blue-500" : textPrimary}`} />
+                    <span className={`text-[10px] ${textSecondary}`}>{opt.label}</span>
+                  </button>
+                );
+              })}
+              {/* Custom image */}
+              <button
+                onClick={() => fileRef.current?.click()}
+                className={`aspect-square flex flex-col items-center justify-center gap-1 rounded-lg border transition-colors ${
+                  icon === "custom"
+                    ? "border-blue-500 bg-blue-500/10"
+                    : `${borderColor} hover:border-blue-500/50`
+                }`}
+                title="Своя картинка"
+              >
+                {icon === "custom" && customImageUrl ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={customImageUrl}
+                      alt=""
+                      className="h-5 w-5 object-cover rounded-full"
+                    />
+                    <span className={`text-[10px] text-blue-500`}>Своя</span>
+                  </>
+                ) : uploading ? (
+                  <>
+                    <Loader2 className={`h-5 w-5 animate-spin ${textPrimary}`} />
+                    <span className={`text-[10px] ${textSecondary}`}>...</span>
+                  </>
+                ) : (
+                  <>
+                    <ImageIcon className={`h-5 w-5 ${textPrimary}`} />
+                    <span className={`text-[10px] ${textSecondary}`}>Своя</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleUpload(f);
+              }}
+            />
+            {icon === "custom" && (
+              <div className="mt-2 flex items-center gap-2">
+                <Upload className={`h-3 w-3 ${textSecondary}`} />
+                <span className={`text-xs ${textSecondary}`}>
+                  {customImageUrl ? "Картинка загружена. " : ""}
+                  Рекомендуем квадратную PNG/SVG до 2 МБ. Кнопка круглая — картинка обрежется в круг.
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Приветствие */}
+          <div>
+            <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
+              Текст приветствия в панели
+            </label>
+            <input
+              type="text"
+              value={greeting}
+              onChange={(e) => setGreeting(e.target.value)}
+              placeholder="Здравствуйте! Напишите нам в удобный мессенджер:"
+              maxLength={200}
+              className={`w-full px-3 py-2 rounded-lg border ${borderColor} ${inputBg} ${textPrimary} text-sm`}
+            />
+            <p className={`text-xs ${textSecondary} mt-1`}>
+              Показывается над списком мессенджеров. Оставьте пустым для дефолта.
+            </p>
+          </div>
+
+          {/* Save */}
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              onClick={save}
+              disabled={saving}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Сохранить
+            </button>
+            {saved && (
+              <span className="text-sm text-green-500 inline-flex items-center gap-1">
+                <Check className="h-4 w-4" /> Сохранено
+              </span>
+            )}
+            {saveError && (
+              <span className="text-sm text-red-500">{saveError}</span>
+            )}
+          </div>
+          <p className={`text-xs ${textSecondary}`}>
+            Изменения появляются у посетителей вашего сайта в течение 5 минут (edge-кэш).
           </p>
         </div>
-      )}
+
+        {/* Live preview */}
+        <div className={`${cardBg} border ${borderColor} rounded-xl overflow-hidden`}>
+          <div className={`px-4 py-2 border-b ${borderColor} text-xs ${textSecondary}`}>
+            Превью
+          </div>
+          <div
+            className="relative h-96 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-slate-800 dark:to-slate-900"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px)",
+              backgroundSize: "20px 20px",
+            }}
+          >
+            <WidgetPreview
+              color={color}
+              position={position}
+              icon={icon}
+              customImageUrl={customImageUrl}
+              greeting={greeting || "Здравствуйте! Напишите нам в удобный мессенджер:"}
+              businessName={config?.name || "Ваш бизнес"}
+              channels={config?.channels || []}
+            />
+          </div>
+        </div>
+      </div>
 
       {/* Snippet */}
       <div className={`${cardBg} border ${borderColor} rounded-xl p-5`}>
@@ -178,8 +447,7 @@ export default function WidgetPage() {
           <code className={`${codeBg} px-1.5 py-0.5 rounded ${textPrimary}`}>
             &lt;/body&gt;
           </code>{" "}
-          на всех страницах вашего сайта. Скрипт грузится асинхронно — не
-          тормозит сайт.
+          на всех страницах сайта. Загрузка асинхронная — не тормозит сайт.
         </p>
       </div>
 
@@ -235,28 +503,149 @@ export default function WidgetPage() {
       {/* Управление */}
       <div className={`${cardBg} border ${borderColor} rounded-xl p-5`}>
         <h3 className={`text-lg font-semibold ${textPrimary} mb-2`}>
-          Управление и обновления
+          Как это работает
         </h3>
         <ul className={`text-sm ${textSecondary} space-y-2 list-disc list-inside`}>
           <li>
-            Виджет обновляется автоматически — при подключении нового канала
-            он появится в виджете без переустановки кода.
+            Виджет автоматически подхватывает подключённые каналы. Подключили
+            WhatsApp — кнопка появится через 5 минут.
           </li>
           <li>
-            Если вы отключаете канал в Staffix — соответствующая кнопка
-            пропадает у посетителя в течение 5 минут.
+            Отключили канал в Staffix — соответствующая кнопка пропадает у
+            посетителей.
           </li>
           <li>
-            Виджет не использует cookies и не отслеживает посетителей — только
-            переводит клик в мессенджер.
+            Без cookies и трекинга. Виджет только переводит клик в мессенджер.
           </li>
           <li>
-            Если WhatsApp не работает — проверьте что в профиле бизнеса указан
-            корректный номер телефона в международном формате (+998...).
+            WhatsApp использует ваш телефон из <b>Настройки → Профиль</b> в
+            формате <code>+998...</code>. Если поле пусто — кнопка WhatsApp
+            скрыта.
           </li>
         </ul>
       </div>
+
+      {/* Список подключённых каналов */}
+      {hasChannels && (
+        <div className={`${cardBg} border ${borderColor} rounded-xl p-5`}>
+          <h3 className={`text-lg font-semibold ${textPrimary} mb-3`}>
+            Каналы в вашем виджете
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {config!.channels.map((ch) => (
+              <a
+                key={ch.type}
+                href={ch.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${borderColor} ${codeBg} text-sm ${textPrimary} hover:opacity-80`}
+              >
+                {ch.type === "telegram" && <Send className="h-4 w-4 text-sky-500" />}
+                {ch.type === "instagram" && <Instagram className="h-4 w-4 text-pink-500" />}
+                {ch.type === "messenger" && <Facebook className="h-4 w-4 text-blue-500" />}
+                {ch.type === "whatsapp" && (
+                  <span className="w-4 h-4 text-green-500 font-bold text-xs flex items-center justify-center">
+                    W
+                  </span>
+                )}
+                {ch.label}
+                <ExternalLink className="h-3 w-3 opacity-50" />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+// Live preview компонент — reproduces the vanilla-JS widget визуально,
+// но в React (проще управлять состоянием чем перегружать loader.js).
+function WidgetPreview({
+  color,
+  position,
+  icon,
+  customImageUrl,
+  greeting,
+  businessName,
+  channels,
+}: {
+  color: string;
+  position: Position;
+  icon: IconId;
+  customImageUrl: string;
+  greeting: string;
+  businessName: string;
+  channels: WidgetChannel[];
+}) {
+  const [open, setOpen] = useState(true); // в превью по умолчанию открыто
+  const side = position === "bl" ? "left-3" : "right-3";
+  const hasCustomImg = icon === "custom" && customImageUrl;
+
+  const IconContent = () => {
+    if (hasCustomImg) {
+      // eslint-disable-next-line @next/next/no-img-element
+      return (
+        <img
+          src={customImageUrl}
+          alt=""
+          className="w-full h-full object-cover rounded-full"
+        />
+      );
+    }
+    if (icon === "dots") return <MoreHorizontal className="h-6 w-6 text-white" />;
+    if (icon === "sparkle") return <Sparkles className="h-6 w-6 text-white" />;
+    if (icon === "wave") return <Hand className="h-6 w-6 text-white" />;
+    return <MessageSquare className="h-6 w-6 text-white" />;
+  };
+
+  return (
+    <>
+      {open && (
+        <div
+          className={`absolute bottom-16 ${side} w-64 bg-white rounded-xl shadow-xl p-3`}
+        >
+          <div className="text-sm font-semibold text-gray-900 truncate">
+            {businessName}
+          </div>
+          <div className="text-xs text-gray-600 mt-0.5 mb-2">{greeting}</div>
+          <div className="space-y-1.5">
+            {channels.length === 0 && (
+              <div className="text-xs text-gray-400 italic">
+                Подключите каналы, чтобы кнопки появились.
+              </div>
+            )}
+            {channels.map((ch) => (
+              <div
+                key={ch.type}
+                className="flex items-center gap-2 px-2.5 py-2 bg-gray-50 rounded-lg text-xs text-gray-900 font-medium"
+              >
+                {ch.type === "telegram" && <Send className="h-3.5 w-3.5 text-sky-500" />}
+                {ch.type === "whatsapp" && (
+                  <span className="w-3.5 h-3.5 text-green-500 font-bold text-[10px] flex items-center justify-center">
+                    W
+                  </span>
+                )}
+                {ch.type === "instagram" && <Instagram className="h-3.5 w-3.5 text-pink-500" />}
+                {ch.type === "messenger" && <Facebook className="h-3.5 w-3.5 text-blue-500" />}
+                {ch.label}
+              </div>
+            ))}
+          </div>
+          <div className="text-[9px] text-gray-400 text-center mt-2 pt-2 border-t border-gray-100">
+            Powered by Staffix
+          </div>
+        </div>
+      )}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`absolute bottom-3 ${side} w-14 h-14 rounded-full shadow-lg flex items-center justify-center overflow-hidden transition-transform hover:scale-110`}
+        style={{ background: hasCustomImg ? "transparent" : color }}
+        aria-label="Preview toggle"
+      >
+        <IconContent />
+      </button>
+    </>
   );
 }
 

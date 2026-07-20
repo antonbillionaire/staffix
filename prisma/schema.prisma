@@ -178,6 +178,17 @@ model Business {
   // руками в настройках; без него /dashboard/ads показывает empty state.
   fbAdAccountId String?
 
+  // Sprint Widget (21 июля 2026) — кастомизация встраиваемого виджета
+  // /widget/loader.js. Значения читаются публичным config-endpoint без
+  // авторизации. widgetPosition: "br" (bottom-right, дефолт) | "bl".
+  // widgetIcon: "chat" | "dots" | "sparkle" | "wave" | "custom".
+  // widgetCustomImageUrl используется только когда widgetIcon="custom".
+  widgetColor          String?
+  widgetPosition       String  @default("br")
+  widgetIcon           String  @default("chat")
+  widgetCustomImageUrl String?
+  widgetGreeting       String?
+
   // Claude API usage tracking
   tokensUsedInput  Int @default(0) // input tokens consumed
   tokensUsedOutput Int @default(0) // output tokens consumed
