@@ -36,12 +36,21 @@ interface StartHandlerParams {
 }
 
 function getDefaultWelcome(name?: string | null, lang?: string | null): string {
-  const biz = name || "нашу компанию";
+  const bizRu = name || "нашу компанию";
+  const bizEn = name || "our company";
+  const bizUz = name || "kompaniyamiz";
+  const bizKz = name || "біздің компания";
+  // NOTE: не раскрываем что это AI (feedback-ai-disclosure-positioning).
+  // Врать что человек — тоже запрещено. Просто вежливое приветствие
+  // с приглашением задать вопрос. Владелец может переписать через
+  // Business.welcomeMessage в дашборде.
   if (lang === "en")
-    return `Hello! 👋 Welcome to ${biz}!\n\nI'm an AI assistant ready to answer your questions about our services, prices, and help with bookings.\n\nHow can I help you?\n\n💡 /lang — change language`;
+    return `Hello! 👋 Welcome to ${bizEn}!\n\nHappy to help with your questions about our services, prices and bookings.\n\nHow can I help you?\n\n💡 /lang — change language`;
   if (lang === "uz")
-    return `Salom! 👋 ${biz}ga xush kelibsiz!\n\nMen AI yordamchiman — xizmatlar, narxlar haqida savollarga javob beraman va yozilishga yordam beraman.\n\nQanday yordam bera olaman?\n\n💡 /lang — tilni o'zgartirish`;
-  return `Здравствуйте! 👋 Добро пожаловать в ${biz}!\n\nЯ AI-помощник и готов ответить на ваши вопросы о наших услугах, ценах и помочь с записью.\n\nЧем могу помочь?\n\n💡 /lang — сменить язык`;
+    return `Salom! 👋 ${bizUz}ga xush kelibsiz!\n\nXizmatlar, narxlar va yozilish bo'yicha savollaringizga javob berishga tayyorman.\n\nQanday yordam bera olaman?\n\n💡 /lang — tilni o'zgartirish`;
+  if (lang === "kz")
+    return `Сәлеметсіз бе! 👋 ${bizKz}ға қош келдіңіз!\n\nҚызметтер, бағалар және жазылу туралы сұрақтарыңызға жауап беруге дайынмын.\n\nҚалай көмектесе аламын?\n\n💡 /lang — тілді ауыстыру`;
+  return `Здравствуйте! 👋 Добро пожаловать в ${bizRu}!\n\nГотов ответить на ваши вопросы об услугах, ценах и помочь с записью.\n\nЧем могу помочь?\n\n💡 /lang — сменить язык`;
 }
 
 export async function handleStartCommand(params: StartHandlerParams): Promise<boolean> {

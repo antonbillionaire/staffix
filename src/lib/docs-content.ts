@@ -4352,4 +4352,124 @@ Menejerdan qo'lda: miqdor + izoh → "Yig'ish" yoki "Sarflash". Chegara ±100 00
 Менеджерден қолмен: сан + пікір → «Есептеу» немесе «Алу». Шектеу ±100 000. Теріс теңгерім мүмкін емес.`,
     },
   },
+
+  // ===== 30. WIDGET (Sprint Widget — 21 июля 2026) =====
+  {
+    id: "site-widget",
+    icon: "Radio",
+    title: {
+      ru: "Виджет Staffix для вашего сайта",
+      en: "Staffix Widget for Your Website",
+      uz: "Sayt uchun Staffix vidjeti",
+      kz: "Сайтыңызға арналған Staffix виджеті",
+    },
+    description: {
+      ru: "Плавающая кнопка → клиент попадает в бота через TG/WA/IG/FB",
+      en: "Floating button → visitor jumps into the bot via TG/WA/IG/FB",
+      uz: "Suzuvchi tugma → mijoz TG/WA/IG/FB orqali botga kiradi",
+      kz: "Қалқымалы түйме → клиент TG/WA/IG/FB арқылы ботқа өтеді",
+    },
+    content: {
+      ru: `## Виджет для сайта
+
+Разместите на своём сайте плавающую кнопку — посетитель одним кликом попадёт в переписку с вашим AI-сотрудником через Telegram, WhatsApp, Instagram Direct или Facebook Messenger.
+
+Никакого чата в iframe — только deep-link в мессенджер, который у посетителя уже установлен. Это удобно клиенту (он общается там где привык) и снимает нагрузку с вашего сайта.
+
+### Установка (1 минута)
+
+1. **Дашборд → Виджет для сайта** — там персональный код с вашим ID.
+2. Нажмите **«Скопировать»**.
+3. Вставьте перед закрывающим тегом \`</body>\` на всех страницах вашего сайта.
+
+Готово. Виджет появится в правом нижнем углу.
+
+### Что видит посетитель
+
+Круглая синяя кнопка → клик → всплывает панель со списком доступных мессенджеров (только тех что вы подключили в Staffix). Клик по кнопке — открывается приложение мессенджера / веб-версия с готовым чатом с вашим ботом.
+
+### На разных платформах
+
+**WordPress**: плагин «Insert Headers and Footers» → поле «Scripts in Footer» → вставить код.
+
+**Tilda**: Настройки сайта → Ещё → HTML-код для вставки внутри HEAD/BODY → выбрать «Перед \`</body>\`».
+
+**Wix**: Settings → Custom Code → + Add Custom Code → вставить, выбрать «Body — end» и «All pages».
+
+**Чистый HTML / Next.js / React**: вставить строку прямо в шаблон layout перед \`</body>\`.
+
+### Управление
+
+- **Подключили новый канал** — он появится в виджете автоматически через ~5 минут (edge-cache).
+- **Отключили канал** — соответствующая кнопка пропадёт у посетителя.
+- **WhatsApp не открывается** — проверьте что в **Настройки → Профиль** указан ваш телефон в международном формате (+998...). Виджет строит ссылку wa.me/PHONE из этого поля.
+- **Ни один канал не подключён** — виджет тихо не рендерится (не будет пустой кнопки).
+
+### Технические детали (для тех кому интересно)
+
+- Скрипт грузится асинхронно (\`async\`), не блокирует рендеринг сайта.
+- Размер ~4 КБ (без React, чистый vanilla JS).
+- Без cookies, без трекинга. Только deep-link.
+- Edge-кэш 5 минут — минимальная нагрузка на наш API.
+- CORS \`*\` — работает на любом домене.
+- Если у вашего сайта строгий CSP — добавьте \`staffix.io\` в \`script-src\`.`,
+      en: `## Website Widget
+
+Add a floating button to your website — one click drops a visitor into a chat with your AI employee via Telegram, WhatsApp, Instagram Direct, or Facebook Messenger.
+
+No embedded chat, no iframes — just a deep-link into the messenger the visitor already has installed. Comfortable for customers, zero overhead for your site.
+
+### Install (1 minute)
+
+1. **Dashboard → Website Widget** — grab your personalised snippet.
+2. Click **"Copy"**.
+3. Paste before \`</body>\` on all pages of your site.
+
+Done — the widget appears in the bottom-right corner.
+
+### What the visitor sees
+
+Round blue button → click → panel with available messengers (only the ones you've connected in Staffix). Click a messenger → opens the app / web version with a ready-to-go chat with your bot.
+
+### Platforms
+
+- **WordPress**: "Insert Headers and Footers" plugin → "Scripts in Footer" field.
+- **Tilda**: Site Settings → More → Insert HTML → "Before \`</body>\`".
+- **Wix**: Settings → Custom Code → Add → "Body — end" + "All pages".
+- **Raw HTML / Next.js / React**: paste directly into your layout before \`</body>\`.
+
+### Notes
+
+- Connect a new channel — appears in the widget within ~5 min.
+- Widget script is async, ~4 KB, no cookies, no tracking.
+- If your site has strict CSP, add \`staffix.io\` to \`script-src\`.
+- WhatsApp uses your business phone from Settings → Profile (international format +...).`,
+      uz: `## Sayt vidjeti
+
+Saytingizga suzuvchi tugma qo'shing — mijoz bir marta bosish bilan Telegram, WhatsApp, Instagram yoki Messenger orqali AI-xodimingiz bilan yozishmaga tushadi.
+
+### O'rnatish
+
+1. **Boshqaruv paneli → Sayt vidjeti** — kodni oling.
+2. **"Nusxalash"** ni bosing.
+3. Saytingizning barcha sahifalarida \`</body>\` yopilishi oldiga joylashtiring.
+
+WordPress, Tilda, Wix va toza HTML uchun batafsil ko'rsatmalar dashboard'da.
+
+**WhatsApp uchun**: profilda telefon xalqaro formatda ko'rsatilgan bo'lishi kerak (+998...).`,
+      kz: `## Сайт виджеті
+
+Сайтыңызға қалқымалы түйме қосыңыз — клиент бір басумен Telegram, WhatsApp, Instagram немесе Messenger арқылы AI-қызметкеріңізбен жазысуға түседі.
+
+### Орнату
+
+1. **Панель → Сайт виджеті** — кодты алыңыз.
+2. **«Көшіру»** басыңыз.
+3. Сайтыңыздың барлық беттерінде \`</body>\` алдында орналастырыңыз.
+
+WordPress, Tilda, Wix және таза HTML үшін толық нұсқаулық панельде.
+
+**WhatsApp үшін**: профильде телефон халықаралық форматта көрсетілуі керек (+998...).`,
+    },
+  },
 ];

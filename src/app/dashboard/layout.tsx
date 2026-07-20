@@ -56,6 +56,7 @@ import {
   Phone,
   Target,
   Megaphone,
+  Code,
   type LucideIcon,
 } from "lucide-react";
 const ChatWidget = dynamic(() => import("@/components/ChatWidget"), { ssr: false });
@@ -149,6 +150,7 @@ function buildNavConfig(isSales: boolean): NavEntry[] {
         { nameKey: "nav.myComments", href: "/dashboard/comments", icon: MessageSquare },
         { nameKey: "nav.myStats", href: "/dashboard/statistics", icon: BarChart3 },
         { nameKey: "nav.myAds", href: "/dashboard/ads", icon: Megaphone },
+        { nameKey: "nav.myWidget", href: "/dashboard/widget", icon: Code },
         { nameKey: "nav.myActivity", href: "/dashboard/activity", icon: Activity },
         { nameKey: "nav.myBroadcasts", href: "/dashboard/broadcasts", icon: Send },
         { nameKey: "nav.myAutomation", href: "/dashboard/automation", icon: Zap },
