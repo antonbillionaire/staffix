@@ -3,8 +3,11 @@ import {
   processReminders,
   processReviewRequests,
   processReactivation,
-  processSubscriptionReminders,
 } from "@/lib/automation";
+// Subscription reminders live in their own daily cron
+// (/api/cron/subscription-reminders) — that path respects the
+// notifyTrialEnding user setting and covers both trial+cancelled cohorts.
+// Previously duplicated here at 15-min cadence with wrong toggle behaviour.
 
 export const maxDuration = 300;
 
@@ -19,11 +22,10 @@ export async function GET(request: Request) {
     console.log("[CRON] Starting automation jobs...");
 
     // Run all automation tasks in parallel
-    const [remindersResult, reviewsResult, reactivationResult, subscriptionResult] = await Promise.allSettled([
+    const [remindersResult, reviewsResult, reactivationResult] = await Promise.allSettled([
       processReminders(),
       processReviewRequests(),
       processReactivation(),
-      processSubscriptionReminders(),
     ]);
 
     const results = {
@@ -40,10 +42,6 @@ export async function GET(request: Request) {
         reactivationResult.status === "fulfilled"
           ? reactivationResult.value
           : { error: reactivationResult.reason },
-      subscriptionReminders:
-        subscriptionResult.status === "fulfilled"
-          ? subscriptionResult.value
-          : { error: subscriptionResult.reason },
     };
 
     console.log("[CRON] Automation jobs completed:", results);

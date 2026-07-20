@@ -40,7 +40,16 @@ export async function GET(request: NextRequest) {
         ],
       },
       include: {
-        business: { include: { user: { select: { email: true, name: true } } } },
+        business: {
+          include: {
+            user: {
+              // notifyTrialEnding pulled so we can honour the user's setting —
+              // the parallel path in lib/automation.ts respected it, this cron
+              // previously did not. Consolidated below.
+              select: { email: true, name: true, notifyTrialEnding: true },
+            },
+          },
+        },
       },
       take: 500,
     });
@@ -53,6 +62,10 @@ export async function GET(request: NextRequest) {
     for (const sub of subs) {
       const user = sub.business.user;
       if (!user?.email) continue;
+      // User can silence trial-ending notifications in /dashboard/settings.
+      // The duplicate copy in lib/automation.ts respected this flag; this
+      // canonical path now respects it too.
+      if (user.notifyTrialEnding === false) continue;
 
       const isTrial = sub.plan === "trial";
       const planConfig = getPlan(sub.plan as PlanId);

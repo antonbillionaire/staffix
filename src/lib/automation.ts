@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import { sendSubscriptionReminder } from "@/lib/email";
 import { decrypt } from "@/lib/crypto";
 
 // ===========================================
@@ -238,12 +237,16 @@ export async function processReminders() {
 
       const hoursUntil = (booking.date.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-      // Напоминание за 24 часа
+      // Напоминание за 24 часа.
+      // Ранее было жёсткое окно `> 23` — если cron лагает больше часа,
+      // напоминание не улетало никогда (флаг reminder24hSent=false остаётся,
+      // но hoursUntil уже < 23 при следующем прогоне). Теперь ловим весь
+      // хвост от 24 часов и вплоть до самой записи, пока не отправили.
       if (
         settings.reminder24hEnabled &&
         !booking.reminder24hSent &&
         hoursUntil <= 24 &&
-        hoursUntil > 23
+        hoursUntil > 0
       ) {
         const message = `Здравствуйте, ${booking.clientName}! 👋
 
@@ -296,12 +299,13 @@ ${business.address ? `📍 ${business.address}` : ""}
         }
       }
 
-      // Напоминание за 2 часа
+      // Напоминание за 2 часа — тот же принцип, что и для 24h.
+      // Оставляем > 0 чтобы не слать когда клиент уже пришёл/пропустил.
       if (
         settings.reminder2hEnabled &&
         !booking.reminder2hSent &&
         hoursUntil <= 2 &&
-        hoursUntil > 1.5
+        hoursUntil > 0
       ) {
         const message = `До вашего визита осталось 2 часа! ⏰
 
@@ -487,6 +491,7 @@ export async function processReactivation() {
       clients: {
         where: {
           isBlocked: false,
+          marketingUnsubscribed: false,  // GDPR/КЗ/УЗ compliance — не спамим отписавшихся
           lastVisitDate: { not: null },
         },
         take: 1000, // ограничение чтобы не упасть на бизнесах с 10К+ клиентов
@@ -609,92 +614,7 @@ export async function processReactivation() {
   return results;
 }
 
-// ===========================================
-// НАПОМИНАНИЯ ОБ ОКОНЧАНИИ ПОДПИСКИ
-// ===========================================
-
-export async function processSubscriptionReminders() {
-  const now = new Date();
-  const results = { sent: 0, failed: 0, errors: [] as string[] };
-
-  // Find all active subscriptions that are expiring within 7 days
-  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-  const subscriptions = await prisma.subscription.findMany({
-    where: {
-      status: "active",
-      expiresAt: { lte: sevenDaysFromNow, gt: now },
-    },
-    include: {
-      business: {
-        include: {
-          user: { select: { email: true, name: true, notifyTrialEnding: true } },
-        },
-      },
-    },
-  });
-
-  for (const sub of subscriptions) {
-    const user = sub.business?.user;
-    if (!user?.email || !user.notifyTrialEnding) continue;
-
-    const msLeft = sub.expiresAt.getTime() - now.getTime();
-    const daysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
-
-    if (daysLeft <= 0) continue;
-
-    const planName = sub.plan === "trial" ? "Пробный период"
-      : sub.plan === "starter" ? "Starter"
-      : sub.plan === "pro" ? "Pro"
-      : sub.plan === "business" ? "Business"
-      : sub.plan === "enterprise" ? "Enterprise"
-      : sub.plan;
-
-    // 7-day reminder (days 4-7)
-    if (daysLeft <= 7 && daysLeft > 3 && !sub.reminder7dSent) {
-      const result = await sendSubscriptionReminder(user.email, user.name, planName, daysLeft);
-      if (result.success) {
-        await prisma.subscription.update({
-          where: { id: sub.id },
-          data: { reminder7dSent: true },
-        });
-        results.sent++;
-      } else {
-        results.failed++;
-        results.errors.push(`7d reminder for ${user.email}: ${result.error}`);
-      }
-    }
-
-    // 3-day reminder (days 2-3)
-    if (daysLeft <= 3 && daysLeft > 1 && !sub.reminder3dSent) {
-      const result = await sendSubscriptionReminder(user.email, user.name, planName, daysLeft);
-      if (result.success) {
-        await prisma.subscription.update({
-          where: { id: sub.id },
-          data: { reminder3dSent: true },
-        });
-        results.sent++;
-      } else {
-        results.failed++;
-        results.errors.push(`3d reminder for ${user.email}: ${result.error}`);
-      }
-    }
-
-    // Last day reminder
-    if (daysLeft <= 1 && !sub.reminder1dSent) {
-      const result = await sendSubscriptionReminder(user.email, user.name, planName, daysLeft);
-      if (result.success) {
-        await prisma.subscription.update({
-          where: { id: sub.id },
-          data: { reminder1dSent: true },
-        });
-        results.sent++;
-      } else {
-        results.failed++;
-        results.errors.push(`1d reminder for ${user.email}: ${result.error}`);
-      }
-    }
-  }
-
-  return results;
-}
+// Subscription reminders были дублированы здесь и в /api/cron/subscription-reminders.
+// Оставлен единственный источник — тот cron (ежесуточный 09:00 UTC, уважает
+// notifyTrialEnding, покрывает и trial и cancelled paid). Дубль удалён,
+// вызов из /api/cron/automations тоже убран.

@@ -1031,20 +1031,19 @@ export async function createOrder(
       }
     }
 
-    // Award cashback points to client
-    if (cashbackEarned > 0 && client) {
+    // Award cashback points to client — обновляем по client.id, а не по
+    // businessId_telegramId. Клиенты найденные по phone/имени (WA/IG/FB
+    // источники, ручные импорты) имеют telegramId=null → update по составному
+    // ключу промахивался и уходил в silent .catch. Через client.id одинаково
+    // работает для всех источников привязки.
+    if (client) {
       prisma.client.update({
-        where: { businessId_telegramId: { businessId, telegramId } },
+        where: { id: client.id },
         data: {
-          loyaltyPoints: { increment: cashbackEarned },
           loyaltyTotalSpent: { increment: finalPrice },
+          ...(cashbackEarned > 0 ? { loyaltyPoints: { increment: cashbackEarned } } : {}),
         },
-      }).catch(() => {});
-    } else if (client) {
-      prisma.client.update({
-        where: { businessId_telegramId: { businessId, telegramId } },
-        data: { loyaltyTotalSpent: { increment: finalPrice } },
-      }).catch(() => {});
+      }).catch((e) => console.error("[Cashback] Failed to update loyalty:", e));
     }
 
     // Уведомляем владельца через Telegram + отправляем кнопки оплаты клиенту

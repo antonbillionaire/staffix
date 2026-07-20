@@ -36,6 +36,18 @@ export async function PATCH(
     const product = await prisma.product.findFirst({ where: { id, businessId } });
     if (!product) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    // Capture previous stock BEFORE the update so we can log the delta.
+    // bulk-stock and create_order already log; this PATCH is the third path
+    // that mutates stock (edit-product modal in dashboard) and it was silent —
+    // владельцу нечего сверять с фактическим отчётом склада.
+    const previousStock = product.stock;
+    const newStockRaw = body.stock;
+    const stockChanging =
+      newStockRaw !== undefined &&
+      newStockRaw !== null &&
+      Number.isFinite(Number(newStockRaw)) &&
+      Number(newStockRaw) !== previousStock;
+
     const updated = await prisma.product.update({
       where: { id },
       data: {
@@ -52,6 +64,21 @@ export async function PATCH(
         isActive: body.isActive !== undefined ? body.isActive : undefined,
       },
     });
+
+    // Log stock change (reason: "manual" — правка через UI).
+    // Fire-and-forget с console.error — StockLog не блокирует ответ клиенту,
+    // но и не заглушаем silent .catch.
+    if (stockChanging && updated.stock !== null && previousStock !== null) {
+      prisma.stockLog.create({
+        data: {
+          productId: id,
+          previousStock,
+          newStock: updated.stock,
+          change: updated.stock - previousStock,
+          reason: "manual",
+        },
+      }).catch((e) => console.error("[Product PATCH] stockLog create failed:", e));
+    }
 
     await markBusinessConversationsForRefresh(businessId);
 
