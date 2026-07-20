@@ -201,7 +201,7 @@ export async function PUT(request: Request) {
     }
 
     const data = await request.json();
-    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, timezone, ownerTelegramUsername, paymeId, clickServiceId, clickMerchantId, waPhoneNumberId, waAccessToken, waVerifyToken, waActive, fbPageId, fbPageAccessToken, fbVerifyToken, fbActive, businessTypes, language, deliveryEnabled, deliveryTimeFrom, deliveryTimeTo, deliveryFee, deliveryFreeFrom, deliveryZones, consultationsEnabled, leadAssignmentMode } = data;
+    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, timezone, ownerTelegramUsername, paymeId, clickServiceId, clickMerchantId, waPhoneNumberId, waAccessToken, waVerifyToken, waActive, fbPageId, fbPageAccessToken, fbVerifyToken, fbActive, fbAdAccountId, businessTypes, language, deliveryEnabled, deliveryTimeFrom, deliveryTimeTo, deliveryFee, deliveryFreeFrom, deliveryZones, consultationsEnabled, leadAssignmentMode } = data;
 
     // Найти бизнес пользователя
     const existingBusiness = await prisma.business.findFirst({
@@ -284,6 +284,14 @@ export async function PUT(request: Request) {
       updateData.fbVerifyToken = fbVerifyToken ? encrypt(fbVerifyToken) : null;
     }
     if (fbActive !== undefined) updateData.fbActive = Boolean(fbActive);
+
+    // Sprint 4D (M18) — Meta Ad Account ID для /dashboard/ads.
+    // Нормализуем: убираем "act_" префикс если ввели вручную — храним только id,
+    // "act_" клеим при вызове Marketing API. Не секрет, encryption не нужна.
+    if (fbAdAccountId !== undefined) {
+      const raw = (fbAdAccountId || "").trim();
+      updateData.fbAdAccountId = raw ? raw.replace(/^act_/, "") : null;
+    }
 
     // Если передан токен бота - валидируем и регистрируем/перерегистрируем webhook.
     // isMasked-guard: если фронт вернул "***" (не редактировали) — не трогаем.

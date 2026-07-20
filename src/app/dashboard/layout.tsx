@@ -55,6 +55,7 @@ import {
   Facebook,
   Phone,
   Target,
+  Megaphone,
   type LucideIcon,
 } from "lucide-react";
 const ChatWidget = dynamic(() => import("@/components/ChatWidget"), { ssr: false });
@@ -147,6 +148,7 @@ function buildNavConfig(isSales: boolean): NavEntry[] {
         { nameKey: "nav.myMessages", href: "/dashboard/messages", icon: Mail, badge: "messages" as const },
         { nameKey: "nav.myComments", href: "/dashboard/comments", icon: MessageSquare },
         { nameKey: "nav.myStats", href: "/dashboard/statistics", icon: BarChart3 },
+        { nameKey: "nav.myAds", href: "/dashboard/ads", icon: Megaphone },
         { nameKey: "nav.myActivity", href: "/dashboard/activity", icon: Activity },
         { nameKey: "nav.myBroadcasts", href: "/dashboard/broadcasts", icon: Send },
         { nameKey: "nav.myAutomation", href: "/dashboard/automation", icon: Zap },

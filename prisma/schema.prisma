@@ -173,6 +173,11 @@ model Business {
   metaUserAccessToken String? // Long-lived User Access Token (60 дней)
   metaTokenExpiresAt  DateTime? // Когда истекает
 
+  // Sprint 4D (M18) — Meta Ad Insights для владельца.
+  // Ad Account ID из Meta Ads Manager (act_XXXXXXXXX). Владелец вводит
+  // руками в настройках; без него /dashboard/ads показывает empty state.
+  fbAdAccountId String?
+
   // Claude API usage tracking
   tokensUsedInput  Int @default(0) // input tokens consumed
   tokensUsedOutput Int @default(0) // output tokens consumed
@@ -237,6 +242,7 @@ model Business {
   botCorrections   BotCorrection[]
   aiInsightRecords AiInsight[]
   metaInsights     MetaInsight[]   @relation("MetaInsightBusiness")
+  adInsights       AdCampaignInsight[] @relation("AdInsightBusiness")
 
   // Программы лояльности (может быть несколько типов)
   loyaltyPrograms LoyaltyProgram[]
@@ -1641,6 +1647,43 @@ model MetaInsight {
   @@index([status, severity])
   @@index([type, createdAt])
   @@index([businessId])
+}
+
+// Sprint 4D (M18) — снимок агрегатов рекламной кампании Meta за день.
+// Cron /api/cron/ad-insights читает Marketing API и обновляет upsert'ом
+// по (businessId, campaignId, date). Владелец видит на /dashboard/ads
+// динамику spend/CPL/CTR и воронку от IG-клика до продажи.
+model AdCampaignInsight {
+  id String @id @default(cuid())
+
+  businessId String
+  business   Business @relation("AdInsightBusiness", fields: [businessId], references: [id], onDelete: Cascade)
+
+  source       String  @default("meta") // meta | tiktok | google — сейчас только meta
+  campaignId   String
+  campaignName String?
+
+  date        DateTime // день (00:00 UTC) — агрегат Marketing API за сутки
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  spend       Float    @default(0) // валюта рекламного кабинета
+  currency    String? // USD, EUR, KZT, UZS…
+
+  // Производные (denormalized для скорости чтения)
+  ctr Float? // clicks/impressions
+  cpl Float? // spend / attributed leads (заполняем cron'ом с воронкой)
+
+  // Атрибуция: сколько лидов и клиентов пришло с рекламы в этот день
+  // (мэпим через Lead.channel=instagram|facebook + createdAt для MVP;
+  // per-campaign атрибуция — ссылки с utm требуют отдельной инфраструктуры).
+  attributedLeads   Int @default(0)
+  attributedClients Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([businessId, campaignId, date])
+  @@index([businessId, date])
 }
 
 // ========================================

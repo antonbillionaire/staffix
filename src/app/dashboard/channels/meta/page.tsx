@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Target,
   AlertTriangle,
+  DollarSign,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -45,6 +46,11 @@ export default function MetaChannelsPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Sprint 4D (M18): Ad Account ID для страницы /dashboard/ads.
+  // Загружаем из /api/business, сохраняем через PUT.
+  const [adAccountId, setAdAccountId] = useState<string>("");
+  const [adAccountSaving, setAdAccountSaving] = useState(false);
+
   const cardBg = isDark ? "bg-[#12122a]" : "bg-white";
   const borderColor = isDark ? "border-white/5" : "border-gray-200";
   const textPrimary = isDark ? "text-white" : "text-gray-900";
@@ -52,7 +58,36 @@ export default function MetaChannelsPage() {
 
   useEffect(() => {
     fetchChannels();
+    // Загружаем текущий ad account id из бизнеса
+    fetch("/api/business")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.business?.fbAdAccountId) setAdAccountId(d.business.fbAdAccountId);
+      })
+      .catch(() => {});
   }, []);
+
+  const saveAdAccountId = async () => {
+    setAdAccountSaving(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch("/api/business", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fbAdAccountId: adAccountId.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setErrorMessage(data.error || "Не удалось сохранить");
+        return;
+      }
+      setSuccessMessage("Рекламный аккаунт сохранён");
+    } catch (e) {
+      setErrorMessage(e instanceof Error ? e.message : "Ошибка сохранения");
+    } finally {
+      setAdAccountSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (successMessage) {
@@ -273,6 +308,40 @@ export default function MetaChannelsPage() {
           </div>
         </div>
       )}
+
+      {/* Sprint 4D (M18): рекламный аккаунт Meta для страницы /dashboard/ads */}
+      <div id="ad-account" className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0">
+            <DollarSign className="h-5 w-5 text-green-500" />
+          </div>
+          <div>
+            <h3 className={`text-lg font-semibold ${textPrimary}`}>Рекламный аккаунт</h3>
+            <p className={`text-sm ${textSecondary}`}>
+              Нужен для показа spend, CPL и CTR на странице «Реклама Meta».
+              Возьмите ID в Meta Ads Manager (например «123456789», без префикса act_).
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={adAccountId}
+            onChange={(e) => setAdAccountId(e.target.value)}
+            placeholder="123456789012"
+            className={`flex-1 px-3 py-2 rounded-lg border ${borderColor} ${
+              isDark ? "bg-[#0a0a1a] text-white" : "bg-white text-gray-900"
+            } text-sm`}
+          />
+          <button
+            onClick={saveAdAccountId}
+            disabled={adAccountSaving}
+            className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            {adAccountSaving ? "Сохраняем…" : "Сохранить"}
+          </button>
+        </div>
+      </div>
 
       {/* Reconnect if partially connected */}
       {isAnyConnected && (!igChannel?.isConnected || !fbChannel?.isConnected) && (
