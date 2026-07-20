@@ -19,6 +19,8 @@ import {
   getClientBookings,
   cancelBooking,
   updateLeadStatus,
+  listServicePackages,
+  createPackageBooking,
 } from "@/lib/booking-tools";
 import { dispatchCrmEvent } from "@/lib/crm-integrations";
 import { notifyManagerByTelegram } from "@/lib/sales-tools";
@@ -81,6 +83,25 @@ export async function handleToolCall(
       case "get_services": {
         const services = await getServicesList(businessId);
         return JSON.stringify(services);
+      }
+
+      case "list_packages": {
+        const packages = await listServicePackages(businessId);
+        return JSON.stringify(packages);
+      }
+
+      case "book_package": {
+        const result = await createPackageBooking({
+          businessId,
+          packageId: toolInput.package_id,
+          dateStr: toolInput.date,
+          timeStr: toolInput.time,
+          clientName: toolInput.client_name,
+          clientPhone: toolInput.client_phone,
+          clientTelegramId: telegramId,
+          staffId: toolInput.staff_id,
+        });
+        return JSON.stringify(result);
       }
 
       case "get_staff": {

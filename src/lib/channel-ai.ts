@@ -66,7 +66,7 @@ const saveClientNoteTool = {
 const channelBookingTools: any[] = [
   ...bookingToolDefinitions.filter(
     (t: { name: string }) =>
-      ["check_availability", "create_booking", "get_services", "get_staff", "update_lead_status", "get_my_bookings", "cancel_booking", "notify_manager", "search_products"].includes(t.name)
+      ["check_availability", "create_booking", "get_services", "get_staff", "update_lead_status", "get_my_bookings", "cancel_booking", "notify_manager", "search_products", "list_packages", "book_package"].includes(t.name)
   ),
   saveClientNoteTool,
 ];
@@ -96,7 +96,7 @@ const channelSalesPlusBookingTools: any[] = [
   ),
   ...bookingToolDefinitions.filter(
     (t: { name: string }) =>
-      ["check_availability", "create_booking", "get_services", "get_staff", "update_lead_status", "get_my_bookings", "cancel_booking", "notify_manager"].includes(t.name)
+      ["check_availability", "create_booking", "get_services", "get_staff", "update_lead_status", "get_my_bookings", "cancel_booking", "notify_manager", "list_packages", "book_package"].includes(t.name)
   ),
   saveClientNoteTool,
 ];
@@ -448,6 +448,27 @@ async function handleChannelToolCall(
       case "get_services": {
         const services = await getServicesList(businessId);
         return JSON.stringify(services);
+      }
+
+      case "list_packages": {
+        const { listServicePackages } = await import("./booking-tools");
+        const packages = await listServicePackages(businessId);
+        return JSON.stringify(packages);
+      }
+
+      case "book_package": {
+        const { createPackageBooking } = await import("./booking-tools");
+        const result = await createPackageBooking({
+          businessId,
+          packageId: toolInput.package_id,
+          dateStr: toolInput.date,
+          timeStr: toolInput.time,
+          clientName: toolInput.client_name || clientName || "Клиент",
+          clientPhone: toolInput.client_phone || "",
+          // clientTelegramId у канальных клиентов нет (не-TG) — оставляем undefined
+          staffId: toolInput.staff_id,
+        });
+        return JSON.stringify(result);
       }
 
       case "get_staff": {

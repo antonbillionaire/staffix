@@ -922,6 +922,173 @@ export async function searchProducts(
 }
 
 // ========================================
+// SERVICE PACKAGES (комбо со скидкой)
+// ========================================
+
+/**
+ * Список активных пакетов услуг с рассчитанной ценой (со скидкой).
+ * Используется AI для показа клиенту и для последующего book_package.
+ */
+export async function listServicePackages(businessId: string): Promise<Array<{
+  packageId: string;
+  name: string;
+  description: string | null;
+  services: Array<{ id: string; name: string; price: number; duration: number }>;
+  totalDuration: number;
+  originalPrice: number;
+  discountType: string;
+  discountAmount: number;
+  finalPrice: number;
+  discountLabel: string;
+}>> {
+  const packages = await prisma.servicePackage.findMany({
+    where: { businessId, isActive: true, autoSuggest: true },
+    include: {
+      items: {
+        include: { service: { select: { id: true, name: true, price: true, duration: true } } },
+        orderBy: { sortOrder: "asc" },
+      },
+    },
+  });
+
+  return packages.map((pkg) => {
+    const services = pkg.items
+      .filter((i) => i.service)
+      .map((i) => ({
+        id: i.service.id,
+        name: i.service.name,
+        price: i.service.price,
+        duration: i.service.duration,
+      }));
+    const totalDuration = services.reduce((s, v) => s + (v.duration || 0), 0);
+    const originalPrice = services.reduce((s, v) => s + (v.price || 0), 0);
+
+    let discountAmount = 0;
+    let finalPrice = originalPrice;
+    let discountLabel = "";
+    if (pkg.discountType === "percent" && pkg.discountPercent) {
+      discountAmount = Math.round((originalPrice * pkg.discountPercent) / 100);
+      finalPrice = originalPrice - discountAmount;
+      discountLabel = `-${pkg.discountPercent}%`;
+    } else if (pkg.discountType === "fixed" && typeof pkg.fixedPrice === "number") {
+      finalPrice = pkg.fixedPrice;
+      discountAmount = originalPrice - pkg.fixedPrice;
+      discountLabel = `фикс. цена ${pkg.fixedPrice.toLocaleString("ru-RU")}`;
+    }
+
+    return {
+      packageId: pkg.id,
+      name: pkg.name,
+      description: pkg.description,
+      services,
+      totalDuration,
+      originalPrice,
+      discountType: pkg.discountType,
+      discountAmount,
+      finalPrice,
+      discountLabel,
+    };
+  });
+}
+
+/**
+ * Забронировать пакет услуг: создаёт цепочку Booking с общим packageGroupId +
+ * servicePackageId + последовательным временем (сервисы идут один за другим).
+ * До сих пор эти поля в схеме были декоративные — AI обещал скидку, но каждый
+ * booking создавался за полную цену как отдельная услуга. Теперь один tool
+ * атомарно бронирует всю цепочку + пишет servicePackageId в каждый Booking,
+ * скидка отображается в подтверждении.
+ */
+export async function createPackageBooking(params: {
+  businessId: string;
+  packageId: string;
+  dateStr: string;   // YYYY-MM-DD
+  timeStr: string;   // HH:MM — время начала первой услуги пакета
+  clientName: string;
+  clientPhone: string;
+  clientTelegramId?: bigint;
+  staffId?: string;
+}): Promise<{ success: boolean; error?: string; bookings?: Array<{ id: string; serviceName: string; startTime: string }>; totalPrice?: number; originalPrice?: number; discountLabel?: string; packageName?: string }> {
+  const { businessId, packageId, dateStr, timeStr, clientName, clientPhone, clientTelegramId, staffId } = params;
+
+  const [pkg, biz] = await Promise.all([
+    prisma.servicePackage.findFirst({
+      where: { id: packageId, businessId, isActive: true },
+      include: {
+        items: {
+          include: { service: { select: { id: true, name: true, price: true, duration: true } } },
+          orderBy: { sortOrder: "asc" },
+        },
+      },
+    }),
+    prisma.business.findUnique({ where: { id: businessId }, select: { timezone: true } }),
+  ]);
+  if (!pkg) return { success: false, error: "Пакет не найден или отключён." };
+  const items = pkg.items.filter((i) => i.service);
+  if (items.length === 0) return { success: false, error: "В пакете нет услуг." };
+  const tz = biz?.timezone || null;
+
+  const originalPrice = items.reduce((s, i) => s + (i.service.price || 0), 0);
+  let finalPrice = originalPrice;
+  let discountLabel = "";
+  if (pkg.discountType === "percent" && pkg.discountPercent) {
+    finalPrice = originalPrice - Math.round((originalPrice * pkg.discountPercent) / 100);
+    discountLabel = `скидка ${pkg.discountPercent}%`;
+  } else if (pkg.discountType === "fixed" && typeof pkg.fixedPrice === "number") {
+    finalPrice = pkg.fixedPrice;
+    discountLabel = `фикс. цена`;
+  }
+
+  // Последовательно раскладываем услуги от времени начала.
+  // dateStr + timeStr → базовое время; каждый следующий начинается через
+  // duration предыдущего. localToUTC делает конверт из "локального" в UTC-Date.
+  const [hh, mm] = timeStr.split(":").map(Number);
+  const packageGroupId = `pkg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+  const results: Array<{ id: string; serviceName: string; startTime: string }> = [];
+  try {
+    await prisma.$transaction(async (tx) => {
+      let cursorMinutes = hh * 60 + mm;
+      for (const item of items) {
+        const startH = Math.floor(cursorMinutes / 60);
+        const startM = cursorMinutes % 60;
+        const startTime = `${String(startH).padStart(2, "0")}:${String(startM).padStart(2, "0")}`;
+        const bookingDate = localToUTC(dateStr, startTime, tz);
+
+        const booking = await tx.booking.create({
+          data: {
+            businessId,
+            date: bookingDate,
+            clientName,
+            clientPhone,
+            clientTelegramId: clientTelegramId ?? null,
+            serviceId: item.service.id,
+            staffId: staffId ?? null,
+            status: "confirmed",
+            servicePackageId: pkg.id,
+            packageGroupId,
+          },
+        });
+        results.push({ id: booking.id, serviceName: item.service.name, startTime });
+        cursorMinutes += item.service.duration || 30;
+      }
+    });
+  } catch (e) {
+    console.error("[createPackageBooking] transaction failed:", e);
+    return { success: false, error: "Не удалось забронировать пакет — попробуйте ещё раз или свяжитесь с администратором." };
+  }
+
+  return {
+    success: true,
+    bookings: results,
+    totalPrice: finalPrice,
+    originalPrice,
+    discountLabel,
+    packageName: pkg.name,
+  };
+}
+
+// ========================================
 // TOOL DEFINITIONS FOR CLAUDE API
 // ========================================
 
@@ -1017,6 +1184,37 @@ export const bookingToolDefinitions: any[] = [
       type: "object" as const,
       properties: {},
       required: [],
+    },
+  },
+  {
+    name: "list_packages",
+    description:
+      "Получить активные пакеты услуг с их скидкой и общей стоимостью. Пакет — это набор услуг с фиксированной ценой или процентной скидкой (например, «Свадебный комплекс» = стрижка + маникюр + макияж со скидкой 15%). Вызывай когда клиент интересуется акциями, комбо, или когда услуги из его запроса подходят под существующий пакет.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "book_package",
+    description:
+      "Забронировать пакет услуг за одну операцию — цепочка записей на все услуги пакета с автоматическим применением скидки. Услуги идут одна за другой начиная с указанного времени. Вызывай ТОЛЬКО после подтверждения клиентом даты и времени старта. Требует ID пакета из list_packages.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        package_id: { type: "string", description: "ID пакета из list_packages" },
+        date: { type: "string", description: "Дата в формате YYYY-MM-DD" },
+        time: { type: "string", description: "Время начала первой услуги пакета в формате HH:MM" },
+        client_name: { type: "string", description: "Имя клиента" },
+        client_phone: { type: "string", description: "Телефон клиента (международный формат)" },
+        staff_id: {
+          type: "string",
+          description:
+            "ID мастера. Если не указан — все услуги пакета делает один мастер по умолчанию (первый доступный).",
+        },
+      },
+      required: ["package_id", "date", "time", "client_name", "client_phone"],
     },
   },
   {
