@@ -637,6 +637,35 @@ export async function generateChannelAIResponse(
 
     if (!biz) return "Извините, произошла ошибка. Пожалуйста, свяжитесь с нами напрямую.";
 
+    // Sprint 3 Step 2: shadow write в единый Client. Помимо ChannelClient
+    // (который остаётся для history-совместимости) сразу заводим/обновляем
+    // строку в Client через новый helper. Владелец видит WA/IG/FB клиентов
+    // в /dashboard/customers, deal-pipeline / loyalty / assigned-staff могут
+    // работать с ним через Client.id. ChannelClient уходит на пенсию отдельным
+    // backfill-скриптом в Step 4.
+    if (channel !== "telegram") {
+      try {
+        const { findOrCreateClientForChannel } = await import("@/lib/client-identity");
+        const ch = channel === "whatsapp" || channel === "instagram" || channel === "facebook"
+          ? channel
+          : null;
+        if (ch) {
+          // Для WA `clientId` (waId) обычно = phone без "+"; используем как phone-hint.
+          const phoneHint = ch === "whatsapp" ? `+${clientId}` : null;
+          findOrCreateClientForChannel({
+            businessId,
+            channel: ch,
+            channelId: clientId,
+            name: clientName || null,
+            phone: phoneHint,
+          }).catch((e) => console.error("[Channel AI] shadow Client write failed:", e));
+        }
+      } catch (e) {
+        // Динамический import мог упасть — не критично, старый path продолжает работать
+        console.error("[Channel AI] client-identity import failed:", e);
+      }
+    }
+
     // Dispatch message_received CRM event (non-blocking)
     dispatchCrmEvent(businessId, "message_received", {
       client: {
