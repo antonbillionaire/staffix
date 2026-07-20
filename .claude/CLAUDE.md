@@ -112,6 +112,15 @@
 - При изменении API, environment variables, интеграций, deployment, моделей данных или пользовательского поведения обновлять релевантную документацию в той же задаче.
 - Если фактический код расходится с описанием в CLAUDE.md, не копировать устаревшее описание: зафиксировать расхождение и предложить точечное обновление.
 
+### Обязательные хелперы (добавлены 20 июля 2026)
+Не копировать эти паттерны inline — всегда использовать общий модуль. Иначе фикс придётся размазывать по десяткам файлов.
+- **Cron endpoints**: `checkCronAuth(request)` из `@/lib/cron-auth`. Fail-closed при пустом `CRON_SECRET`. Прямое сравнение `authHeader !== \`Bearer ${process.env.CRON_SECRET}\`` **запрещено** — при незаданном env это открывает endpoint.
+- **Loyalty points**: любое изменение `Client.loyaltyPoints` идёт через `writeLoyaltyLedger()` из `@/lib/loyalty-ledger`. Прямой `prisma.client.update({ loyaltyPoints: {...} })` **запрещён** — теряется история за что начислили. Функция ведёт транзакцию: строка в `LoyaltyLedger` + обновление баланса в одном `$transaction`.
+- **HTML в Telegram-уведомлениях**: любой user-controlled текст (имя клиента, услуга, адрес, товар) в parse_mode=HTML сообщениях **обязательно** через `escapeTgHtml()` из `@/lib/notifications`. Иначе клиент с именем `<b>x</b>` ломает вёрстку или инъектит ссылки.
+- **SSRF-safe fetch**: для внешних URL от владельца бизнеса (CRM webhook, импорт по ссылке) использовать `safeExternalFetch()` или `validateExternalUrlWithDns()` из `@/lib/crm-integrations`. Прямой `fetch(userUrl)` — SSRF vector.
+- **Timing-safe compare секретов**: сравнивать webhook-секреты только через `timingSafeEqual(Buffer, Buffer)`, не через `===`.
+- **Multi-channel identity**: клиенты создаются через `findOrCreateClientForChannel()` из `@/lib/client-identity`. Прямой поиск по `telegramId` в новом коде — deprecated (Client.telegramId стал nullable в Sprint 3).
+
 ## Что такое Staffix
 SaaS-платформа для бизнесов: AI-сотрудник который берёт на себя ВСЮ рутину фронт-офиса.
 - Бизнес создаёт AI-бота → клиенты общаются через Telegram/WhatsApp/Instagram/Facebook
