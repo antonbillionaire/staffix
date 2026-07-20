@@ -552,10 +552,23 @@ async function handleChannelToolCall(
       }
 
       case "identify_client": {
-        // Канальный клиент не имеет Telegram ID — авто-привязка не сработает,
-        // но lookup по телефону всё равно даст знание о статусе клиента.
-        const result = await identifyClientByPhone(businessId, toolInput.phone);
-        return JSON.stringify(result);
+        // Sprint 3 step 4: если phone передан — идём по phone (как раньше),
+        // это работает для клиентов из CRM/импорта. Если phone пустой —
+        // fallback на channel-ID lookup: после Sprint 3 shadow-write и
+        // backfill у нас есть Client с whatsappId/instagramId/fbPsid, значит
+        // клиент, который написал WA-ботом без явного phone, всё равно
+        // идентифицируется как «постоянный».
+        const phone = (toolInput.phone || "").trim();
+        if (phone) {
+          const result = await identifyClientByPhone(businessId, phone);
+          return JSON.stringify(result);
+        }
+        if (channel === "whatsapp" || channel === "instagram" || channel === "facebook") {
+          const { identifyClientByChannelId } = await import("@/lib/sales-tools");
+          const result = await identifyClientByChannelId(businessId, channel, clientId);
+          return JSON.stringify(result);
+        }
+        return JSON.stringify({ success: false, error: "Нет данных для идентификации" });
       }
 
       case "get_upsell_suggestions": {

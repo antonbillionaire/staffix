@@ -114,16 +114,17 @@ export const salesToolDefinitions: Anthropic.Tool[] = [
   {
     name: "identify_client",
     description:
-      "Найти клиента в базе бизнеса по телефону. Используй ОДИН РАЗ в начале диалога после того как клиент дал номер телефона. Если клиент найден — обращайся к нему по имени, упомяни его уровень лояльности и накопленный кэшбек/баллы. Если не найден — продолжай как с новым клиентом. Не вызывай повторно если уже идентифицировал.",
+      "Найти клиента в базе бизнеса. Вызывай ОДИН РАЗ в начале диалога (сразу если клиент пишет из WA/IG/FB — там мы знаем его канальный ID; либо после того как клиент дал номер телефона в TG). Если найден — обращайся к нему по имени, упомяни уровень лояльности и накопленный кэшбек/баллы. Если не найден — продолжай как с новым клиентом. Не вызывай повторно.",
     input_schema: {
       type: "object" as const,
       properties: {
         phone: {
           type: "string",
-          description: "Номер телефона клиента в любом формате (нормализуется автоматически)",
+          description: "Номер телефона клиента в любом формате (нормализуется автоматически). Опционально: если пусто и мы в WA/IG/FB — идентифицируем по канальному ID.",
         },
       },
-      required: ["phone"],
+      // phone теперь опциональный — в WA/IG/FB fallback идёт по channel-id
+      required: [],
     },
   },
   {
@@ -521,6 +522,88 @@ export async function identifyClientByPhone(
     };
   } catch (error) {
     console.error("identifyClientByPhone error:", error);
+    return { success: false, error: "Ошибка идентификации" };
+  }
+}
+
+/**
+ * Sprint 3 step 4: идентификация клиента по channel-specific ID (WA/IG/FB)
+ * без запроса телефона. Работает если клиент уже есть в Client — через
+ * прошлые контакты или после backfill-скрипта.
+ *
+ * Возвращает те же loyalty-данные что и identifyClientByPhone, чтобы бот мог
+ * персонально приветствовать до того как клиент вспомнит свой номер.
+ */
+export async function identifyClientByChannelId(
+  businessId: string,
+  channel: "whatsapp" | "instagram" | "facebook",
+  channelId: string,
+): Promise<SalesToolResult> {
+  try {
+    const where: Prisma.ClientWhereInput = { businessId };
+    if (channel === "whatsapp") where.whatsappId = channelId;
+    else if (channel === "instagram") where.instagramId = channelId;
+    else if (channel === "facebook") where.fbPsid = channelId;
+
+    const client = await prisma.client.findFirst({
+      where,
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        telegramId: true,
+        loyaltyTier: true,
+        loyaltyCashbackPercent: true,
+        loyaltyPoints: true,
+        loyaltyTotalSpent: true,
+      },
+    });
+
+    if (!client) {
+      return { success: true, found: false, message: "Клиент не найден в базе." };
+    }
+
+    // Программы лояльности — те же самые расчёты что в identifyClientByPhone.
+    const programs = await prisma.loyaltyProgram.findMany({
+      where: { businessId, enabled: true },
+      select: { type: true, cashbackPercent: true, tiers: true },
+    });
+
+    let tierLabel = "";
+    let tierDiscount = 0;
+    const tieredProgram = programs.find((p) => p.type === "tiered");
+    if (tieredProgram?.tiers && client.loyaltyTier) {
+      const tiers = tieredProgram.tiers as Array<{ name: string; discount: number }>;
+      const tierData = tiers.find((t) => t.name.toLowerCase() === client.loyaltyTier);
+      if (tierData) {
+        tierLabel = tierData.name;
+        tierDiscount = tierData.discount;
+      }
+    }
+
+    let cashbackPercent = 0;
+    if (client.loyaltyCashbackPercent !== null && client.loyaltyCashbackPercent !== undefined) {
+      cashbackPercent = client.loyaltyCashbackPercent;
+    } else {
+      const cashbackProgram = programs.find((p) => p.type === "cashback");
+      if (cashbackProgram?.cashbackPercent) cashbackPercent = cashbackProgram.cashbackPercent;
+    }
+
+    return {
+      success: true,
+      found: true,
+      client: {
+        name: client.name,
+        phone: client.phone,
+        tierName: tierLabel || null,
+        tierDiscountPercent: tierDiscount,
+        cashbackPercent,
+        loyaltyPoints: client.loyaltyPoints,
+        totalSpent: client.loyaltyTotalSpent,
+      },
+    };
+  } catch (error) {
+    console.error("identifyClientByChannelId error:", error);
     return { success: false, error: "Ошибка идентификации" };
   }
 }
