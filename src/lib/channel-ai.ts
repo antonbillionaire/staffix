@@ -7,6 +7,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { dispatchCrmEvent } from "@/lib/crm-integrations";
+import { logActivityFireAndForget } from "@/lib/activity-log";
 import {
   bookingToolDefinitions,
   checkAvailability,
@@ -630,6 +631,19 @@ export async function generateChannelAIResponse(
       },
     }).catch((e) => console.error("[CRM] message_received dispatch error:", e));
 
+    // Activity log — раньше вызывался только из telegram/webhook, у WA/IG/FB
+    // владелец видел пустой журнал в /dashboard/activity. Централизованный
+    // вызов здесь покрывает все три канала одним изменением.
+    logActivityFireAndForget({
+      businessId,
+      type: "message_received",
+      summary: `Клиент${clientName ? ` ${clientName}` : ""} написал в ${channel}`,
+      channel,
+      technical: {
+        preview: userMessage.substring(0, 120),
+      },
+    });
+
     // Lazy document loading (июль 2026): матчер выбирает ТОЛЬКО релевантные
     // документы для текущего вопроса клиента. Ужимает 20-30K токенов «фоновой
     // справки» до 3-5K релевантной. Матчер сам делает fallback на все docs
@@ -1174,10 +1188,26 @@ export async function generateChannelAIResponse(
       console.error(`[Channel AI] SAVE FAILED: conv=${conv.id}`, saveErr);
     }
 
+    logActivityFireAndForget({
+      businessId,
+      type: "ai_response",
+      summary: `AI ответил клиенту в ${channel}`,
+      channel,
+      technical: { preview: replyText.substring(0, 120) },
+    });
+
     return replyText;
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e);
     console.error(`Channel AI error (${channel}):`, errMsg);
+    logActivityFireAndForget({
+      businessId,
+      type: "error",
+      severity: "error",
+      summary: `Ошибка ответа AI в ${channel}`,
+      channel,
+      technical: { error: errMsg },
+    });
 
     // Specific message for Anthropic overload (529)
     if (errMsg.includes("overloaded") || errMsg.includes("529")) {

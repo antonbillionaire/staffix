@@ -85,12 +85,18 @@ export async function POST(request: Request) {
     }
 
     let deletedCount = 0;
+    // Полный список Meta-каналов включая legacy-имя "messenger" (историческое
+    // значение для FB Messenger — часть кодовой базы писала так). Раньше
+    // удалялись только "facebook"|"instagram", записи с "messenger" копились
+    // и нарушали контракт Meta data-deletion.
+    const META_CHANNELS = ["facebook", "instagram", "messenger"] as const;
+
     for (const biz of businesses) {
       // Delete channel conversations from Meta channels
       await prisma.channelConversation.deleteMany({
         where: {
           businessId: biz.id,
-          channel: { in: ["facebook", "instagram"] },
+          channel: { in: META_CHANNELS as unknown as string[] },
         },
       });
 
@@ -98,7 +104,27 @@ export async function POST(request: Request) {
       await prisma.channelMessage.deleteMany({
         where: {
           businessId: biz.id,
-          channel: { in: ["facebook", "instagram"] },
+          channel: { in: META_CHANNELS as unknown as string[] },
+        },
+      });
+
+      // Delete channel clients (PII: names, phones, notes из Meta-разговоров).
+      // Раньше эта таблица не чистилась — нарушение обязательства удалить всё.
+      // Модель ChannelClient не хранит `channel`, фильтруем по lastChannel
+      // (последний канал контакта) — этого достаточно чтобы поймать всех
+      // клиентов пришедших через FB Messenger/IG DM.
+      await prisma.channelClient.deleteMany({
+        where: {
+          businessId: biz.id,
+          lastChannel: { in: META_CHANNELS as unknown as string[] },
+        },
+      });
+
+      // Delete leads originating from Meta channels — contact info + adId.
+      await prisma.lead.deleteMany({
+        where: {
+          businessId: biz.id,
+          channel: { in: META_CHANNELS as unknown as string[] },
         },
       });
 
@@ -106,7 +132,7 @@ export async function POST(request: Request) {
       await prisma.channelConnection.deleteMany({
         where: {
           businessId: biz.id,
-          channel: { in: ["facebook", "instagram"] },
+          channel: { in: META_CHANNELS as unknown as string[] },
         },
       });
 

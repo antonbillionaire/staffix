@@ -217,10 +217,23 @@ export async function generateAIResponse(
 - Если в саммари написано "клиент спрашивал про X, я ответил Y" — используй это только чтобы понять КОНТЕКСТ запроса, но цифры/факты бери из FAQ заново.
 - Контекст разговора (имя, предпочтения, что обсуждали в общем) — сохраняй. Конкретные факты — переспрашивай у промпта.`
       : "";
+    // AI Learning corrections — раньше подключались только в channel-ai.ts,
+    // TG (главный канал) их игнорировал. Владелец правил бота через
+    // /dashboard/ai-learning и видел эффект только в WA/IG/FB. Теперь
+    // корректировки грузятся и для Telegram — единое поведение.
+    let correctionsBlock = "";
+    try {
+      const { loadActiveCorrections } = await import("@/lib/channel-memory");
+      correctionsBlock = await loadActiveCorrections(businessId);
+    } catch (e) {
+      console.error("[TG AI] loadActiveCorrections failed:", e);
+    }
+    const correctionsSection = correctionsBlock ? `\n\n${correctionsBlock}` : "";
+
     // Все «дрейфующие» куски (дата, refreshNotice, routing) пакуем в
     // переменный хвост, рядом с клиентским контекстом. Стабильный префикс
     // остаётся неизменным от вызова к вызову — Anthropic держит его в кэше.
-    const variableTail = systemPrompt.variable + systemHint + refreshNotice + routingPromptSection;
+    const variableTail = systemPrompt.variable + systemHint + refreshNotice + routingPromptSection + correctionsSection;
     // Порядок cache-блоков: stable(1h) → docs(5m) → variable(5m). Порядок важен
     // потому что каждый последующий cache_key = hash(всех предыдущих + этого).
     // stable первым — он самый стабильный. docs перед variable — их набор
