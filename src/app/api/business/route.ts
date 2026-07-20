@@ -186,7 +186,7 @@ export async function PUT(request: Request) {
     }
 
     const data = await request.json();
-    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, botLogo, timezone, ownerTelegramUsername, paymeId, clickServiceId, clickMerchantId, waPhoneNumberId, waAccessToken, waVerifyToken, waActive, fbPageId, fbPageAccessToken, fbVerifyToken, fbActive, businessTypes, language, deliveryEnabled, deliveryTimeFrom, deliveryTimeTo, deliveryFee, deliveryFreeFrom, deliveryZones, consultationsEnabled, leadAssignmentMode } = data;
+    const { name, phone, address, workingHours, botToken, aiTone, welcomeMessage, aiRules, timezone, ownerTelegramUsername, paymeId, clickServiceId, clickMerchantId, waPhoneNumberId, waAccessToken, waVerifyToken, waActive, fbPageId, fbPageAccessToken, fbVerifyToken, fbActive, businessTypes, language, deliveryEnabled, deliveryTimeFrom, deliveryTimeTo, deliveryFee, deliveryFreeFrom, deliveryZones, consultationsEnabled, leadAssignmentMode } = data;
 
     // Найти бизнес пользователя
     const existingBusiness = await prisma.business.findFirst({
@@ -210,7 +210,6 @@ export async function PUT(request: Request) {
     if (aiTone !== undefined) updateData.aiTone = aiTone;
     if (welcomeMessage !== undefined) updateData.welcomeMessage = welcomeMessage;
     if (aiRules !== undefined) updateData.aiRules = aiRules;
-    if (botLogo !== undefined) updateData.botLogo = botLogo;
     if (timezone !== undefined) updateData.timezone = timezone;
     if (ownerTelegramUsername !== undefined) updateData.ownerTelegramUsername = ownerTelegramUsername;
     if (paymeId !== undefined) updateData.paymeId = paymeId || null;

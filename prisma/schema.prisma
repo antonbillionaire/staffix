@@ -131,7 +131,6 @@ model Business {
   botToken      String? @unique
   botUsername   String?
   botActive     Boolean @default(false)
-  botLogo       String? // URL к логотипу бота
   webhookSecret String? // HMAC secret для верификации Telegram webhook (secret_token)
 
   // Telegram уведомления владельца
@@ -173,9 +172,6 @@ model Business {
   metaUserId          String? // Facebook/Meta User ID (for data deletion scoping)
   metaUserAccessToken String? // Long-lived User Access Token (60 дней)
   metaTokenExpiresAt  DateTime? // Когда истекает
-
-  // Powered by Staffix (вирусный механизм)
-  hidePoweredBy Boolean @default(false) // true = подпись скрыта (Pro+)
 
   // Claude API usage tracking
   tokensUsedInput  Int @default(0) // input tokens consumed
@@ -227,8 +223,6 @@ model Business {
   // Задачи менеджеров
   tasks Task[]
 
-  // Финансы (зарплаты сотрудников)
-  financeTransactions      FinanceTransaction[]
   servicePackages          ServicePackage[]
   serviceIncompatibilities ServiceIncompatibility[]
 
@@ -421,7 +415,6 @@ model Staff {
   orders              Order[]
   schedule            StaffSchedule[]
   timeOffs            StaffTimeOff[]
-  financeTransactions FinanceTransaction[]
   // Задачи назначенные на сотрудника (Task.assignedStaffId → SetNull при удалении)
   assignedTasks       Task[]               @relation("TaskAssignedStaff")
 
@@ -431,32 +424,6 @@ model Staff {
   tgBusinessConnections TelegramBusinessConnection[]
 
   @@index([businessId])
-}
-
-// Финансовые транзакции по сотрудникам (премии, штрафы, выплаты)
-model FinanceTransaction {
-  id String @id @default(cuid())
-
-  staffId String
-  staff   Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
-
-  // Тип: bonus (премия) | fine (штраф) | payout (выплата) | adjustment (корректировка)
-  type String
-
-  amount Int // сумма (положительная всегда; знак определяется типом)
-  reason String? // комментарий "Премия за выполнение плана", "Штраф за опоздание"
-
-  // Период к которому относится (для группировки в отчётах)
-  periodStart DateTime?
-  periodEnd   DateTime?
-
-  businessId String
-  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@index([staffId, createdAt])
-  @@index([businessId, type, createdAt])
 }
 
 // FAQ / База знаний

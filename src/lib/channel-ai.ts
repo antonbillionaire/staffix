@@ -1097,16 +1097,6 @@ export async function generateChannelAIResponse(
       }
     }
 
-    // "— staffix.io" signature for free/starter plans temporarily disabled
-    // on Антон's request (June 2026) — looked like leftover SaaS-template
-    // branding inside the client's own bot, confusing real customers. Re-enable
-    // later as a proper opt-in (e.g. only on Trial, never on paid). Original
-    // logic kept here as a reference for quick restore:
-    //   const bizSettings = await prisma.business.findUnique({
-    //     where: { id: businessId }, select: { hidePoweredBy: true },
-    //   });
-    //   if (!bizSettings?.hidePoweredBy) replyText += "\n\n— staffix.io";
-
     // Check soft message limit (warn business owner at 80%, once)
     const sub = await prisma.subscription.findUnique({
       where: { businessId },
