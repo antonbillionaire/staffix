@@ -792,7 +792,13 @@ model Client {
   // Статус
   lastVisitDate DateTime?
   totalVisits   Int       @default(0)
+  // isBlocked семантически = «отписался от рассылок» — не влияет на бот.
+  // Отдельный флаг botMuted (июль 2026) = бот больше не отвечает клиенту
+  // ни в одном канале. Разделили после аудита M19: раньше кнопка
+  // «Заблокировать» в UI обещала оба эффекта но реально работала только
+  // как отписка от рассылок.
   isBlocked     Boolean   @default(false) // отписался от рассылок
+  botMuted      Boolean   @default(false) // бот не отвечает этому клиенту
 
   // Последняя реактивация
   lastReactivationSent DateTime?
@@ -1220,6 +1226,10 @@ model ChannelClient {
   totalVisits        Int       @default(0)
   lastVisitDate      DateTime?
   summaryUpdatedAt   DateTime?
+
+  // M19: бот больше не отвечает этому клиенту (owner-driven mute).
+  // Аналог Client.botMuted для канальных клиентов, у которых нет TG-идентичности.
+  botMuted           Boolean   @default(false)
 
   businessId String
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)

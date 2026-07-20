@@ -30,6 +30,7 @@ interface CustomerDetail {
     totalVisits: number;
     lastVisitDate: string | null;
     isBlocked: boolean;
+    botMuted: boolean;
     importantNotes: string | null;
     createdAt: string;
     isActive: boolean;
@@ -134,7 +135,7 @@ export default function CustomerDetailPage({
     }
   };
 
-  const toggleBlock = async () => {
+  const toggleUnsubscribe = async () => {
     if (!data) return;
     setActionLoading(true);
     try {
@@ -147,7 +148,26 @@ export default function CustomerDetailPage({
         fetchCustomer();
       }
     } catch (error) {
-      console.error("Error toggling block:", error);
+      console.error("Error toggling unsubscribe:", error);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const toggleMute = async () => {
+    if (!data) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/customers/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ botMuted: !data.customer.botMuted }),
+      });
+      if (res.ok) {
+        fetchCustomer();
+      }
+    } catch (error) {
+      console.error("Error toggling bot mute:", error);
     } finally {
       setActionLoading(false);
     }
@@ -223,8 +243,13 @@ export default function CustomerDetailPage({
               </span>
             )}
             {customer.isBlocked && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-500">
-                Заблокирован
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/10 text-orange-500" title="Клиент отписан от рассылок">
+                Без рассылок
+              </span>
+            )}
+            {customer.botMuted && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-500" title="Бот не отвечает этому клиенту">
+                Бот выключен
               </span>
             )}
           </div>
@@ -235,24 +260,49 @@ export default function CustomerDetailPage({
             </p>
           )}
         </div>
-        <button
-          onClick={toggleBlock}
-          disabled={actionLoading}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors ${
-            customer.isBlocked
-              ? "bg-green-500/10 text-green-500 hover:bg-green-500/20"
-              : "bg-red-500/10 text-red-500 hover:bg-red-500/20"
-          }`}
-        >
-          {actionLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : customer.isBlocked ? (
-            <CheckCircle className="h-4 w-4" />
-          ) : (
-            <Ban className="h-4 w-4" />
-          )}
-          {customer.isBlocked ? "Разблокировать" : "Заблокировать"}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Bot mute — теперь отдельная кнопка (M19).
+              Ранее кнопка «Заблокировать» обещала выключить бота, но реально
+              меняла только isBlocked (отписка от рассылок). Разделено на две. */}
+          <button
+            onClick={toggleMute}
+            disabled={actionLoading}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors ${
+              customer.botMuted
+                ? "bg-green-500/10 text-green-500 hover:bg-green-500/20"
+                : "bg-red-500/10 text-red-500 hover:bg-red-500/20"
+            }`}
+            title={customer.botMuted ? "Разрешить боту снова отвечать этому клиенту" : "Заглушить бота — не отвечать этому клиенту"}
+          >
+            {actionLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : customer.botMuted ? (
+              <CheckCircle className="h-4 w-4" />
+            ) : (
+              <Ban className="h-4 w-4" />
+            )}
+            {customer.botMuted ? "Разблокировать бота" : "Заглушить бота"}
+          </button>
+          <button
+            onClick={toggleUnsubscribe}
+            disabled={actionLoading}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors ${
+              customer.isBlocked
+                ? "bg-green-500/10 text-green-500 hover:bg-green-500/20"
+                : "bg-orange-500/10 text-orange-500 hover:bg-orange-500/20"
+            }`}
+            title={customer.isBlocked ? "Разрешить снова слать рассылки" : "Не слать этому клиенту рассылки (бот продолжает отвечать)"}
+          >
+            {actionLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : customer.isBlocked ? (
+              <CheckCircle className="h-4 w-4" />
+            ) : (
+              <Ban className="h-4 w-4" />
+            )}
+            {customer.isBlocked ? "Вернуть рассылки" : "Отписать от рассылок"}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -75,6 +75,18 @@ export async function generateAIResponse(
     const clientContext = await buildClientContext(businessId, telegramId);
     console.log(`[Webhook] Client context: ${clientContext ? "loaded" : "null (new client)"}`);
 
+    // M19: Client.botMuted — владелец нажал «Заглушить бота» в карточке.
+    // Отдельно от isBlocked (которое означает отписку от рассылок). Бот
+    // возвращает пустой ответ — webhook отдаст 200, клиенту ничего не уйдёт.
+    const mutedClient = await prisma.client.findUnique({
+      where: { businessId_telegramId: { businessId, telegramId } },
+      select: { botMuted: true },
+    });
+    if (mutedClient?.botMuted) {
+      console.log(`[Webhook] Client ${telegramId} is bot-muted — skipping AI`);
+      return { text: "", imageUrls: [] };
+    }
+
     // 3. Определяем режим бота: продажи или запись
     const salesMode = isSalesMode(businessContext.businessType, businessContext.dashboardMode);
     console.log(`[Webhook] Mode: ${salesMode ? "sales" : "service"}, type=${businessContext.businessType}`);

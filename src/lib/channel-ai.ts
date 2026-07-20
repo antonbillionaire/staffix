@@ -652,6 +652,29 @@ export async function generateChannelAIResponse(
       },
     }).catch((e) => console.error("[CRM] message_received dispatch error:", e));
 
+    // M19: если владелец нажал «Заглушить бота» для этого клиента —
+    // возвращаем пустую строку. Не логируем ai_response, не отправляем.
+    // Проверяем ChannelClient.botMuted по каналу-специфичному ID.
+    try {
+      const mutedChannelClient = await prisma.channelClient.findFirst({
+        where: {
+          businessId,
+          OR: [
+            { instagramId: clientId },
+            { fbPsid: clientId },
+            { whatsappPhone: clientId },
+          ],
+        },
+        select: { botMuted: true },
+      });
+      if (mutedChannelClient?.botMuted) {
+        console.log(`[Channel AI] Client ${clientId} (${channel}) is bot-muted — skipping AI`);
+        return "";
+      }
+    } catch {
+      // не критично для основного flow
+    }
+
     // Activity log — раньше вызывался только из telegram/webhook, у WA/IG/FB
     // владелец видел пустой журнал в /dashboard/activity. Централизованный
     // вызов здесь покрывает все три канала одним изменением.

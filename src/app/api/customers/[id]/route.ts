@@ -99,6 +99,7 @@ export async function GET(
         totalVisits: client.totalVisits,
         lastVisitDate: client.lastVisitDate,
         isBlocked: client.isBlocked,
+        botMuted: client.botMuted,
         importantNotes: client.importantNotes,
         createdAt: client.createdAt,
         assignedStaffId: client.assignedStaffId,
@@ -256,6 +257,7 @@ export async function PATCH(
       where: { id },
       data: {
         isBlocked: body.isBlocked ?? client.isBlocked,
+        botMuted: body.botMuted ?? client.botMuted,
         name,
         phone,
         ...importantNotesUpdate,
