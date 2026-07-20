@@ -658,8 +658,15 @@ export async function GET(request: NextRequest) {
           businessId: business.id,
           updatedAt: { gte: startDate },
         },
-        include: {
-          messages: { select: { id: true } },
+        select: {
+          id: true,
+          businessId: true,
+          clientTelegramId: true,
+          clientName: true,
+          updatedAt: true,
+          // _count вместо include messages: { select: { id: true } } — иначе
+          // Prisma тянет тысячи message-rows в память для одного числа.
+          _count: { select: { messages: true } },
         },
         orderBy: { updatedAt: "desc" },
         take: 60, // берём чуть больше чем нужно, после count-sort режем
@@ -710,7 +717,7 @@ export async function GET(request: NextRequest) {
             `TG …${c.clientTelegramId.toString().slice(-4)}`,
           clientPhone: info?.phone || null,
           channel: "telegram",
-          messageCount: c.messages.length,
+          messageCount: c._count.messages,
           lastActivityAt: c.updatedAt.toISOString(),
         };
       }),

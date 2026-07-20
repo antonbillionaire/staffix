@@ -141,7 +141,13 @@ export default function SupportPage() {
   };
 
   const handleViewMessages = () => {
-    router.push("/dashboard/messages");
+    // MINOR fix: раньше кнопка вела на /dashboard/messages (диалоги с
+    // клиентами), а не на список тикетов поддержки — путало владельцев.
+    // Возвращаем на эту же страницу, где ниже уже показан список тикетов.
+    setSent(false);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   const handleTicketAction = async (ticketId: string, action: string, rating?: number) => {

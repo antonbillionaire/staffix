@@ -69,10 +69,23 @@ export default function NotificationsPage() {
     } catch {}
   };
 
+  // Иконки по всем актуальным типам уведомлений (раньше только 3, остальные
+  // сваливались в дефолт-колокольчик — не понятно что за событие).
   const typeIcon = (type: string) => {
     if (type === "new_booking") return "📅";
     if (type === "cancellation") return "❌";
     if (type === "reschedule") return "🔄";
+    if (type === "new_order") return "🛍";
+    if (type === "order_status") return "📦";
+    if (type === "manager_escalation") return "🆘";
+    if (type === "loyalty_milestone") return "🎉";
+    if (type === "trial_ending" || type === "subscription_expiring") return "⏰";
+    if (type === "limit_reached" || type === "messages_low") return "⚠️";
+    if (type === "payment_received") return "💳";
+    if (type === "review_received") return "⭐";
+    if (type === "new_lead") return "🎯";
+    if (type === "new_client") return "👤";
+    if (type === "broadcast_sent") return "📢";
     return "🔔";
   };
 

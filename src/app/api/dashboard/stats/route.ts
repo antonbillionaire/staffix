@@ -84,11 +84,13 @@ export async function GET(request: Request) {
       Promise.resolve(business.subscription?.messagesUsed || 0),
     ]);
 
-    // Channel status
+    // Channel status — раньше whatsapp/instagram были захардкожены в false
+    // ("coming soon"), но каналы уже год как работают. Теперь реальные флаги.
     const channels = {
       telegram: !!business.botActive && !!business.botToken,
-      whatsapp: false, // coming soon
-      instagram: false, // coming soon
+      whatsapp: !!business.waActive && !!business.waAccessToken && !!business.waPhoneNumberId,
+      instagram: !!business.igActive && !!business.igBusinessAccountId,
+      facebook: !!business.fbActive && !!business.fbPageId,
     };
 
     // Readiness checklist

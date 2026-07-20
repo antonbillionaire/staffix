@@ -122,8 +122,10 @@ export default function StatisticsPage() {
     const rows = stats.messagesByDay.map(d => [d.date, d.count.toString()]);
     const csvContent = [headers, ...rows].map(row => row.join(",")).join("\n");
 
-    // Download
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    // UTF-8 BOM (﻿) в начале — Excel без него открывает кириллицу как
+    // крокозябры (Windows-1251 по умолчанию). Google Sheets/LibreOffice ок
+    // и без BOM. Пара байт стоит совместимости с Excel.
+    const blob = new Blob(["﻿" + csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = `statistics_${period}.csv`;
@@ -738,6 +740,16 @@ export default function StatisticsPage() {
         <div className={`${cardBg} rounded-xl border ${borderColor} p-6`}>
           <h3 className={`text-lg font-semibold ${textPrimary} mb-4`}>{t("statistics.customerSegments")}</h3>
           {stats.customerSegments ? (
+            (() => {
+              // Guard от деления на ноль: у новых бизнесов totalClients=0 →
+              // раньше показывали "NaN%" рядом с "0 VIP" и графики уезжали.
+              const segTotal =
+                stats.customerSegments.vip +
+                stats.customerSegments.active +
+                stats.customerSegments.inactive;
+              const pct = (n: number) =>
+                segTotal > 0 ? Math.round((n / segTotal) * 100) : 0;
+              return (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -747,7 +759,7 @@ export default function StatisticsPage() {
                 <span className={`font-bold ${textPrimary}`}>{stats.customerSegments.vip}</span>
               </div>
               <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                <div className="h-full bg-yellow-500 rounded-full" style={{ width: `${(stats.customerSegments.vip / stats.totalClients) * 100}%` }} />
+                <div className="h-full bg-yellow-500 rounded-full" style={{ width: `${pct(stats.customerSegments.vip)}%` }} />
               </div>
 
               <div className="flex items-center justify-between">
@@ -758,7 +770,7 @@ export default function StatisticsPage() {
                 <span className={`font-bold ${textPrimary}`}>{stats.customerSegments.active}</span>
               </div>
               <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                <div className="h-full bg-green-500 rounded-full" style={{ width: `${(stats.customerSegments.active / stats.totalClients) * 100}%` }} />
+                <div className="h-full bg-green-500 rounded-full" style={{ width: `${pct(stats.customerSegments.active)}%` }} />
               </div>
 
               <div className="flex items-center justify-between">
@@ -769,9 +781,11 @@ export default function StatisticsPage() {
                 <span className={`font-bold ${textPrimary}`}>{stats.customerSegments.inactive}</span>
               </div>
               <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                <div className="h-full bg-gray-500 rounded-full" style={{ width: `${(stats.customerSegments.inactive / stats.totalClients) * 100}%` }} />
+                <div className="h-full bg-gray-500 rounded-full" style={{ width: `${pct(stats.customerSegments.inactive)}%` }} />
               </div>
             </div>
+              );
+            })()
           ) : (
             <p className={textSecondary}>{t("statistics.noSegmentsData")}</p>
           )}

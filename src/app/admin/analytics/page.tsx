@@ -100,7 +100,8 @@ export default function AdminAnalyticsPage() {
     try {
       // Generate CSV report
       const report = generateCSVReport(data);
-      const blob = new Blob([report], { type: "text/csv;charset=utf-8;" });
+      // BOM для корректного открытия кириллицы в Excel (Windows-1251 иначе)
+      const blob = new Blob(["﻿" + report], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
