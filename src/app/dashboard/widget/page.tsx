@@ -275,12 +275,12 @@ export default function WidgetPage() {
             </div>
           </div>
 
-          {/* Иконка */}
+          {/* Иконка — 4 preset в ряд */}
           <div>
             <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
               Иконка на кнопке
             </label>
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {ICON_OPTIONS.map((opt) => {
                 const Icon = opt.icon;
                 return (
@@ -299,39 +299,14 @@ export default function WidgetPage() {
                   </button>
                 );
               })}
-              {/* Custom image */}
-              <button
-                onClick={() => fileRef.current?.click()}
-                className={`aspect-square flex flex-col items-center justify-center gap-1 rounded-lg border transition-colors ${
-                  icon === "custom"
-                    ? "border-blue-500 bg-blue-500/10"
-                    : `${borderColor} hover:border-blue-500/50`
-                }`}
-                title="Своя картинка"
-              >
-                {icon === "custom" && customImageUrl ? (
-                  <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={customImageUrl}
-                      alt=""
-                      className="h-5 w-5 object-cover rounded-full"
-                    />
-                    <span className={`text-[10px] text-blue-500`}>Своя</span>
-                  </>
-                ) : uploading ? (
-                  <>
-                    <Loader2 className={`h-5 w-5 animate-spin ${textPrimary}`} />
-                    <span className={`text-[10px] ${textSecondary}`}>...</span>
-                  </>
-                ) : (
-                  <>
-                    <ImageIcon className={`h-5 w-5 ${textPrimary}`} />
-                    <span className={`text-[10px] ${textSecondary}`}>Своя</span>
-                  </>
-                )}
-              </button>
             </div>
+          </div>
+
+          {/* Своя иконка — отдельная явная секция */}
+          <div>
+            <label className={`block text-sm font-medium ${textSecondary} mb-2`}>
+              Или загрузите свою иконку
+            </label>
             <input
               ref={fileRef}
               type="file"
@@ -342,15 +317,69 @@ export default function WidgetPage() {
                 if (f) handleUpload(f);
               }}
             />
-            {icon === "custom" && (
-              <div className="mt-2 flex items-center gap-2">
-                <Upload className={`h-3 w-3 ${textSecondary}`} />
-                <span className={`text-xs ${textSecondary}`}>
-                  {customImageUrl ? "Картинка загружена. " : ""}
-                  Рекомендуем квадратную PNG/SVG до 2 МБ. Кнопка круглая — картинка обрежется в круг.
-                </span>
+
+            {icon === "custom" && customImageUrl ? (
+              // Уже загружено: превью + Заменить + Удалить
+              <div
+                className={`flex items-center gap-3 p-3 rounded-lg border-2 border-blue-500 bg-blue-500/10`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={customImageUrl}
+                  alt=""
+                  className="h-12 w-12 rounded-full object-cover border border-white/30"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium ${textPrimary}`}>
+                    Ваша иконка загружена
+                  </p>
+                  <p className={`text-xs ${textSecondary} truncate`}>
+                    Она показывается на кнопке виджета вместо стандартной.
+                  </p>
+                </div>
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${borderColor} ${textPrimary} hover:bg-white/5 disabled:opacity-50`}
+                >
+                  Заменить
+                </button>
+                <button
+                  onClick={() => {
+                    setCustomImageUrl("");
+                    setIcon("chat");
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-500 hover:bg-red-500/10"
+                >
+                  Удалить
+                </button>
               </div>
+            ) : (
+              // Не загружено: одна большая явная кнопка
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className={`w-full flex items-center justify-center gap-2 py-4 rounded-lg border-2 border-dashed ${borderColor} ${textPrimary} hover:border-blue-500 hover:bg-blue-500/5 transition-colors disabled:opacity-50`}
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span className="text-sm font-medium">Загружаем...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-5 w-5" />
+                    <span className="text-sm font-medium">
+                      Загрузить свою иконку
+                    </span>
+                  </>
+                )}
+              </button>
             )}
+
+            <p className={`text-xs ${textSecondary} mt-2`}>
+              PNG или JPG, до 2 МБ. Лучше квадратная — мы обрежем в круг.
+            </p>
           </div>
 
           {/* Приветствие */}
