@@ -44,10 +44,23 @@ export async function GET(
                 },
               },
             },
+            channelConversations: {
+              orderBy: { updatedAt: "desc" },
+              take: 10,
+              select: {
+                id: true,
+                channel: true,
+                clientName: true,
+                updatedAt: true,
+                messageCount: true,
+                history: true,
+              },
+            },
             _count: {
               select: {
                 bookings: true,
                 conversations: true,
+                channelConversations: true,
                 services: true,
                 staff: true,
               },
@@ -90,15 +103,41 @@ export async function GET(
     const recentConversations = business?.conversations.map((c) => ({
       id: c.id,
       type: "conversation" as const,
+      channel: "telegram" as const,
       date: c.updatedAt,
       description: c.messages[0]?.content?.substring(0, 100) || "Новый диалог",
       messagesCount: c._count?.messages || 0,
     })) || [];
 
-    // Merge and sort timeline
-    const timeline = [...recentBookings, ...recentConversations]
+    // Sprint 4B: подтягиваем ChannelConversation (WA/IG/FB) в timeline тоже.
+    // Раньше карточка админа показывала только TG-диалоги — для WA-only
+    // бизнесов лента была пустой при реальных сотнях сообщений.
+    // history-JSON хранит последнюю реплику, вытаскиваем её как description.
+    interface HistoryEntry { role?: string; content?: string }
+    const recentChannelConversations = business?.channelConversations.map((c) => {
+      const hist = Array.isArray(c.history) ? (c.history as unknown as HistoryEntry[]) : [];
+      const lastMsg = hist[hist.length - 1];
+      return {
+        id: c.id,
+        type: "conversation" as const,
+        channel: c.channel,
+        date: c.updatedAt,
+        description: (lastMsg?.content || "").substring(0, 100) || `Диалог (${c.channel})`,
+        messagesCount: c.messageCount || 0,
+      };
+    }) || [];
+
+    // Merge and sort timeline — TG + channel + bookings
+    const timeline = [...recentBookings, ...recentConversations, ...recentChannelConversations]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 10);
+
+    // Sprint 4B: суммарный счётчик диалогов — TG + все канальные.
+    // Раньше показывали только TG (business._count.conversations), из-за чего
+    // карточка RIGHT FLIGHT показывала «3 диалога» при реальных 1984.
+    const totalDialogs = business
+      ? (business._count.conversations || 0) + (business._count.channelConversations || 0)
+      : 0;
 
     return NextResponse.json({
       user: {
@@ -123,7 +162,13 @@ export async function GET(
             onboardingCompleted: business.onboardingCompleted,
             dashboardMode: business.dashboardMode,
             createdAt: business.createdAt,
-            counts: business._count,
+            // Sprint 4B: dialogs теперь включают все каналы (TG + WA/IG/FB).
+            counts: {
+              ...business._count,
+              dialogs: totalDialogs,
+              conversationsChannel: business._count.channelConversations || 0,
+              conversationsTelegram: business._count.conversations || 0,
+            },
             services: business.services.map((s) => ({
               id: s.id,
               name: s.name,

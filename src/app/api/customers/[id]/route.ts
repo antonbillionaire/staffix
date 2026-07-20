@@ -27,7 +27,7 @@ export async function GET(
     // разделы пусты (будут наполнены после ChannelClient→Client backfill).
     const tgId = client.telegramId;
 
-    // Get conversation
+    // Get TG conversation
     const conversation = tgId
       ? await prisma.conversation.findFirst({
           where: {
@@ -43,6 +43,33 @@ export async function GET(
           },
         })
       : null;
+
+    // Sprint 4B: ChannelConversation'ы этого же клиента (WA/IG/FB).
+    // Раньше карточка показывала «0 сообщений» для чисто-канальных клиентов
+    // и обрезала историю у клиентов с несколькими каналами. Теперь суммируем
+    // messageCount со всех каналов, куда клиент писал, и мержим их сообщения
+    // в общий поток для отображения.
+    const channelIdMatchers: Array<{ channel: string; clientId: string }> = [];
+    if (client.whatsappId) channelIdMatchers.push({ channel: "whatsapp", clientId: client.whatsappId });
+    if (client.instagramId) channelIdMatchers.push({ channel: "instagram", clientId: client.instagramId });
+    if (client.fbPsid) channelIdMatchers.push({ channel: "facebook", clientId: client.fbPsid });
+
+    const channelConversations = channelIdMatchers.length > 0
+      ? await prisma.channelConversation.findMany({
+          where: {
+            businessId,
+            OR: channelIdMatchers,
+          },
+          select: {
+            id: true,
+            channel: true,
+            messageCount: true,
+            history: true,
+            updatedAt: true,
+          },
+          orderBy: { updatedAt: "desc" },
+        })
+      : [];
 
     // Get bookings
     const bookings = tgId
@@ -102,6 +129,48 @@ export async function GET(
       orderBy: { name: "asc" },
     });
 
+    // Sprint 4B: суммарный счётчик сообщений TG + WA/IG/FB.
+    // Плюс вмерженный поток последних сообщений для отображения в карточке.
+    interface HistoryEntry { role?: string; content?: string; createdAt?: string | number }
+    type MsgRow = { id: string; role: string; content: string; createdAt: string };
+
+    const channelMessagesCount = channelConversations.reduce(
+      (sum, c) => sum + (c.messageCount || 0),
+      0
+    );
+    const combinedMessagesCount =
+      (conversation?._count.messages || 0) + channelMessagesCount;
+
+    const tgMessagesList: MsgRow[] = (conversation?.messages || []).map((m) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      createdAt: m.createdAt.toISOString(),
+    }));
+
+    // history — JSON [{role, content, createdAt?}]. createdAt не всегда есть,
+    // тогда используем updatedAt беседы как якорь (лучше чем ничего).
+    const channelMessagesList: MsgRow[] = [];
+    channelConversations.forEach((c) => {
+      const hist = Array.isArray(c.history) ? (c.history as HistoryEntry[]) : [];
+      hist.forEach((h, idx) => {
+        if (!h || typeof h !== "object" || !h.content) return;
+        const at = h.createdAt
+          ? new Date(h.createdAt).toISOString()
+          : c.updatedAt.toISOString();
+        channelMessagesList.push({
+          id: `${c.id}:${idx}`,
+          role: h.role || "user",
+          content: String(h.content),
+          createdAt: at,
+        });
+      });
+    });
+
+    const combinedMessages = [...tgMessagesList, ...channelMessagesList]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 50);
+
     return NextResponse.json({
       customer: {
         id: client.id,
@@ -127,16 +196,15 @@ export async function GET(
         customFields: (client.customFields as Record<string, string | number>) || {},
       },
       staffList,
-      conversation: conversation
+      // Sprint 4B: conversation теперь агрегирует TG + WA/IG/FB. id = tg-conversation
+      // id (для legacy-ссылок) или id первой канальной беседы если TG нет.
+      // messagesCount = TG + сумма messageCount со всех каналов. messages —
+      // сортированный merge последних 50 сообщений из всех источников.
+      conversation: (conversation || channelConversations.length > 0)
         ? {
-            id: conversation.id,
-            messagesCount: conversation._count.messages,
-            messages: conversation.messages.map((m) => ({
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              createdAt: m.createdAt,
-            })),
+            id: conversation?.id || channelConversations[0]?.id || client.id,
+            messagesCount: combinedMessagesCount,
+            messages: combinedMessages,
           }
         : null,
       bookings: bookings.map((b) => ({

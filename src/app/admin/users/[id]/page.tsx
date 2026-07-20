@@ -53,6 +53,11 @@ interface UserDetail {
     counts: {
       bookings: number;
       conversations: number;
+      // Sprint 4B: разбиение по каналам + суммарный dialogs
+      channelConversations?: number;
+      conversationsTelegram?: number;
+      conversationsChannel?: number;
+      dialogs?: number;
       services: number;
       staff: number;
     };
@@ -341,9 +346,19 @@ export default function AdminUserDetailPage({
                     <p className="text-xl font-bold text-white">{business.counts.bookings}</p>
                     <p className="text-xs text-gray-500">Записей</p>
                   </div>
-                  <div className="bg-white/5 rounded-lg p-3 text-center">
+                  <div
+                    className="bg-white/5 rounded-lg p-3 text-center"
+                    title={
+                      typeof business.counts.conversationsTelegram === "number"
+                        ? `Telegram: ${business.counts.conversationsTelegram} · WA/IG/FB: ${business.counts.conversationsChannel ?? 0}`
+                        : undefined
+                    }
+                  >
                     <MessageSquare className="h-5 w-5 text-purple-400 mx-auto mb-1" />
-                    <p className="text-xl font-bold text-white">{business.counts.conversations}</p>
+                    {/* Sprint 4B: dialogs = TG + WA + IG + FB (было только TG) */}
+                    <p className="text-xl font-bold text-white">
+                      {business.counts.dialogs ?? business.counts.conversations}
+                    </p>
                     <p className="text-xs text-gray-500">Диалогов</p>
                   </div>
                 </div>
