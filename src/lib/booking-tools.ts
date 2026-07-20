@@ -76,12 +76,19 @@ export function parseWorkingHours(
   // Check if there are day-specific hours
   const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon, ...
 
-  // Map of day abbreviations (Russian)
+  // Map of day abbreviations. Русские сокращения + английские (Mon/Tue/…)
+  // потому что английский workingHours "Mon-Fri 9-18" раньше не парсился
+  // и падал в fallback 9-18 без учёта дня недели.
   const dayMap: Record<string, number[]> = {
     "пн": [1], "вт": [2], "ср": [3], "чт": [4], "пт": [5], "сб": [6], "вс": [0],
     "пн-пт": [1, 2, 3, 4, 5],
     "пн-сб": [1, 2, 3, 4, 5, 6],
     "будни": [1, 2, 3, 4, 5],
+    "mon": [1], "tue": [2], "wed": [3], "thu": [4], "fri": [5], "sat": [6], "sun": [0],
+    "mon-fri": [1, 2, 3, 4, 5],
+    "mon-sat": [1, 2, 3, 4, 5, 6],
+    "weekdays": [1, 2, 3, 4, 5],
+    "weekends": [0, 6],
   };
 
   // Try to find day-specific hours
