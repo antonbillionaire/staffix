@@ -36,18 +36,24 @@ type HistoryMessage = { role: "user" | "assistant"; content: string };
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 /**
- * Локальное время в Asia/Tashkent — простая проверка «рабочих часов».
- * Возвращает час дня в TSH (0-23). Ошибка на границе часа приемлема,
- * cron всё равно бегает каждые 30 мин.
+ * Локальное время в timezone Виктора — простая проверка «рабочих часов».
+ * Возвращает час дня (0-23). Ошибка на границе часа приемлема, cron всё
+ * равно бегает каждые 30 мин.
+ *
+ * SalesLead не хранит timezone лида, поэтому используем одну зону для всех.
+ * Часовой пояс настраивается VICTOR_TIMEZONE env-переменной (по умолчанию
+ * Asia/Tashkent — основной рынок). Если Staffix расширится за пределы CIS —
+ * подкрутите env вместо изменения кода.
  */
-function tashkentHour(): number {
+function victorHour(): number {
+  const tz = process.env.VICTOR_TIMEZONE || "Asia/Tashkent";
   const now = new Date();
-  const tashkentString = now.toLocaleString("en-US", {
-    timeZone: "Asia/Tashkent",
+  const hourString = now.toLocaleString("en-US", {
+    timeZone: tz,
     hour12: false,
     hour: "2-digit",
   });
-  return parseInt(tashkentString, 10) || 0;
+  return parseInt(hourString, 10) || 0;
 }
 
 /**
@@ -139,12 +145,14 @@ export async function GET(request: NextRequest) {
   const now = new Date();
   const startedAt = now.getTime();
 
-  // Часы работы (Tashkent) — ночью не будим
-  const hourTsh = tashkentHour();
-  if (hourTsh < 9 || hourTsh >= 21) {
+  // Часы работы — ночью не будим. Локально по VICTOR_TIMEZONE (по умолчанию
+  // Tashkent). Окно чуть шире TSH-9-21: 8-22 захватывает RU (MSK-3) вечером
+  // и KZ (TSH+1) утром без ночного спама.
+  const hour = victorHour();
+  if (hour < 8 || hour >= 22) {
     return NextResponse.json({
       skipped: "outside working hours",
-      hourTsh,
+      hour,
       timestamp: now.toISOString(),
     });
   }
@@ -232,5 +240,5 @@ export async function GET(request: NextRequest) {
 
   const durationMs = Date.now() - startedAt;
   console.log(`[victor-follow-up] done in ${durationMs}ms:`, results);
-  return NextResponse.json({ ...results, durationMs, hourTsh });
+  return NextResponse.json({ ...results, durationMs, hour });
 }

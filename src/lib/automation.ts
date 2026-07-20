@@ -116,7 +116,7 @@ export async function sendAutomationMessage(
   chatId: bigint,
   message: string,
   buttons?: { text: string; callback_data: string }[][]
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; blockedByUser?: boolean }> {
   try {
     // decrypt() — envelope encryption; passthrough для plaintext
     const token = decrypt(botToken) || botToken;
@@ -150,7 +150,14 @@ export async function sendAutomationMessage(
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Telegram automation message error:", errorText);
-      return { success: false, error: errorText };
+      // Telegram отвечает 403 + "bot was blocked by the user" когда клиент
+      // сам заблокировал бота. Пока мы не отмечали этих клиентов и продолжали
+      // отправлять reactivation каждый месяц — впустую жгли API. Флажок вверх
+      // → вызывающий помечает Client.isBlocked=true.
+      const blockedByUser =
+        response.status === 403 &&
+        /bot was blocked by the user|user is deactivated/i.test(errorText);
+      return { success: false, error: errorText, blockedByUser };
     }
 
     return { success: true };
@@ -611,6 +618,14 @@ export async function processReactivation() {
       } else {
         results.failed++;
         results.errors.push(`Reactivation for client ${client.id}: ${result.error}`);
+        // Клиент заблокировал бота → помечаем в БД, чтобы cron не тратил
+        // ресурсы на попытки отправить каждый месяц.
+        if (result.blockedByUser) {
+          await prisma.client.update({
+            where: { id: client.id },
+            data: { isBlocked: true },
+          }).catch(() => {});
+        }
       }
     }
   }

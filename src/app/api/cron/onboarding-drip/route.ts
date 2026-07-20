@@ -52,6 +52,11 @@ export async function GET(request: NextRequest) {
             igBusinessAccountId: true,
             fbPageId: true,
             fbActive: true,
+            // MINOR fix: подтягиваем subscription чтобы day14 не слал
+            // "мы соскучились" оплатившим Pro/Business.
+            subscription: {
+              select: { plan: true, status: true },
+            },
             _count: {
               select: {
                 services: true,
@@ -137,9 +142,15 @@ export async function GET(request: NextRequest) {
           !!(biz.fbPageId && biz.fbActive)
         );
         const hasCatalog = biz && biz._count.services + biz._count.products > 0;
+        // MINOR fix: Pro/Business оплатили — они точно не "inactive",
+        // не отправляем "мы соскучились". Trial и cancelled — можем.
+        const paidPlan =
+          biz?.subscription?.plan &&
+          biz.subscription.plan !== "trial" &&
+          biz.subscription.status === "active";
 
-        // Only send if setup is still incomplete
-        if (!hasChannel || !hasCatalog) {
+        // Only send if setup is still incomplete AND user hasn't upgraded
+        if ((!hasChannel || !hasCatalog) && !paidPlan) {
           const result = await sendDripReengageReminder(user.email, user.name);
           if (result.success) {
             await prisma.user.update({
