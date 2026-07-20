@@ -356,7 +356,12 @@ describe("PayPro Webhook POST", () => {
   // ── ORDER_REFUNDED: Downgrade to trial ────────────────────────────────────
 
   it("ORDER_REFUNDED -> subscription downgraded to trial", async () => {
-    vi.mocked(prisma.business.findFirst).mockResolvedValue(baseBusiness as never);
+    // B4 guard: refund сбрасывает подписку только если orderId в IPN совпадает
+    // с subscription.payproOrderId. Симулируем refund именно текущего заказа.
+    vi.mocked(prisma.business.findFirst).mockResolvedValue({
+      ...baseBusiness,
+      subscription: { ...baseBusiness.subscription, payproOrderId: "order-123" },
+    } as never);
 
     const POST = await importHandler();
     const body = buildIPNBody({
@@ -379,6 +384,25 @@ describe("PayPro Webhook POST", () => {
         }),
       })
     );
+  });
+
+  it("ORDER_REFUNDED with mismatched orderId -> subscription NOT touched (B4 guard)", async () => {
+    // Regression guard: refund прошлого заказа не сбрасывает активную подписку.
+    // До Sprint 1 fix B4 отправка refund'а по любому orderId сбрасывала подписку в trial.
+    vi.mocked(prisma.business.findFirst).mockResolvedValue(baseBusiness as never);
+
+    const POST = await importHandler();
+    const body = buildIPNBody({
+      ...baseIPNFields,
+      IPN_TYPE_ID: "2",
+      IPN_TYPE_NAME: "OrderRefunded",
+      ORDER_ID: "order-123", // ≠ baseBusiness.subscription.payproOrderId ("order-old")
+    });
+    const req = makePayProRequest(body);
+    const res = await POST(req as never);
+
+    expect(res.status).toBe(200);
+    expect(prisma.subscription.update).not.toHaveBeenCalled();
   });
 
   // ── SUBSCRIPTION_SUSPENDED ────────────────────────────────────────────────
@@ -407,7 +431,11 @@ describe("PayPro Webhook POST", () => {
   // ── ORDER_CHARGED_BACK (chargeback) ───────────────────────────────────────
 
   it("ORDER_CHARGED_BACK -> subscription deactivated like refund", async () => {
-    vi.mocked(prisma.business.findFirst).mockResolvedValue(baseBusiness as never);
+    // Same B4 guard: chargeback затрагивает подписку только когда orderId совпадает.
+    vi.mocked(prisma.business.findFirst).mockResolvedValue({
+      ...baseBusiness,
+      subscription: { ...baseBusiness.subscription, payproOrderId: "order-123" },
+    } as never);
 
     const POST = await importHandler();
     const body = buildIPNBody({

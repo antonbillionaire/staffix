@@ -204,6 +204,7 @@ describe("Instagram Webhook POST", () => {
   it("valid message -> business found -> AI response -> reply sent", async () => {
     vi.mocked(prisma.business.findFirst).mockResolvedValue({
       id: "biz-1",
+      botActive: true,
       fbPageId: "page-1",
       fbPageAccessToken: "token-123",
       subscription: { messagesUsed: 5, messagesLimit: 100, expiresAt: new Date(Date.now() + 86400000) },
@@ -267,6 +268,7 @@ describe("Instagram Webhook POST", () => {
     vi.mocked(checkSubscriptionLimit).mockResolvedValueOnce({ allowed: false, reason: "expired" });
     vi.mocked(prisma.business.findFirst).mockResolvedValue({
       id: "biz-1",
+      botActive: true,
       fbPageId: "page-1",
       fbPageAccessToken: "token-123",
     } as never);
@@ -309,11 +311,12 @@ describe("WhatsApp Webhook POST", () => {
       type: "text",
     });
 
-    vi.mocked(prisma.business.findFirst).mockResolvedValue({ id: "biz-wa" } as never);
+    vi.mocked(prisma.business.findFirst).mockResolvedValue({ id: "biz-wa", botActive: true } as never);
     vi.mocked(prisma.business.findUnique).mockResolvedValue({
       waPhoneNumberId: "phone-123",
       waAccessToken: "wa-token",
       waActive: true,
+      botActive: true,
       subscription: { messagesUsed: 0, messagesLimit: 100, expiresAt: new Date(Date.now() + 86400000) },
     } as never);
 
@@ -357,11 +360,12 @@ describe("WhatsApp Webhook POST", () => {
       type: "text",
     });
 
-    vi.mocked(prisma.business.findFirst).mockResolvedValue({ id: "biz-wa" } as never);
+    vi.mocked(prisma.business.findFirst).mockResolvedValue({ id: "biz-wa", botActive: true } as never);
     vi.mocked(prisma.business.findUnique).mockResolvedValue({
       waPhoneNumberId: "phone-123",
       waAccessToken: "wa-token",
       waActive: true,
+      botActive: true,
     } as never);
 
     const POST = await importHandler();
@@ -396,10 +400,11 @@ describe("Facebook Webhook POST", () => {
       { senderId: "fb-user-1", pageId: "fb-page-1", text: "Hello FB", messageId: "fb-msg-1" },
     ]);
 
-    vi.mocked(prisma.business.findFirst).mockResolvedValue({ id: "biz-fb" } as never);
+    vi.mocked(prisma.business.findFirst).mockResolvedValue({ id: "biz-fb", botActive: true } as never);
     vi.mocked(prisma.business.findUnique).mockResolvedValue({
       fbPageAccessToken: "fb-token",
       fbActive: true,
+      botActive: true,
       subscription: { messagesUsed: 0, messagesLimit: 1000, expiresAt: new Date(Date.now() + 86400000) },
     } as never);
 
@@ -443,10 +448,11 @@ describe("Facebook Webhook POST", () => {
       { senderId: "fb-user-1", pageId: "fb-page-1", text: "Hello", messageId: "fb-msg-2" },
     ]);
 
-    vi.mocked(prisma.business.findFirst).mockResolvedValue({ id: "biz-fb" } as never);
+    vi.mocked(prisma.business.findFirst).mockResolvedValue({ id: "biz-fb", botActive: true } as never);
     vi.mocked(prisma.business.findUnique).mockResolvedValue({
       fbPageAccessToken: "fb-token",
       fbActive: true,
+      botActive: true,
     } as never);
 
     const POST = await importHandler();
@@ -494,6 +500,7 @@ describe("Telegram Webhook POST", () => {
       name: "Test Biz",
       botToken: "123:ABC",
       webhookSecret: "test-secret",
+      botActive: true,
     } as never);
 
     // checkMessageLimit
@@ -534,6 +541,7 @@ describe("Telegram Webhook POST", () => {
       name: "Test Biz",
       botToken: "123:ABC",
       webhookSecret: "correct-secret",
+      botActive: true,
     } as never);
 
     const POST = await importHandler();
@@ -570,6 +578,7 @@ describe("Telegram Webhook POST", () => {
       name: "Test Biz",
       botToken: "123:ABC",
       webhookSecret: "test-secret",
+      botActive: true,
     } as never);
 
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue({

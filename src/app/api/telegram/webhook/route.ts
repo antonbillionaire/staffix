@@ -128,16 +128,8 @@ export async function POST(request: NextRequest) {
 
     catchBotToken = botToken;
 
-    // Owner paused the bot from dashboard — return 200 OK so Telegram stops
-    // retrying, but do not process the update. Automations already respected
-    // botActive; incoming webhooks did not — this closes that gap for all
-    // four channels (TG here, WA/IG/FB in their respective webhooks).
-    if (!business.botActive) {
-      console.log(`[TG Webhook] Bot paused (botActive=false) for business ${business.id} — skipping update`);
-      return NextResponse.json({ ok: true });
-    }
-
-    // Rate limiting — защита от flood
+    // Rate limiting — защита от flood (до secret verification: если ботa
+    // спамят даже валидными хитами, обрубаем на 30 rps без разбора).
     const rlResult = await rateLimit(`tg-webhook:${business.id}`, 30, 1);
     if (!rlResult.allowed) {
       return NextResponse.json({ ok: true }); // Telegram ожидает 200 даже при отклонении
@@ -146,6 +138,9 @@ export async function POST(request: NextRequest) {
     const rawBody = await request.text();
 
     // Верификация secret_token (Telegram шлёт его в X-Telegram-Bot-Api-Secret-Token).
+    // ДОЛЖНА быть раньше botActive/subscription-гардов: иначе злонамеренный
+    // запрос с чужого IP на muted-бота получит 200 OK «всё ок» вместо 403,
+    // из чего атакующий может выяснить структуру endpoint'а.
     // business.webhookSecret уже расшифрован при загрузке выше — сравниваем напрямую.
     const receivedToken = request.headers.get("x-telegram-bot-api-secret-token");
     if (!business.webhookSecret) {
@@ -157,6 +152,17 @@ export async function POST(request: NextRequest) {
     if (!receivedToken || receivedToken !== business.webhookSecret) {
       console.error(`Telegram webhook: invalid secret_token for businessId=${businessId}`);
       return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
+    }
+
+    // Owner paused the bot from dashboard — return 200 OK so Telegram stops
+    // retrying, but do not process the update. Automations already respected
+    // botActive; incoming webhooks did not — this closes that gap for all
+    // four channels (TG here, WA/IG/FB in their respective webhooks).
+    // Проверяем ПОСЛЕ secret-verification, иначе невалидный запрос получает
+    // 200 вместо 403 на muted-боте (leak что endpoint существует).
+    if (!business.botActive) {
+      console.log(`[TG Webhook] Bot paused (botActive=false) for business ${business.id} — skipping update`);
+      return NextResponse.json({ ok: true });
     }
 
     const update: TelegramUpdate = JSON.parse(rawBody);
