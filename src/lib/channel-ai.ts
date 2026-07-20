@@ -76,7 +76,7 @@ const channelBookingTools: any[] = [
 const channelSalesTools: any[] = [
   ...salesToolDefinitions.filter(
     (t: { name: string }) =>
-      ["search_products", "get_product_details", "get_categories", "create_order", "get_client_orders", "get_upsell_suggestions"].includes(t.name)
+      ["search_products", "get_product_details", "get_categories", "list_by_category", "create_order", "get_client_orders", "get_upsell_suggestions", "identify_client"].includes(t.name)
   ),
   ...bookingToolDefinitions.filter(
     (t: { name: string }) =>
@@ -92,7 +92,7 @@ const channelSalesTools: any[] = [
 const channelSalesPlusBookingTools: any[] = [
   ...salesToolDefinitions.filter(
     (t: { name: string }) =>
-      ["search_products", "get_product_details", "get_categories", "create_order", "get_client_orders", "get_upsell_suggestions"].includes(t.name)
+      ["search_products", "get_product_details", "get_categories", "list_by_category", "create_order", "get_client_orders", "get_upsell_suggestions", "identify_client"].includes(t.name)
   ),
   ...bookingToolDefinitions.filter(
     (t: { name: string }) =>
@@ -991,6 +991,7 @@ export async function generateChannelAIResponse(
     // (Смотрим ВСЕГДА — не только когда клиент прислал телефон в этом turn'e —
     //  чтобы hard-code guard ниже мог решить: перехватывать промис или нет.)
     let channelClientPhoneOnRecord: string | null = null;
+    let channelClientRowId: string | null = null;  // для последующего phone-persist ниже
     try {
       const existing = await prisma.channelClient.findFirst({
         where: {
@@ -1001,11 +1002,26 @@ export async function generateChannelAIResponse(
             { whatsappPhone: clientId },
           ],
         },
-        select: { phone: true },
+        select: { id: true, phone: true },
       });
       channelClientPhoneOnRecord = existing?.phone ?? null;
+      channelClientRowId = existing?.id ?? null;
     } catch {
       // не критично
+    }
+
+    // B10: клиент прислал новый телефон — сохраняем в ChannelClient.phone.
+    // Раньше этого не делалось: safety-net эскалировала «новый контакт» на
+    // каждом сообщении с номером, потому что при следующем turn'e phone
+    // всё ещё null. Теперь дубликаты уведомлений уходят.
+    if (extractedPhoneCh && extractedPhoneCh !== channelClientPhoneOnRecord && channelClientRowId) {
+      prisma.channelClient.update({
+        where: { id: channelClientRowId },
+        data: { phone: extractedPhoneCh },
+      }).catch((e) => console.error("[Channel AI] Failed to persist client phone:", e));
+      // Обновляем локальную переменную — hard-code guard ниже должен видеть
+      // что у нас теперь есть телефон, чтобы не перехватывать answer.
+      channelClientPhoneOnRecord = extractedPhoneCh;
     }
     const channelClientHadPhoneBefore = !!channelClientPhoneOnRecord;
     const newContactProvidedCh = !!extractedPhoneCh && !channelClientHadPhoneBefore;
@@ -1091,7 +1107,16 @@ export async function generateChannelAIResponse(
         const reason = `${label}\n${contextLines.join("\n")}`;
 
         const urgency = missingPhoneForHandoff ? "urgent" : "normal";
-        await notifyManagerByTelegram(businessId, BigInt(0), reason, clientName, urgency);
+        await notifyManagerByTelegram(
+          businessId,
+          BigInt(0),
+          reason,
+          clientName,
+          urgency,
+          // B13 частичный fix: чтобы Notification.metadata содержала реальный
+          // канал+ID клиента вместо фейкового telegramId=0.
+          { channel, channelClientId: clientId },
+        );
 
         // Также создаём Task чтобы менеджер видел эту эскалацию в дашборде,
         // не только в TG-пуше (июль 2026 — раньше safety-net'ы генерировали

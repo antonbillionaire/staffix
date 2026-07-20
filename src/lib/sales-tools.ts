@@ -944,7 +944,10 @@ export async function createOrder(
             clientName,
             clientPhone: clientPhone || null,
             clientAddress: clientAddress || null,
-            clientTelegramId: telegramId,
+            // Не пишем 0 для не-TG клиентов — визуальный шум в дашборде
+            // (Order "от клиента с ID 0"). Null для WA/IG/FB — их идентичность
+            // хранится в clientChannel + clientChannelId ниже.
+            clientTelegramId: telegramId > BigInt(0) ? telegramId : null,
             clientChannel: channel || (telegramId > BigInt(0) ? "telegram" : null),
             clientChannelId: channelClientId || null,
             clientNotes: notes || null,
@@ -1379,7 +1382,12 @@ export async function notifyManagerByTelegram(
   clientTelegramId: bigint,
   reason: string,
   clientName?: string,
-  urgency?: string
+  urgency?: string,
+  // B13 частичный фикс: для клиентов из WA/IG/FB передаём их канальный ID —
+  // в Notification.metadata пишем реальный идентификатор вместо telegramId=0.
+  // Полноценный fix (assigned manager для канальных клиентов) отложен до
+  // ChannelClient↔Client merge в Sprint 3.
+  channelInfo?: { channel: string; channelClientId: string }
 ): Promise<SalesToolResult> {
   // Один маркер для трейсинга всего цикла эскалации в Vercel-логах.
   const tag = `[notify_manager][${businessId}]`;
@@ -1404,7 +1412,12 @@ export async function notifyManagerByTelegram(
 
     const isUrgent = urgency === "urgent";
     const urgencyLabel = isUrgent ? "🚨 СРОЧНО" : "📩 Новый запрос";
-    const clientLabel = clientName ? `👤 ${clientName}` : `👤 Клиент (ID: ${clientTelegramId})`;
+    // Для не-TG клиентов лейбл через channelInfo, а не через фейковый ID=0.
+    const clientLabel = clientName
+      ? `👤 ${clientName}`
+      : channelInfo
+      ? `👤 Клиент (${channelInfo.channel}: ${channelInfo.channelClientId})`
+      : `👤 Клиент (ID: ${clientTelegramId})`;
 
     // 1) Всегда оставляем запись в дашборде, даже если Telegram владельца не настроен —
     //    иначе эскалация превращается в ложь боту ("я передал" → никто не получил).
@@ -1422,6 +1435,11 @@ export async function notifyManagerByTelegram(
             clientTelegramId: clientTelegramId.toString(),
             clientName: clientName || null,
             urgency: urgency || "normal",
+            // Для WA/IG/FB — реальные координаты клиента вместо telegramId=0.
+            ...(channelInfo ? {
+              channel: channelInfo.channel,
+              channelClientId: channelInfo.channelClientId,
+            } : {}),
           },
         },
       });
