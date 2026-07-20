@@ -12,6 +12,9 @@ import {
   Check,
   X,
   Loader2,
+  UserCog,
+  HelpCircle,
+  Languages,
 } from "lucide-react";
 
 interface BotCorrection {
@@ -210,6 +213,15 @@ export default function AiLearningPage() {
         return <Lightbulb className="h-5 w-5 text-yellow-500" />;
       case "warning":
         return <ThumbsDown className="h-5 w-5 text-red-500" />;
+      // Sprint 4C: 4 типа генерируем в insights-generator.ts
+      case "faq_suggestion":
+        return <Lightbulb className="h-5 w-5 text-yellow-500" />;
+      case "escalation_pattern":
+        return <UserCog className="h-5 w-5 text-orange-500" />;
+      case "dont_know_pattern":
+        return <HelpCircle className="h-5 w-5 text-red-500" />;
+      case "language_gap":
+        return <Languages className="h-5 w-5 text-blue-500" />;
       default:
         return <Brain className="h-5 w-5 text-purple-500" />;
     }
