@@ -694,6 +694,7 @@ export async function GET(request: NextRequest) {
         select: { telegramId: true, name: true, phone: true },
       });
       for (const c of clientsWithInfo) {
+        if (!c.telegramId) continue; // Sprint 3: nullable telegramId — non-TG клиенты пропускаются в TG-map
         tgClientsById.set(c.telegramId.toString(), { name: c.name, phone: c.phone });
       }
     }

@@ -57,7 +57,10 @@ export async function handleStartCommand(params: StartHandlerParams): Promise<bo
         where: { id: importedClientId, businessId },
         select: { id: true, telegramId: true, name: true },
       });
-      if (importedClient && importedClient.telegramId <= BigInt(0)) {
+      // Sprint 3: telegramId стал nullable. Placeholder-клиент теперь может
+      // иметь telegramId=null (импорт CSV без TG) ИЛИ telegramId=0 (legacy).
+      // В обоих случаях привязываем к реальному TG chat_id.
+      if (importedClient && (importedClient.telegramId === null || importedClient.telegramId <= BigInt(0))) {
         // Если уже есть реальный клиент с этим chat_id — placeholder удаляем (merge).
         // У реального клиента уже могут быть bookings/история, perdere её нельзя.
         const existingReal = await prisma.client.findUnique({

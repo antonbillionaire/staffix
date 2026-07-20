@@ -63,8 +63,14 @@ export async function GET(request: NextRequest) {
       prisma.client.count({ where: baseWhere }),
     ]);
 
-    // Get related data only for the current page's clients
-    const clientTelegramIds = clients.map((c) => c.telegramId);
+    // Sprint 3: Client.telegramId стал nullable. Для смежных таблиц которые
+    // всё ещё привязаны к TG (Conversation/Booking/Review/Order.clientTelegramId
+    // остаются BigInt), пропускаем клиентов без TG-идентичности. Их бронирования
+    // и разговоры лежат в отдельных ветках (booking через ChannelClient path
+    // до Sprint 3 merge — этот блок починится там).
+    const clientTelegramIds: bigint[] = clients
+      .map((c) => c.telegramId)
+      .filter((id): id is bigint => id !== null);
 
     const [conversations, bookings, reviews, orders] = await Promise.all([
       prisma.conversation.findMany({
@@ -118,11 +124,14 @@ export async function GET(request: NextRequest) {
     });
 
     const enrichedClients = clients.map((client) => {
-      const telegramKey = client.telegramId.toString();
-      const conversation = conversationMap.get(telegramKey);
-      const clientBookings = bookingsByClient.get(telegramKey) || [];
-      const clientReviews = reviewsByClient.get(telegramKey) || [];
-      const clientOrders = ordersByClient.get(telegramKey) || { count: 0, totalSpent: 0 };
+      // Для non-TG клиентов telegramKey = null → карты для них дадут пустые
+      // коллекции. После Sprint 3 backfill эти клиенты получат свои channel-id
+      // и здесь появится вторая ветка поиска.
+      const telegramKey = client.telegramId ? client.telegramId.toString() : null;
+      const conversation = telegramKey ? conversationMap.get(telegramKey) : undefined;
+      const clientBookings = telegramKey ? (bookingsByClient.get(telegramKey) || []) : [];
+      const clientReviews = telegramKey ? (reviewsByClient.get(telegramKey) || []) : [];
+      const clientOrders = telegramKey ? (ordersByClient.get(telegramKey) || { count: 0, totalSpent: 0 }) : { count: 0, totalSpent: 0 };
 
       const hasRecentVisit = client.lastVisitDate
         ? new Date(client.lastVisitDate) > thirtyDaysAgo
@@ -139,7 +148,7 @@ export async function GET(request: NextRequest) {
 
       return {
         id: client.id,
-        telegramId: client.telegramId.toString(),
+        telegramId: client.telegramId ? client.telegramId.toString() : null,
         telegramUsername: client.telegramUsername,
         name: client.name || conversation?.clientName || "Клиент",
         phone: client.phone,
@@ -149,7 +158,7 @@ export async function GET(request: NextRequest) {
         createdAt: client.createdAt,
         isActive,
         isVip,
-        messagesCount: conversation?._count?.messages || 0,
+        messagesCount: conversation?._count?.messages ?? 0,
         bookingsCount: clientBookings.length,
         ordersCount: clientOrders.count,
         ordersTotalSpent: clientOrders.totalSpent,

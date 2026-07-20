@@ -253,6 +253,10 @@ export async function POST(request: NextRequest) {
 
       // Telegram pass
       for (const c of tgClients) {
+        // tgClients фильтруются выше по наличию telegramId, но TS теперь видит
+        // client.telegramId как nullable — гардим и пропускаем импортированных
+        // без TG-идентичности вместо падения.
+        if (!c.telegramId) continue;
         const personalised = content
           .replace(/\{\{\s*имя\s*\}\}/gi, c.name || "")
           .replace(/\{\{\s*name\s*\}\}/gi, c.name || "");

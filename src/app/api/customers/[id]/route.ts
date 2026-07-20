@@ -21,43 +21,55 @@ export async function GET(
       return NextResponse.json({ error: "Клиент не найден" }, { status: 404 });
     }
 
+    // Sprint 3: Client.telegramId стал nullable для WA/IG/FB клиентов.
+    // Диалоги/бронирования/отзывы связаны по clientTelegramId (BigInt) — ищем
+    // только когда TG-идентичность есть. Для channel-only клиентов эти
+    // разделы пусты (будут наполнены после ChannelClient→Client backfill).
+    const tgId = client.telegramId;
+
     // Get conversation
-    const conversation = await prisma.conversation.findFirst({
-      where: {
-        businessId,
-        clientTelegramId: client.telegramId,
-      },
-      include: {
-        messages: {
-          orderBy: { createdAt: "desc" },
-          take: 50,
-        },
-        _count: { select: { messages: true } },
-      },
-    });
+    const conversation = tgId
+      ? await prisma.conversation.findFirst({
+          where: {
+            businessId,
+            clientTelegramId: tgId,
+          },
+          include: {
+            messages: {
+              orderBy: { createdAt: "desc" },
+              take: 50,
+            },
+            _count: { select: { messages: true } },
+          },
+        })
+      : null;
 
     // Get bookings
-    const bookings = await prisma.booking.findMany({
-      where: {
-        businessId,
-        clientTelegramId: client.telegramId,
-      },
-      include: {
-        service: true,
-        staff: true,
-      },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    });
+    const bookings = tgId
+      ? await prisma.booking.findMany({
+          where: {
+            businessId,
+            clientTelegramId: tgId,
+          },
+          include: {
+            service: true,
+            staff: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        })
+      : [];
 
     // Get reviews
-    const reviews = await prisma.review.findMany({
-      where: {
-        businessId,
-        clientTelegramId: client.telegramId,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const reviews = tgId
+      ? await prisma.review.findMany({
+          where: {
+            businessId,
+            clientTelegramId: tgId,
+          },
+          orderBy: { createdAt: "desc" },
+        })
+      : [];
 
     // Calculate stats
     const now = new Date();
@@ -93,7 +105,10 @@ export async function GET(
     return NextResponse.json({
       customer: {
         id: client.id,
-        telegramId: client.telegramId.toString(),
+        telegramId: client.telegramId?.toString() ?? null,
+        whatsappId: client.whatsappId ?? null,
+        instagramId: client.instagramId ?? null,
+        fbPsid: client.fbPsid ?? null,
         name: client.name || conversation?.clientName || "Клиент",
         phone: client.phone,
         totalVisits: client.totalVisits,

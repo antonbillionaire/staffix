@@ -107,6 +107,10 @@ export async function GET(request: Request) {
     // нашёл значение в диалогах. No-op если у бизнеса нет полей в конфиге.
     for (const client of clientsNeedingUpdate) {
       try {
+        // Sprint 3: telegramId стал nullable — для WA/IG/FB-only клиентов
+        // summary/customFields сейчас пропускаем (channel-based summary
+        // будет в Sprint 3 через единый ai/core.ts).
+        if (!client.telegramId) continue;
         const summary = await updateClientSummary(
           client.businessId,
           client.telegramId

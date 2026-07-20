@@ -778,8 +778,19 @@ model Review {
 model Client {
   id String @id @default(cuid())
 
-  telegramId       BigInt
+  // Каналы идентичности клиента (Sprint 3, июль 2026):
+  //   telegramId  — was required-only column; теперь nullable, чтобы
+  //                 WA/IG/FB-only клиенты жили в этой же таблице.
+  //   whatsappId  — Meta WA-ID (обычно = phone без +).
+  //   instagramId — Instagram scoped user ID (IGSID).
+  //   fbPsid      — Facebook Messenger Page-Scoped ID.
+  // Каждый может быть null. Composite unique(businessId, X) на каждом.
+  // PostgreSQL по умолчанию NULLS DISTINCT — много rows с NULL не конфликтуют.
+  telegramId       BigInt?
   telegramUsername String? // @username из Telegram (без @), обновляется при каждом сообщении
+  whatsappId       String?
+  instagramId      String?
+  fbPsid           String?
   name             String?
   surname          String?
   phone            String?
@@ -875,6 +886,9 @@ model Client {
   updatedAt DateTime @updatedAt
 
   @@unique([businessId, telegramId])
+  @@unique([businessId, whatsappId])
+  @@unique([businessId, instagramId])
+  @@unique([businessId, fbPsid])
   @@index([businessId, lastVisitDate])
   @@index([businessId, lastMessageAt])
   @@index([businessId, dealStage])
@@ -1378,7 +1392,9 @@ model ClientBroadcastDelivery {
 
   // Получатель
   clientId   String
-  telegramId BigInt
+  // telegramId nullable, чтобы email-доставки для WA/IG/FB-only клиентов
+  // не требовали фиктивного telegramId=0. Sprint 3, июль 2026.
+  telegramId BigInt?
   // Email — заполняется только для email-доставок. Snapshot на момент рассылки
   // (если клиент потом сменит email, в логе остаётся куда реально ушло).
   email      String?

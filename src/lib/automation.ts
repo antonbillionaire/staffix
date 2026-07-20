@@ -517,6 +517,10 @@ export async function processReactivation() {
 
     for (const client of business.clients) {
       if (!client.lastVisitDate) continue;
+      // Sprint 3: telegramId стал nullable. Реактивация пока идёт только в TG
+      // (buttons+callback_data привязаны к TG). Для WA/IG клиентов reactivation
+      // будет реализована через единый ai/core.ts в этом же спринте.
+      if (!client.telegramId) continue;
 
       // Проверяем, прошло ли достаточно времени с последнего визита
       if (client.lastVisitDate > reactivationThreshold) continue;
