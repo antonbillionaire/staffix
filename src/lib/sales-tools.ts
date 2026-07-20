@@ -1039,14 +1039,29 @@ export async function createOrder(
     // источники, ручные импорты) имеют telegramId=null → update по составному
     // ключу промахивался и уходил в silent .catch. Через client.id одинаково
     // работает для всех источников привязки.
+    //
+    // B16: loyaltyVisits инкрементируется на каждый заказ (даже без cashback),
+    // чтобы программа "каждый N-й визит — награда" реально считалась.
+    // notifyLoyaltyMilestone дальше проверит порог и создаст Notification.
     if (client) {
-      prisma.client.update({
+      const updated = await prisma.client.update({
         where: { id: client.id },
         data: {
           loyaltyTotalSpent: { increment: finalPrice },
+          loyaltyVisits: { increment: 1 },
           ...(cashbackEarned > 0 ? { loyaltyPoints: { increment: cashbackEarned } } : {}),
         },
-      }).catch((e) => console.error("[Cashback] Failed to update loyalty:", e));
+        select: { id: true, name: true, loyaltyVisits: true },
+      }).catch((e) => {
+        console.error("[Cashback] Failed to update loyalty:", e);
+        return null;
+      });
+      if (updated) {
+        const { notifyLoyaltyMilestone } = await import("./booking-tools");
+        notifyLoyaltyMilestone(businessId, updated).catch((e) =>
+          console.error("[Loyalty] milestone notify failed:", e)
+        );
+      }
     }
 
     // Уведомляем владельца через Telegram + отправляем кнопки оплаты клиенту

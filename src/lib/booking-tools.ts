@@ -402,6 +402,56 @@ async function notifyBooking(
 }
 
 // ========================================
+// LOYALTY REWARD MILESTONE
+// ========================================
+
+/**
+ * Owner-facing уведомление при достижении клиентом порога программы
+ * лояльности visits ("каждый N-й визит — награда"). Раньше поле
+ * LoyaltyProgram.visitsForReward + Client.loyaltyVisits не использовались
+ * никак: владелец включал программу в UI, обещал клиентам, счётчик не
+ * инкрементировался, награда не срабатывала. Теперь:
+ *   1) loyaltyVisits инкрементируется на каждый booking/order (см. call site)
+ *   2) при loyaltyVisits % visitsForReward === 0 → Notification владельцу
+ *      "клиент дошёл до X-го визита, выдайте награду"
+ */
+export async function notifyLoyaltyMilestone(
+  businessId: string,
+  client: { id: string; name: string | null; loyaltyVisits: number },
+): Promise<void> {
+  if (client.loyaltyVisits <= 0) return;
+
+  const program = await prisma.loyaltyProgram.findFirst({
+    where: { businessId, type: "visits", enabled: true },
+    select: { visitsForReward: true, rewardType: true, rewardDiscount: true },
+  });
+  if (!program || !program.visitsForReward || program.visitsForReward <= 0) return;
+
+  if (client.loyaltyVisits % program.visitsForReward !== 0) return;
+
+  const rewardStr =
+    program.rewardType === "free"
+      ? "бесплатная услуга"
+      : `скидка ${program.rewardDiscount ?? 50}%`;
+
+  await prisma.notification.create({
+    data: {
+      businessId,
+      type: "loyalty_reward",
+      title: `🎁 Клиент${client.name ? ` ${client.name}` : ""} заработал награду`,
+      message: `Достигнут ${client.loyaltyVisits}-й визит по программе «каждый ${program.visitsForReward}-й». Награда: ${rewardStr}. Примените при следующем визите.`,
+      metadata: {
+        clientId: client.id,
+        loyaltyVisits: client.loyaltyVisits,
+        visitsForReward: program.visitsForReward,
+        rewardType: program.rewardType,
+        rewardDiscount: program.rewardDiscount,
+      },
+    },
+  });
+}
+
+// ========================================
 // CREATE BOOKING
 // ========================================
 
@@ -558,7 +608,7 @@ export async function createBooking(
       });
       const autoAssign = existing ? null : await pickStaffForNewLead(businessId);
 
-      await prisma.client.upsert({
+      const upsertedClient = await prisma.client.upsert({
         where: {
           businessId_telegramId: {
             businessId,
@@ -572,6 +622,7 @@ export async function createBooking(
           phone: clientPhone || null,
           lastVisitDate: bookingDate,
           totalVisits: 1,
+          loyaltyVisits: 1,
           assignedStaffId: autoAssign,
         },
         update: {
@@ -579,8 +630,19 @@ export async function createBooking(
           phone: clientPhone || undefined,
           lastVisitDate: bookingDate,
           totalVisits: { increment: 1 },
+          loyaltyVisits: { increment: 1 },
         },
+        select: { id: true, name: true, loyaltyVisits: true },
       });
+
+      // B16: если у бизнеса включена программа лояльности типа "visits"
+      // (каждый N-й визит — награда) и клиент достиг порога — уведомляем
+      // владельца в дашборде через Notification. Владелец сам решает: сделать
+      // бесплатной услугу / дать скидку / что-то ещё, а бот больше не обещает
+      // фиктивные бонусы, которых счётчик не учитывал.
+      notifyLoyaltyMilestone(businessId, upsertedClient).catch((e) =>
+        console.error("[Loyalty] milestone notify failed:", e)
+      );
 
       // Auto-promote in deal pipeline: lead → consultation_booked.
       // No-op if client is already further along (e.g. "client") — promotion
