@@ -65,31 +65,40 @@ export async function GET(request: Request) {
       }
     }
 
-    // 3. Находим клиентов у которых давно не обновлялся summary
-    // (обновляем если было > 5 новых сообщений с момента последнего обновления)
-    const clientsNeedingUpdate = await prisma.client.findMany({
-      where: {
-        OR: [
-          // Никогда не было summary
-          { aiSummary: null, totalMessages: { gte: 5 } },
-          // Summary устарел (> 10 сообщений с момента обновления)
-          {
-            AND: [
-              { summaryUpdatedAt: { not: null } },
-              { totalMessages: { gte: 10 } },
-            ],
+    // 3. Находим клиентов у которых нужен свежий summary.
+    //
+    // Ветка 1: у клиента вообще нет summary + накоплено ≥5 сообщений.
+    // Ветка 2: summary устарел — было ≥10 сообщений И lastMessageAt свежее
+    //          чем summaryUpdatedAt (иначе пере-суммаризируем один и тот же
+    //          неизменный диалог каждые 2 часа впустую, жгём Haiku токены).
+    //
+    // Prisma не умеет cross-field compare в findMany — используем $queryRaw.
+    // Возвращаем только id, дальше select полноценных полей отдельным запросом.
+    const staleClientRows = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "Client"
+      WHERE (
+        ("aiSummary" IS NULL AND "totalMessages" >= 5)
+        OR
+        ("summaryUpdatedAt" IS NOT NULL AND "totalMessages" >= 10
+          AND "lastMessageAt" IS NOT NULL
+          AND "lastMessageAt" > "summaryUpdatedAt")
+      )
+      ORDER BY "lastMessageAt" DESC NULLS LAST
+      LIMIT ${MAX_CLIENTS}
+    `;
+
+    const clientsNeedingUpdate = staleClientRows.length
+      ? await prisma.client.findMany({
+          where: { id: { in: staleClientRows.map((r) => r.id) } },
+          select: {
+            id: true,
+            businessId: true,
+            telegramId: true,
+            totalMessages: true,
+            summaryUpdatedAt: true,
           },
-        ],
-      },
-      select: {
-        id: true,
-        businessId: true,
-        telegramId: true,
-        totalMessages: true,
-        summaryUpdatedAt: true,
-      },
-      take: MAX_CLIENTS,
-    });
+        })
+      : [];
 
     console.log(`Found ${clientsNeedingUpdate.length} clients needing summary update`);
 

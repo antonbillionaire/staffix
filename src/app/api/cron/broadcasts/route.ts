@@ -18,6 +18,18 @@ export const maxDuration = 300;
 
 const MAX_BROADCASTS_PER_RUN = 10;
 
+// Telegram Bot API rate limit: 30 сообщений/сек на бот. Строго держим ниже,
+// чтобы не начать получать 429 в середине рассылки. 50мс между send'ами =
+// ~20 сообщений/сек — комфортный запас.
+const TG_SEND_DELAY_MS = 50;
+
+// Watchdog: если broadcast залип в "sending" дольше этого — считаем что
+// Vercel убил функцию посередине (maxDuration=300s превышен), возвращаем
+// в "scheduled" чтобы следующий тик его подобрал.
+const SENDING_STUCK_THRESHOLD_MS = 15 * 60 * 1000; // 15 минут
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 function getOrCreateUnsubscribeToken(existing: string | null): string {
   if (existing) return existing;
   return randomBytes(24).toString("base64url");
@@ -31,6 +43,20 @@ export async function POST(request: Request) {
 
   try {
     const now = new Date();
+
+    // WATCHDOG: сначала подбираем "залипшие" рассылки — те что были помечены
+    // "sending" > 15 мин назад. Vercel убивает функцию через maxDuration=300s,
+    // catch в try..catch не выполнится (SIGKILL), broadcast остаётся в
+    // "sending" навсегда. Возвращаем в "scheduled" — с этого прогона они
+    // будут пере-подобраны в обычной ветке ниже.
+    const stuckThreshold = new Date(now.getTime() - SENDING_STUCK_THRESHOLD_MS);
+    const revived = await prisma.clientBroadcast.updateMany({
+      where: { status: "sending", updatedAt: { lt: stuckThreshold } },
+      data: { status: "scheduled" },
+    });
+    if (revived.count > 0) {
+      console.warn(`[cron/broadcasts] Watchdog revived ${revived.count} stuck broadcasts (were 'sending' > 15min)`);
+    }
 
     const due = await prisma.clientBroadcast.findMany({
       where: {
@@ -146,6 +172,8 @@ export async function POST(request: Request) {
               });
               failed++;
             }
+            // Throttle к TG API — держим < 30 msg/s per bot.
+            await sleep(TG_SEND_DELAY_MS);
           } else if (delivery.channel === "email") {
             const recipientEmail = delivery.email || client.email;
             if (!recipientEmail) {
