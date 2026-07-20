@@ -184,17 +184,46 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-white mb-4">9. Файлы cookie</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">9. Файлы cookie и аналитика</h2>
             <p className="text-gray-300 leading-relaxed">
-              Мы используем cookie и аналогичные технологии для:
+              Мы используем два вида cookie:
+            </p>
+
+            <h3 className="text-lg font-semibold text-white mt-4 mb-2">Необходимые cookie</h3>
+            <p className="text-gray-300 leading-relaxed">
+              Без них Сервис не работает — сюда входят: сессия входа (NextAuth), выбор
+              языка интерфейса, выбор темы (тёмная/светлая), защита от CSRF-атак. Они
+              ставятся всегда, отдельного согласия не требуют.
+            </p>
+
+            <h3 className="text-lg font-semibold text-white mt-4 mb-2">Аналитические cookie</h3>
+            <p className="text-gray-300 leading-relaxed">
+              Ставятся <strong>только после вашего согласия</strong> в плашке cookie-consent
+              на первом визите. Если вы отклоните — эти сервисы вообще не подключаются.
             </p>
             <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4 mt-4">
-              <li>Обеспечения работы Сервиса (необходимые cookie)</li>
-              <li>Запоминания ваших настроек и предпочтений</li>
-              <li>Анализа использования Сервиса</li>
+              <li>
+                <strong>Google Analytics 4</strong> — измерение трафика, источники
+                посетителей, конверсии в регистрацию. Данные хранятся у Google.
+              </li>
+              <li>
+                <strong>Meta Pixel</strong> — атрибуция рекламных кампаний Facebook/Instagram
+                и построение аудиторий для ретаргетинга. Данные хранятся у Meta.
+              </li>
+              <li>
+                <strong>PostHog (EU cloud)</strong> — продуктовая аналитика: какими
+                функциями пользуются владельцы бизнеса в дашборде, session recordings
+                (записи сессий с автоматической маскировкой полей ввода). Данные
+                хранятся в дата-центре PostHog в Германии.
+              </li>
             </ul>
-            <p className="text-gray-300 leading-relaxed mt-4">
-              Вы можете управлять cookie через настройки браузера.
+
+            <h3 className="text-lg font-semibold text-white mt-4 mb-2">Как отозвать согласие</h3>
+            <p className="text-gray-300 leading-relaxed">
+              Очистите cookie и localStorage для домена staffix.io в настройках браузера —
+              при следующем визите плашка появится снова, и вы сможете выбрать «Отклонить».
+              Мы также уважаем сигнал «Do Not Track» браузера: даже если вы приняли cookie,
+              но потом включили DNT, скрипты аналитики загружаться перестанут.
             </p>
           </section>
 

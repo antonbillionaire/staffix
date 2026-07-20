@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import CookieConsent from "@/components/CookieConsent";
+import AnalyticsScripts from "@/components/AnalyticsScripts";
 
 const inter = Inter({
   subsets: ["latin", "cyrillic"],
@@ -71,6 +72,7 @@ export default function RootLayout({
         <Providers>
           {children}
           <CookieConsent />
+          <AnalyticsScripts />
         </Providers>
       </body>
     </html>

@@ -62,6 +62,7 @@ const OnboardingWizard = dynamic(() => import("@/components/OnboardingWizard"), 
 const OnboardingChecklist = dynamic(() => import("@/components/OnboardingChecklist"), { ssr: false });
 import TrialExpiredBanner from "@/components/TrialExpiredBanner";
 import SubscriptionSuspendedBanner from "@/components/SubscriptionSuspendedBanner";
+import PostHogIdentify from "@/components/PostHogIdentify";
 import { type PlanId, hasMenuAccess } from "@/lib/plans";
 
 interface NavChild {
@@ -875,6 +876,9 @@ export default function DashboardLayout({
 
         {/* Chat Widget */}
         <ChatWidget />
+
+        {/* Bind logged-in user to their PostHog profile (no-op if consent not given) */}
+        <PostHogIdentify />
       </div>
     </div>
   );

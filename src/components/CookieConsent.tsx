@@ -3,31 +3,38 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Cookie, X } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { getConsent, setConsent } from "@/lib/analytics-consent";
 
+/**
+ * CookieConsent — плашка согласия на аналитические cookies.
+ *
+ * Что делает:
+ *   - При первом визите (нет записи в localStorage) — показывает баннер
+ *   - Accept → localStorage='accepted' + событие → AnalyticsScripts грузит GA4/Pixel/PostHog
+ *   - Decline → localStorage='declined' → ничего третье-стороннее не грузится
+ *
+ * Локализация: 4 языка (ru/en/uz/kz) через useLanguage(). Если ключ перевода
+ * отсутствует — fallback на английский (см. LanguageContext.t).
+ */
 export default function CookieConsent() {
+  const { t } = useLanguage();
   const [showBanner, setShowBanner] = useState(false);
 
   useEffect(() => {
-    // Check if user has already consented
-    const consent = localStorage.getItem("cookie-consent");
-    if (!consent) {
-      // Show banner after a short delay for better UX
-      const timer = setTimeout(() => {
-        setShowBanner(true);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
+    // Если уже решил — не показываем.
+    if (getConsent() !== null) return;
+    const timer = setTimeout(() => setShowBanner(true), 1000);
+    return () => clearTimeout(timer);
   }, []);
 
   const acceptCookies = () => {
-    localStorage.setItem("cookie-consent", "accepted");
-    localStorage.setItem("cookie-consent-date", new Date().toISOString());
+    setConsent("accepted");
     setShowBanner(false);
   };
 
   const declineCookies = () => {
-    localStorage.setItem("cookie-consent", "declined");
-    localStorage.setItem("cookie-consent-date", new Date().toISOString());
+    setConsent("declined");
     setShowBanner(false);
   };
 
@@ -43,13 +50,13 @@ export default function CookieConsent() {
               <Cookie className="h-5 w-5 text-blue-400" />
             </div>
             <div>
-              <p className="text-white font-medium mb-1">Мы используем cookies</p>
+              <p className="text-white font-medium mb-1">{t("cookie.title")}</p>
               <p className="text-gray-400 text-sm">
-                Мы используем файлы cookie для улучшения работы сайта, анализа трафика и персонализации.
-                Продолжая использовать сайт, вы соглашаетесь с{" "}
+                {t("cookie.body")}{" "}
                 <Link href="/privacy" className="text-blue-400 hover:text-blue-300">
-                  Политикой конфиденциальности
-                </Link>.
+                  {t("cookie.privacyLink")}
+                </Link>
+                .
               </p>
             </div>
           </div>
@@ -60,20 +67,21 @@ export default function CookieConsent() {
               onClick={declineCookies}
               className="flex-1 md:flex-none px-4 py-2 text-sm font-medium text-gray-400 hover:text-white border border-white/10 rounded-xl hover:bg-white/5 transition-colors"
             >
-              Отклонить
+              {t("cookie.decline")}
             </button>
             <button
               onClick={acceptCookies}
               className="flex-1 md:flex-none px-6 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl hover:opacity-90 transition-opacity"
             >
-              Принять
+              {t("cookie.accept")}
             </button>
           </div>
 
-          {/* Close button (mobile) */}
+          {/* Close button (mobile) — считаем как "declined" (пассивный отказ) */}
           <button
             onClick={declineCookies}
             className="absolute top-2 right-2 md:hidden p-1 text-gray-500 hover:text-white"
+            aria-label={t("cookie.decline")}
           >
             <X className="h-4 w-4" />
           </button>
