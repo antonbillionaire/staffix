@@ -399,6 +399,66 @@ export const faqCategories: FaqCategory[] = [
           kz: "Иә! Сіз:\n• Қарым-қатынас стилін таңдай аласыз: достық, кәсіби немесе бейресми\n• Өзіңіздің сәлемдесу хабарыңызды жаза аласыз\n• Арнайы ережелер қоса аласыз\n• 6 дайын шаблоннан таңдай аласыз",
         },
       },
+      {
+        id: "ai-insights-explained",
+        question: {
+          ru: "Что такое AI-подсказки в дашборде?",
+          en: "What are the AI insights in the dashboard?",
+          uz: "Boshqaruv panelidagi AI maslahatlari nima?",
+          kz: "Панельдегі AI кеңестері дегеніміз не?",
+        },
+        answer: {
+          ru: "Раз в неделю Staffix анализирует переписки бота с клиентами и выкладывает 4 типа подсказок в дашборде («AI Обучение → Подсказки»):\n• Часто спрашивают вопрос, на который бот не знает ответ → предлагает добавить FAQ\n• Бот часто передаёт менеджеру одни и те же темы → предлагает обучить бота\n• Бот в целом слишком часто говорит «не знаю» (>20% ответов) → сигнал что база знаний слаба\n• Клиенты пишут на языке, отличном от языка бота (например, узбекский vs русский) → предлагает сменить язык\nОдин клик «Принять» — Staffix сам создаёт FAQ.",
+          en: "Once a week, Staffix reads through your bot's conversations and posts 4 kinds of insights (AI Learning → Insights):\n• 3+ similar questions the bot couldn't answer → offers to add a FAQ\n• Bot escalates the same topics to a human → suggests training the bot instead\n• Bot says \"I don't know\" >20% of the time → your knowledge base is thin\n• Clients write in one language, bot answers in another → prompts you to switch\nOne click \"Accept\" creates the FAQ.",
+          uz: "Haftalik Staffix bot suhbatlarini tahlil qiladi va 4 xil maslahat chiqaradi: (1) tez-tez so'raladigan javob yo'q savol → FAQ qo'shishni taklif qiladi, (2) bot menejerga topshirayotgan mavzular, (3) bot 20% dan ortiq javobda \"bilmadim\", (4) mijoz va bot tili nomuvofiqligi.",
+          kz: "Апта сайын Staffix бот диалогтарын талдап 4 түрлі кеңес шығарады: (1) бот білмейтін жиі сұрақ → FAQ ұсынады, (2) менеджерге жиі жіберілетін тақырыптар, (3) бот 20%+ жауапта «білмеймін», (4) клиент пен бот тілінің сәйкессіздігі.",
+        },
+      },
+      {
+        id: "meta-ads-explained",
+        question: {
+          ru: "Как работает страница «Реклама Meta»?",
+          en: "How does the \"Meta Ads\" page work?",
+          uz: "\"Meta Reklama\" sahifasi qanday ishlaydi?",
+          kz: "«Meta жарнамасы» беті қалай жұмыс істейді?",
+        },
+        answer: {
+          ru: "Если вы запускаете рекламу в Instagram/Facebook, страница «Реклама Meta» в дашборде показывает:\n• Потрачено / Клики / CTR / Средний CPL (стоимость лида)\n• Воронку: клик по рекламе → лид в директ → клиент\n• Таблицу по каждой кампании\nНастраивается один раз: Каналы → Meta → Ad Account ID из Ads Manager. Токен доступа берётся из уже подключённого Facebook Login. Обновляется автоматически раз в сутки, либо кнопкой «Обновить» вручную. Ограничение: атрибуция per-campaign усреднённая, точная разбивка по UTM в планах.",
+          en: "If you run Instagram/Facebook ads, the \"Meta Ads\" page in your dashboard shows Spend / Clicks / CTR / Avg. CPL, a funnel from ad-click to sale, and a per-campaign table. One-time setup: Channels → Meta → Ad Account ID from Ads Manager. Access token comes from your existing Facebook Login. Auto-refreshed daily, or click \"Refresh\" for a manual sync. Attribution is per-day (not per-campaign UTM yet).",
+          uz: "Instagram/Facebook reklamasi ishlatsangiz, boshqaruv panelidagi \"Meta Reklama\" sahifasi Xarajat / Bosishlar / CTR / o'rtacha CPL, reklamadan sotuvgacha voronka, kampaniyalar bo'yicha jadval ko'rsatadi. Sozlash: Kanallar → Meta → Ad Account ID.",
+          kz: "Instagram/Facebook жарнамасын жүргізсеңіз, панельдегі «Meta жарнамасы» беті Шығын / Басулар / CTR / орт. CPL, жарнамадан сатуға дейінгі воронка, науқандар кестесі көрсетеді. Баптау: Арналар → Meta → Ad Account ID.",
+        },
+      },
+      {
+        id: "loyalty-ledger-explained",
+        question: {
+          ru: "Как посмотреть за что клиенту начислены баллы?",
+          en: "How do I see why a customer earned points?",
+          uz: "Mijozga ballar nima uchun berilganini qanday ko'rish mumkin?",
+          kz: "Клиентке ұпайлар неге берілгенін қалай көремін?",
+        },
+        answer: {
+          ru: "Откройте карточку клиента → блок «Баллы лояльности». Показывается баланс + история движений (до 100 записей): «+250 · Начислено · Кэшбек за услугу маникюр (5%) · 20 июля».\nМожно вручную начислить или списать баллы с комментарием (например «компенсация за задержку»). Границы: ±100 000 за операцию, баланс не уходит в минус. История ведётся с 20 июля 2026.",
+          en: "Open the customer's card → \"Loyalty Points\" block. Balance + history of up to 100 movements: \"+250 · Earned · Cashback for manicure (5%) · 20 Jul\". You can manually credit/debit with a comment (\"apology for delay\"). Bounded at ±100,000/op, no negative balance. History starts 20 Jul 2026.",
+          uz: "Mijoz kartochkasi → \"Sodiqlik ballari\" bloki: balans + so'nggi 100 harakat tarixi sabab bilan (masalan \"Manikyur xizmati uchun keshbek (5%)\"). Menejerdan qo'lda yig'ish/sarflash mumkin.",
+          kz: "Клиент картасы → «Адалдық ұпайлары» блогы: теңгерім + соңғы 100 қозғалыс тарихы себебімен. Менеджерден қолмен есептеу/алу мүмкін.",
+        },
+      },
+      {
+        id: "multichannel-card-explained",
+        question: {
+          ru: "Почему в карточке клиента раньше показывалось 3 диалога, а на самом деле их 1000+?",
+          en: "Why did my customer card show 3 dialogs when there were actually 1000+?",
+          uz: "Nima uchun mijoz kartochkasida 3 ta suhbat, aslida 1000+ bo'lgan?",
+          kz: "Неге клиент картасында 3 диалог көрсетілген, ал шын мәнінде 1000+?",
+        },
+        answer: {
+          ru: "Раньше Staffix считал только Telegram-диалоги в статистике. Для бизнесов, работающих в основном через Instagram/WhatsApp/Facebook, счётчик занижал реальность. С 20 июля 2026 карточка клиента и админ-панель считают диалоги во всех 4 каналах вместе (Telegram + WhatsApp + Instagram + Facebook), с разбивкой в тултипе. Плюс каждый клиент теперь помечен маленькими иконками — вы сразу видите, из каких каналов он с вами общался.",
+          en: "Previously Staffix counted only Telegram dialogs in stats. For businesses running mostly on Instagram/WhatsApp/Facebook, this under-reported reality. Since 20 Jul 2026, the customer card and admin panel count all 4 channels together (Telegram + WhatsApp + Instagram + Facebook), with a per-channel breakdown on hover. Each customer also carries small icons showing which channels they've used.",
+          uz: "Ilgari Staffix statistikada faqat Telegram suhbatlarini hisoblardi. 20-iyuldan barcha 4 kanal (Telegram + WhatsApp + Instagram + Facebook) birga hisoblanadi.",
+          kz: "Бұрын Staffix статистикада тек Telegram диалогтарын санайтын. 20 шілдеден бастап барлық 4 арна (Telegram + WhatsApp + Instagram + Facebook) бірге саналады.",
+        },
+      },
     ],
   },
 

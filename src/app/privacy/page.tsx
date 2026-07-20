@@ -104,12 +104,14 @@ export default function PrivacyPolicyPage() {
               <li>Instagram Business Account ID and username</li>
               <li>Direct messages and conversation history from Instagram DM and Facebook Messenger</li>
               <li>Sender profile information (name, profile ID) from incoming messages</li>
+              <li>Ad campaign aggregates from Meta Marketing API (spend, impressions, clicks, CTR) if you connect your Ad Account ID for the &quot;Meta Ads&quot; dashboard. No per-user ad data is stored.</li>
             </ul>
             <h3 className="text-xl font-medium text-white mb-3 mt-6">5.2. How We Use Meta Platform Data:</h3>
             <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4">
               <li>To process incoming messages and generate AI-powered responses</li>
               <li>To provide you with conversation analytics and customer insights</li>
               <li>To maintain conversation context for better customer service</li>
+              <li>To display your own ad performance (spend / CPL / CTR / funnel) if you connect Meta Marketing API — data is fetched daily and shown only to you</li>
             </ul>
             <h3 className="text-xl font-medium text-white mb-3 mt-6">5.3. What We Do NOT Do:</h3>
             <ul className="list-disc list-inside text-gray-300 space-y-2 ml-4">

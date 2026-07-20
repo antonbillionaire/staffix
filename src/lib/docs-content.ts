@@ -4078,4 +4078,278 @@ AI ham buyurtma qabul qiladi, ham mijozlarni xizmat (bepul konsultatsiya) sifati
 AI әрі тапсырыс қабылдайды, әрі клиенттерді қызмет (тегін кеңес) ретінде жазып алады.`,
     },
   },
+
+  // ===== 27. AI INSIGHTS (Sprint 4C — 20 июля 2026) =====
+  {
+    id: "ai-insights",
+    icon: "Brain",
+    title: {
+      ru: "AI-подсказки для владельца",
+      en: "AI Insights for Owners",
+      uz: "Egasi uchun AI maslahatlar",
+      kz: "Иесі үшін AI кеңестері",
+    },
+    description: {
+      ru: "Раз в неделю AI сам находит слабые места бота",
+      en: "Weekly, AI surfaces bot weak spots",
+      uz: "Haftalik, AI botning zaif joylarini topadi",
+      kz: "Аптасына, AI боттың әлсіз тұстарын табады",
+    },
+    content: {
+      ru: `## AI-подсказки для владельца
+
+Каждый понедельник в 09:00 UTC Staffix анализирует переписки бота с клиентами за прошедшую неделю и выкладывает 4 типа подсказок на странице **AI Обучение → Подсказки**.
+
+### Тип 1 — «Часто спрашивают X»
+
+Клиенты 3+ раз спросили одно и то же, бот ответил «уточните у менеджера». AI кластеризует похожие вопросы в один и предлагает добавить FAQ.
+
+Одна кнопка «Принять» — Staffix создаёт FAQ автоматически. Бот сразу подхватывает новую тему и в следующий раз ответит сам.
+
+### Тип 2 — «Бот часто передаёт менеджеру: X»
+
+Похоже на первый тип, но обращает внимание не на «не знаю», а на явные эскалации: «передам менеджеру», «специалист свяжется». Значит эти вопросы бот **может** решать, если научить его.
+
+Действие: либо добавить FAQ, либо оставить эскалацию, если тема действительно требует человека (медицина, деньги, юр. вопросы).
+
+### Тип 3 — «Бот говорит "не знаю" в X% случаев»
+
+Общий агрегат: если бот больше чем в 20% ответов честно признался что не знает — база знаний слаба в целом. Нужно расширить документы бизнеса или FAQ.
+
+Показывается только если ответов было хотя бы 20 за неделю (иначе — статистический шум).
+
+### Тип 4 — «Клиенты пишут на узбекском, а бот отвечает на русском»
+
+Staffix автоматически определяет язык клиентов и язык ответов бота. Если 30%+ сообщений клиентов приходят не на языке бота — вы получаете подсказку сменить язык бота или расширить инструкции.
+
+Определяются: русский, узбекский (латиница), казахский, английский.
+
+### Как использовать
+
+- Заходите в **AI Обучение → Подсказки** раз в неделю
+- «Принять» → создать FAQ / поменять настройку
+- «Отклонить» → подсказка больше не появится в этой формулировке 14 дней
+
+Все подсказки не дублируются — если по одной теме уже был инсайт, второй раз не создаётся.`,
+      en: `## AI Insights for Owners
+
+Every Monday at 09:00 UTC, Staffix analyses the last week of bot ↔ client conversations and surfaces 4 kinds of insights on the **AI Learning → Insights** page.
+
+### Type 1 — "Clients keep asking X"
+3+ similar questions where the bot said "I don't know". One-click "Accept" creates a FAQ.
+
+### Type 2 — "Bot keeps escalating: X"
+Repeated hand-offs to a manager on similar topics. Either add a FAQ or leave the escalation intentional (medical/financial questions).
+
+### Type 3 — "Bot says 'I don't know' X% of the time"
+Aggregate signal: if >20% of bot replies are refusals over 20+ messages a week, your knowledge base is too thin.
+
+### Type 4 — "Clients write in Uzbek, bot answers in Russian"
+Automatic language detection (ru/kz/uz/en). If ≥30% of client messages are in a different language than the bot's, you're told to switch bot's language or extend its instructions.
+
+Insights are deduplicated for 7–14 days so the same suggestion doesn't reappear every week.`,
+      uz: `## Egasi uchun AI maslahatlar
+
+Har dushanba 09:00 UTC da Staffix o'tgan haftadagi suhbatlarni tahlil qiladi va **AI o'qitish → Maslahatlar** sahifasida 4 xil maslahat chiqaradi.
+
+1. **"Mijozlar tez-tez X so'raydi"** — 3+ o'xshash savol, bot javob bilmagan. Bir marta bosish bilan FAQ yaratiladi.
+2. **"Bot menejerga topshiryapti"** — takroriy topshirishlar. FAQ qo'shing yoki savolni odam hal qilishiga qoldiring.
+3. **"Bot X% javobda 'bilmadim'"** — bilim bazasi zaif ekanligini ko'rsatuvchi umumiy ko'rsatkich.
+4. **"Mijozlar o'zbekcha yozadi, bot ruscha javob beradi"** — til nomuvofiqligi. Bot tilini o'zgartiring.`,
+      kz: `## Иесі үшін AI кеңестері
+
+Әр дүйсенбіде 09:00 UTC Staffix өткен аптадағы диалогтарды талдап, **AI үйрену → Кеңестер** бетінде 4 түрлі кеңес шығарады.
+
+1. **"Клиенттер X сұрайды"** — 3+ ұқсас сұрақ, бот жауап білмеген.
+2. **"Бот менеджерге жиі жібереді"** — қайталанатын тапсырулар.
+3. **"Бот X% жауапта 'білмеймін' дейді"** — білім қоры әлсіз.
+4. **"Клиенттер қазақша жазады, бот орысша жауап береді"** — тіл сәйкессіздігі.`,
+    },
+  },
+
+  // ===== 28. META ADS (Sprint 4D — 20 июля 2026) =====
+  {
+    id: "meta-ads",
+    icon: "BarChart3",
+    title: {
+      ru: "Реклама Meta — свой дашборд",
+      en: "Meta Ads Dashboard",
+      uz: "Meta Reklama boshqaruv paneli",
+      kz: "Meta жарнамасы — өз панелі",
+    },
+    description: {
+      ru: "Spend, CPL, CTR + воронка от клика до продажи",
+      en: "Spend, CPL, CTR + click-to-sale funnel",
+      uz: "Xarajat, CPL, CTR + savdo voronkasi",
+      kz: "Шығын, CPL, CTR + сату воронкасы",
+    },
+    content: {
+      ru: `## Реклама Meta — дашборд владельца
+
+Staffix читает Meta Marketing API и показывает вам реальную стоимость лида и клиента с рекламы в Instagram/Facebook. Не нужно вручную сопоставлять кабинет Meta с базой Staffix.
+
+### Подключение
+
+1. Дашборд → **Каналы → Meta** → блок «Рекламный аккаунт»
+2. Введите Ad Account ID из Meta Ads Manager (например \`123456789\`, без префикса \`act_\`)
+3. Токен доступа берётся из уже подключённого Facebook Login. Если Meta-каналы работают — токен уже есть.
+4. Данные появятся в течение суток (крон раз в день в 08:00 UTC), либо нажмите «Обновить» на странице «Реклама Meta» для ручной синхронизации.
+
+### Что вы видите на странице «Реклама Meta»
+
+- **Плитки KPI**: Потрачено / Клики / CTR / Средний CPL (в валюте вашего рекламного кабинета).
+- **Воронка от рекламы до продажи**: Клики по рекламе → Лиды в IG/FB → Клиенты (три большие цифры + процент конверсии между ними).
+- **Таблица по кампаниям**: Название / Показы / Клики / CTR / Потрачено / Лиды / CPL / Клиентов. Отсортировано по потраченной сумме.
+- **Период**: неделя / месяц / всё время.
+
+### Как считается атрибуция
+
+Каждый день Staffix проверяет: сколько лидов пришло в этом бизнесе через IG/FB в этот день. Именно эти цифры складываются как «атрибуция» к кампаниям того дня.
+
+**Важное ограничение**: разбивка по конкретной кампании (например «эта продажа с кампании А, эта с Б») пока не делается — все лиды дня записываются во все кампании этого дня. Точная UTM-атрибуция потребует отдельного трекинга ссылок.
+
+### Как оценить эффективность
+
+- **CPL** (стоимость лида) — сколько $ вы тратите на одно новое обращение в IG/FB. Норма зависит от ниши; клиника — $5-20, курсы — $2-10, доставка еды — $1-5.
+- **CTR** — процент кликов от показов. Ниже 1% — креатив слабый; выше 3% — отличный.
+- **Воронка Клик → Лид** — сколько людей от кликнувших реально написали в директ. Ниже 3% — оффер в объявлении не совпадает с оффером на странице.
+- **Воронка Лид → Клиент** — сколько написавших дошли до сделки. Ниже 10% — бот теряет клиентов (посмотрите AI-подсказки).
+
+### Ограничения (для честности)
+
+- Только Meta. TikTok / Google Ads — в планах.
+- Разбивка per-campaign не делается. Все лиды дня видны во всех кампаниях этого дня.
+- Данные обновляются раз в сутки. Кнопка «Обновить» — если срочно.`,
+      en: `## Meta Ads Dashboard
+
+Staffix pulls Meta Marketing API and shows you the real cost of a lead and a client from your Instagram/Facebook ads. No more spreadsheets.
+
+### Setup
+1. Dashboard → **Channels → Meta** → "Ad Account" block
+2. Enter Ad Account ID from Meta Ads Manager (e.g. \`123456789\`, no \`act_\` prefix)
+3. Access token is taken from your already-connected Facebook Login
+4. Data arrives within a day (daily cron 08:00 UTC) or click "Refresh" on the Meta Ads page
+
+### What you see
+- KPIs: Spend / Clicks / CTR / Average CPL
+- **Funnel**: Ad clicks → IG/FB leads → Clients
+- **Campaign table** sorted by spend
+- Period switch: week / month / all time
+
+### Attribution note
+Per-day, all IG/FB leads are attributed to all campaigns of that day. Per-campaign UTM tracking would need separate infrastructure.`,
+      uz: `## Meta Reklama boshqaruv paneli
+
+Staffix Meta Marketing API dan ma'lumot oladi va Instagram/Facebook reklamasidan lid va mijoz haqiqiy narxini ko'rsatadi.
+
+**Ulash**: Boshqaruv paneli → **Kanallar → Meta** → "Reklama akkaunti" bo'limi → Meta Ads Manager dan Ad Account ID ni kiriting.
+
+Ma'lumot 24 soat ichida paydo bo'ladi (kunlik cron 08:00 UTC) yoki "Yangilash" tugmasini bosing.`,
+      kz: `## Meta жарнамасы — иесінің панелі
+
+Staffix Meta Marketing API-дан деректерді оқып, Instagram/Facebook жарнамасынан лид пен клиенттің нақты құнын көрсетеді.
+
+**Қосу**: Панель → **Арналар → Meta** → «Жарнама аккаунты» блогы → Meta Ads Manager-ден Ad Account ID енгізіңіз.
+
+Деректер 24 сағат ішінде пайда болады (күнделікті крон 08:00 UTC) немесе «Жаңарту» түймесін басыңыз.`,
+    },
+  },
+
+  // ===== 29. LOYALTY LEDGER (Sprint 4E — 20 июля 2026) =====
+  {
+    id: "loyalty-ledger",
+    icon: "Users",
+    title: {
+      ru: "История баллов лояльности",
+      en: "Loyalty Points History",
+      uz: "Sodiqlik ballari tarixi",
+      kz: "Адалдық ұпайларының тарихы",
+    },
+    description: {
+      ru: "Каждое начисление и списание записывается с причиной",
+      en: "Every earn and spend recorded with reason",
+      uz: "Har bir yig'ish va sarflash sabab bilan yoziladi",
+      kz: "Әр есептеу мен алу себебімен жазылады",
+    },
+    content: {
+      ru: `## История баллов лояльности
+
+Раньше вы видели только текущий баланс баллов клиента. Теперь каждое движение баллов записывается отдельно с указанием **за что** и **когда**.
+
+### Где смотреть
+
+Карточка клиента (\`/dashboard/customers/[id]\`) → блок «Баллы лояльности» с иконкой подарка.
+
+Показывает:
+- Текущий баланс
+- Количество визитов клиента
+- Общую сумму покупок
+- **Историю движений** — до 100 последних операций
+
+### Типы движений
+
+- **Начислено** — за визит, покупку или бронирование. AI записывает автоматически с указанием причины: «Кэшбек за услугу маникюр (5%)».
+- **Потрачено** — списание, когда клиент оплачивает баллами (в будущих версиях).
+- **Сгорело** — сгорание по срокам программы (крон в будущем).
+- **Вручную** — начисление/списание от менеджера с комментарием.
+
+### Ручное начисление от менеджера
+
+В блоке «Баллы лояльности» на карточке клиента:
+1. Введите количество баллов
+2. Комментарий (необязательно, но рекомендуется — «Компенсация за задержку»)
+3. Кнопка «Начислить» или «Списать»
+
+**Защита**: ±100 000 за операцию (защита от опечатки). Баланс не может уйти в минус — если попытаетесь списать больше чем есть, спишется сколько было.
+
+### Зачем это нужно
+
+**Прозрачность**: клиент спрашивает «за что мне 500 баллов?» — вы открываете его карточку и видите точную запись.
+
+**Аудит**: если что-то пошло не так (двойное начисление, ошибочное списание) — есть точная история для разбора.
+
+**Обоснование**: менеджер помечает *почему* начислил бонусные баллы («извинение за задержку»). Через месяц вы или бухгалтерия видите обоснование.
+
+### Ограничения
+
+- История ведётся с 20 июля 2026 (backfill старых движений не делали — их не разобрать).
+- Баланс до этой даты просто равен «сумме приращений на 20 июля».`,
+      en: `## Loyalty Points History
+
+Previously you saw only the current balance. Now every earn/spend is recorded with a reason.
+
+### Where
+Customer card (\`/dashboard/customers/[id]\`) → "Loyalty Points" block.
+
+### Kinds
+- **earn** — for visit/purchase/booking. AI writes automatically with reason: "Cashback for manicure (5%)".
+- **spend** — points used as payment (future).
+- **expire** — automatic burn per program terms (future cron).
+- **manual** — manager credit/debit with comment.
+- **adjustment** — technical fix (migration).
+
+### Manual credit
+Enter amount + optional reason, click "Credit" or "Debit". Bounded at ±100,000 per operation. Balance can't go negative.
+
+Point-in-time note: history starts 20 July 2026 (no backfill of old movements).`,
+      uz: `## Sodiqlik ballari tarixi
+
+Ilgari faqat joriy balansni ko'rgansiz. Endi har bir ball harakati sabab bilan yoziladi.
+
+Mijoz kartochkasi (\`/dashboard/customers/[id]\`) → "Sodiqlik ballari" bloki.
+
+**Turlari**: earn (yig'ish), spend (sarflash), expire (kuyib ketish), manual (qo'lda menejer), adjustment (tuzatish).
+
+Menejerdan qo'lda: miqdor + izoh → "Yig'ish" yoki "Sarflash". Chegara ±100 000. Salbiy balans mumkin emas.`,
+      kz: `## Адалдық ұпайларының тарихы
+
+Бұрын тек ағымдағы теңгерімді көретінсіз. Енді әр ұпай қозғалысы себебімен жазылады.
+
+Клиент картасы (\`/dashboard/customers/[id]\`) → «Адалдық ұпайлары» блогы.
+
+**Түрлері**: earn (есептеу), spend (жұмсау), expire (жанып кету), manual (менеджерден қолмен), adjustment (түзету).
+
+Менеджерден қолмен: сан + пікір → «Есептеу» немесе «Алу». Шектеу ±100 000. Теріс теңгерім мүмкін емес.`,
+    },
+  },
 ];
