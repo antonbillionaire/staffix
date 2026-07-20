@@ -73,6 +73,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "name and serviceIds required" }, { status: 400 });
     }
 
+    // Валидация скидки/цены — без этого можно было отправить -50 (скидка
+    // на 150%) или 999 → пакет становился дороже отдельных услуг или уходил
+    // в отрицательную цену.
+    const discountNum = discountPercent != null ? Number(discountPercent) : null;
+    if (discountNum !== null && (!Number.isFinite(discountNum) || discountNum < 0 || discountNum > 100)) {
+      return NextResponse.json({ error: "discountPercent должен быть 0-100" }, { status: 400 });
+    }
+    const fixedPriceNum = fixedPrice != null ? Number(fixedPrice) : null;
+    if (fixedPriceNum !== null && (!Number.isFinite(fixedPriceNum) || fixedPriceNum < 0)) {
+      return NextResponse.json({ error: "fixedPrice не может быть отрицательным" }, { status: 400 });
+    }
+
     // Verify all services belong to this business
     const services = await prisma.service.findMany({
       where: { id: { in: serviceIds }, businessId },
@@ -87,8 +99,8 @@ export async function POST(request: NextRequest) {
         name: name.trim(),
         description: description?.trim() || null,
         discountType: discountType || "percent",
-        discountPercent: discountPercent ? Number(discountPercent) : null,
-        fixedPrice: fixedPrice ? Math.round(Number(fixedPrice)) : null,
+        discountPercent: discountNum,
+        fixedPrice: fixedPriceNum !== null ? Math.round(fixedPriceNum) : null,
         autoSuggest: autoSuggest !== false,
         isActive: true,
         businessId,

@@ -31,6 +31,21 @@ export async function PUT(
     const pkg = await prisma.servicePackage.findFirst({ where: { id, businessId } });
     if (!pkg) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    // Валидация границ (см. POST /api/packages) — тот же вектор проблемы
+    // через PATCH (-50, 200, отрицательная фиксированная цена и т.п.).
+    if (discountPercent !== undefined && discountPercent !== null) {
+      const n = Number(discountPercent);
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        return NextResponse.json({ error: "discountPercent должен быть 0-100" }, { status: 400 });
+      }
+    }
+    if (fixedPrice !== undefined && fixedPrice !== null) {
+      const n = Number(fixedPrice);
+      if (!Number.isFinite(n) || n < 0) {
+        return NextResponse.json({ error: "fixedPrice не может быть отрицательным" }, { status: 400 });
+      }
+    }
+
     // Update package fields
     const updated = await prisma.servicePackage.update({
       where: { id },
