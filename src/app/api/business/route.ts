@@ -46,7 +46,12 @@ export async function GET() {
     const todayEnd = new Date(todayStart);
     todayEnd.setDate(todayEnd.getDate() + 1);
 
-    const [bookingsToday, totalClients] = await Promise.all([
+    // Counts подгружаются отдельно чтобы не тащить полные массивы через
+    // include (услуг/сотрудников/FAQ может быть много). Getting Started
+    // раньше проверял business.services?.length от findFirst без include —
+    // всегда получал undefined и рисовал шаг «не сделано» даже когда всё
+    // настроено. Теперь фронт использует counts.* для решения.
+    const [bookingsToday, totalClients, servicesCount, staffCount, faqsCount, productsCount] = await Promise.all([
       prisma.booking.count({
         where: {
           businessId: business.id,
@@ -57,6 +62,10 @@ export async function GET() {
       prisma.client.count({
         where: { businessId: business.id },
       }),
+      prisma.service.count({ where: { businessId: business.id } }),
+      prisma.staff.count({ where: { businessId: business.id } }),
+      prisma.fAQ.count({ where: { businessId: business.id } }),
+      prisma.product.count({ where: { businessId: business.id } }),
     ]);
 
     // Маскируем ВСЕ секретные токены (июль 2026 P0 security fix).
@@ -90,6 +99,12 @@ export async function GET() {
         hasMetaUserAccessToken: !!business.metaUserAccessToken,
       },
       stats: { bookingsToday, totalClients },
+      counts: {
+        services: servicesCount,
+        staff: staffCount,
+        faqs: faqsCount,
+        products: productsCount,
+      },
       isAdmin: isAdmin(session?.user?.email),
     });
   } catch (error) {

@@ -32,10 +32,13 @@ interface Business {
   dashboardMode?: string;
   botToken: string | null;
   botActive: boolean;
-  services?: { id: string }[];
-  staff?: { id: string }[];
-  faqs?: { id: string }[];
-  products?: { id: string }[];
+}
+
+interface Counts {
+  services: number;
+  staff: number;
+  faqs: number;
+  products: number;
 }
 
 interface Step {
@@ -57,6 +60,7 @@ export default function GettingStartedPage() {
   const isDark = theme === "dark";
 
   const [business, setBusiness] = useState<Business | null>(null);
+  const [counts, setCounts] = useState<Counts>({ services: 0, staff: 0, faqs: 0, products: 0 });
   const [loading, setLoading] = useState(true);
   const [expandedTips, setExpandedTips] = useState<string[]>([]);
 
@@ -71,6 +75,7 @@ export default function GettingStartedPage() {
       .then((r) => r.json())
       .then((data) => {
         setBusiness(data.business || data);
+        if (data.counts) setCounts(data.counts);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -212,10 +217,14 @@ export default function GettingStartedPage() {
   const steps: Step[] = baseSteps.map((s) => {
     let done = false;
     if (business) {
-      if (s.id === "services") done = (business.services?.length ?? 0) > 0;
-      else if (s.id === "staff") done = (business.staff?.length ?? 0) > 0;
-      else if (s.id === "faq") done = (business.faqs?.length ?? 0) > 0;
-      else if (s.id === "products") done = (business.products?.length ?? 0) > 0;
+      // B3 fix: /api/business возвращает counts.* — раньше страница читала
+      // business.services/staff/faqs/products как relation-массивы, но
+      // findFirst не грузит эти relations, счётчики всегда были 0 → все шаги
+      // показывались "не сделано" даже когда всё настроено.
+      if (s.id === "services") done = counts.services > 0;
+      else if (s.id === "staff") done = counts.staff > 0;
+      else if (s.id === "faq") done = counts.faqs > 0;
+      else if (s.id === "products") done = counts.products > 0;
       else if (s.id === "bot") done = business.botActive;
     }
     return { ...s, done };

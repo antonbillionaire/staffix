@@ -74,13 +74,30 @@ export async function sendOwnerNotification(
     // Plain text version (strip HTML tags for non-Telegram channels)
     const plain = plainText || text.replace(/<[^>]+>/g, "");
 
+    // 0. Dashboard bell (fallback канал — ВСЕГДА, до TG/WA).
+    //
+    // M34: раньше при отвале TG (владелец заблокировал бота, потерял чат,
+    // не сделал /start) уведомление уходило в никуда — Notification в БД
+    // не создавалось, колокольчик в дашборде пустой. Владелец пропускал
+    // важные события. Теперь bell пишется независимо от результата TG/WA —
+    // если наружные каналы упадут, владелец всё равно увидит запись в
+    // /dashboard/notifications при следующем входе.
+    prisma.notification.create({
+      data: {
+        businessId,
+        type: "owner_notify",
+        title: plain.slice(0, 200),
+        message: text,
+      },
+    }).catch((err) => console.error("Owner notify bell error:", err));
+
     // 1. Telegram (primary)
     if (business.botToken && business.ownerTelegramChatId) {
       sendTelegramMsg(business.botToken, business.ownerTelegramChatId, text).catch(
         (err) => console.error("Owner notify TG error:", err)
       );
     } else if (!business.ownerTelegramChatId) {
-      console.warn(`[Notify] Owner of business ${businessId} has no Telegram chatId — notification skipped`);
+      console.warn(`[Notify] Owner of business ${businessId} has no Telegram chatId — TG skipped (bell still saved)`);
     }
 
     // 2. WhatsApp (if connected and owner phone is available)
