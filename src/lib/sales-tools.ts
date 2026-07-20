@@ -13,6 +13,7 @@ import { getPaymentButtons } from "./payment-links";
 import { sendOwnerNotification } from "./notifications";
 import { promoteDealStageByTelegram } from "./deal-pipeline";
 import { logActivityFireAndForget } from "./activity-log";
+import { writeLoyaltyLedger } from "./loyalty-ledger";
 
 const LOW_STOCK_THRESHOLD = 5;
 
@@ -1127,12 +1128,14 @@ export async function createOrder(
     // чтобы программа "каждый N-й визит — награда" реально считалась.
     // notifyLoyaltyMilestone дальше проверит порог и создаст Notification.
     if (client) {
+      // Sprint 4E: loyaltyTotalSpent/loyaltyVisits — прямой increment (не ledger).
+      // Начисление баллов cashback идёт через writeLoyaltyLedger чтобы владелец
+      // видел «за что клиенту начислили эти баллы» в истории.
       const updated = await prisma.client.update({
         where: { id: client.id },
         data: {
           loyaltyTotalSpent: { increment: finalPrice },
           loyaltyVisits: { increment: 1 },
-          ...(cashbackEarned > 0 ? { loyaltyPoints: { increment: cashbackEarned } } : {}),
         },
         select: { id: true, name: true, loyaltyVisits: true },
       }).catch((e) => {
@@ -1140,6 +1143,17 @@ export async function createOrder(
         return null;
       });
       if (updated) {
+        if (cashbackEarned > 0) {
+          await writeLoyaltyLedger({
+            businessId,
+            clientId: updated.id,
+            kind: "earn",
+            points: cashbackEarned,
+            reason: `Кэшбек за заказ (${cashbackPercent}%)`,
+            relatedId: order.id,
+            createdBy: "system",
+          }).catch((e) => console.error("[Cashback] Failed to write ledger:", e));
+        }
         const { notifyLoyaltyMilestone } = await import("./booking-tools");
         notifyLoyaltyMilestone(businessId, updated).catch((e) =>
           console.error("[Loyalty] milestone notify failed:", e)

@@ -19,6 +19,9 @@ import {
   DollarSign,
   User,
   Send,
+  Gift,
+  Plus,
+  Minus,
 } from "lucide-react";
 import ChannelBadge from "@/components/ChannelBadge";
 
@@ -90,6 +93,27 @@ export default function CustomerDetailPage({
   const [notesEditing, setNotesEditing] = useState(false);
   const [notesDraft, setNotesDraft] = useState("");
   const [notesSaving, setNotesSaving] = useState(false);
+
+  // Sprint 4E (M28) — Loyalty Ledger в карточке клиента
+  interface LedgerEntry {
+    id: string;
+    kind: string;
+    points: number;
+    reason: string | null;
+    relatedId: string | null;
+    createdBy: string | null;
+    createdAt: string;
+  }
+  const [loyalty, setLoyalty] = useState<{
+    balance: number;
+    visits: number;
+    totalSpent: number;
+    entries: LedgerEntry[];
+  } | null>(null);
+  const [loyaltyAmount, setLoyaltyAmount] = useState("");
+  const [loyaltyReason, setLoyaltyReason] = useState("");
+  const [loyaltySaving, setLoyaltySaving] = useState(false);
+  const [loyaltyError, setLoyaltyError] = useState<string | null>(null);
   const initialTab = searchParams.get("tab");
   const bookingsRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -132,6 +156,13 @@ export default function CustomerDetailPage({
       } else if (res.status === 404) {
         router.push("/dashboard/customers");
       }
+      // Sprint 4E: подгружаем историю лояльности параллельно
+      fetch(`/api/customers/${id}/loyalty`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((l) => {
+          if (l) setLoyalty(l);
+        })
+        .catch(() => {});
     } catch (error) {
       console.error("Error fetching customer:", error);
     } finally {
@@ -608,6 +639,167 @@ export default function CustomerDetailPage({
                       </option>
                     ))}
                   </select>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Sprint 4E (M28): Программа лояльности — история и ручное начисление */}
+          <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={`text-lg font-semibold ${textPrimary} flex items-center gap-2`}>
+                <Gift className="h-5 w-5 text-pink-500" />
+                Баллы лояльности
+              </h2>
+              <div className="text-right">
+                <p className={`text-2xl font-bold ${textPrimary}`}>
+                  {loyalty?.balance ?? 0}
+                </p>
+                <p className={`text-xs ${textTertiary}`}>
+                  {loyalty?.visits ?? 0} визитов • потрачено {loyalty?.totalSpent ?? 0}
+                </p>
+              </div>
+            </div>
+
+            {/* Ручное начисление / списание */}
+            <div className="mb-4">
+              <div className="flex flex-col md:flex-row gap-2">
+                <input
+                  type="number"
+                  value={loyaltyAmount}
+                  onChange={(e) => setLoyaltyAmount(e.target.value)}
+                  placeholder="Количество баллов"
+                  min="1"
+                  max="100000"
+                  className={`flex-1 px-3 py-2 rounded-lg border ${borderColor} ${itemBg} ${textPrimary} text-sm`}
+                />
+                <input
+                  type="text"
+                  value={loyaltyReason}
+                  onChange={(e) => setLoyaltyReason(e.target.value)}
+                  placeholder="Комментарий (необязательно)"
+                  maxLength={200}
+                  className={`flex-1 px-3 py-2 rounded-lg border ${borderColor} ${itemBg} ${textPrimary} text-sm`}
+                />
+                <button
+                  onClick={async () => {
+                    const n = parseInt(loyaltyAmount, 10);
+                    if (!Number.isFinite(n) || n <= 0) {
+                      setLoyaltyError("Введите положительное число");
+                      return;
+                    }
+                    setLoyaltySaving(true);
+                    setLoyaltyError(null);
+                    try {
+                      const res = await fetch(`/api/customers/${id}/loyalty`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "addPoints", amount: n, reason: loyaltyReason || null }),
+                      });
+                      if (!res.ok) {
+                        setLoyaltyError((await res.json())?.error || "Ошибка");
+                      } else {
+                        setLoyaltyAmount("");
+                        setLoyaltyReason("");
+                        const l = await fetch(`/api/customers/${id}/loyalty`).then((r) => r.json());
+                        setLoyalty(l);
+                      }
+                    } catch (e) {
+                      setLoyaltyError(e instanceof Error ? e.message : "Ошибка");
+                    } finally {
+                      setLoyaltySaving(false);
+                    }
+                  }}
+                  disabled={loyaltySaving}
+                  className="px-3 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50 inline-flex items-center gap-1"
+                >
+                  <Plus className="h-4 w-4" /> Начислить
+                </button>
+                <button
+                  onClick={async () => {
+                    const n = parseInt(loyaltyAmount, 10);
+                    if (!Number.isFinite(n) || n <= 0) {
+                      setLoyaltyError("Введите положительное число");
+                      return;
+                    }
+                    setLoyaltySaving(true);
+                    setLoyaltyError(null);
+                    try {
+                      const res = await fetch(`/api/customers/${id}/loyalty`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "subtractPoints", amount: n, reason: loyaltyReason || null }),
+                      });
+                      if (!res.ok) {
+                        setLoyaltyError((await res.json())?.error || "Ошибка");
+                      } else {
+                        setLoyaltyAmount("");
+                        setLoyaltyReason("");
+                        const l = await fetch(`/api/customers/${id}/loyalty`).then((r) => r.json());
+                        setLoyalty(l);
+                      }
+                    } catch (e) {
+                      setLoyaltyError(e instanceof Error ? e.message : "Ошибка");
+                    } finally {
+                      setLoyaltySaving(false);
+                    }
+                  }}
+                  disabled={loyaltySaving}
+                  className="px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 inline-flex items-center gap-1"
+                >
+                  <Minus className="h-4 w-4" /> Списать
+                </button>
+              </div>
+              {loyaltyError && (
+                <p className="text-xs text-red-500 mt-2">{loyaltyError}</p>
+              )}
+            </div>
+
+            {/* История */}
+            <div>
+              <p className={`text-xs font-medium ${textSecondary} mb-2`}>История движений</p>
+              {(!loyalty || loyalty.entries.length === 0) ? (
+                <p className={`${textTertiary} text-sm py-2`}>
+                  Пока нет движений баллов
+                </p>
+              ) : (
+                <div className="space-y-1 max-h-64 overflow-y-auto">
+                  {loyalty.entries.map((e) => {
+                    const label =
+                      e.kind === "earn"
+                        ? "Начислено"
+                        : e.kind === "spend"
+                        ? "Потрачено"
+                        : e.kind === "expire"
+                        ? "Сгорело"
+                        : e.kind === "manual"
+                        ? "Вручную"
+                        : "Правка";
+                    const sign = e.points >= 0 ? "+" : "";
+                    const color = e.points >= 0 ? "text-green-500" : "text-red-500";
+                    return (
+                      <div
+                        key={e.id}
+                        className={`flex items-center justify-between px-3 py-2 rounded ${itemBg}`}
+                      >
+                        <div>
+                          <p className={`text-sm ${textPrimary}`}>
+                            <span className={`font-medium ${color}`}>
+                              {sign}
+                              {e.points}
+                            </span>{" "}
+                            <span className={textSecondary}>· {label}</span>
+                          </p>
+                          {e.reason && (
+                            <p className={`text-xs ${textTertiary}`}>{e.reason}</p>
+                          )}
+                        </div>
+                        <p className={`text-xs ${textTertiary}`}>
+                          {new Date(e.createdAt).toLocaleDateString("ru-RU")}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

@@ -9,6 +9,7 @@ import { sendBookingNotification } from "./notifications";
 import { dispatchCrmEvent } from "./crm-integrations";
 import { promoteDealStageByTelegram } from "./deal-pipeline";
 import { pickStaffForNewLead } from "./lead-assignment";
+import { writeLoyaltyLedger } from "./loyalty-ledger";
 
 // ========================================
 // TYPES
@@ -772,7 +773,7 @@ export async function createBooking(
     if (clientTelegramId && servicePrice > 0) {
       const loyaltyClient = await prisma.client.findUnique({
         where: { businessId_telegramId: { businessId, telegramId: clientTelegramId } },
-        select: { loyaltyCashbackPercent: true, loyaltyTier: true, loyaltyTotalSpent: true },
+        select: { id: true, loyaltyCashbackPercent: true, loyaltyTier: true, loyaltyTotalSpent: true },
       });
 
       if (loyaltyClient) {
@@ -811,15 +812,26 @@ export async function createBooking(
         finalPrice = servicePrice - discountAmount;
         cashbackEarned = cashbackPercent > 0 ? Math.round(finalPrice * cashbackPercent / 100) : 0;
 
-        // Award cashback
-        if (cashbackEarned > 0) {
-          prisma.client.update({
-            where: { businessId_telegramId: { businessId, telegramId: clientTelegramId } },
-            data: {
-              loyaltyPoints: { increment: cashbackEarned },
-              loyaltyTotalSpent: { increment: finalPrice },
-            },
-          }).catch(() => {});
+        // Award cashback + write ledger entry (Sprint 4E).
+        // loyaltyTotalSpent обновляем прямым update (не ledger — это отдельная
+        // метрика), а начисление баллов идёт через ledger чтобы владелец видел
+        // «за что клиент получил эти баллы» в истории карточки клиента.
+        if (cashbackEarned > 0 && loyaltyClient.id) {
+          await Promise.allSettled([
+            prisma.client.update({
+              where: { id: loyaltyClient.id },
+              data: { loyaltyTotalSpent: { increment: finalPrice } },
+            }),
+            writeLoyaltyLedger({
+              businessId,
+              clientId: loyaltyClient.id,
+              kind: "earn",
+              points: cashbackEarned,
+              reason: `Кэшбек за услугу «${serviceName}» (${cashbackPercent}%)`,
+              relatedId: booking.id,
+              createdBy: "system",
+            }),
+          ]);
         }
       }
     }

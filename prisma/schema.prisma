@@ -243,6 +243,7 @@ model Business {
   aiInsightRecords AiInsight[]
   metaInsights     MetaInsight[]   @relation("MetaInsightBusiness")
   adInsights       AdCampaignInsight[] @relation("AdInsightBusiness")
+  loyaltyLedger    LoyaltyLedger[] @relation("LoyaltyLedgerBusiness")
 
   // Программы лояльности (может быть несколько типов)
   loyaltyPrograms LoyaltyProgram[]
@@ -887,6 +888,9 @@ model Client {
 
   // Задачи привязанные к клиенту (Task.clientId → SetNull при удалении клиента)
   tasks Task[] @relation("TaskClient")
+
+  // Sprint 4E (M28) — история движений баллов лояльности
+  loyaltyLedger LoyaltyLedger[] @relation("LoyaltyLedgerClient")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1647,6 +1651,37 @@ model MetaInsight {
   @@index([status, severity])
   @@index([type, createdAt])
   @@index([businessId])
+}
+
+// Sprint 4E (M28) — Loyalty Ledger.
+// История движений баллов лояльности. Client.loyaltyPoints — быстрое
+// счётное поле (denormalized), а LoyaltyLedger — источник правды для
+// аудита и потенциального пересчёта. kind:
+//   earn      — начисление за визит/покупку (Booking/Order)
+//   spend     — списание при использовании баллов
+//   expire    — сгорание по срокам программы
+//   manual    — ручное начисление от менеджера (bonus)
+//   adjustment— техническая корректировка (migration/backfill)
+model LoyaltyLedger {
+  id String @id @default(cuid())
+
+  businessId String
+  business   Business @relation("LoyaltyLedgerBusiness", fields: [businessId], references: [id], onDelete: Cascade)
+
+  clientId String
+  client   Client @relation("LoyaltyLedgerClient", fields: [clientId], references: [id], onDelete: Cascade)
+
+  kind   String // earn | spend | expire | manual | adjustment
+  points Int // signed: +N начисление, -N списание/сгорание
+
+  reason    String? // человекочитаемое описание для истории
+  relatedId String? // id связанной сущности: Booking / Order / ...
+  createdBy String? // "system" | staff.id | "manager"
+
+  createdAt DateTime @default(now())
+
+  @@index([businessId, clientId, createdAt])
+  @@index([businessId, createdAt])
 }
 
 // Sprint 4D (M18) — снимок агрегатов рекламной кампании Meta за день.
