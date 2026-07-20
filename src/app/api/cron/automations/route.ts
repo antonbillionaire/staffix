@@ -4,6 +4,7 @@ import {
   processReviewRequests,
   processReactivation,
 } from "@/lib/automation";
+import { checkCronAuth } from "@/lib/cron-auth";
 // Subscription reminders live in their own daily cron
 // (/api/cron/subscription-reminders) — that path respects the
 // notifyTrialEnding user setting and covers both trial+cancelled cohorts.
@@ -14,10 +15,8 @@ export const maxDuration = 300;
 export async function GET(request: Request) {
   try {
     // Verify cron secret
-    const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const cronAuth = checkCronAuth(request);
+  if (!cronAuth.ok) return cronAuth.response!;
 
     console.log("[CRON] Starting automation jobs...");
 

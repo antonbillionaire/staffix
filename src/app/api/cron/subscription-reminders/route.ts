@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendSubscriptionReminder } from "@/lib/email";
 import { getPlan, type PlanId } from "@/lib/plans";
+import { checkCronAuth } from "@/lib/cron-auth";
 
 // Vercel Cron — runs daily at 09:00 UTC. Sends 7-day / 3-day / 1-day
 // reminders before access ends.
@@ -21,10 +22,8 @@ export const maxDuration = 60;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const cronAuth = checkCronAuth(request);
+  if (!cronAuth.ok) return cronAuth.response!;
 
   const now = new Date();
 

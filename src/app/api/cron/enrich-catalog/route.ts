@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { enrichProduct } from "@/lib/catalog-enricher";
+import { checkCronAuth } from "@/lib/cron-auth";
 
 export const maxDuration = 60;
 
@@ -18,10 +19,8 @@ const PER_BUSINESS_LIMIT = 30;
 const MAX_BUSINESSES_PER_RUN = 5;
 
 export async function POST(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const cronAuth = checkCronAuth(request);
+  if (!cronAuth.ok) return cronAuth.response!;
 
   try {
     // Ищем бизнесы у которых есть активные товары с пустыми тегами

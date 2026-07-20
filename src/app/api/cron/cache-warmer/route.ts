@@ -33,6 +33,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { warmChannelCache } from "@/lib/channel-ai";
+import { checkCronAuth } from "@/lib/cron-auth";
 
 export const maxDuration = 300;
 
@@ -42,10 +43,8 @@ const MAX_BUSINESSES_PER_RUN = 100; // safety cap
 const SUPPORTED_CHANNELS = ["instagram", "whatsapp", "facebook"] as const;
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const cronAuth = checkCronAuth(request);
+  if (!cronAuth.ok) return cronAuth.response!;
 
   const startedAt = new Date();
   const since = new Date(Date.now() - WARM_LOOKBACK_DAYS * 86_400 * 1000);

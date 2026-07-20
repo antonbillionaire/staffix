@@ -5,16 +5,15 @@ import {
   sendDripChannelReminder,
   sendDripReengageReminder,
 } from "@/lib/email";
+import { checkCronAuth } from "@/lib/cron-auth";
 
 export const maxDuration = 300;
 
 // Vercel Cron — runs daily at 10:00 UTC
 export async function GET(request: NextRequest) {
   // Verify cron secret
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const cronAuth = checkCronAuth(request);
+  if (!cronAuth.ok) return cronAuth.response!;
 
   const now = new Date();
   let sent = 0;

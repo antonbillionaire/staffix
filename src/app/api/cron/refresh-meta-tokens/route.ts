@@ -9,16 +9,15 @@ import { prisma } from "@/lib/prisma";
 import { refreshLongLivedToken, getUserPages } from "@/lib/meta-oauth";
 import { cleanupWebhookDedup } from "@/lib/webhook-dedup";
 import { encrypt, decrypt } from "@/lib/crypto";
+import { checkCronAuth } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 export async function GET(request: Request) {
   // Verify cron secret (Vercel sends Authorization header)
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  const cronAuth = checkCronAuth(request);
+  if (!cronAuth.ok) return cronAuth.response!;
 
   const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 

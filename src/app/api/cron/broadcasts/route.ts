@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { sendAutomationMessage } from "@/lib/automation";
 import { sendClientBroadcastEmail } from "@/lib/email";
 import { randomBytes } from "crypto";
+import { checkCronAuth } from "@/lib/cron-auth";
 
 export const maxDuration = 300;
 
@@ -36,10 +37,8 @@ function getOrCreateUnsubscribeToken(existing: string | null): string {
 }
 
 export async function POST(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const cronAuth = checkCronAuth(request);
+  if (!cronAuth.ok) return cronAuth.response!;
 
   try {
     const now = new Date();

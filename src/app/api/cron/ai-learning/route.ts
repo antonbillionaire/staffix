@@ -12,6 +12,7 @@ import {
   generateChannelConversationSummary,
   updateChannelClientSummary,
 } from "@/lib/channel-memory";
+import { checkCronAuth } from "@/lib/cron-auth";
 
 export const maxDuration = 300;
 
@@ -19,10 +20,8 @@ const MAX_CONVERSATIONS = 20;
 
 export async function POST(request: Request) {
   // Verify cron secret
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const cronAuth = checkCronAuth(request);
+  if (!cronAuth.ok) return cronAuth.response!;
 
   try {
     const results = {

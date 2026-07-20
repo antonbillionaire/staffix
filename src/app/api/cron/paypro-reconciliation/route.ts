@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendTelegramNotification } from "@/lib/email";
+import { checkCronAuth } from "@/lib/cron-auth";
 
 // Vercel Cron — runs hourly. Detects subscriptions whose paid period ended
 // but our DB still shows them active because a PayPro webhook (TERMINATED /
@@ -13,10 +14,8 @@ import { sendTelegramNotification } from "@/lib/email";
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const cronAuth = checkCronAuth(request);
+  if (!cronAuth.ok) return cronAuth.response!;
 
   const now = new Date();
   // 30-min grace window — PayPro webhooks normally arrive within seconds, but

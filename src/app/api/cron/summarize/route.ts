@@ -15,6 +15,7 @@ import {
   updateClientSummary,
   extractCustomFieldsFromConversation,
 } from "@/lib/ai-memory";
+import { checkCronAuth } from "@/lib/cron-auth";
 
 // Максимум обработок за один запуск (чтобы не превысить timeout)
 const MAX_CONVERSATIONS = 10;
@@ -22,10 +23,8 @@ const MAX_CLIENTS = 5;
 
 export async function GET(request: Request) {
   // Verify cron secret
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const cronAuth = checkCronAuth(request);
+  if (!cronAuth.ok) return cronAuth.response!;
 
   try {
     const results = {

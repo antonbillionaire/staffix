@@ -16,6 +16,7 @@
 export const maxDuration = 300;
 
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { markWebhookProcessed } from "@/lib/webhook-dedup";
@@ -149,7 +150,16 @@ export async function POST(request: NextRequest) {
       );
       return NextResponse.json({ error: "Webhook secret not configured" }, { status: 403 });
     }
-    if (!receivedToken || receivedToken !== business.webhookSecret) {
+    // Timing-safe сравнение защищает от side-channel атак по времени
+    // (не даёт атакующему угадывать секрет по разнице latency).
+    if (
+      !receivedToken ||
+      receivedToken.length !== business.webhookSecret.length ||
+      !timingSafeEqual(
+        Buffer.from(receivedToken, "utf8"),
+        Buffer.from(business.webhookSecret, "utf8")
+      )
+    ) {
       console.error(`Telegram webhook: invalid secret_token for businessId=${businessId}`);
       return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
     }

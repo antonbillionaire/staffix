@@ -27,6 +27,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { sendInstagramMessage, sendWhatsAppMessage } from "@/lib/sales-bot/meta-api";
+import { checkCronAuth } from "@/lib/cron-auth";
 
 export const maxDuration = 60;
 
@@ -132,10 +133,8 @@ async function generateNudge(history: HistoryMessage[]): Promise<string | null> 
 }
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const cronAuth = checkCronAuth(request);
+  if (!cronAuth.ok) return cronAuth.response!;
 
   const now = new Date();
   const startedAt = now.getTime();

@@ -10,6 +10,25 @@ import { sendFBMessage } from "./facebook-utils";
 import { decrypt } from "./crypto";
 
 // ========================================
+// HTML ESCAPING FOR TELEGRAM parse_mode=HTML
+// ========================================
+
+/**
+ * Экранирование HTML для Telegram parse_mode=HTML. Без него имя клиента
+ * "<b>hack</b>" ломает вёрстку сообщения владельцу, а клиент с именем
+ * "</b>x<a href='...'>клик</a>" — превращает уведомление в ссылку.
+ * Применять для КАЖДОГО внешнего значения (имя клиента, адрес, комментарий),
+ * которое подставляется в HTML-шаблон уведомления.
+ */
+export function escapeTgHtml(s: string | null | undefined): string {
+  if (!s) return "";
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// ========================================
 // TELEGRAM HELPER
 // ========================================
 
@@ -164,16 +183,19 @@ export async function notifyWarehouseOrderConfirmed(
 
     if (warehouseStaff.length === 0) return;
 
+    // HTML-escape всех user-controlled полей: имя товара/клиента/адрес
+    // приходят из БД, но заводятся клиентом или ботом → потенциальный
+    // vector для инъекции в parse_mode=HTML.
     const itemsList = data.items
-      .map((i) => `• ${i.name} × ${i.quantity}`)
+      .map((i) => `• ${escapeTgHtml(i.name)} × ${i.quantity}`)
       .join("\n");
 
     // Оператор и склад — собирают физически, цена их не касается.
     // Админ — контролирует, цену видит.
     const baseMessage =
       `📦 <b>Заказ #${data.orderNumber} подтверждён — собирайте!</b>\n\n` +
-      `👤 ${data.clientName}${data.clientPhone ? ` | ${data.clientPhone}` : ""}\n` +
-      (data.clientAddress ? `📍 ${data.clientAddress}\n` : "") +
+      `👤 ${escapeTgHtml(data.clientName)}${data.clientPhone ? ` | ${escapeTgHtml(data.clientPhone)}` : ""}\n` +
+      (data.clientAddress ? `📍 ${escapeTgHtml(data.clientAddress)}\n` : "") +
       `\n<b>Состав:</b>\n${itemsList}`;
 
     const adminMessage =
@@ -434,23 +456,30 @@ function formatNotificationMessages(
   data: BookingNotificationData
 ): { title: string; ownerMsg: string; staffMsg: string } {
   const dateFormatted = formatDateShort(data.date, data.time);
+  // Все имена/услуги/мастера escape'им один раз — сообщения уходят с
+  // parse_mode=HTML, а поля user-controlled (имя клиента из TG profile,
+  // service/staff — из БД, но заводит владелец в дашборде).
+  const clientName = escapeTgHtml(data.clientName);
+  const clientPhone = escapeTgHtml(data.clientPhone);
+  const serviceName = escapeTgHtml(data.serviceName);
+  const staffName = escapeTgHtml(data.staffName);
 
   if (type === "new_booking") {
     const title = "Новая запись";
     const ownerMsg = [
       "📅 <b>Новая запись!</b>",
       "",
-      `Клиент: ${data.clientName}${data.clientPhone ? ` (${data.clientPhone})` : ""}`,
-      `Услуга: ${data.serviceName}`,
-      `Мастер: ${data.staffName}`,
+      `Клиент: ${clientName}${clientPhone ? ` (${clientPhone})` : ""}`,
+      `Услуга: ${serviceName}`,
+      `Мастер: ${staffName}`,
       `Дата: ${dateFormatted}`,
     ].join("\n");
 
     const staffMsg = [
       "📅 <b>К вам новая запись!</b>",
       "",
-      `Клиент: ${data.clientName}`,
-      `Услуга: ${data.serviceName}`,
+      `Клиент: ${clientName}`,
+      `Услуга: ${serviceName}`,
       `Дата: ${dateFormatted}`,
     ].join("\n");
 
@@ -462,17 +491,17 @@ function formatNotificationMessages(
     const ownerMsg = [
       "❌ <b>Запись отменена</b>",
       "",
-      `Клиент: ${data.clientName}`,
-      `Услуга: ${data.serviceName}`,
-      `Мастер: ${data.staffName}`,
+      `Клиент: ${clientName}`,
+      `Услуга: ${serviceName}`,
+      `Мастер: ${staffName}`,
       `Дата: ${dateFormatted}`,
     ].join("\n");
 
     const staffMsg = [
       "❌ <b>Запись отменена</b>",
       "",
-      `Клиент: ${data.clientName}`,
-      `Услуга: ${data.serviceName}`,
+      `Клиент: ${clientName}`,
+      `Услуга: ${serviceName}`,
       `Дата: ${dateFormatted}`,
     ].join("\n");
 
@@ -484,17 +513,17 @@ function formatNotificationMessages(
   const ownerMsg = [
     "🔄 <b>Запись перенесена</b>",
     "",
-    `Клиент: ${data.clientName}`,
-    `Услуга: ${data.serviceName}`,
-    `Мастер: ${data.staffName}`,
+    `Клиент: ${clientName}`,
+    `Услуга: ${serviceName}`,
+    `Мастер: ${staffName}`,
     `Новая дата: ${dateFormatted}`,
   ].join("\n");
 
   const staffMsg = [
     "🔄 <b>Запись перенесена</b>",
     "",
-    `Клиент: ${data.clientName}`,
-    `Услуга: ${data.serviceName}`,
+    `Клиент: ${clientName}`,
+    `Услуга: ${serviceName}`,
     `Новая дата: ${dateFormatted}`,
   ].join("\n");
 

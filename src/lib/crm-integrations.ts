@@ -10,6 +10,7 @@
  */
 
 import { createHmac, createCipheriv, createDecipheriv, randomBytes } from "crypto";
+import * as dns from "dns/promises";
 import { prisma } from "./prisma";
 
 // ========================================
@@ -118,6 +119,38 @@ export function validateExternalUrl(urlString: string): void {
   // Block URLs with auth credentials
   if (parsed.username || parsed.password) {
     throw new Error("URL не должен содержать учётные данные");
+  }
+}
+
+/**
+ * Async-версия — резолвит hostname в IP через DNS и проверяет, что
+ * итоговый IP не приватный. Защищает от DNS-based SSRF: атакующий
+ * регистрирует `attacker.com` → указывает `A 127.0.0.1` → без DNS-check
+ * мы бы пробили metadata server / внутреннюю сеть. Вызывать перед fetch
+ * (изнутри async-функции). Sync validateExternalUrl оставили для мест
+ * где async неудобен (форма настройки CRM), но проброс должен быть в
+ * async слоях.
+ */
+export async function validateExternalUrlWithDns(urlString: string): Promise<void> {
+  validateExternalUrl(urlString);
+  const parsed = new URL(urlString);
+
+  // Если hostname уже IP — validateExternalUrl отработал; иначе резолвим.
+  const isIp = /^\d+\.\d+\.\d+\.\d+$/.test(parsed.hostname) || parsed.hostname.includes(":");
+  if (isIp) return;
+
+  try {
+    const records = await dns.lookup(parsed.hostname, { all: true });
+    for (const r of records) {
+      if (isPrivateIP(r.address)) {
+        throw new Error(
+          `URL ${parsed.hostname} резолвится в приватный IP (${r.address}) — запрещено`
+        );
+      }
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("приватный IP")) throw e;
+    throw new Error(`Не удалось проверить DNS для ${parsed.hostname}`);
   }
 }
 
@@ -385,8 +418,11 @@ async function sendWebhook(
   const url = config.url as string;
   if (!url) throw new Error("Webhook URL is not configured");
 
-  // SSRF protection
-  validateExternalUrl(url);
+  // SSRF protection: sync-проверка + async DNS-резолв.
+  // DNS-check закрывает атаку, где атакующий регистрирует домен с A-записью
+  // 127.0.0.1 / 169.254.169.254 (metadata endpoints) — sync-check по hostname
+  // такое не поймает.
+  await validateExternalUrlWithDns(url);
 
   const body = JSON.stringify(event);
   const headers: Record<string, string> = {
@@ -581,8 +617,11 @@ async function sendBitrix24(
     throw new Error("Bitrix24: domain or token not configured");
   }
 
-  // Sanitize domain — only allow valid Bitrix24 hostnames
-  if (!/^[\w.-]+\.bitrix24\.\w+$/.test(domain)) {
+  // Sanitize domain — only allow valid Bitrix24 hostnames.
+  // Раньше `\.\w+$` пропускало `bitrix24.a` (1-буквенный TLD): регистрируется
+  // мусорный домен вида evil.bitrix24.a → мы делаем POST по нему. Сузили
+  // до 2-6 букв — покрывает .ru/.by/.kz/.ua/.uz/.com/.co.uk и т.п.
+  if (!/^[a-z0-9][a-z0-9-]{0,62}\.bitrix24\.[a-z]{2,6}$/i.test(domain)) {
     throw new Error("Bitrix24: некорректный домен. Формат: mycompany.bitrix24.ru");
   }
 
