@@ -34,12 +34,18 @@ import {
   List,
   Download,
 } from "lucide-react";
+import ChannelBadge from "@/components/ChannelBadge";
 
 interface Customer {
   id: string;
   telegramId: string | null;
   telegramUsername?: string | null;
   instagramUsername?: string | null;
+  // Sprint 4A: список каналов клиента для UI-бейджей.
+  channels?: string[];
+  whatsappId?: string | null;
+  instagramId?: string | null;
+  fbPsid?: string | null;
   name: string;
   channel?: string;
   leadStatus?: string | null;
@@ -643,15 +649,15 @@ export default function CustomersPage() {
                             <Link href={`/dashboard/customers/${customer.id}`} className="block">
                               <div className="flex items-start justify-between gap-2 mb-1">
                                 <p className={`${textPrimary} font-medium text-sm truncate`}>{customer.name}</p>
-                                {customer.channel && customer.channel !== "telegram" && (
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${
-                                    customer.channel === "whatsapp" ? "bg-green-500/20 text-green-400" :
-                                    customer.channel === "instagram" ? "bg-pink-500/20 text-pink-400" :
-                                    "bg-blue-500/20 text-blue-400"
-                                  }`}>
-                                    {customer.channel === "whatsapp" ? "WA" : customer.channel === "instagram" ? "IG" : "FB"}
-                                  </span>
-                                )}
+                                {/* Sprint 4A: все каналы клиента (не только «не-TG») */}
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  {(customer.channels && customer.channels.length > 0
+                                    ? customer.channels
+                                    : customer.channel ? [customer.channel] : []
+                                  ).map((ch) => (
+                                    <ChannelBadge key={ch} channel={ch} size="sm" />
+                                  ))}
+                                </div>
                               </div>
                               {(customer.telegramUsername || customer.instagramUsername) && (
                                 <p className="text-xs text-blue-400 truncate">
@@ -708,18 +714,15 @@ export default function CustomersPage() {
                   <tr key={customer.id} className={`border-b ${borderColor} ${hoverBg}`}>
                     <td className="py-3 px-4">
                       <div>
-                        <p className={`${textPrimary} font-medium flex items-center gap-2`}>
+                        <p className={`${textPrimary} font-medium flex items-center gap-2 flex-wrap`}>
                           {customer.name}
-                          {customer.channel && customer.channel !== "telegram" && (
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${
-                              customer.channel === "whatsapp" ? "bg-green-500/20 text-green-400" :
-                              customer.channel === "instagram" ? "bg-pink-500/20 text-pink-400" :
-                              customer.channel === "facebook" ? "bg-blue-500/20 text-blue-400" :
-                              "bg-gray-500/20 text-gray-400"
-                            }`}>
-                              {customer.channel === "whatsapp" ? "WA" : customer.channel === "instagram" ? "IG" : "FB"}
-                            </span>
-                          )}
+                          {/* Sprint 4A: все каналы клиента */}
+                          {(customer.channels && customer.channels.length > 0
+                            ? customer.channels
+                            : customer.channel ? [customer.channel] : []
+                          ).map((ch) => (
+                            <ChannelBadge key={ch} channel={ch} size="sm" />
+                          ))}
                         </p>
                         {(customer.telegramUsername || customer.instagramUsername) && (
                           <p className="text-sm text-blue-400">

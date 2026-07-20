@@ -146,10 +146,22 @@ export async function GET(request: NextRequest) {
           ? clientReviews.reduce((sum, r) => sum + r.rating, 0) / clientReviews.length
           : null;
 
+      // Sprint 4A: список каналов клиента для UI-бейджей. Non-null поле =
+      // клиент когда-то писал через этот канал, значит показываем иконку.
+      const channels: string[] = [];
+      if (client.telegramId) channels.push("telegram");
+      if (client.whatsappId) channels.push("whatsapp");
+      if (client.instagramId) channels.push("instagram");
+      if (client.fbPsid) channels.push("facebook");
+
       return {
         id: client.id,
         telegramId: client.telegramId ? client.telegramId.toString() : null,
         telegramUsername: client.telegramUsername,
+        whatsappId: client.whatsappId ?? null,
+        instagramId: client.instagramId ?? null,
+        fbPsid: client.fbPsid ?? null,
+        channels,
         name: client.name || conversation?.clientName || "Клиент",
         phone: client.phone,
         totalVisits: client.totalVisits,
@@ -208,7 +220,13 @@ export async function GET(request: NextRequest) {
       id: lead.id,
       telegramId: null,
       telegramUsername: lead.client?.telegramUsername ?? null,
+      whatsappId: null as string | null,
+      instagramId: null as string | null,
+      fbPsid: null as string | null,
       instagramUsername: lead.client?.instagramUsername ?? null,
+      // Channel leads по природе относятся к своему одному каналу — берём из lead.channel.
+      // Нормализуем "messenger" → "facebook" для совместимости с UI-иконками.
+      channels: [lead.channel === "messenger" ? "facebook" : lead.channel],
       name: lead.clientName || "Клиент",
       phone: null,
       totalVisits: 0,

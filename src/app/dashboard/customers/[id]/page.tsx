@@ -20,11 +20,15 @@ import {
   User,
   Send,
 } from "lucide-react";
+import ChannelBadge from "@/components/ChannelBadge";
 
 interface CustomerDetail {
   customer: {
     id: string;
-    telegramId: string;
+    telegramId: string | null;
+    whatsappId?: string | null;
+    instagramId?: string | null;
+    fbPsid?: string | null;
     name: string;
     phone: string | null;
     totalVisits: number;
@@ -252,6 +256,12 @@ export default function CustomerDetailPage({
                 Бот выключен
               </span>
             )}
+            {/* Sprint 4A: каналы клиента — какие мессенджеры он использует.
+                Non-null поле = писал через этот канал. */}
+            {customer.telegramId && <ChannelBadge channel="telegram" />}
+            {customer.whatsappId && <ChannelBadge channel="whatsapp" />}
+            {customer.instagramId && <ChannelBadge channel="instagram" />}
+            {customer.fbPsid && <ChannelBadge channel="facebook" />}
           </div>
           {customer.phone && (
             <p className={`${textSecondary} flex items-center gap-1`}>
@@ -414,8 +424,9 @@ export default function CustomerDetailPage({
 
         {/* Right column - Info & Messages */}
         <div className="space-y-6">
-          {/* Invite link — only for clients without a real Telegram chat (imported via CSV) */}
-          {(customer.telegramId.startsWith("-") || customer.telegramId === "0") && (
+          {/* Invite link — only for clients without a real Telegram chat (imported via CSV).
+              Sprint 3: telegramId стал nullable — трактуем null как «нет привязки». */}
+          {(customer.telegramId === null || customer.telegramId.startsWith("-") || customer.telegramId === "0") && (
             <div className={`${cardBg} border ${borderColor} rounded-xl p-6`}>
               <h2 className={`text-lg font-semibold ${textPrimary} mb-2`}>
                 Клиент не подключён к боту
@@ -538,7 +549,7 @@ export default function CustomerDetailPage({
               <div className="flex items-center justify-between">
                 <span className={textSecondary}>Telegram ID</span>
                 <span className={`${textPrimary} font-mono text-sm`}>
-                  {customer.telegramId.startsWith("-") || customer.telegramId === "0"
+                  {customer.telegramId === null || customer.telegramId.startsWith("-") || customer.telegramId === "0"
                     ? "не подключён"
                     : customer.telegramId}
                 </span>
