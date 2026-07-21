@@ -191,8 +191,9 @@ export default function WidgetPage() {
       <div>
         <h1 className={`text-2xl font-bold ${textPrimary}`}>Виджет для сайта</h1>
         <p className={textSecondary}>
-          Плавающая кнопка на вашем сайте → посетитель попадает в бота через
-          Telegram / WhatsApp / Instagram / Messenger.
+          Плавающая кнопка на вашем сайте → посетитель открывает чат, ваш
+          AI-бот отвечает прямо на сайте. Внизу окна — кнопки TG / WA / IG /
+          Messenger как альтернатива для тех, кто предпочитает мессенджер.
         </p>
       </div>
 
@@ -536,19 +537,37 @@ export default function WidgetPage() {
         </h3>
         <ul className={`text-sm ${textSecondary} space-y-2 list-disc list-inside`}>
           <li>
-            Виджет автоматически подхватывает подключённые каналы. Подключили
-            WhatsApp — кнопка появится через 5 минут.
+            <b>Чат прямо на сайте.</b> Посетитель кликает кнопку — открывается
+            чат-окно с приветствием. Пишет сообщение — ваш AI-бот отвечает так
+            же как в мессенджерах: знает услуги, товары, FAQ, умеет
+            записывать / оформлять заказы.
           </li>
           <li>
-            Отключили канал в Staffix — соответствующая кнопка пропадает у
-            посетителей.
+            <b>Кнопки мессенджеров внизу окна.</b> Для тех кто предпочитает
+            TG / WA / IG / Messenger — они там, автоматически показываются
+            только подключённые каналы.
           </li>
           <li>
-            Без cookies и трекинга. Виджет только переводит клик в мессенджер.
+            <b>Диалоги в вашей CRM.</b> Веб-разговоры появляются в{" "}
+            <b>Клиенты</b> с бейджем «web» — как обычные клиенты. Тот же
+            dealStage, те же уведомления менеджерам.
           </li>
           <li>
-            WhatsApp использует ваш телефон из <b>Настройки → Профиль</b> в
-            формате <code>+998...</code>. Если поле пусто — кнопка WhatsApp
+            <b>Без cookies, без трекинга.</b> Виджет использует localStorage
+            для visitor_id (чтобы посетитель не начинал каждый раз с нуля) —
+            но никаких аналитик-скриптов не грузит.
+          </li>
+          <li>
+            <b>Защита от спама.</b> Rate-limit 30 сообщений/час с одного IP +
+            honeypot против ботов.
+          </li>
+          <li>
+            <b>Стоимость.</b> Веб-сообщения считаются как обычные — входят в
+            лимит вашего тарифа (Pro: 1000, Business: 3000).
+          </li>
+          <li>
+            <b>WhatsApp</b> использует ваш телефон из <b>Настройки → Профиль</b>{" "}
+            в формате <code>+998...</code>. Если поле пусто — кнопка WhatsApp
             скрыта.
           </li>
         </ul>
@@ -632,36 +651,62 @@ function WidgetPreview({
     <>
       {open && (
         <div
-          className={`absolute bottom-16 ${side} w-64 bg-white rounded-xl shadow-xl p-3`}
+          className={`absolute bottom-16 ${side} w-72 bg-white rounded-xl shadow-xl overflow-hidden flex flex-col`}
+          style={{ height: "340px" }}
         >
-          <div className="text-sm font-semibold text-gray-900 truncate">
-            {businessName}
+          {/* Header с именем бизнеса на цвете виджета */}
+          <div
+            className="px-3 py-2 text-white text-xs font-semibold flex items-center justify-between"
+            style={{ background: color }}
+          >
+            <span className="truncate">{businessName}</span>
+            <span className="opacity-70 text-sm">×</span>
           </div>
-          <div className="text-xs text-gray-600 mt-0.5 mb-2">{greeting}</div>
-          <div className="space-y-1.5">
-            {channels.length === 0 && (
-              <div className="text-xs text-gray-400 italic">
-                Подключите каналы, чтобы кнопки появились.
+          {/* Область сообщений — превью welcome */}
+          <div className="flex-1 overflow-hidden bg-gray-50 p-3">
+            <div className="flex justify-start mb-2">
+              <div className="max-w-[80%] px-3 py-2 bg-white border border-gray-200 rounded-2xl rounded-bl-md text-xs text-gray-900">
+                {greeting}
               </div>
-            )}
-            {channels.map((ch) => (
-              <div
-                key={ch.type}
-                className="flex items-center gap-2 px-2.5 py-2 bg-gray-50 rounded-lg text-xs text-gray-900 font-medium"
-              >
-                {ch.type === "telegram" && <Send className="h-3.5 w-3.5 text-sky-500" />}
-                {ch.type === "whatsapp" && (
-                  <span className="w-3.5 h-3.5 text-green-500 font-bold text-[10px] flex items-center justify-center">
-                    W
-                  </span>
-                )}
-                {ch.type === "instagram" && <Instagram className="h-3.5 w-3.5 text-pink-500" />}
-                {ch.type === "messenger" && <Facebook className="h-3.5 w-3.5 text-blue-500" />}
-                {ch.label}
-              </div>
-            ))}
+            </div>
           </div>
-          <div className="text-[9px] text-gray-400 text-center mt-2 pt-2 border-t border-gray-100">
+          {/* Input row (визуал только) */}
+          <div className="p-2 bg-white border-t border-gray-100 flex gap-1.5">
+            <div className="flex-1 px-2.5 py-1.5 border border-gray-200 rounded-full text-xs text-gray-400">
+              Напишите сообщение...
+            </div>
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs"
+              style={{ background: color }}
+            >
+              →
+            </div>
+          </div>
+          {/* Кнопки мессенджеров внизу */}
+          {channels.length > 0 && (
+            <div className="px-3 pt-1.5 pb-2 bg-white border-t border-gray-50">
+              <div className="text-[9px] text-gray-500 mb-1">
+                Или напишите в мессенджер:
+              </div>
+              <div className="flex gap-1.5">
+                {channels.map((ch) => (
+                  <div
+                    key={ch.type}
+                    className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center"
+                    title={ch.label}
+                  >
+                    {ch.type === "telegram" && <Send className="h-3 w-3 text-sky-500" />}
+                    {ch.type === "whatsapp" && (
+                      <span className="text-green-500 font-bold text-[9px]">W</span>
+                    )}
+                    {ch.type === "instagram" && <Instagram className="h-3 w-3 text-pink-500" />}
+                    {ch.type === "messenger" && <Facebook className="h-3 w-3 text-blue-500" />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="text-[8px] text-gray-400 text-center py-1 bg-white">
             Powered by Staffix
           </div>
         </div>

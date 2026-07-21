@@ -54,10 +54,53 @@ const WIDGET_SCRIPT = `(function(){
     messenger: '#0084FF',
   };
 
+  // visitor_id — стабильный anonymous ID посетителя. Живёт в localStorage
+  // 30 дней. При возврате продолжаем тот же диалог с ботом.
+  var VISITOR_ID_KEY = 'staffix_visitor_id';
+  var CHAT_HISTORY_KEY = 'staffix_chat_' + businessId;
+
+  function getVisitorId() {
+    try {
+      var id = localStorage.getItem(VISITOR_ID_KEY);
+      if (id && /^[a-zA-Z0-9_-]{8,64}$/.test(id)) return id;
+      // Генерируем UUID-совместимый ID (crypto.randomUUID есть везде с 2022)
+      var newId;
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        newId = crypto.randomUUID().replace(/-/g, '');
+      } else {
+        // Fallback для очень старых браузеров
+        newId = 'v' + Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
+      }
+      localStorage.setItem(VISITOR_ID_KEY, newId);
+      return newId;
+    } catch (e) {
+      // localStorage может быть отключён (private mode, GDPR opt-out) —
+      // тогда каждая сессия = новый visitor. Не сломается, просто без continuity.
+      return 'v' + Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
+    }
+  }
+
+  function loadHistory() {
+    try {
+      var raw = localStorage.getItem(CHAT_HISTORY_KEY);
+      if (!raw) return [];
+      var arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr.slice(-20) : [];
+    } catch (e) { return []; }
+  }
+
+  function saveHistory(msgs) {
+    try {
+      localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(msgs.slice(-20)));
+    } catch (e) { /* quota exceeded etc — ignore */ }
+  }
+
   fetch(origin + '/api/widget/' + encodeURIComponent(businessId) + '/config')
     .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(function(cfg){
-      if (!cfg.channels || cfg.channels.length === 0) return; // нечего показывать
+      // Даже если каналов нет — рендерим виджет для веб-чата.
+      // Раньше при channels.length===0 виджет не появлялся, теперь чат работает
+      // независимо от мессенджеров.
       renderWidget(cfg);
     })
     .catch(function(err){
@@ -86,17 +129,27 @@ const WIDGET_SCRIPT = `(function(){
     return String(s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   }
 
+  function escHtml(s) {
+    // Экранирование текста сообщения для innerHTML.
+    // Даже если сам бот не выдаст XSS, посетитель может ввести <script> —
+    // а мы отображаем его же сообщения в чате. Строгий escape.
+    return String(s || '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
   function renderWidget(cfg) {
     var position = cfg.theme.position === 'bl' ? 'left:20px;' : 'right:20px;';
     var color = cfg.theme.color || '#2563eb';
     var hasCustomImg = cfg.theme.icon === 'custom' && cfg.theme.customImageUrl;
+    var visitorId = getVisitorId();
+    var chatHistory = loadHistory();
 
     var container = document.createElement('div');
     container.id = '__staffix-widget';
     container.style.cssText = 'position:fixed;bottom:20px;' + position + 'z-index:2147483647;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;';
 
-    // Кнопка-триггер. Для custom-image убираем background — картинка сама
-    // становится содержимым кнопки.
+    // Кнопка-триггер.
     var btn = document.createElement('button');
     btn.setAttribute('aria-label', 'Открыть чат');
     var btnBg = hasCustomImg ? 'transparent' : color;
@@ -105,49 +158,181 @@ const WIDGET_SCRIPT = `(function(){
     btn.onmouseout = function(){ btn.style.transform = 'scale(1)'; };
     btn.innerHTML = renderTriggerContent(cfg);
 
-    // Панель с каналами (скрыта по умолчанию)
+    // Панель чата — большая, с историей сообщений, инпутом и кнопками мессенджеров.
     var panel = document.createElement('div');
     var panelSide = cfg.theme.position === 'bl' ? 'left:0;' : 'right:0;';
-    panel.style.cssText = 'position:absolute;bottom:76px;' + panelSide + 'width:300px;background:white;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.18);padding:16px;display:none;';
+    panel.style.cssText = 'position:absolute;bottom:76px;' + panelSide + 'width:360px;max-width:calc(100vw - 40px);height:500px;max-height:calc(100vh - 120px);background:white;border-radius:16px;box-shadow:0 20px 40px rgba(0,0,0,0.2);display:none;flex-direction:column;overflow:hidden;';
 
+    // Header — имя бизнеса + closing X
     var header = document.createElement('div');
-    header.style.cssText = 'font-size:15px;font-weight:600;color:#111;margin-bottom:4px;';
-    header.textContent = cfg.name || 'Свяжитесь с нами';
+    header.style.cssText = 'padding:14px 16px;background:' + color + ';color:white;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;';
+    var headerTitle = document.createElement('div');
+    headerTitle.style.cssText = 'font-size:15px;font-weight:600;';
+    headerTitle.textContent = cfg.name || 'Чат';
+    header.appendChild(headerTitle);
+    var closeBtn = document.createElement('button');
+    closeBtn.setAttribute('aria-label', 'Закрыть');
+    closeBtn.style.cssText = 'background:transparent;border:none;color:white;cursor:pointer;font-size:22px;line-height:1;padding:4px 8px;opacity:0.8;';
+    closeBtn.innerHTML = '&times;';
+    header.appendChild(closeBtn);
     panel.appendChild(header);
 
-    var subtitle = document.createElement('div');
-    subtitle.style.cssText = 'font-size:13px;color:#666;margin-bottom:14px;';
-    subtitle.textContent = cfg.theme.greeting || 'Выберите мессенджер:';
-    panel.appendChild(subtitle);
+    // Область сообщений — прокручиваемый список
+    var messagesEl = document.createElement('div');
+    messagesEl.style.cssText = 'flex:1;overflow-y:auto;padding:14px;background:#f7f8fa;';
+    panel.appendChild(messagesEl);
 
-    cfg.channels.forEach(function(ch){
-      var link = document.createElement('a');
-      link.href = ch.url;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:6px;background:#f8f9fa;border-radius:8px;text-decoration:none;color:#111;font-size:14px;font-weight:500;transition:background .15s;';
-      link.onmouseover = function(){ link.style.background = '#eef1f4'; };
-      link.onmouseout = function(){ link.style.background = '#f8f9fa'; };
-      var icon = document.createElement('span');
-      icon.style.cssText = 'display:inline-flex;color:' + (COLORS[ch.type] || color) + ';';
-      icon.innerHTML = ICONS[ch.type] || '';
-      link.appendChild(icon);
-      var label = document.createElement('span');
-      label.textContent = ch.label;
-      link.appendChild(label);
-      panel.appendChild(link);
-    });
+    // "Печатает..." индикатор — прячется по умолчанию
+    var typingEl = document.createElement('div');
+    typingEl.style.cssText = 'padding:0 14px 8px;font-size:12px;color:#888;background:#f7f8fa;display:none;';
+    typingEl.textContent = 'печатает...';
+    panel.appendChild(typingEl);
 
+    // Инпут + кнопка отправки
+    var inputRow = document.createElement('form');
+    inputRow.style.cssText = 'padding:10px;background:white;border-top:1px solid #eee;display:flex;gap:8px;flex-shrink:0;';
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'Напишите сообщение...';
+    input.maxLength = 1000;
+    input.style.cssText = 'flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:20px;font-size:14px;outline:none;font-family:inherit;';
+    input.onfocus = function(){ input.style.borderColor = color; };
+    input.onblur = function(){ input.style.borderColor = '#ddd'; };
+    // Honeypot — скрытое поле "website". Бот заполнит, человек — нет.
+    var honeypot = document.createElement('input');
+    honeypot.type = 'text';
+    honeypot.name = 'website';
+    honeypot.tabIndex = -1;
+    honeypot.autocomplete = 'off';
+    honeypot.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;opacity:0;';
+    var sendBtn = document.createElement('button');
+    sendBtn.type = 'submit';
+    sendBtn.setAttribute('aria-label', 'Отправить');
+    sendBtn.style.cssText = 'width:40px;height:40px;border-radius:50%;background:' + color + ';border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+    sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>';
+    inputRow.appendChild(input);
+    inputRow.appendChild(honeypot);
+    inputRow.appendChild(sendBtn);
+    panel.appendChild(inputRow);
+
+    // Кнопки мессенджеров внизу — только если каналы есть
+    if (cfg.channels && cfg.channels.length > 0) {
+      var messengers = document.createElement('div');
+      messengers.style.cssText = 'padding:8px 14px 10px;background:white;border-top:1px solid #f0f0f0;flex-shrink:0;';
+      var mHeader = document.createElement('div');
+      mHeader.style.cssText = 'font-size:11px;color:#888;margin-bottom:6px;';
+      mHeader.textContent = 'Или напишите в мессенджер:';
+      messengers.appendChild(mHeader);
+      var mRow = document.createElement('div');
+      mRow.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
+      cfg.channels.forEach(function(ch){
+        var a = document.createElement('a');
+        a.href = ch.url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.title = ch.label;
+        a.style.cssText = 'width:36px;height:36px;border-radius:50%;background:#f5f5f5;color:' + (COLORS[ch.type] || color) + ';display:flex;align-items:center;justify-content:center;text-decoration:none;transition:transform .15s;';
+        a.onmouseover = function(){ a.style.transform = 'scale(1.1)'; };
+        a.onmouseout = function(){ a.style.transform = 'scale(1)'; };
+        a.innerHTML = ICONS[ch.type] || '';
+        mRow.appendChild(a);
+      });
+      messengers.appendChild(mRow);
+      panel.appendChild(messengers);
+    }
+
+    // Powered by Staffix футер
     var footer = document.createElement('div');
-    footer.style.cssText = 'font-size:11px;color:#999;text-align:center;margin-top:10px;padding-top:10px;border-top:1px solid #eee;';
-    footer.innerHTML = 'Powered by <a href="https://staffix.io" target="_blank" rel="noopener" style="color:#666;text-decoration:none;font-weight:600;">Staffix</a>';
+    footer.style.cssText = 'padding:6px;text-align:center;font-size:10px;color:#aaa;background:white;flex-shrink:0;';
+    footer.innerHTML = 'Powered by <a href="https://staffix.io" target="_blank" rel="noopener" style="color:#888;text-decoration:none;font-weight:600;">Staffix</a>';
     panel.appendChild(footer);
 
-    var open = false;
-    btn.addEventListener('click', function(){
-      open = !open;
-      panel.style.display = open ? 'block' : 'none';
+    // ── Логика сообщений ────────────────────────────────────────────
+    function renderMessage(role, content) {
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'margin-bottom:8px;display:flex;' + (role === 'user' ? 'justify-content:flex-end;' : 'justify-content:flex-start;');
+      var bubble = document.createElement('div');
+      bubble.style.cssText = 'max-width:78%;padding:8px 12px;border-radius:14px;font-size:14px;line-height:1.4;word-wrap:break-word;white-space:pre-wrap;' +
+        (role === 'user'
+          ? 'background:' + color + ';color:white;border-bottom-right-radius:4px;'
+          : 'background:white;color:#222;border:1px solid #e8e8e8;border-bottom-left-radius:4px;');
+      bubble.innerHTML = escHtml(content);
+      wrap.appendChild(bubble);
+      messagesEl.appendChild(wrap);
+      // Скролл вниз к последнему сообщению
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    // Рендерим welcome + сохранённую историю
+    if (chatHistory.length === 0) {
+      var welcome = cfg.theme.greeting || 'Здравствуйте! Чем могу помочь?';
+      chatHistory.push({ role: 'assistant', content: welcome });
+      saveHistory(chatHistory);
+    }
+    chatHistory.forEach(function(m){ renderMessage(m.role, m.content); });
+
+    function sendMessage(text) {
+      if (!text || !text.trim()) return;
+      var trimmed = text.trim().substring(0, 1000);
+
+      // Отображаем user сообщение сразу
+      chatHistory.push({ role: 'user', content: trimmed });
+      renderMessage('user', trimmed);
+      saveHistory(chatHistory);
+      input.value = '';
+      input.disabled = true;
+      sendBtn.disabled = true;
+      sendBtn.style.opacity = '0.5';
+      typingEl.style.display = 'block';
+
+      fetch(origin + '/api/widget/' + encodeURIComponent(businessId) + '/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: trimmed,
+          visitor_id: visitorId,
+          website: honeypot.value, // если бот заполнил — сервер отсеет
+        }),
+      })
+        .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, data: j }; }); })
+        .then(function(res){
+          typingEl.style.display = 'none';
+          input.disabled = false;
+          sendBtn.disabled = false;
+          sendBtn.style.opacity = '1';
+          var reply = res.data && res.data.reply
+            ? res.data.reply
+            : (res.data && res.data.error) || 'Извините, что-то пошло не так. Попробуйте ещё раз или напишите в мессенджер.';
+          chatHistory.push({ role: 'assistant', content: reply });
+          renderMessage('assistant', reply);
+          saveHistory(chatHistory);
+          input.focus();
+        })
+        .catch(function(err){
+          typingEl.style.display = 'none';
+          input.disabled = false;
+          sendBtn.disabled = false;
+          sendBtn.style.opacity = '1';
+          console.warn('[Staffix Widget] chat failed:', err);
+          var errMsg = 'Не удалось отправить. Проверьте интернет или напишите нам в мессенджер ниже.';
+          chatHistory.push({ role: 'assistant', content: errMsg });
+          renderMessage('assistant', errMsg);
+        });
+    }
+
+    inputRow.addEventListener('submit', function(e){
+      e.preventDefault();
+      sendMessage(input.value);
     });
+
+    var open = false;
+    function togglePanel() {
+      open = !open;
+      panel.style.display = open ? 'flex' : 'none';
+      if (open) setTimeout(function(){ input.focus(); }, 100);
+    }
+    btn.addEventListener('click', togglePanel);
+    closeBtn.addEventListener('click', togglePanel);
 
     container.appendChild(panel);
     container.appendChild(btn);
