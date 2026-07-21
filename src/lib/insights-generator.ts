@@ -199,8 +199,14 @@ async function clusterQuestions(
 ${questions.slice(0, 200).map((q, i) => `${i + 1}. ${q}`).join("\n")}`;
 
   try {
+    // Шаг 5 плана оптимизации (мини-версия, 21 июля 2026):
+    // Batch API отменён из-за низкого ROI ($5/мес экономии vs 3-5 дней работы).
+    // Вместо этого — Haiku 4.5 для кластеризации: задача простая (сгруппировать
+    // похожие вопросы), Haiku справится, а стоит в 3× дешевле Sonnet
+    // ($1/M in + $5/M out vs $3/$15). Экономия ~$1-2/мес на всей платформе
+    // + быстрее по latency.
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-5",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 2000,
       messages: [{ role: "user", content: prompt }],
     });
