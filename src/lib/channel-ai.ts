@@ -181,26 +181,46 @@ export function buildChannelSystemPrompt(
     ? "дружелюбным и непринуждённым"
     : "вежливым и дружелюбным";
 
+  // Шаг 3 плана оптимизации себестоимости (21 июля 2026): компактный формат
+  // каталога — режем description до 80 символов, убираем noise-поля. Cache_key
+  // stable-блока не меняется (тот же порядок, те же товары — только формат).
+  // Экономия: ~40-60% токенов каталога без потери информации.
+  const truncDesc = (s: string, max = 80): string => {
+    const t = s.trim();
+    return t.length > max ? t.substring(0, max - 1) + "…" : t;
+  };
+
   const servicesList = biz.services.length > 0
     ? biz.services
         .map((s) => {
-          let line = `- ${s.name}`;
-          if (s.description) line += ` — ${s.description}`;
-          if (s.price) line += ` | ${s.price.toLocaleString("ru-RU")}`;
-          if (s.duration) line += ` (${s.duration} мин)`;
+          // Компактный формат: "Название | 5000₸ | 30 мин — краткое описание"
+          const parts: string[] = [s.name];
+          if (s.price) parts.push(`${s.price.toLocaleString("ru-RU")}`);
+          if (s.duration) parts.push(`${s.duration} мин`);
+          let line = `- ${parts.join(" | ")}`;
+          if (s.description) line += ` — ${truncDesc(s.description)}`;
           return line;
         })
         .join("\n")
     : "Услуги не указаны";
 
+  // Products: для service-mode бизнеса без товаров вообще не рендерим блок
+  // (клиника с 0 товаров не должна тратить 300 токенов на заголовок и пустоту).
+  // Для sales-mode или service+products — компактный формат.
   const productsList = biz.products.length > 0
     ? biz.products
         .map((p) => {
-          let line = `- ${p.name}`;
-          if (p.description) line += ` — ${p.description}`;
-          if (p.price) line += ` | ${p.price.toLocaleString("ru-RU")}`;
-          if (p.category) line += ` [${p.category}]`;
-          if (p.stock !== null && p.stock !== undefined) line += p.stock > 0 ? ` (в наличии: ${p.stock})` : ` (нет в наличии)`;
+          // Компактный формат: "Название | 5000₸ | [Категория] | есть/нет"
+          // description режем до 80 символов — обычно этого хватает для контекста.
+          const parts: string[] = [p.name];
+          if (p.price) parts.push(`${p.price.toLocaleString("ru-RU")}`);
+          if (p.category) parts.push(`[${p.category}]`);
+          if (p.stock !== null && p.stock !== undefined) {
+            // Упрощаем: "12 шт" вместо "в наличии: 12 шт".
+            parts.push(p.stock > 0 ? `${p.stock}шт` : "нет");
+          }
+          let line = `- ${parts.join(" | ")}`;
+          if (p.description) line += ` — ${truncDesc(p.description)}`;
           return line;
         })
         .join("\n")

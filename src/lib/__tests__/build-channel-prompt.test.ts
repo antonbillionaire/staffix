@@ -183,7 +183,10 @@ describe("buildChannelSystemPrompt", () => {
     expect(prompt).toContain("Пинцет 6 см");
     expect(prompt).toContain("Для тонких волос");
     expect(prompt).toContain("Пинцет 10 см");
-    expect(prompt).toContain("нет в наличии");
+    // Sprint compact format (21 июля 2026): "нет в наличии" → "нет",
+    // "в наличии: 10" → "10шт" — экономия 40-60% токенов каталога.
+    expect(prompt).toContain("нет");
+    expect(prompt).toContain("10шт");
   });
 
   it("includes service description in prompt", () => {
