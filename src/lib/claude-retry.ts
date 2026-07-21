@@ -124,6 +124,49 @@ export function logClaudeUsage(
   );
 }
 
+/**
+ * Инкрементит per-business счётчики токенов в БД (Шаг 1 плана оптимизации
+ * себестоимости, 21 июля 2026). Все 4 составляющих:
+ *   - tokensUsedInput   — некэшированный вход
+ *   - tokensUsedOutput  — выход
+ *   - tokensCacheRead   — чтение кэша (дёшево, $0.30/M на Sonnet 5)
+ *   - tokensCacheCreate — запись кэша (самая дорогая статья, $3.75-6/M)
+ *
+ * Fire-and-forget: .catch логирует, но не throw'ает — учёт токенов не
+ * должен ломать ответ клиенту. Вызывать после КАЖДОГО callClaudeWithRetry
+ * которая привязана к конкретному businessId (главный ответ + tool-loop
+ * итерации). Для не-клиентских вызовов (warmer, insights, summarize)
+ * не вызывать — они попадут в общий счёт Anthropic, но не в per-client
+ * статистику.
+ *
+ * Ленивый import prisma чтобы не тащить его в edge-runtime bundles где
+ * этот helper может не понадобиться.
+ */
+export function trackClaudeUsage(
+  businessId: string,
+  usage: Message["usage"]
+): void {
+  if (!businessId || !usage) return;
+  const input = usage.input_tokens ?? 0;
+  const output = usage.output_tokens ?? 0;
+  const cacheRead = usage.cache_read_input_tokens ?? 0;
+  const cacheCreate = usage.cache_creation_input_tokens ?? 0;
+  if (input + output + cacheRead + cacheCreate === 0) return; // ничего писать
+  import("./prisma")
+    .then(({ prisma }) =>
+      prisma.business.update({
+        where: { id: businessId },
+        data: {
+          tokensUsedInput:   { increment: input },
+          tokensUsedOutput:  { increment: output },
+          tokensCacheRead:   { increment: cacheRead },
+          tokensCacheCreate: { increment: cacheCreate },
+        },
+      })
+    )
+    .catch((e) => console.error(`[trackClaudeUsage] biz=${businessId}:`, e));
+}
+
 export async function callClaudeWithRetry(params: MessageCreateParams, retries = 2): Promise<Message> {
   const cachedParams = withPromptCaching(params);
   for (let attempt = 0; attempt <= retries; attempt++) {

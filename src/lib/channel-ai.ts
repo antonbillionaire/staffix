@@ -31,7 +31,7 @@ import {
 } from "@/lib/sales-tools";
 
 import Anthropic from "@anthropic-ai/sdk";
-import { callClaudeWithRetry, logClaudeUsage } from "@/lib/claude-retry";
+import { callClaudeWithRetry, logClaudeUsage, trackClaudeUsage } from "@/lib/claude-retry";
 import { pickRelevantDocuments } from "@/lib/document-matcher";
 import { pickMainModel } from "@/lib/complexity-classifier";
 // Anti-probe boundary — prepended to every WA/IG/FB user-bot system prompt
@@ -894,6 +894,8 @@ export async function generateChannelAIResponse(
     }
     let response = await callClaudeWithRetry(mainParams);
     logClaudeUsage(`${channel}/main/${mainModel.complexity}`, response.usage, { biz: businessId, client: clientId, model: mainModel.model });
+    // Main Sonnet-ответ — самый дорогой вызов оборота. Трекаем сразу.
+    if (response.usage) trackClaudeUsage(businessId, response.usage);
 
     // Tool loop — process tool_use responses (max 5 iterations)
     let iterations = 0;
@@ -967,22 +969,18 @@ export async function generateChannelAIResponse(
           tools,
         });
         logClaudeUsage(`${channel}/tool-loop-haiku`, response.usage, { biz: businessId, client: clientId, iter: iterations });
+        // Каждая итерация — отдельный вызов Claude со своей ценой. Раньше
+        // трекали только финальный response, теряли токены итераций tool-loop.
+        if (response.usage) trackClaudeUsage(businessId, response.usage);
       } catch (apiError) {
         console.error("[Channel AI] API error after tool execution:", apiError);
         break;
       }
     }
 
-    // Track Claude API token usage
-    if (response.usage) {
-      prisma.business.update({
-        where: { id: businessId },
-        data: {
-          tokensUsedInput: { increment: response.usage.input_tokens },
-          tokensUsedOutput: { increment: response.usage.output_tokens },
-        },
-      }).catch((e) => console.error("[Channel AI] Token tracking error:", e));
-    }
+    // (Track усage теперь идёт inline: main Sonnet после первого вызова +
+    // каждая Haiku-итерация внутри цикла. Финальный track убран чтобы не
+    // double-count последнюю итерацию.)
 
     // Extract final text response.
     // Фильтруем non-empty text blocks (Claude иногда возвращает `text: ""`).

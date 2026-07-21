@@ -15,7 +15,7 @@
  *    промпт, чтобы факты брались из FAQ/услуг, а не из истории/saммари.
  */
 
-import { callClaudeWithRetry, logClaudeUsage } from "@/lib/claude-retry";
+import { callClaudeWithRetry, logClaudeUsage, trackClaudeUsage } from "@/lib/claude-retry";
 import { prisma } from "@/lib/prisma";
 import {
   buildClientContext,
@@ -283,6 +283,9 @@ export async function generateAIResponse(
     }
     let response = await callClaudeWithRetry(mainParams);
     logClaudeUsage(`tg/main/${mainModel.complexity}`, response.usage, { biz: businessId, tg: telegramId, sales: salesMode ? 1 : 0, model: mainModel.model });
+    // Main Sonnet-ответ. Раньше TG-бот вообще не трекал токены в БД
+    // (только console.log). Теперь идёт в Business.tokensUsed*.
+    if (response.usage) trackClaudeUsage(businessId, response.usage);
     console.log(`[Webhook] Claude response: stop_reason=${response.stop_reason}`);
 
     // 7. Цикл tool_use (до 5 итераций)
@@ -380,6 +383,8 @@ export async function generateAIResponse(
           tools: activeTools,
         });
         logClaudeUsage("tg/tool-loop-haiku", response.usage, { biz: businessId, tg: telegramId, iter: iterations + 1 });
+        // Каждая Haiku-итерация — отдельный billed вызов.
+        if (response.usage) trackClaudeUsage(businessId, response.usage);
       } catch (apiError) {
         // Если API упал ПОСЛЕ успешного tool — собираем ответ из результатов
         console.error("[Webhook] API error after tool execution:", apiError);

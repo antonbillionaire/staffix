@@ -189,9 +189,16 @@ model Business {
   widgetCustomImageUrl String?
   widgetGreeting       String?
 
-  // Claude API usage tracking
-  tokensUsedInput  Int @default(0) // input tokens consumed
-  tokensUsedOutput Int @default(0) // output tokens consumed
+  // Claude API usage tracking.
+  // input/output — обычные некэшированные токены.
+  // cacheRead/cacheCreate добавлены 21 июля 2026 (Шаг 1 плана оптимизации
+  // себестоимости) — без них per-client себестоимость считалась только по
+  // нижней границе, кэш был "невидимой" статьёй расходов. Теперь
+  // client-cost-report.mjs может считать полную цену без вилки Sonnet/Haiku.
+  tokensUsedInput       Int @default(0)
+  tokensUsedOutput      Int @default(0)
+  tokensCacheRead       Int @default(0) // cache_read_input_tokens (дешёвые, $0.30/M на Sonnet 5)
+  tokensCacheCreate     Int @default(0) // cache_creation_input_tokens ($3.75-6/M — самая дорогая статья)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
