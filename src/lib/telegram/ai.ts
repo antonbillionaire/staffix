@@ -16,6 +16,7 @@
  */
 
 import { callClaudeWithRetry, logClaudeUsage, trackClaudeUsage } from "@/lib/claude-retry";
+import { pickCacheStrategy } from "@/lib/cache-strategy";
 import { prisma } from "@/lib/prisma";
 import {
   buildClientContext,
@@ -246,18 +247,29 @@ export async function generateAIResponse(
     // переменный хвост, рядом с клиентским контекстом. Стабильный префикс
     // остаётся неизменным от вызова к вызову — Anthropic держит его в кэше.
     const variableTail = systemPrompt.variable + systemHint + refreshNotice + routingPromptSection + correctionsSection;
-    // Порядок cache-блоков: stable(1h) → docs(5m) → variable(5m). Порядок важен
-    // потому что каждый последующий cache_key = hash(всех предыдущих + этого).
-    // stable первым — он самый стабильный. docs перед variable — их набор
-    // меняется по темам (штук 5-10 у бизнеса), variable по клиентам (много).
-    // Больше hit'ов если реже-меняющееся идёт раньше.
+    // Шаг 2 плана оптимизации (21 июля 2026): умный cache_control — для
+    // sparse traffic write cache тратит впустую (2× дороже чем без кэша).
+    // pickCacheStrategy смотрит активность бизнеса/клиента и решает где
+    // ставить cache_control, а где отправлять без кэша.
+    const cacheStrategy = await pickCacheStrategy(businessId, String(telegramId));
+    console.log(`[TG AI] cache strategy: ${cacheStrategy.reason} → stable=${cacheStrategy.stableTTL} docs=${cacheStrategy.docsTTL ?? "off"} var=${cacheStrategy.variableTTL ?? "off"}`);
+    // Порядок cache-блоков: stable → docs → variable. Порядок важен потому
+    // что каждый последующий cache_key = hash(всех предыдущих + этого).
     const systemBlocks = [
-      { type: "text" as const, text: systemPrompt.stable, cache_control: { type: "ephemeral" as const, ttl: "1h" as const } },
+      { type: "text" as const, text: systemPrompt.stable, cache_control: { type: "ephemeral" as const, ttl: cacheStrategy.stableTTL } },
       ...(systemPrompt.docs.trim()
-        ? [{ type: "text" as const, text: systemPrompt.docs, cache_control: { type: "ephemeral" as const, ttl: "5m" as const } }]
+        ? [
+            cacheStrategy.docsTTL
+              ? { type: "text" as const, text: systemPrompt.docs, cache_control: { type: "ephemeral" as const, ttl: cacheStrategy.docsTTL } }
+              : { type: "text" as const, text: systemPrompt.docs },
+          ]
         : []),
       ...(variableTail.trim()
-        ? [{ type: "text" as const, text: variableTail, cache_control: { type: "ephemeral" as const, ttl: "5m" as const } }]
+        ? [
+            cacheStrategy.variableTTL
+              ? { type: "text" as const, text: variableTail, cache_control: { type: "ephemeral" as const, ttl: cacheStrategy.variableTTL } }
+              : { type: "text" as const, text: variableTail },
+          ]
         : []),
     ];
 

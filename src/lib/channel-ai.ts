@@ -32,6 +32,7 @@ import {
 
 import Anthropic from "@anthropic-ai/sdk";
 import { callClaudeWithRetry, logClaudeUsage, trackClaudeUsage } from "@/lib/claude-retry";
+import { pickCacheStrategy } from "@/lib/cache-strategy";
 import { pickRelevantDocuments } from "@/lib/document-matcher";
 import { pickMainModel } from "@/lib/complexity-classifier";
 // Anti-probe boundary — prepended to every WA/IG/FB user-bot system prompt
@@ -864,21 +865,30 @@ export async function generateChannelAIResponse(
     // max_tokens: 1024 — на Sonnet 5 новый токенайзер даёт ~30% больше токенов
     // на кириллице; бампаем с 800 чтобы не резать ответы про туры.
     //
-    // system: массив с двумя cache-блоками — base на 1h (стабильно), docs на
-    // 5m (варьируется при lazy-loading). Если docs пуст — один блок.
+    // Шаг 2 плана оптимизации (21 июля 2026): умный cache_control.
+    // Для sparse traffic write кэша тратит впустую (в 2× дороже чем без него);
+    // pickCacheStrategy определяет по активности бизнеса/клиента.
+    const cacheStrategy = await pickCacheStrategy(businessId, clientId);
+    console.log(`[Channel AI] cache strategy: ${cacheStrategy.reason} → stable=${cacheStrategy.stableTTL} docs=${cacheStrategy.docsTTL ?? "off"}`);
+    // system: массив с блоками — base с адаптивным TTL, docs может быть без
+    // cache_control если matcher выдаёт разные наборы или бизнес quiet.
     const systemBlocks: Anthropic.TextBlockParam[] = [
       {
         type: "text",
         text: systemBase,
-        cache_control: { type: "ephemeral", ttl: "1h" },
+        cache_control: { type: "ephemeral", ttl: cacheStrategy.stableTTL },
       },
     ];
     if (systemDocs) {
-      systemBlocks.push({
-        type: "text",
-        text: systemDocs,
-        cache_control: { type: "ephemeral", ttl: "5m" },
-      });
+      if (cacheStrategy.docsTTL) {
+        systemBlocks.push({
+          type: "text",
+          text: systemDocs,
+          cache_control: { type: "ephemeral", ttl: cacheStrategy.docsTTL },
+        });
+      } else {
+        systemBlocks.push({ type: "text", text: systemDocs });
+      }
     }
     // Параметр thinking — только для Sonnet 5. Haiku 4.5 его не поддерживает
     // (по докам это Sonnet/Opus-only feature); если передать — Anthropic 400.
