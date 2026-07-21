@@ -23,6 +23,12 @@ export async function getOrCreateConversation(
   contextRefreshSoftWarning: boolean;
 }> {
   try {
+    // Шаг 4 плана оптимизации себестоимости (21 июля 2026):
+    // если у conversation уже есть summary (генерируется cron-summarize
+    // каждые 10 сообщений) — берём только 5 последних сообщений вместо 20.
+    // Summary сам уже уходит в system prompt через ai-memory. Экономия:
+    // ~10-15k tokens на длинных беседах, качество ответа не страдает
+    // (summary концентрированнее чем 15 старых сырых сообщений).
     let conversation = await prisma.conversation.findUnique({
       where: {
         businessId_clientTelegramId: {
@@ -33,17 +39,29 @@ export async function getOrCreateConversation(
       include: {
         messages: {
           orderBy: { createdAt: "desc" },
-          take: 20, // последние 20 для контекста
+          take: 20, // берём с запасом, ниже режем до 5 если есть summary
         },
       },
     });
 
     if (conversation) {
+      // Если есть summary И диалог длинный (>=10 msg) — грузим 5 последних.
+      // Если summary нет или диалог короткий — 20 как раньше.
+      const hasFreshSummary = !!conversation.summary && conversation.messageCount >= 10;
+      const keepLast = hasFreshSummary ? 5 : 20;
+
       let messagesAsc = conversation.messages
         .slice()
         .reverse()
+        .slice(-keepLast)
         .map((m) => ({ role: m.role, content: m.content }));
       let softWarning = false;
+
+      if (hasFreshSummary) {
+        console.log(
+          `[Webhook] Conv ${conversation.id}: has summary + ${conversation.messageCount} msgs → sending only last ${messagesAsc.length} messages (Step 4 optimization)`
+        );
+      }
 
       if (conversation.needsContextRefresh) {
         // Жёсткая стратегия (Right Flight case, июль 2026): при обновлении

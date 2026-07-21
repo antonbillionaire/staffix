@@ -826,8 +826,16 @@ export async function generateChannelAIResponse(
         data: { needsContextRefresh: false },
       }).catch(e => console.error("[Channel AI] reset needsContextRefresh failed:", e));
     } else {
-      // Keep last 20 messages to avoid token overflow
-      recentHistory = history.slice(-20);
+      // Шаг 4 плана оптимизации себестоимости (21 июля 2026):
+      // если у conversation есть summary и диалог длинный — грузим 5 последних
+      // вместо 20. Summary уже в system prompt через ai-memory. Экономия
+      // ~10-15k tokens на длинных беседах, качество не страдает.
+      const hasFreshSummary = !!conv.summary && (conv.messageCount ?? 0) >= 10;
+      const keepLast = hasFreshSummary ? 5 : 20;
+      recentHistory = history.slice(-keepLast);
+      if (hasFreshSummary) {
+        console.log(`[Channel AI] conv ${conv.id}: summary + ${conv.messageCount} msgs → last ${keepLast} messages only`);
+      }
     }
 
     if (refreshSoftWarning) {
