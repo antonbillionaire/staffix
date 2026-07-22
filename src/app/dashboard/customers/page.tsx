@@ -35,6 +35,7 @@ import {
   Download,
 } from "lucide-react";
 import ChannelBadge from "@/components/ChannelBadge";
+import PageHint from "@/components/PageHint";
 
 interface Customer {
   id: string;
@@ -446,6 +447,7 @@ export default function CustomersPage() {
 
   return (
     <div className="space-y-6">
+      <PageHint id="customers-empty" />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

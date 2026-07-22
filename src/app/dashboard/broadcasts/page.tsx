@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import PageHint from "@/components/PageHint";
 import {
   Send,
   Plus,
@@ -165,6 +166,7 @@ export default function BroadcastsPage() {
 
   return (
     <div className="space-y-6">
+      <PageHint id="broadcasts" />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

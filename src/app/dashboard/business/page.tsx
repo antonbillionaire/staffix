@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import PageHint from "@/components/PageHint";
 import {
   Calendar,
   Users,
@@ -77,6 +78,7 @@ export default function BusinessPage() {
 
   return (
     <div className="space-y-6">
+      <PageHint id="business" />
       <div>
         <h1 className={`text-2xl font-bold ${textPrimary} mb-1`}>{t("nav.myBusiness")}</h1>
         <p className={textSecondary}>Записи, клиенты, заказы и аналитика</p>

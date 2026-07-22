@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Calendar, Clock, User, Phone, Loader2, Scissors } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import PageHint from "@/components/PageHint";
 
 interface Booking {
   id: string;
@@ -120,6 +121,7 @@ export default function BookingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
+      <PageHint id="bookings-empty" />
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
       </div>
     );

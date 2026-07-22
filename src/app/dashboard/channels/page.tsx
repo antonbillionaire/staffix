@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useSearchParams } from "next/navigation";
+import PageHint from "@/components/PageHint";
 import {
   MessageSquare,
   Instagram,
@@ -197,6 +198,7 @@ export default function ChannelsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
+      <PageHint id="channels" />
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
       </div>
     );

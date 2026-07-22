@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { generatePrompt, PROMPT_TEMPLATES } from "@/lib/prompt-templates";
+import PageHint from "@/components/PageHint";
 import {
   Plus,
   Pencil,
@@ -442,6 +443,7 @@ export default function KnowledgeBasePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
+      <PageHint id="knowledge" />
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
       </div>
     );

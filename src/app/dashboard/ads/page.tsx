@@ -21,6 +21,7 @@ import {
   Megaphone,
 } from "lucide-react";
 import Link from "next/link";
+import PageHint from "@/components/PageHint";
 
 interface Totals {
   spend: number;
@@ -127,6 +128,7 @@ export default function AdsPage() {
   if (loading && !data) {
     return (
       <div className="flex items-center justify-center py-24">
+      <PageHint id="ads" />
         <Loader2 className={`h-8 w-8 animate-spin ${textSecondary}`} />
       </div>
     );

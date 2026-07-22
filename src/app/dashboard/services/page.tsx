@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, Pencil, Trash2, X, Loader2, Upload } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import PageHint from "@/components/PageHint";
 
 interface Service {
   id: string;
@@ -196,6 +197,7 @@ export default function ServicesPage() {
 
   return (
     <div className="max-w-4xl">
+      <PageHint id="services" />
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>{t("servicesPage.title")}</h2>

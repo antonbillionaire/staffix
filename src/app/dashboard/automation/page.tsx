@@ -5,6 +5,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import UpgradePrompt from "@/components/UpgradePrompt";
+import PageHint from "@/components/PageHint";
 import {
   Bell,
   Star,
@@ -120,6 +121,7 @@ export default function AutomationPage() {
   if (loading || subscriptionLoading) {
     return (
       <div className="flex items-center justify-center h-64">
+      <PageHint id="automation" />
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
       </div>
     );

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, Pencil, Trash2, X, User, Loader2, Camera, CalendarDays, MessageCircle, BedDouble } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import PageHint from "@/components/PageHint";
 
 interface Staff {
   id: string;
@@ -419,6 +420,7 @@ export default function StaffPage() {
 
   return (
     <div className="max-w-4xl">
+      <PageHint id="staff" />
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className={`text-lg font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>{t("staffPage.title")}</h2>

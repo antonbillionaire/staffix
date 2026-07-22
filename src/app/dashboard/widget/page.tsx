@@ -26,6 +26,7 @@ import {
   Save,
 } from "lucide-react";
 import Link from "next/link";
+import PageHint from "@/components/PageHint";
 
 interface WidgetChannel {
   type: string;
@@ -188,6 +189,7 @@ export default function WidgetPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
+      <PageHint id="widget" />
       <div>
         <h1 className={`text-2xl font-bold ${textPrimary}`}>Виджет для сайта</h1>
         <p className={textSecondary}>

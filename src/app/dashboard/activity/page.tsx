@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import PageHint from "@/components/PageHint";
 import {
   Activity,
   RefreshCw,
@@ -189,6 +190,7 @@ export default function ActivityLogPage() {
 
   return (
     <div className={`min-h-screen ${isDark ? "bg-[#0a0a1a] text-white" : "bg-gray-50 text-gray-900"} p-4 md:p-6`}>
+      <PageHint id="activity" />
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">

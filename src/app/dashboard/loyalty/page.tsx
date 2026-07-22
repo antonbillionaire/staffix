@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import PageHint from "@/components/PageHint";
 import {
   Loader2,
   Save,
@@ -196,6 +197,7 @@ export default function LoyaltyPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
+      <PageHint id="loyalty" />
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
       </div>
     );

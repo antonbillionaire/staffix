@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Loader2, ShoppingBag, Phone, MapPin, ChevronDown, ChevronUp, Check, Truck, X, Clock, AlertCircle, Download } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import PageHint from "@/components/PageHint";
 
 interface OrderItem {
   id: string;
@@ -129,6 +130,7 @@ export default function OrdersPage() {
   if (loading) {
     return (
       <div className={`flex items-center justify-center min-h-screen ${bg}`}>
+      <PageHint id="orders-empty" />
         <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
       </div>
     );
