@@ -573,9 +573,13 @@ async function findChannelClient(
 }
 
 /**
- * Находит или создаёт ChannelClient
+ * Находит или создаёт ChannelClient. Экспортируется — вызываем из channel-ai.ts
+ * в shadow-write блоке, чтобы для комментариев IG/FB и первого сообщения
+ * гарантированно была запись в БД (иначе owner-mute, phone-persist и
+ * preferences работают только для тех клиентов, которым бот успел вызвать
+ * saveClientNote / другую tool).
  */
-async function findOrCreateChannelClient(
+export async function findOrCreateChannelClient(
   businessId: string,
   channel: string,
   clientId: string

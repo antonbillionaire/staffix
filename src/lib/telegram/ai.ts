@@ -29,6 +29,10 @@ import {
 } from "@/lib/ai-memory";
 import { bookingToolDefinitions } from "@/lib/booking-tools";
 import { salesToolDefinitions, executeSalesTool, notifyManagerByTelegram } from "@/lib/sales-tools";
+
+// Автопроизводный список имён sales-tools — синхронизирован с salesToolDefinitions.
+// Именно этот Set используется чтобы отличить sales-tool от booking-tool при роутинге.
+const SALES_TOOL_NAME_SET = new Set(salesToolDefinitions.map((t) => t.name));
 import { buildSalesSystemPrompt, isSalesMode } from "@/lib/sales-prompt";
 import { botPromisedHandoffRegex } from "@/lib/handoff-detector";
 import {
@@ -339,17 +343,9 @@ export async function generateAIResponse(
 
           // Роутим к нужному диспетчеру по имени, не по режиму:
           // в sales+consultations возможны и sales, и booking tools в одном диалоге.
-          const SALES_TOOL_NAMES = new Set([
-            "search_products",
-            "get_product_details",
-            "get_categories",
-            "list_by_category",
-            "identify_client",
-            "create_order",
-            "get_client_orders",
-            "get_upsell_suggestions",
-          ]);
-          const isSalesTool = SALES_TOOL_NAMES.has(block.name);
+          // Раньше был hard-coded Set — новые sales-tools забывали дописать сюда
+          // и в результате шли в booking-диспетчер, который отвечал "unknown tool".
+          const isSalesTool = SALES_TOOL_NAME_SET.has(block.name);
           const result = isSalesTool
             ? await executeSalesTool(
                 block.name,

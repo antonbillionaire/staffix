@@ -11,6 +11,11 @@ import { promoteDealStageByTelegram } from "./deal-pipeline";
 import { pickStaffForNewLead } from "./lead-assignment";
 import { writeLoyaltyLedger } from "./loyalty-ledger";
 
+// Sentinel staff id for businesses that don't manage individual staff (solo
+// owner / no roster). Exported so callers (create_booking, tools, tests)
+// can compare against it without duplicating the literal.
+export const ANY_STAFF_ID = "__any__";
+
 // ========================================
 // TYPES
 // ========================================
@@ -205,12 +210,12 @@ export async function checkAvailability(
 
   // If no staff registered, create a virtual "any" staff entry
   if (staffMembers.length === 0) {
-    staffMembers = [{ id: "__any__", name: "Любой мастер" }];
+    staffMembers = [{ id: ANY_STAFF_ID, name: "Любой мастер" }];
   }
 
   // Load staff schedules for this day of the week
   const dayOfWeek = targetDate.getUTCDay(); // 0=Sun ... 6=Sat
-  const staffIds = staffMembers.filter((s) => s.id !== "__any__").map((s) => s.id);
+  const staffIds = staffMembers.filter((s) => s.id !== ANY_STAFF_ID).map((s) => s.id);
   const staffSchedules = staffIds.length > 0
     ? await prisma.staffSchedule.findMany({
         where: { staffId: { in: staffIds }, dayOfWeek },
@@ -287,7 +292,7 @@ export async function checkAvailability(
     }
 
     // Filter bookings for this staff member
-    const staffBookings = staffMember.id === "__any__"
+    const staffBookings = staffMember.id === ANY_STAFF_ID
       ? existingBookings
       : existingBookings.filter((b) => b.staffId === staffMember.id || b.staffId === null);
 
@@ -514,7 +519,7 @@ export async function createBooking(
 
     // Get staff info
     let staffName = "Любой мастер";
-    const actualStaffId = staffId && staffId !== "__any__" ? staffId : undefined;
+    const actualStaffId = staffId && staffId !== ANY_STAFF_ID ? staffId : undefined;
     if (actualStaffId) {
       const staff = await prisma.staff.findUnique({
         where: { id: actualStaffId },

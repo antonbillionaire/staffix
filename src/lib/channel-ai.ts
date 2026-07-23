@@ -693,6 +693,16 @@ export async function generateChannelAIResponse(
             name: clientName || null,
             phone: phoneHint,
           }).catch((e) => console.error("[Channel AI] shadow Client write failed:", e));
+
+          // Гарантируем и per-channel ChannelClient — до этого фикса запись
+          // появлялась только когда бот успевал вызвать saveClientNote
+          // (или другую tool, дёргающую findOrCreateChannelClient). Для
+          // IG/FB-комментариев и первого DM без tool-calls это значило что
+          // owner-mute, phone-persist и preferences не работают.
+          const { findOrCreateChannelClient } = await import("@/lib/channel-memory");
+          findOrCreateChannelClient(businessId, ch, clientId).catch((e) =>
+            console.error("[Channel AI] shadow ChannelClient write failed:", e)
+          );
         }
       } catch (e) {
         // Динамический import мог упасть — не критично, старый path продолжает работать

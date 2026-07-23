@@ -48,16 +48,22 @@ export async function pickStaffForNewLead(businessId: string): Promise<string | 
     }
 
     if (business.leadAssignmentMode === "by_load") {
-      // Compute load for each eligible staff: pending tasks + active-stage clients.
+      // Compute load for each eligible staff:
+      //   pending tasks + active-stage clients + upcoming bookings (next 14 days).
       // "Active stage" = lead | consultation_booked | consultation_done.
-      // We do this in two grouped queries instead of N round-trips.
-      const [taskLoad, clientLoad] = await Promise.all([
+      // Booking-load важен для service-бизнесов (клиники / салоны): у мастера
+      // может быть 0 pending-tasks, но 15 записей на неделю — новый лид ему
+      // выдавать хуже чем свободному коллеге. До этого фикса booking не
+      // учитывался и лиды шли перегруженным мастерам.
+      const eligibleIds = eligible.map((s) => s.id);
+      const bookingLoadWindow = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+      const [taskLoad, clientLoad, bookingLoad] = await Promise.all([
         prisma.task.groupBy({
           by: ["assignedStaffId"],
           where: {
             businessId,
             status: "pending",
-            assignedStaffId: { in: eligible.map((s) => s.id) },
+            assignedStaffId: { in: eligibleIds },
           },
           _count: { _all: true },
         }),
@@ -66,7 +72,17 @@ export async function pickStaffForNewLead(businessId: string): Promise<string | 
           where: {
             businessId,
             dealStage: { in: ["lead", "consultation_booked", "consultation_done"] },
-            assignedStaffId: { in: eligible.map((s) => s.id) },
+            assignedStaffId: { in: eligibleIds },
+          },
+          _count: { _all: true },
+        }),
+        prisma.booking.groupBy({
+          by: ["staffId"],
+          where: {
+            businessId,
+            status: { in: ["pending", "confirmed"] },
+            date: { gte: new Date(), lte: bookingLoadWindow },
+            staffId: { in: eligibleIds },
           },
           _count: { _all: true },
         }),
@@ -79,6 +95,9 @@ export async function pickStaffForNewLead(businessId: string): Promise<string | 
       }
       for (const c of clientLoad) {
         if (c.assignedStaffId) loadMap.set(c.assignedStaffId, (loadMap.get(c.assignedStaffId) ?? 0) + c._count._all);
+      }
+      for (const b of bookingLoad) {
+        if (b.staffId) loadMap.set(b.staffId, (loadMap.get(b.staffId) ?? 0) + b._count._all);
       }
 
       // Pick min-load. Ties resolved by staff id (deterministic) so the

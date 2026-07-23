@@ -90,6 +90,8 @@ type UserWithBusiness = {
   email: string;
   createdAt: Date;
   updatedAt: Date;
+  notifyLowMessages?: boolean | null;
+  notifyTrialEnding?: boolean | null;
   businesses: Array<{
     name: string;
     subscription: {
@@ -118,6 +120,8 @@ async function getMatchingUsers(
       const windowEnd = new Date(targetDate.getTime() + 12 * 60 * 60 * 1000);
 
       return users.filter((u) => {
+        // Respect user's "notifyTrialEnding" toggle from /dashboard/settings.
+        if (u.notifyTrialEnding === false) return false;
         const sub = u.businesses[0]?.subscription;
         if (!sub?.expiresAt) return false;
         const expiry = new Date(sub.expiresAt);
@@ -138,6 +142,9 @@ async function getMatchingUsers(
     case "messages_low": {
       const threshold = Number(params.percentage) || 20;
       return users.filter((u) => {
+        // Respect user's "notifyLowMessages" toggle from /dashboard/settings.
+        // Раньше настройка сохранялась в БД но нигде не читалась — dead toggle.
+        if (u.notifyLowMessages === false) return false;
         const sub = u.businesses[0]?.subscription;
         if (!sub) return false;
         const remaining =
