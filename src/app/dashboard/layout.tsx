@@ -62,6 +62,7 @@ import {
 const ChatWidget = dynamic(() => import("@/components/ChatWidget"), { ssr: false });
 const OnboardingWizard = dynamic(() => import("@/components/OnboardingWizard"), { ssr: false });
 const OnboardingChecklist = dynamic(() => import("@/components/OnboardingChecklist"), { ssr: false });
+const DashboardHelper = dynamic(() => import("@/components/DashboardHelper"), { ssr: false });
 import TrialExpiredBanner from "@/components/TrialExpiredBanner";
 import SubscriptionSuspendedBanner from "@/components/SubscriptionSuspendedBanner";
 import PostHogIdentify from "@/components/PostHogIdentify";
@@ -878,8 +879,13 @@ export default function DashboardLayout({
           {children}
         </main>
 
-        {/* Chat Widget */}
+        {/* Chat Widget (для поддержки Staffix, старый) */}
         <ChatWidget />
+
+        {/* AI-помощник для владельца — отвечает на вопросы по функциям
+            дашборда используя всю документацию Staffix + текущее состояние
+            бизнеса. Плавающая кнопка справа-снизу, ниже ChatWidget'а. */}
+        <DashboardHelper />
 
         {/* Bind logged-in user to their PostHog profile (no-op if consent not given) */}
         <PostHogIdentify />
