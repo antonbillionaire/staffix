@@ -177,8 +177,38 @@ export async function POST(request: NextRequest) {
           }, { status: 400 });
         }
 
-        csvText = aiText.trim();
-        console.log(`[PDF Import] Extracted ${csvText.split("\n").length - 1} products from PDF`);
+        // Claude иногда оборачивает CSV в markdown code-fence или добавляет
+        // «Here is the CSV:» преамбулу. Стрипаем и то, и другое: сначала
+        // берём кусок внутри ```...```, если он есть, иначе первую строку
+        // с ';' считаем началом CSV.
+        let cleaned = aiText.trim();
+        const fenceMatch = cleaned.match(/```(?:csv|CSV)?\s*\n([\s\S]*?)\n```/);
+        if (fenceMatch) {
+          cleaned = fenceMatch[1].trim();
+        } else {
+          const linesRaw = cleaned.split("\n");
+          const firstCsvIdx = linesRaw.findIndex((l) => l.includes(";"));
+          if (firstCsvIdx > 0) cleaned = linesRaw.slice(firstCsvIdx).join("\n");
+        }
+
+        // Sanity: минимум header + 1 строка данных, и header содержит хотя бы одну
+        // из ожидаемых колонок (защита от «Claude ответил свободным текстом»).
+        const lines = cleaned.split("\n").filter((l) => l.trim());
+        const headerLower = (lines[0] || "").toLowerCase();
+        const hasKnownColumn =
+          headerLower.includes("назв") ||
+          headerLower.includes("цена") ||
+          headerLower.includes("name") ||
+          headerLower.includes("price");
+        if (lines.length < 2 || !hasKnownColumn) {
+          console.error("[PDF Import] AI returned non-CSV output:", cleaned.slice(0, 200));
+          return NextResponse.json({
+            error: "Не удалось распознать товары в PDF (нестандартный формат). Попробуйте Excel/CSV.",
+          }, { status: 400 });
+        }
+
+        csvText = cleaned;
+        console.log(`[PDF Import] Extracted ${lines.length - 1} products from PDF`);
       } catch (pdfErr) {
         console.error("[PDF Import] Error:", pdfErr);
         return NextResponse.json({

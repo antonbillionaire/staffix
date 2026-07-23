@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { upsertSalesLead } from "@/lib/sales-bot/upsert-lead";
 
 // Telegram types
 interface TelegramUpdate {
@@ -143,35 +144,22 @@ async function notifyAdmin(
   }
 }
 
-// Save or update lead in database
-async function upsertSalesLead(
+// Save or update lead in database (TG-specific wrapper вокруг общего helper).
+async function upsertTelegramLead(
   telegramId: number,
   chatId: number,
   username: string | undefined,
   firstName: string,
   lastName: string | undefined
 ): Promise<void> {
-  try {
-    const name = firstName + (lastName ? ` ${lastName}` : "");
-    await prisma.salesLead.upsert({
-      where: { telegramChatId: BigInt(chatId) },
-      create: {
-        telegramId: BigInt(telegramId),
-        telegramUsername: username || null,
-        telegramChatId: BigInt(chatId),
-        name,
-        channel: "telegram",
-        stage: "new",
-      },
-      update: {
-        name,
-        telegramUsername: username || undefined,
-        updatedAt: new Date(),
-      },
-    });
-  } catch (error) {
-    console.error("Sales bot: Error upserting lead:", error);
-  }
+  const name = firstName + (lastName ? ` ${lastName}` : "");
+  await upsertSalesLead({
+    channel: "telegram",
+    telegramId: BigInt(telegramId),
+    telegramChatId: BigInt(chatId),
+    telegramUsername: username || null,
+    name,
+  });
 }
 
 // Update lead stage
@@ -353,7 +341,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Save/update lead
-    await upsertSalesLead(
+    await upsertTelegramLead(
       message.from.id,
       chatId,
       message.from.username,

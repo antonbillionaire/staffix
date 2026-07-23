@@ -8,6 +8,7 @@ import {
   verifyMetaWebhook,
 } from "@/lib/sales-bot/meta-api";
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
+import { upsertSalesLead } from "@/lib/sales-bot/upsert-lead";
 
 // Conversation history helpers — persisted in SalesLead.history (DB-backed)
 type HistoryMessage = { role: "user" | "assistant"; content: string };
@@ -162,24 +163,12 @@ export async function POST(request: NextRequest) {
           const senderName =
             value.contacts?.[0]?.profile?.name || senderPhone;
 
-          // Save/update lead
-          try {
-            await prisma.salesLead.upsert({
-              where: { whatsappPhone: senderPhone },
-              create: {
-                whatsappPhone: senderPhone,
-                name: senderName,
-                channel: "whatsapp",
-                stage: "new",
-              },
-              update: {
-                name: senderName,
-                updatedAt: new Date(),
-              },
-            });
-          } catch {
-            // Lead upsert failed - might need unique index on whatsappPhone
-          }
+          // Save/update lead — единый helper для TG/WA/IG
+          await upsertSalesLead({
+            channel: "whatsapp",
+            whatsappPhone: senderPhone,
+            name: senderName,
+          });
 
           // Generate and send AI response
           const aiResponse = await generateAIResponse(

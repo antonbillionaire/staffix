@@ -12,6 +12,7 @@ import {
 } from "@/lib/sales-bot/meta-api";
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
 import { markWebhookProcessed } from "@/lib/webhook-dedup";
+import { upsertSalesLead } from "@/lib/sales-bot/upsert-lead";
 
 // Conversation history helpers — persisted in SalesLead.history (DB-backed)
 type HistoryMessage = { role: "user" | "assistant"; content: string };
@@ -85,39 +86,26 @@ async function generateAIResponse(
   }
 }
 
-// Save/update lead in DB, fetch IG profile if name is missing
+// Save/update lead in DB, fetch IG profile if name is missing.
+// Upsert-логика вынесена в единый helper (см. sales-bot/upsert-lead.ts) —
+// здесь остаётся только IG-специфика (fetchIgProfile для отсутствующего имени).
 async function upsertLead(
   instagramId: string,
   channel: string,
   name?: string
 ) {
-  try {
-    // If no name provided (DM), try to fetch from Instagram API
-    let displayName = name || null;
-    if (!displayName) {
-      const profile = await getInstagramUserProfile(instagramId);
-      if (profile) {
-        displayName = profile.name || (profile.username ? `@${profile.username}` : null);
-      }
+  let displayName = name || null;
+  if (!displayName) {
+    const profile = await getInstagramUserProfile(instagramId);
+    if (profile) {
+      displayName = profile.name || (profile.username ? `@${profile.username}` : null);
     }
-
-    await prisma.salesLead.upsert({
-      where: { instagramId },
-      create: {
-        instagramId,
-        channel,
-        name: displayName,
-        stage: "new",
-      },
-      update: {
-        // Update name if we now have one and it was missing before
-        ...(displayName ? { name: displayName } : {}),
-        updatedAt: new Date(),
-      },
-    });
-  } catch {
-    // Ignore upsert errors (e.g. missing unique index)
   }
+  await upsertSalesLead({
+    channel: channel === "facebook" ? "facebook" : "instagram",
+    instagramId,
+    name: displayName || "",
+  });
 }
 
 // Webhook verification (GET)

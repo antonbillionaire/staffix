@@ -181,19 +181,33 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        // Try to find existing client by phone (if provided)
-        if (phone) {
+        // Dedup priority: phone → email → telegram-username-in-notes.
+        // Раньше проверялся только phone — CSV с email-only или tg-only клиентами
+        // создавал дубликаты для каждого повторного импорта одного и того же
+        // файла. Ищем последовательно через OR-условия чтобы поймать любой из
+        // 3-х идентификаторов.
+        const matchClauses: Array<Record<string, unknown>> = [];
+        if (phone) matchClauses.push({ phone });
+        if (email) matchClauses.push({ email });
+        if (tgUsername) {
+          // Client.telegramUsername — реальное поле. Плюс fallback на
+          // importantNotes для старых записей где @username лежит в заметках.
+          matchClauses.push({ telegramUsername: tgUsername });
+          matchClauses.push({ importantNotes: { contains: `@${tgUsername}` } });
+        }
+
+        if (matchClauses.length > 0) {
           const existing = await prisma.client.findFirst({
-            where: { businessId, phone },
+            where: { businessId, OR: matchClauses },
           });
 
           if (existing) {
-            // Update existing client
             await prisma.client.update({
               where: { id: existing.id },
               data: {
                 ...(fullName ? { name: fullName } : {}),
                 ...(surname ? { surname } : {}),
+                ...(phone ? { phone } : {}),
                 ...(email ? { email } : {}),
                 ...(company ? { company } : {}),
                 ...(importantNotes ? { importantNotes } : {}),
@@ -213,6 +227,7 @@ export async function POST(request: NextRequest) {
           data: {
             businessId,
             telegramId: placeholderId,
+            telegramUsername: tgUsername || null,
             name: fullName || null,
             surname: surname || null,
             phone: phone || null,
