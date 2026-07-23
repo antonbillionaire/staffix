@@ -198,17 +198,13 @@ async function processWAMessage(
       return;
     }
 
-    // decrypt() — envelope encryption; passthrough для plaintext
-    let dbToken: string | null = business.waAccessToken;
-    if (dbToken) {
-      const { decrypt } = await import("@/lib/crypto");
-      dbToken = decrypt(dbToken) || dbToken;
-    }
-    // Prefer System User token (never expires), fall back to business token
+    // Prefer System User token (never expires), fall back to business token.
+    // decrypt() выполняется внутри sendWAMessage/markWAMessageRead — здесь
+    // прокидываем токен как есть, без внешнего decrypt.
     const envToken = process.env.WHATSAPP_ACCESS_TOKEN;
-    const waToken = envToken || dbToken;
+    const waToken = envToken || business.waAccessToken;
     if (!waToken) return;
-    console.log(`[WA Webhook] Token source: ${envToken ? 'ENV' : 'DB'}, len=${waToken.length}`);
+    console.log(`[WA Webhook] Token source: ${envToken ? 'ENV' : 'DB'}`);
 
     // Check message limit
     const { allowed, reason } = await checkSubscriptionLimit(businessId);

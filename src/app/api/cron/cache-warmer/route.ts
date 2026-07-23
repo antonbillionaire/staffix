@@ -23,16 +23,13 @@
  *  - Net: экономия ~$0.10-0.50/день на «жирных» бизнесах с рваным трафиком.
  *
  * Что НЕ делает:
- *  - Не подогревает TG-промпты (там есть variable client tail —
- *    отдельная история, добавим в Phase 2 если будет смысл).
- *  - Не подогревает Sales-промпты (TG sales mode — тоже Phase 2).
  *  - Не различает «активный» канал и «давно молчит» — если канал
  *    подключён, считаем что он используется.
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { warmChannelCache } from "@/lib/channel-ai";
+import { warmChannelCache, warmTelegramCache } from "@/lib/channel-ai";
 import { checkCronAuth } from "@/lib/cron-auth";
 
 export const maxDuration = 300;
@@ -51,19 +48,25 @@ export async function GET(request: Request) {
 
   // Берём бизнесы у которых:
   //  1) подписка не suspended (нет смысла греть кэш для отключённых)
-  //  2) есть подключённые каналы (IG/WA/FB) с активностью за 7 дней
+  //  2) есть подключённые каналы (TG/IG/WA/FB) с активностью за 7 дней
+  //     — TG активность видна по Conversation.updatedAt (не channelConversation).
   //  3) у бизнеса СЕЙЧАС рабочие часы (по Business.timezone)
   const candidates = await prisma.business.findMany({
     where: {
       OR: [
         { channelConversations: { some: { updatedAt: { gte: since } } } },
         { channelClients: { some: { lastContactAt: { gte: since } } } },
+        // TG-активность — Conversation (не ChannelConversation, у TG исторически
+        // отдельная таблица). Без этого TG-only бизнесы никогда не попадали в
+        // warmer и cache_write писался при первом сообщении каждый день.
+        { conversations: { some: { updatedAt: { gte: since } } } },
       ],
     },
     select: {
       id: true,
       name: true,
       timezone: true, // для фильтра «сейчас рабочие часы?»
+      botActive: true, // TG bot active?
       channelConnections: {
         where: { isConnected: true, channel: { in: ["instagram", "whatsapp", "facebook"] } },
         select: { channel: true },
@@ -117,7 +120,20 @@ export async function GET(request: Request) {
       .filter((ch): ch is (typeof SUPPORTED_CHANNELS)[number] =>
         SUPPORTED_CHANNELS.includes(ch as (typeof SUPPORTED_CHANNELS)[number])
       );
-    if (channels.length === 0) {
+
+    // TG — основной канал в CIS; греем если бот активен, отдельно от
+    // channelConnections (у TG исторически другой путь настройки — Business.botToken).
+    if (biz.botActive) {
+      try {
+        const usage = await warmTelegramCache(biz.id);
+        if (usage) result.warmed++;
+      } catch (e) {
+        result.errors++;
+        console.error(`[cache-warmer] failed biz=${biz.id} channel=telegram:`, e);
+      }
+    }
+
+    if (channels.length === 0 && !biz.botActive) {
       result.skippedNoChannel++;
       continue;
     }

@@ -65,11 +65,16 @@ export async function markWAMessageRead(
   messageId: string
 ): Promise<void> {
   try {
+    // decrypt() — envelope encryption; passthrough для plaintext (env token
+    // и старые DB-записи). Раньше здесь decrypt отсутствовал и callsite'ы
+    // вынуждены были дублировать decrypt снаружи, чтобы markWAMessageRead
+    // работал одновременно с sendWAMessage.
+    const token = decrypt(accessToken) || accessToken;
     await fetch(`${WA_API_BASE}/${phoneNumberId}/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",

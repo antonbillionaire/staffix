@@ -1490,3 +1490,104 @@ export async function warmChannelCache(
   return sonnetUsage;
 }
 
+/**
+ * Pre-warm the Anthropic prompt cache for the Telegram bot.
+ *
+ * Telegram — основной канал Staffix для CIS. До 23 июля 2026 warmer
+ * подогревал только WA/IG/FB, а TG-стабильный префикс писался заново на
+ * первом сообщении каждого нового клиента → cache_write ~$0.18/раз.
+ *
+ * Отдельная функция (не переиспользуем warmChannelCache), потому что для
+ * TG собирается system prompt через buildSystemPrompt из ai-memory, а не
+ * через buildChannelSystemPromptParts. Собираем ровно stable-часть с
+ * cache_control 1h, без docs/variable — так же как это делает production
+ * при первом вызове.
+ */
+export async function warmTelegramCache(
+  businessId: string
+): Promise<Anthropic.Message["usage"] | null> {
+  // Ленивые импорты чтобы не тянуть в bundle если warmer не вызван.
+  const { buildBusinessContext, buildSystemPrompt } = await import("@/lib/ai-memory");
+  const { isSalesMode, buildSalesSystemPrompt } = await import("@/lib/sales-prompt");
+
+  const businessContext = await buildBusinessContext(businessId);
+  if (!businessContext) return null;
+
+  const salesMode = isSalesMode(businessContext.businessType, businessContext.dashboardMode);
+  let stable: string;
+  if (salesMode) {
+    const { getAvailableCategories } = await import("@/lib/sales-tools");
+    const categories = await getAvailableCategories(businessId);
+    const totalProducts = await prisma.product.count({
+      where: { businessId, isActive: true },
+    });
+    const sp = buildSalesSystemPrompt(
+      {
+        name: businessContext.name,
+        businessType: businessContext.businessType,
+        phone: businessContext.phone,
+        address: businessContext.address,
+        workingHours: businessContext.workingHours,
+        welcomeMessage: businessContext.welcomeMessage,
+        aiTone: businessContext.aiTone,
+        aiRules: businessContext.aiRules,
+        language: businessContext.language || "ru",
+        categories,
+        totalProducts,
+        // warmer греет только stable — без документов и без FAQ-специфики
+        documents: [],
+        faqs: businessContext.faqs,
+        consultationsEnabled: businessContext.consultationsEnabled,
+        services: businessContext.services,
+        staff: businessContext.staff,
+      },
+      null
+    );
+    stable = sp.stable;
+  } else {
+    const sp = buildSystemPrompt(businessContext, null, []);
+    stable = sp.stable;
+  }
+
+  if (stable.length < 4096) return null;
+
+  const systemBlocks: Anthropic.TextBlockParam[] = [
+    {
+      type: "text",
+      text: stable,
+      cache_control: { type: "ephemeral", ttl: "1h" },
+    },
+  ];
+
+  // Sonnet 5 + Haiku 4.5 — те же две модели что и на WA/IG/FB warm.
+  const [sonnetUsage] = await Promise.all([
+    callClaudeWithRetry({
+      model: "claude-sonnet-5",
+      max_tokens: 1,
+      thinking: { type: "disabled" },
+      system: systemBlocks,
+      messages: [{ role: "user" as const, content: "ping" }],
+    }).then((r) => {
+      logClaudeUsage(`warm/telegram/sonnet`, r.usage, { biz: businessId });
+      return r.usage;
+    }).catch((e) => {
+      console.error(`[warm/telegram/sonnet] biz=${businessId}:`, e);
+      return null;
+    }),
+    callClaudeWithRetry({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1,
+      system: systemBlocks,
+      messages: [{ role: "user" as const, content: "ping" }],
+    }).then((r) => {
+      logClaudeUsage(`warm/telegram/haiku`, r.usage, { biz: businessId });
+      return r.usage;
+    }).catch((e) => {
+      console.error(`[warm/telegram/haiku] biz=${businessId}:`, e);
+      return null;
+    }),
+  ]);
+
+  return sonnetUsage;
+}
+
