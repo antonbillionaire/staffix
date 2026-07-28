@@ -57,6 +57,48 @@ export async function sendWAMessage(
 }
 
 /**
+ * Send a product image to a WhatsApp user via URL.
+ * Meta Cloud API поддерживает image message с `image.link` — публичный
+ * HTTPS URL (JPG/PNG до 5 MB). Наш Vercel Blob подходит по умолчанию.
+ *
+ * Отдельным сообщением после текстового ответа (не в одной посылке —
+ * WhatsApp не поддерживает совмещение text+image в одном сообщении).
+ */
+export async function sendWAImage(
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  imageUrl: string
+): Promise<boolean> {
+  try {
+    const token = decrypt(accessToken) || accessToken;
+    const res = await fetch(`${WA_API_BASE}/${phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "image",
+        image: { link: imageUrl },
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("WA sendImage error:", err);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("WA sendImage exception:", e);
+    return false;
+  }
+}
+
+/**
  * Mark messages as read (shows double blue tick to user)
  */
 export async function markWAMessageRead(

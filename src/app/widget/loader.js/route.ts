@@ -263,6 +263,26 @@ const WIDGET_SCRIPT = `(function(){
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
+    // Отрисовка фото товара под ответом ассистента. Приходит массив
+    // публичных HTTPS URL в поле data.images (Vercel Blob). Максимум 5,
+    // клик по картинке — открытие в новой вкладке.
+    function renderImage(url) {
+      if (!url || typeof url !== 'string') return;
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'margin-bottom:8px;display:flex;justify-content:flex-start;';
+      var img = document.createElement('img');
+      img.src = url;
+      img.alt = 'Фото товара';
+      img.loading = 'lazy';
+      img.style.cssText = 'max-width:78%;max-height:280px;border-radius:14px;border:1px solid #e8e8e8;cursor:pointer;object-fit:cover;';
+      img.addEventListener('click', function(){ window.open(url, '_blank', 'noopener'); });
+      // Fail-safe: битая ссылка — просто прячем, не ломаем чат
+      img.addEventListener('error', function(){ wrap.style.display = 'none'; });
+      wrap.appendChild(img);
+      messagesEl.appendChild(wrap);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
     // Рендерим welcome + сохранённую историю
     if (chatHistory.length === 0) {
       var welcome = cfg.theme.greeting || 'Здравствуйте! Чем могу помочь?';
@@ -305,6 +325,13 @@ const WIDGET_SCRIPT = `(function(){
             : (res.data && res.data.error) || 'Извините, что-то пошло не так. Попробуйте ещё раз или напишите в мессенджер.';
           chatHistory.push({ role: 'assistant', content: reply });
           renderMessage('assistant', reply);
+          // Фото товаров — если бот вызвал search_products/get_product_details.
+          // Не сохраняем в chatHistory (localStorage) чтобы не раздувать;
+          // при перезагрузке страницы картинки не восстановятся — приемлемо.
+          var imgs = (res.data && Array.isArray(res.data.images)) ? res.data.images : [];
+          for (var i = 0; i < imgs.length && i < 5; i++) {
+            renderImage(imgs[i]);
+          }
           saveHistory(chatHistory);
           input.focus();
         })

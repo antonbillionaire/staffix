@@ -93,6 +93,50 @@ export async function sendFBMessage(
 }
 
 /**
+ * Send a product image to a Facebook Messenger user via URL.
+ * Meta Messenger API поддерживает image attachment с `payload.url` (JPG/PNG,
+ * до 25 MB). is_reusable=true — Meta закэширует и в след. раз пришлёт быстрее.
+ *
+ * Отдельным сообщением после текстового ответа.
+ */
+export async function sendFBImage(
+  pageAccessToken: string,
+  recipientId: string,
+  imageUrl: string,
+  pageId?: string
+): Promise<boolean> {
+  try {
+    const token = pageId
+      ? await getPageAccessToken(pageId, pageAccessToken)
+      : (decrypt(pageAccessToken) || pageAccessToken);
+    const endpoint = pageId ? `${FB_API_BASE}/${pageId}/messages` : `${FB_API_BASE}/me/messages`;
+    const res = await fetch(`${endpoint}?access_token=${token}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        recipient: { id: recipientId },
+        messaging_type: "RESPONSE",
+        message: {
+          attachment: {
+            type: "image",
+            payload: { url: imageUrl, is_reusable: true },
+          },
+        },
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("FB sendImage error:", err);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("FB sendImage exception:", e);
+    return false;
+  }
+}
+
+/**
  * Send typing indicator to show user that bot is processing
  */
 export async function sendFBTyping(

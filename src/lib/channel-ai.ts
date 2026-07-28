@@ -654,13 +654,24 @@ async function handleChannelToolCall(
  * Generate AI response for a WhatsApp/Instagram/FB message.
  * Now supports booking tools for real appointment creation with conflict checking.
  */
+/**
+ * Ответ AI в мультиканальном чате. Возвращает финальный текст + список URL
+ * фото товаров которые надо приложить отдельными сообщениями (например
+ * после search_products / get_product_details, где tool вернул `imageUrl`).
+ * До 28 июля 2026 возвращался только текст, фото шли только в TG.
+ */
+export interface ChannelAIResponse {
+  text: string;
+  imageUrls: string[];
+}
+
 export async function generateChannelAIResponse(
   businessId: string,
   channel: string,
   clientId: string,
   userMessage: string,
   clientName?: string
-): Promise<string> {
+): Promise<ChannelAIResponse> {
   try {
     console.log(`[Channel AI] START: business=${businessId}, channel=${channel}, clientId=${clientId}, name=${clientName}`);
     const [biz, conv] = await Promise.all([
@@ -669,7 +680,7 @@ export async function generateChannelAIResponse(
     ]);
     console.log(`[Channel AI] Conv: id=${conv.id}, historyLen=${((conv.history as unknown[]) || []).length}`);
 
-    if (!biz) return "Извините, произошла ошибка. Пожалуйста, свяжитесь с нами напрямую.";
+    if (!biz) return { text: "Извините, произошла ошибка. Пожалуйста, свяжитесь с нами напрямую.", imageUrls: [] };
 
     // Sprint 3 Step 2: shadow write в единый Client. Помимо ChannelClient
     // (который остаётся для history-совместимости) сразу заводим/обновляем
@@ -742,7 +753,7 @@ export async function generateChannelAIResponse(
       });
       if (mutedChannelClient?.botMuted) {
         console.log(`[Channel AI] Client ${clientId} (${channel}) is bot-muted — skipping AI`);
-        return "";
+        return { text: "", imageUrls: [] };
       }
     } catch {
       // не критично для основного flow
@@ -950,6 +961,10 @@ export async function generateChannelAIResponse(
     const maxIterations = 5;
     // Все tool-names вызванные за оборот — нужно для safety-net (см. ниже)
     const calledToolNames: string[] = [];
+    // Последняя пачка tool_results — нужна для extraction imageUrls (фото
+    // товаров) после выхода из цикла, чтобы webhook приложил картинки.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let lastToolResults: any[] = [];
 
     while (response.stop_reason === "tool_use" && iterations < maxIterations) {
       iterations++;
@@ -995,6 +1010,9 @@ export async function generateChannelAIResponse(
         role: "user",
         content: toolResults,
       });
+
+      // Сохраняем на будущее — imageUrls из последней пачки идут в webhook.
+      lastToolResults = toolResults;
 
       // Call Claude again with tool results.
       // ЭКСПЕРИМЕНТ (июль 2026): tool-loop итерации на Haiku 4.5 вместо Sonnet.
@@ -1353,7 +1371,27 @@ export async function generateChannelAIResponse(
       technical: { preview: replyText.substring(0, 120) },
     });
 
-    return replyText;
+    // Собираем imageUrls из последней пачки tool_results — фото товаров,
+    // которые webhook приложит отдельными сообщениями после текста.
+    // Формат идентичен telegram/ai.ts: {product:{imageUrl}} или {products:[{imageUrl}]}.
+    const imageUrls: string[] = [];
+    for (const tr of lastToolResults) {
+      try {
+        const content = typeof tr.content === "string" ? JSON.parse(tr.content) : tr.content;
+        if (content?.products && Array.isArray(content.products)) {
+          for (const p of content.products) {
+            if (p?.imageUrl && typeof p.imageUrl === "string") imageUrls.push(p.imageUrl);
+          }
+        }
+        if (content?.product?.imageUrl && typeof content.product.imageUrl === "string") {
+          imageUrls.push(content.product.imageUrl);
+        }
+      } catch {
+        /* not JSON / unexpected shape — skip silently */
+      }
+    }
+
+    return { text: replyText, imageUrls };
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e);
     console.error(`Channel AI error (${channel}):`, errMsg);
@@ -1368,10 +1406,10 @@ export async function generateChannelAIResponse(
 
     // Specific message for Anthropic overload (529)
     if (errMsg.includes("overloaded") || errMsg.includes("529")) {
-      return "Извините, сервер AI временно перегружен. Пожалуйста, попробуйте через 1-2 минуты.";
+      return { text: "Извините, сервер AI временно перегружен. Пожалуйста, попробуйте через 1-2 минуты.", imageUrls: [] };
     }
 
-    return "Извините, произошла техническая ошибка. Пожалуйста, напишите нам позже.";
+    return { text: "Извините, произошла техническая ошибка. Пожалуйста, напишите нам позже.", imageUrls: [] };
   }
 }
 

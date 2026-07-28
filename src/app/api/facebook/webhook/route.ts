@@ -17,7 +17,7 @@ export const maxDuration = 60;
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { parseFBWebhookAll, sendFBMessage, sendFBTyping, parseLeadgenEvents, fetchLeadAdData, getPageAccessToken } from "@/lib/facebook-utils";
+import { parseFBWebhookAll, sendFBMessage, sendFBImage, sendFBTyping, parseLeadgenEvents, fetchLeadAdData, getPageAccessToken } from "@/lib/facebook-utils";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
 import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
@@ -273,7 +273,14 @@ async function processBusinessFBMessage(
       senderName
     );
 
-    await sendFBMessage(fbToken, msg.senderId, reply, msg.pageId);
+    await sendFBMessage(fbToken, msg.senderId, reply.text, msg.pageId);
+
+    // Send product images (max 5) отдельными сообщениями после текста.
+    for (const imgUrl of reply.imageUrls.slice(0, 5)) {
+      await sendFBImage(fbToken, msg.senderId, imgUrl, msg.pageId).catch((e) =>
+        console.error(`[FB Webhook] Failed to send product image ${imgUrl}:`, e)
+      );
+    }
 
     await incrementMessageCount(businessId);
   } catch (e) {

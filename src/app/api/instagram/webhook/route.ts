@@ -356,8 +356,15 @@ async function processIGMessage(
     senderName
   );
 
-  const sendResult = await sendIGMessage(pageId, pageToken, senderId, reply);
+  const sendResult = await sendIGMessage(pageId, pageToken, senderId, reply.text);
   console.log(`[IG Webhook] sendIGMessage result: ${sendResult}`);
+
+  // Send product images (max 5) отдельными сообщениями после текста.
+  for (const imgUrl of reply.imageUrls.slice(0, 5)) {
+    await sendIGImage(pageId, pageToken, senderId, imgUrl).catch((e) =>
+      console.error(`[IG Webhook] Failed to send product image ${imgUrl}:`, e)
+    );
+  }
 
   // Increment message usage
   await incrementMessageCount(business.id);
@@ -429,10 +436,18 @@ async function processIGComment(
     commenterName
   );
 
-  // Send private DM reply to the commenter (1 per comment, 7-day window)
-  const sent = await sendIGPrivateReply(pageId, business.fbPageAccessToken, commentId, reply);
+  // Send private DM reply to the commenter (1 per comment, 7-day window).
+  // Comment-to-DM использует recipient.comment_id — Meta не поддерживает
+  // attachment через этот путь, поэтому только текст. После первого reply
+  // окно DM открывается — можем прислать фото товаров как обычные DM.
+  const sent = await sendIGPrivateReply(pageId, business.fbPageAccessToken, commentId, reply.text);
 
   if (sent) {
+    for (const imgUrl of reply.imageUrls.slice(0, 5)) {
+      await sendIGImage(pageId, business.fbPageAccessToken, commenterId, imgUrl).catch((e) =>
+        console.error(`[IG Webhook] Failed to send product image ${imgUrl}:`, e)
+      );
+    }
     await incrementMessageCount(business.id);
   }
 }
@@ -521,6 +536,50 @@ async function sendIGMessage(
     return true;
   } catch (e) {
     console.error("IG sendMessage exception:", e);
+    return false;
+  }
+}
+
+/**
+ * Отправить фото товара клиенту в Instagram DM (28 июля 2026).
+ * Meta Graph API поддерживает attachment `type:"image"` + payload URL.
+ * До этого фото товаров показывались только в Telegram — в WA/IG/FB
+ * клиент видел только текст описания без картинки.
+ */
+async function sendIGImage(
+  igAccountId: string,
+  accessToken: string,
+  recipientId: string,
+  imageUrl: string
+): Promise<boolean> {
+  try {
+    const { decrypt } = await import("@/lib/crypto");
+    const token = decrypt(accessToken) || accessToken;
+    const res = await fetch(`${META_API_BASE}/${igAccountId}/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        recipient: { id: recipientId },
+        messaging_type: "RESPONSE",
+        message: {
+          attachment: {
+            type: "image",
+            payload: { url: imageUrl, is_reusable: true },
+          },
+        },
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("IG sendImage error:", err);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("IG sendImage exception:", e);
     return false;
   }
 }

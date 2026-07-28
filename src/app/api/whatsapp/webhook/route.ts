@@ -14,7 +14,7 @@ export const maxDuration = 60;
 
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { parseWAWebhook, sendWAMessage, markWAMessageRead } from "@/lib/whatsapp-utils";
+import { parseWAWebhook, sendWAMessage, sendWAImage, markWAMessageRead } from "@/lib/whatsapp-utils";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
 import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
 import { checkSubscriptionLimit, incrementMessageCount } from "@/lib/subscription-check";
@@ -230,8 +230,17 @@ async function processWAMessage(
       msg.name
     );
 
-    // Send reply
-    await sendWAMessage(business.waPhoneNumberId, waToken, msg.waId, reply);
+    // Send reply text
+    await sendWAMessage(business.waPhoneNumberId, waToken, msg.waId, reply.text);
+
+    // Send product images (max 5) отдельными сообщениями после текста.
+    // WhatsApp не поддерживает text+image в одном сообщении, поэтому шлём
+    // последовательно. Ошибка отправки одного фото не блокирует остальные.
+    for (const imgUrl of reply.imageUrls.slice(0, 5)) {
+      await sendWAImage(business.waPhoneNumberId, waToken, msg.waId, imgUrl).catch((e) =>
+        console.error(`[WA Webhook] Failed to send product image ${imgUrl}:`, e)
+      );
+    }
 
     // Increment message usage
     await incrementMessageCount(businessId);

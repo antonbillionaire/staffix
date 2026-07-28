@@ -47,6 +47,8 @@ interface ChatRequest {
 
 interface ChatResponse {
   reply: string;
+  /** URL фото товаров — фронт виджета отрисует после текста ответа. */
+  images?: string[];
   /** Ссылки на мессенджеры — фронт может показать под ответом. */
   channels?: Array<{ type: string; url: string; label: string }>;
 }
@@ -162,15 +164,18 @@ export async function POST(
   // channel="web" — новый канал. ChannelConversation создастся автоматически.
   // ChannelClient не создаётся (в channel-ai есть guard "web" != whatsapp/ig/fb).
   // visitor_id = anonymous UUID, name опционально (можно расширить позже).
-  let reply: string;
+  let reply = "";
+  let images: string[] = [];
   try {
-    reply = await generateChannelAIResponse(
+    const aiResp = await generateChannelAIResponse(
       biz.id,
       "web",
       body.visitor_id,
       message,
       body.name || undefined
     );
+    reply = aiResp.text;
+    images = aiResp.imageUrls.slice(0, 5);
   } catch (e) {
     console.error(`[widget-chat] AI failed for biz=${businessId}:`, e);
     reply =
@@ -195,5 +200,9 @@ export async function POST(
     channels.push({ type: "messenger", url: `https://m.me/${biz.fbPageId}`, label: "Messenger" });
   }
 
-  return jsonWithCors({ reply, channels } as ChatResponse);
+  return jsonWithCors({
+    reply,
+    ...(images.length > 0 ? { images } : {}),
+    channels,
+  } as ChatResponse);
 }
