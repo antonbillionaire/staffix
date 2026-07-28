@@ -552,6 +552,12 @@ model Conversation {
   // в следующем ответе бота, чтобы новые данные имели приоритет над старыми ответами
   needsContextRefresh Boolean @default(false)
 
+  // Silent-follow-up nudge (28 июля 2026): cron client-bot-follow-up шлёт
+  // ОДИН мягкий follow-up если бот задал вопрос, а клиент не ответил в
+  // течение ~45 минут. nudgeCount ≥ 1 → больше не тревожим этот диалог.
+  nudgeCount   Int       @default(0)
+  nudgeSentAt  DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1588,6 +1594,10 @@ model ChannelConversation {
 
   // Флаг: база знаний изменилась — обрезать history в следующем ответе бота
   needsContextRefresh Boolean @default(false)
+
+  // Silent-follow-up nudge (28 июля 2026) — см. Conversation.nudgeCount.
+  nudgeCount   Int       @default(0)
+  nudgeSentAt  DateTime?
 
   businessId String
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)

@@ -82,6 +82,10 @@
     {
       "path": "/api/cron/victor-follow-up",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/client-bot-follow-up",
+      "schedule": "*/30 * * * *"
     }
   ]
 }
