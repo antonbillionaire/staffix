@@ -360,6 +360,8 @@ export async function buildBusinessContext(
 // it has the highest LLM attention weight (system instructions earliest in the
 // context have strongest grip on behavior). Hides Staffix/Claude/Anthropic etc.
 import { ANTI_PROBE_USER_BOT } from "@/lib/security-prompts";
+import { HUMAN_TONE_PROMPT, HUMAN_TONE_REMINDER } from "@/lib/prompts/human-tone";
+import { FUNNEL_RULES_PROMPT } from "@/lib/prompts/funnel-rules";
 
 /**
  * Создаёт системный промпт с контекстом клиента и бизнеса
@@ -422,6 +424,10 @@ export function buildSystemPrompt(
   const botName = business.botDisplayName || "Помощник";
 
   let prompt = `${ANTI_PROBE_USER_BOT}
+
+${HUMAN_TONE_PROMPT}
+
+${FUNNEL_RULES_PROMPT}
 
 Ты — ${botName}, сотрудник компании "${business.name}".
 
@@ -628,7 +634,10 @@ ${toneMap[business.aiTone || "friendly"] || toneMap.friendly}
 
   // Дальше — переменный хвост: клиентский контекст. Меняется на каждого
   // клиента и иногда — внутри одного диалога (когда summary обновляется).
-  let variable = "";
+  // Открывается напоминанием про тон — компенсирует «дрейф» модели на
+  // длинных диалогах (>20 сообщений), где стабильный префикс постепенно
+  // теряет вес и модель скатывается к дефолтному формальному стилю.
+  let variable = `${HUMAN_TONE_REMINDER}\n`;
 
   if (!client || client.totalVisits === 0) {
     variable += `\n## СТРАТЕГИЯ ДЛЯ НОВОГО КЛИЕНТА:\nЭто новый клиент. Сначала поздоровайся и узнай его имя. Затем задай 1-2 вопроса чтобы понять потребность. Не вываливай весь прайс сразу — предложи наиболее подходящую услугу.`;

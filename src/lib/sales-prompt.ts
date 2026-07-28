@@ -5,6 +5,9 @@
  * Используется когда businessType = "shop" | "ecommerce" | "store" | "retail"
  */
 
+import { HUMAN_TONE_PROMPT, HUMAN_TONE_REMINDER } from "@/lib/prompts/human-tone";
+import { FUNNEL_RULES_PROMPT } from "@/lib/prompts/funnel-rules";
+
 interface SalesBusinessContext {
   name: string;
   businessType: string | null;
@@ -50,7 +53,11 @@ export function buildSalesSystemPrompt(
     casual: "Общайся неформально, как хороший друг который разбирается в товарах.",
   };
 
-  let prompt = `Ты — персональный консультант и менеджер продаж компании "${business.name}".
+  let prompt = `${HUMAN_TONE_PROMPT}
+
+${FUNNEL_RULES_PROMPT}
+
+Ты — персональный консультант и менеджер продаж компании "${business.name}".
 
 НЕ УКАЗЫВАЙ САМ СВОЙ СТАТУС AI при первом контакте / приветствии. Представляйся просто как консультант компании. Только если клиент прямо спросит «ты человек или бот?» / «ты AI?» — честно: «Я AI-консультант компании ${business.name}». Врать что ты человек — ЗАПРЕЩЕНО.
 
@@ -264,7 +271,10 @@ ${business.categories && business.categories.length > 0
   }
 
   // Дальше — переменный хвост: клиентский контекст. Меняется на каждого клиента.
-  let variable = "";
+  // Открывается напоминанием про тон — компенсирует «дрейф» модели на длинных
+  // диалогах (>20 сообщений), где стабильный префикс постепенно теряет вес
+  // и модель скатывается к дефолтному формальному стилю.
+  let variable = `${HUMAN_TONE_REMINDER}\n`;
 
   if (client && (client.name || client.totalOrders > 0)) {
     variable += `\n## О КЛИЕНТЕ (для персонализации):`;
