@@ -77,6 +77,10 @@ export default function ProductsPage() {
     // Показываются в preview отдельно чтобы владелец понимал что «Объём»,
     // «Штрихкод» и т.п. сохранятся, а не потеряются.
     attributeColumns?: string[];
+    // Колонка с URL фото + число строк её содержащих. Владелец видит
+    // предупреждение «Скачаю N картинок» до нажатия «Импортировать».
+    imageUrlColumn?: string | null;
+    imageUrlCount?: number;
     sampleRows: Array<Record<string, string>>;
   } | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -1090,6 +1094,13 @@ export default function ProductsPage() {
                           </span>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {previewData.imageUrlColumn && (previewData.imageUrlCount ?? 0) > 0 && (
+                    <div className={`text-xs px-3 py-2 rounded ${isDark ? "bg-purple-500/20 text-purple-200 border border-purple-500/30" : "bg-purple-50 text-purple-800 border border-purple-200"}`}>
+                      📷 Колонка «{previewData.imageUrlColumn}» — скачаю {previewData.imageUrlCount} фото с указанных ссылок и привяжу к товарам.
+                      Импорт займёт дольше (примерно {Math.ceil((previewData.imageUrlCount ?? 0) / 5) * 3} секунд на фото).
                     </div>
                   )}
 

@@ -2,9 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
+import { put } from "@vercel/blob";
 import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 import { safeExternalFetch, SafeFetchError } from "@/lib/safe-fetch";
 import { parseCsv } from "@/lib/csv-parser";
+
+// Увеличенный timeout для случая когда CSV содержит фото-URL и мы их
+// скачиваем + загружаем в Vercel Blob параллельно батчами. Стандартные
+// 60 сек хватало на текст, но 50 картинок × 2-3 сек = 30-60 сек занимает
+// даже с параллелизмом 5. Vercel Pro максимум 300 сек.
+export const maxDuration = 300;
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB — тот же лимит что в /api/upload/image
+const ALLOWED_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/avif",
+]);
+const IMAGE_URL_ALIASES = [
+  "фото", "фото url", "фото ссылка", "изображение", "картинка",
+  "image", "image url", "image_url", "photo", "photo_url", "picture", "img", "image link",
+];
+const IMAGE_DOWNLOAD_CONCURRENCY = 5;
 
 async function getUserBusiness(): Promise<string | null> {
   const session = await auth();
@@ -24,13 +45,101 @@ async function getUserBusiness(): Promise<string | null> {
   return business?.id || null;
 }
 
-/**
- * Parse CSV text into rows of cells.
- */
 // CSV parsing вынесен в src/lib/csv-parser.ts — правильный state-machine
 // который держит inQuotes через переносы строк. До 30 июля 2026 здесь была
 // упрощённая версия split("\n") которая ломала многострочные описания
 // (клиент OLLEE поймал этот баг на 44 товарах → 100+ мусорных строк).
+
+/**
+ * Скачать картинку по URL и залить в Vercel Blob. Используется в CSV-импорте
+ * (30 июля 2026) когда клиент указывает колонку «Фото URL» / «Image» — файлы
+ * из его облака (Google Drive shared, свой сайт) заливаются в наш Blob и
+ * привязываются к Product.imageUrl.
+ *
+ * Возвращает URL в Vercel Blob или null (если что-то пошло не так — товар
+ * сохранится без картинки, ошибка не блокирует импорт).
+ *
+ * Защита:
+ *   - safeExternalFetch → блокирует private IPs (SSRF)
+ *   - Content-Type whitelist (только image/*)
+ *   - Content-Length limit 5 MB (тот же что у /api/upload/image)
+ *   - Timeout 15 сек на одну загрузку
+ */
+async function downloadAndUploadImage(
+  url: string,
+  businessId: string
+): Promise<string | null> {
+  try {
+    if (!url || typeof url !== "string") return null;
+    const trimmed = url.trim();
+    if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) return null;
+
+    // safeExternalFetch держит собственный AbortSignal.timeout(15s) через timeoutMs.
+    const res = await safeExternalFetch(trimmed, { timeoutMs: 15_000 });
+    if (!res.ok) {
+      console.warn(`[import/products] image fetch ${res.status}: ${trimmed.slice(0, 100)}`);
+      return null;
+    }
+
+    const contentType = (res.headers.get("content-type") || "").toLowerCase().split(";")[0].trim();
+    if (!ALLOWED_IMAGE_TYPES.has(contentType)) {
+      console.warn(`[import/products] wrong content-type '${contentType}' for ${trimmed.slice(0, 100)}`);
+      return null;
+    }
+
+    const contentLength = Number(res.headers.get("content-length") || "0");
+    if (contentLength > MAX_IMAGE_BYTES) {
+      console.warn(`[import/products] image too large ${contentLength}b: ${trimmed.slice(0, 100)}`);
+      return null;
+    }
+
+    const buffer = await res.arrayBuffer();
+    if (buffer.byteLength > MAX_IMAGE_BYTES) {
+      console.warn(`[import/products] image too large (streamed) ${buffer.byteLength}b: ${trimmed.slice(0, 100)}`);
+      return null;
+    }
+
+    const ext = contentType.split("/")[1] || "jpg";
+    const filename = `products/${businessId}/import-${Date.now()}.${ext}`;
+    const blob = await put(filename, Buffer.from(buffer), {
+      access: "public",
+      addRandomSuffix: true,
+      contentType,
+    });
+    return blob.url;
+  } catch (e) {
+    if (e instanceof SafeFetchError) {
+      console.warn(`[import/products] SSRF-blocked image: ${e.message}`);
+    } else if (e instanceof Error && e.name === "AbortError") {
+      console.warn(`[import/products] image download timeout: ${url.slice(0, 100)}`);
+    } else {
+      console.error(`[import/products] image download failed:`, e);
+    }
+    return null;
+  }
+}
+
+/**
+ * Параллельная обработка списка задач батчами. Возвращает результаты в
+ * том же порядке что и входы. Ошибка одной задачи → null в её позиции.
+ */
+async function inBatches<T, R>(
+  items: T[],
+  batchSize: number,
+  fn: (item: T, idx: number) => Promise<R | null>
+): Promise<Array<R | null>> {
+  const results: Array<R | null> = new Array(items.length).fill(null);
+  for (let start = 0; start < items.length; start += batchSize) {
+    const chunk = items.slice(start, start + batchSize);
+    const settled = await Promise.allSettled(
+      chunk.map((item, i) => fn(item, start + i))
+    );
+    settled.forEach((s, i) => {
+      results[start + i] = s.status === "fulfilled" ? s.value : null;
+    });
+  }
+  return results;
+}
 
 // POST /api/import/products
 // Body: { csv: string }
@@ -254,15 +363,34 @@ export async function POST(request: NextRequest) {
       colMap.description = 3; colMap.stock = 4; colMap.sku = 5; colMap.oldPrice = 6;
     }
 
+    // Колонка «Фото URL» — ссылки на картинки в облаке клиента.
+    // При импорте скачиваем и заливаем в Vercel Blob → Product.imageUrl.
+    // Не смешиваем с attributes: URL не полезен AI, полезен только визуально.
+    let imageUrlColIndex: number | null = null;
+    if (hasHeader) {
+      for (let ci = 0; ci < firstRow.length; ci++) {
+        if (Object.values(colMap).includes(ci)) continue; // не забираем занятую
+        const cell = firstRow[ci];
+        if (IMAGE_URL_ALIASES.some((a) => cell.includes(a))) {
+          imageUrlColIndex = ci;
+          break;
+        }
+      }
+    }
+
     // Неопознанные колонки → идут в Product.attributes (JSON dictionary).
     // Пример для OLLEE: файл содержит «Обьем» + «Штрихкод» — их нет в ALIASES,
     // но раньше они просто игнорировались. Теперь сохраняются как
     // { "Обьем": "80ml", "Штрихкод": "8809722156116" } и AI их видит.
-    const mappedColumnIndexes = new Set(Object.values(colMap));
+    // Колонку «Фото URL» тоже НЕ включаем в attributes — она обработана выше.
+    const reservedIndexes = new Set([
+      ...Object.values(colMap),
+      ...(imageUrlColIndex !== null ? [imageUrlColIndex] : []),
+    ]);
     const attributeColumns: Array<{ index: number; label: string }> = [];
     if (hasHeader) {
       for (let ci = 0; ci < rows[0].length; ci++) {
-        if (mappedColumnIndexes.has(ci)) continue;
+        if (reservedIndexes.has(ci)) continue;
         const originalHeader = (rows[0][ci] || "").trim();
         // Пропускаем полностью пустые header'ы (например пустая колонка «Фото»
         // без данных — не создаём фейковых attribute-ов).
@@ -303,6 +431,18 @@ export async function POST(request: NextRequest) {
         return mapped;
       });
 
+      // Показать в preview сколько строк содержат фото-URL — владелец
+      // сразу понимает что фото будут скачаны.
+      let imageUrlCount = 0;
+      if (imageUrlColIndex !== null) {
+        for (const row of dataRows) {
+          const url = (row[imageUrlColIndex] || "").trim();
+          if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+            imageUrlCount++;
+          }
+        }
+      }
+
       return NextResponse.json({
         preview: true,
         hasHeader,
@@ -312,6 +452,10 @@ export async function POST(request: NextRequest) {
         // Дополнительные колонки-свойства, которые попадут в Product.attributes.
         // UI показывает секцию «Дополнительные свойства которые будут сохранены».
         attributeColumns: attributeColumns.map((c) => c.label),
+        // Колонка с URL фото + сколько строк её содержат — предупреждение UI
+        // что импорт займёт дольше (нам надо скачать N картинок).
+        imageUrlColumn: imageUrlColIndex !== null ? rows[0][imageUrlColIndex] : null,
+        imageUrlCount,
         sampleRows,
       });
     }
@@ -325,9 +469,13 @@ export async function POST(request: NextRequest) {
       sku: string | null;
       oldPrice: number | null;
       attributes: Record<string, string> | null;
+      imageUrl: string | null;
       isActive: boolean;
       businessId: string;
     }[] = [];
+    // URL-ы фото собираем параллельно с товарами, скачиваем ПОСЛЕ основной
+    // валидации (чтобы не тратить время на битые товары).
+    const imageUrlsToFetch: Array<{ productIdx: number; url: string }> = [];
     const errors: string[] = [];
 
     for (let i = 0; i < dataRows.length; i++) {
@@ -387,9 +535,44 @@ export async function POST(request: NextRequest) {
         sku: sku || null,
         oldPrice,
         attributes,
+        imageUrl: null, // заполнится после скачивания (см. ниже)
         isActive: true,
         businessId,
       });
+
+      // Если в строке был URL фото — регистрируем для скачивания
+      if (imageUrlColIndex !== null) {
+        const rawUrl = (row[imageUrlColIndex] || "").trim();
+        if (rawUrl && (rawUrl.startsWith("http://") || rawUrl.startsWith("https://"))) {
+          imageUrlsToFetch.push({
+            productIdx: productsToCreate.length - 1,
+            url: rawUrl,
+          });
+        }
+      }
+    }
+
+    // Параллельно скачиваем фото и заливаем в Vercel Blob. Батчами по 5 —
+    // компромисс между скоростью и нагрузкой на Vercel Blob API. Ошибки
+    // не блокируют импорт: товар без фото всё равно создастся.
+    let imagesFetched = 0;
+    let imagesFailed = 0;
+    if (imageUrlsToFetch.length > 0) {
+      console.log(`[import/products] downloading ${imageUrlsToFetch.length} images...`);
+      const blobUrls = await inBatches(
+        imageUrlsToFetch,
+        IMAGE_DOWNLOAD_CONCURRENCY,
+        (item) => downloadAndUploadImage(item.url, businessId)
+      );
+      blobUrls.forEach((blobUrl, i) => {
+        if (blobUrl) {
+          productsToCreate[imageUrlsToFetch[i].productIdx].imageUrl = blobUrl;
+          imagesFetched++;
+        } else {
+          imagesFailed++;
+        }
+      });
+      console.log(`[import/products] images done: ${imagesFetched} ok, ${imagesFailed} failed`);
     }
 
     // Batch insert all valid products in one query.
@@ -409,11 +592,19 @@ export async function POST(request: NextRequest) {
       await markBusinessConversationsForRefresh(businessId);
     }
 
+    // Сводка по фото — показать владельцу отдельно
+    const imagesMsg =
+      imageUrlsToFetch.length > 0
+        ? ` · Фото загружено: ${imagesFetched}${imagesFailed > 0 ? `, не удалось: ${imagesFailed}` : ""}`
+        : "";
+
     return NextResponse.json({
       success: true,
       created: createdCount,
+      imagesFetched,
+      imagesFailed,
       errors: errors.length > 0 ? errors : undefined,
-      message: `Создано товаров: ${createdCount}${errors.length > 0 ? `, пропущено: ${errors.length}` : ""}`,
+      message: `Создано товаров: ${createdCount}${errors.length > 0 ? `, пропущено: ${errors.length}` : ""}${imagesMsg}`,
     });
   } catch (error) {
     console.error("POST /api/import/products:", error);
