@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
+import { parseCsv } from "@/lib/csv-parser";
 
 async function getUserBusiness(): Promise<string | null> {
   const session = await auth();
@@ -21,45 +22,7 @@ async function getUserBusiness(): Promise<string | null> {
   return business?.id || null;
 }
 
-/**
- * Parse CSV text into rows of cells.
- * Handles quoted fields with commas and semicolons as delimiters.
- */
-function parseCsv(text: string): string[][] {
-  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
-  const rows: string[][] = [];
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-
-    // Detect delimiter: semicolon takes priority if present
-    const delim = line.includes(";") ? ";" : ",";
-    const cells: string[] = [];
-    let current = "";
-    let inQuotes = false;
-
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (ch === delim && !inQuotes) {
-        cells.push(current.trim());
-        current = "";
-      } else {
-        current += ch;
-      }
-    }
-    cells.push(current.trim());
-    rows.push(cells);
-  }
-
-  return rows;
-}
+// CSV parsing вынесен в src/lib/csv-parser.ts (30 июля 2026).
 
 // POST /api/import/services
 // Body: { csv: string } — CSV text

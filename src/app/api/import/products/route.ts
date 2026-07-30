@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
 import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 import { safeExternalFetch, SafeFetchError } from "@/lib/safe-fetch";
+import { parseCsv } from "@/lib/csv-parser";
 
 async function getUserBusiness(): Promise<string | null> {
   const session = await auth();
@@ -26,40 +27,10 @@ async function getUserBusiness(): Promise<string | null> {
 /**
  * Parse CSV text into rows of cells.
  */
-function parseCsv(text: string): string[][] {
-  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
-  const rows: string[][] = [];
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-
-    const delim = line.includes(";") ? ";" : ",";
-    const cells: string[] = [];
-    let current = "";
-    let inQuotes = false;
-
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (ch === delim && !inQuotes) {
-        cells.push(current.trim());
-        current = "";
-      } else {
-        current += ch;
-      }
-    }
-    cells.push(current.trim());
-    rows.push(cells);
-  }
-
-  return rows;
-}
+// CSV parsing вынесен в src/lib/csv-parser.ts — правильный state-machine
+// который держит inQuotes через переносы строк. До 30 июля 2026 здесь была
+// упрощённая версия split("\n") которая ломала многострочные описания
+// (клиент OLLEE поймал этот баг на 44 товарах → 100+ мусорных строк).
 
 // POST /api/import/products
 // Body: { csv: string }
