@@ -494,6 +494,17 @@ export default function ProductsPage() {
               <Upload className="w-4 h-4" />
               {t("products.importCatalog")}
             </button>
+            {/* Массовая загрузка фото товаров — отдельная страница (30 июля 2026)
+                потому что flow принципиально другой (бинарные файлы, ZIP,
+                матчинг по SKU). Смешивать с CSV-модалкой было бы путано. */}
+            <a
+              href="/dashboard/products/import-photos"
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border ${isDark ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+              title="Массовая загрузка фото товаров"
+            >
+              <ImagePlus className="w-4 h-4" />
+              Массово фото
+            </a>
             <button
               onClick={openCreate}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"

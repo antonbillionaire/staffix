@@ -18,6 +18,7 @@
     "@tanstack/react-virtual": "^3.13.24",
     "@vercel/blob": "^2.3.3",
     "bcryptjs": "^3.0.3",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.563.0",
     "mammoth": "^1.11.0",
     "next": "16.1.4",
