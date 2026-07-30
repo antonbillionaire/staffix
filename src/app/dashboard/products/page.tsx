@@ -20,6 +20,11 @@ interface Product {
   imageUrl: string | null;
   productUrl: string | null;
   isActive: boolean;
+  // Свойства товара (объём, вес, штрихкод, размер, материал и т.п.).
+  // Заполняется автоматически при CSV-импорте из неопознанных колонок,
+  // либо владельцем вручную в карточке товара. AI видит их через
+  // get_product_details и отвечает клиенту точно, без «уточню у менеджера».
+  attributes?: Record<string, string> | null;
 }
 
 const EMPTY_FORM = {
@@ -33,6 +38,9 @@ const EMPTY_FORM = {
   tags: "",
   imageUrl: "",
   productUrl: "",
+  // Attributes в форме — массив пар для удобного добавления/удаления в UI.
+  // При save конвертируется в { key: value } словарь.
+  attributes: [] as Array<{ key: string; value: string }>,
 };
 
 export default function ProductsPage() {
@@ -65,6 +73,10 @@ export default function ProductsPage() {
     usePositional: boolean;
     totalRows: number;
     mapping: Array<{ field: string; label: string; columnIndex: number; headerName: string }>;
+    // Дополнительные колонки-свойства которые попадут в Product.attributes.
+    // Показываются в preview отдельно чтобы владелец понимал что «Объём»,
+    // «Штрихкод» и т.п. сохранятся, а не потеряются.
+    attributeColumns?: string[];
     sampleRows: Array<Record<string, string>>;
   } | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -117,6 +129,9 @@ export default function ProductsPage() {
       tags: p.tags.join(", "),
       imageUrl: p.imageUrl || "",
       productUrl: p.productUrl || "",
+      attributes: p.attributes
+        ? Object.entries(p.attributes).map(([key, value]) => ({ key, value }))
+        : [],
     });
     setIsModalOpen(true);
   };
@@ -125,6 +140,15 @@ export default function ProductsPage() {
     if (!form.name || !form.price) return;
     setSaving(true);
     try {
+      // Собираем attributes из массива пар. Пустые ключи/значения пропускаем.
+      // Пустой словарь → шлём {} (для PATCH это сигнал «очистить все свойства»).
+      const attributesObj: Record<string, string> = {};
+      for (const { key, value } of form.attributes) {
+        const k = key.trim();
+        const v = value.trim();
+        if (k && v) attributesObj[k] = v;
+      }
+
       const payload = {
         name: form.name.trim(),
         description: form.description.trim() || null,
@@ -136,6 +160,7 @@ export default function ProductsPage() {
         tags: form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
         imageUrl: form.imageUrl.trim() || null,
         productUrl: form.productUrl.trim() || null,
+        attributes: attributesObj,
         isActive: true,
       };
 
@@ -827,6 +852,77 @@ export default function ProductsPage() {
                   {t("products.productUrlHint") || "Бот отправит ссылку клиенту вместе с описанием товара"}
                 </p>
               </div>
+
+              {/* Свойства товара (30 июля 2026): объём, вес, штрихкод, размер и т.п.
+                  Заполняется автоматически при CSV-импорте либо вручную. AI видит
+                  через get_product_details и отвечает клиенту точно. */}
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${text}`}>
+                  Свойства товара
+                </label>
+                <p className={`text-xs mb-2 ${sub}`}>
+                  Например: Объём — 80ml, Штрихкод — 8809722156116, Материал — хлопок. ИИ сотрудник видит эти данные и отвечает клиенту точно, без «уточню у менеджера».
+                </p>
+                <div className="space-y-2">
+                  {form.attributes.map((attr, idx) => (
+                    <div key={idx} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={attr.key}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            attributes: f.attributes.map((a, i) => (i === idx ? { ...a, key: e.target.value } : a)),
+                          }))
+                        }
+                        placeholder="Название свойства"
+                        maxLength={60}
+                        className={`w-1/3 px-3 py-2 rounded-lg border text-sm outline-none ${input}`}
+                      />
+                      <input
+                        type="text"
+                        value={attr.value}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            attributes: f.attributes.map((a, i) => (i === idx ? { ...a, value: e.target.value } : a)),
+                          }))
+                        }
+                        placeholder="Значение"
+                        maxLength={300}
+                        className={`flex-1 px-3 py-2 rounded-lg border text-sm outline-none ${input}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            attributes: f.attributes.filter((_, i) => i !== idx),
+                          }))
+                        }
+                        className={`px-3 py-2 rounded-lg text-sm ${isDark ? "bg-gray-700 hover:bg-gray-600 text-gray-300" : "bg-gray-100 hover:bg-gray-200 text-gray-600"}`}
+                        title="Удалить свойство"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {form.attributes.length < 30 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          attributes: [...f.attributes, { key: "", value: "" }],
+                        }))
+                      }
+                      className={`text-sm px-3 py-1.5 rounded-lg ${isDark ? "bg-gray-700 hover:bg-gray-600 text-gray-300" : "bg-blue-50 hover:bg-blue-100 text-blue-700"}`}
+                    >
+                      + Добавить свойство
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className={`flex gap-3 p-5 border-t ${isDark ? "border-gray-700" : "border-gray-200"}`}>
@@ -981,6 +1077,21 @@ export default function ProductsPage() {
                       ))}
                     </div>
                   </div>
+
+                  {previewData.attributeColumns && previewData.attributeColumns.length > 0 && (
+                    <div className="space-y-1">
+                      <p className={`text-xs font-medium ${isDark ? "text-green-300" : "text-green-700"}`}>
+                        Дополнительные свойства, которые будут сохранены (ИИ сотрудник их увидит):
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {previewData.attributeColumns.map((label) => (
+                          <span key={label} className={`text-xs px-2 py-1 rounded ${isDark ? "bg-green-500/20 text-green-300 border border-green-500/30" : "bg-green-50 text-green-800 border border-green-200"}`}>
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="overflow-x-auto">
                     <p className={`text-xs font-medium mb-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>{t("products.sampleRows").replace("{count}", String(previewData.sampleRows.length))}:</p>

@@ -1872,6 +1872,14 @@ model Product {
   imageUrl   String?
   productUrl String? // ссылка на товар на сайте магазина
 
+  // Свойства товара — гибкий словарь key-value (30 июля 2026).
+  // Формат: { "Объём": "80ml", "Штрихкод": "8809722156116", "Материал": "хлопок" }.
+  // При импорте CSV — сюда автоматически кладутся все колонки которые не
+  // мапятся в известные поля (name/price/description/stock/sku/category/etc).
+  // AI видит эти свойства через get_product_details и не выдумывает данные
+  // которых нет в описании. Владелец может редактировать в /dashboard/products.
+  attributes Json?
+
   isActive Boolean @default(true)
 
   businessId String

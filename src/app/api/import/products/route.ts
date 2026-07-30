@@ -202,14 +202,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Файл пустой" }, { status: 400 });
     }
 
-    // Column-name aliases for smart mapping
+    // Column-name aliases for smart mapping.
+    // Всё что не мапится — попадает в Product.attributes как key=value
+    // (30 июля 2026, чтобы OLLEE и другие клиенты с колонками «Объём»,
+    // «Штрихкод», «Вес», «Материал» не теряли эти данные — AI их видит через
+    // get_product_details и не выдумывает).
     const ALIASES: Record<string, string[]> = {
-      name: ["название", "наименование", "name", "товар", "product", "item", "продукт"],
+      name: ["название", "наименование", "name", "товар", "product", "item", "продукт", "номенклатура"],
       price: ["цена", "price", "стоимость", "cost"],
       category: ["категория", "category", "группа", "group"],
-      description: ["описание", "description", "desc"],
+      description: ["описание", "description", "desc", "краткое описние"],
       stock: ["остаток", "stock", "количество", "qty", "quantity", "кол-во"],
-      sku: ["артикул", "sku", "код", "code"],
+      sku: ["артикул", "sku", "код", "code", "штрихкод", "barcode", "ean"],
       oldPrice: ["старая цена", "old price", "старая_цена", "скидка от", "old_price", "oldprice"],
       productUrl: ["ссылка", "url", "link", "страница", "page_url", "product_url"],
     };
@@ -250,6 +254,23 @@ export async function POST(request: NextRequest) {
       colMap.description = 3; colMap.stock = 4; colMap.sku = 5; colMap.oldPrice = 6;
     }
 
+    // Неопознанные колонки → идут в Product.attributes (JSON dictionary).
+    // Пример для OLLEE: файл содержит «Обьем» + «Штрихкод» — их нет в ALIASES,
+    // но раньше они просто игнорировались. Теперь сохраняются как
+    // { "Обьем": "80ml", "Штрихкод": "8809722156116" } и AI их видит.
+    const mappedColumnIndexes = new Set(Object.values(colMap));
+    const attributeColumns: Array<{ index: number; label: string }> = [];
+    if (hasHeader) {
+      for (let ci = 0; ci < rows[0].length; ci++) {
+        if (mappedColumnIndexes.has(ci)) continue;
+        const originalHeader = (rows[0][ci] || "").trim();
+        // Пропускаем полностью пустые header'ы (например пустая колонка «Фото»
+        // без данных — не создаём фейковых attribute-ов).
+        if (!originalHeader) continue;
+        attributeColumns.push({ index: ci, label: originalHeader });
+      }
+    }
+
     const dataRows = hasHeader ? rows.slice(1) : rows;
 
     if (dataRows.length === 0) {
@@ -275,6 +296,10 @@ export async function POST(request: NextRequest) {
         for (const [field, colIndex] of Object.entries(colMap)) {
           mapped[field] = row[colIndex] || "";
         }
+        // Плюс sample attributes для этой строки
+        for (const { index, label } of attributeColumns) {
+          mapped[`attr:${label}`] = row[index] || "";
+        }
         return mapped;
       });
 
@@ -284,6 +309,9 @@ export async function POST(request: NextRequest) {
         usePositional,
         totalRows: dataRows.length,
         mapping,
+        // Дополнительные колонки-свойства, которые попадут в Product.attributes.
+        // UI показывает секцию «Дополнительные свойства которые будут сохранены».
+        attributeColumns: attributeColumns.map((c) => c.label),
         sampleRows,
       });
     }
@@ -296,6 +324,7 @@ export async function POST(request: NextRequest) {
       stock: number | null;
       sku: string | null;
       oldPrice: number | null;
+      attributes: Record<string, string> | null;
       isActive: boolean;
       businessId: string;
     }[] = [];
@@ -336,6 +365,19 @@ export async function POST(request: NextRequest) {
         if (!isNaN(op) && op > price) oldPrice = op;
       }
 
+      // Собираем attributes из неопознанных колонок этой строки.
+      // Пустые значения пропускаем — не создаём {"Обьем": ""} для товаров
+      // где эта колонка не заполнена.
+      let attributes: Record<string, string> | null = null;
+      if (attributeColumns.length > 0) {
+        const attrs: Record<string, string> = {};
+        for (const { index, label } of attributeColumns) {
+          const val = (row[index] || "").trim();
+          if (val) attrs[label] = val;
+        }
+        if (Object.keys(attrs).length > 0) attributes = attrs;
+      }
+
       productsToCreate.push({
         name,
         price,
@@ -344,15 +386,25 @@ export async function POST(request: NextRequest) {
         stock,
         sku: sku || null,
         oldPrice,
+        attributes,
         isActive: true,
         businessId,
       });
     }
 
-    // Batch insert all valid products in one query
+    // Batch insert all valid products in one query.
+    // Prisma требует Json | JsonNull для nullable Json полей — конвертируем
+    // наш `null` в специальный маркер `Prisma.DbNull` через as-cast (или
+    // явно omitting attributes когда null, что упрощает контракт).
     let createdCount = 0;
     if (productsToCreate.length > 0) {
-      const result = await prisma.product.createMany({ data: productsToCreate });
+      const dataForPrisma = productsToCreate.map((p) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { attributes, ...rest } = p;
+        return attributes ? { ...rest, attributes } : rest;
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await prisma.product.createMany({ data: dataForPrisma as any });
       createdCount = result.count;
       await markBusinessConversationsForRefresh(businessId);
     }

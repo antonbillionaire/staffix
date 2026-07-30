@@ -726,6 +726,11 @@ export async function getProductDetails(
             : `В наличии (${product.stock}+ шт.)`,
         imageUrl: product.imageUrl || null,
         productUrl: product.productUrl || null,
+        // Свойства товара (30 июля 2026) — объём, вес, штрихкод, размер и т.п.
+        // Приходят из CSV-импорта (все неопознанные колонки) или редактируются
+        // владельцем в /dashboard/products. AI использует их для точных ответов
+        // на техвопросы клиента вместо «уточню у менеджера».
+        attributes: product.attributes || null,
       },
     };
   } catch (error) {
