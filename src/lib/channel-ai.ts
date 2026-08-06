@@ -1132,10 +1132,17 @@ export async function generateChannelAIResponse(
     //     не срабатывает) — раньше телефон терялся молча, теперь уведомим.
     // Зеркалит логику TG webhook через единый detector.
     const { botPromisedHandoffRegex } = await import("@/lib/handoff-detector");
-    const { extractPhone } = await import("@/lib/ai-memory");
+    const { detectPhone } = await import("@/lib/phone-parser");
+    const { evaluateHandoffGuard } = await import("@/lib/handoff-guard");
     const promisedForwardingRegex = botPromisedHandoffRegex();
     const calledNotifyManagerCh = calledToolNames.includes("notify_manager");
-    const extractedPhoneCh = extractPhone(userMessage);
+    // Расширенный phone-parser: знает про Business.country → распознаёт
+    // локальные форматы (узб. 9 цифр без +998 и т.д.) + возвращает флаг
+    // incomplete=true когда клиент прислал 5-11 цифр но парсер не смог
+    // нормализовать (недописанный номер — guard попросит уточнить).
+    const bizCountry = (biz.country || undefined) as import("@/lib/phone-parser").PhoneCountry;
+    const phoneDetection = detectPhone(userMessage, bizCountry);
+    const extractedPhoneCh = phoneDetection.phone;
 
     // Был ли у клиента телефон до этого сообщения? Смотрим в ChannelClient.
     // (Смотрим ВСЕГДА — не только когда клиент прислал телефон в этом turn'e —
@@ -1178,30 +1185,59 @@ export async function generateChannelAIResponse(
     const hasPhoneNowCh = !!(extractedPhoneCh || channelClientPhoneOnRecord);
     const botPromisedCh = promisedForwardingRegex.test(replyText);
 
-    // ⚠️ HARD-CODE GUARD (июль 2026, AY 16 июля):
-    // Промпт-правило (fabc9fe) уменьшает частоту протечек, но не убирает их.
-    // Если бот ВСЁ ЖЕ пообещал «менеджер свяжется», НЕ вызвал notify_manager
-    // (значит это не осознанная эскалация клиента-жалобщика), И у нас нет
-    // телефона — ПЕРЕХВАТЫВАЕМ ответ. Клиент видит просьбу дать номер вместо
-    // ложного обещания. Эскалацию не отправляем — менеджер отработает когда
-    // телефон реально придёт (тогда сработает newContactProvidedCh trigger).
-    //
-    // Это защита от потери лидов: без guard'а бот говорил «свяжемся», клиент
-    // ждал, но менеджеру нечем было связаться. С guard'ом клиент видит нормальный
-    // запрос телефона.
+    // ⚠️ HARD-CODE GUARD (июль 2026 → 6 августа переработан):
+    // Правило `feedback_bot_never_escalate_without_phone` — если бот пообещал
+    // «менеджер свяжется» без телефона и без реального notify_manager —
+    // перехватываем, иначе лид теряется. Логика в handoff-guard.ts:
+    //   - Неполный номер («99888») → просим уточнить
+    //   - 3-й раз подряд guard → реально зовём notify_manager (LLM зациклился)
+    //   - Первое-второе срабатывание → вариативная фраза с именем клиента
+    // Счётчик guardHits хранится в ChannelConversation.extractedInfo для
+    // сохранения между вызовами.
+    const prevExtracted = (conv.extractedInfo as Record<string, unknown> | null) || {};
+    const previousGuardHits = typeof prevExtracted.guardHits === "number" ? prevExtracted.guardHits : 0;
+    const guardResult = evaluateHandoffGuard({
+      botReplyText: replyText,
+      phoneDetection,
+      hasPhoneOnRecord: hasPhoneNowCh,
+      calledNotifyManager: calledNotifyManagerCh,
+      promisedForwardingRegex,
+      clientName: clientName || conv.clientName,
+      previousGuardHits,
+    });
+
     let promiseIntercepted = false;
-    if (botPromisedCh && !calledNotifyManagerCh && !hasPhoneNowCh) {
+    let guardForcesNotify = false;
+    if (guardResult.intercepted) {
       console.warn(
-        `[Channel AI] HARD-CODE GUARD: prompt leaked promise without phone — intercepting. business=${businessId} channel=${channel}`
+        `[Channel AI] HANDOFF GUARD (${guardResult.logReason}): business=${businessId} channel=${channel} hits=${previousGuardHits}→${guardResult.newGuardHits}`
       );
-      replyText =
-        "Отлично! Чтобы менеджер мог с Вами связаться и всё подробно рассказать — " +
-        "подскажите, пожалуйста, Ваш номер телефона и удобное время для звонка.";
+      replyText = guardResult.overrideReply!;
       promiseIntercepted = true;
+      guardForcesNotify = !!guardResult.forceNotifyManager;
+
+      // Персистим счётчик в extractedInfo для следующего turn'а
+      prisma.channelConversation.update({
+        where: { id: conv.id },
+        data: {
+          extractedInfo: { ...prevExtracted, guardHits: guardResult.newGuardHits },
+        },
+      }).catch((e) => console.error("[Channel AI] guardHits persist failed:", e));
+    } else if (previousGuardHits > 0) {
+      // Guard не сработал в этот раз — сбрасываем счётчик (клиент вернулся в
+      // нормальный диалог, LLM даёт валидный ответ)
+      prisma.channelConversation.update({
+        where: { id: conv.id },
+        data: {
+          extractedInfo: { ...prevExtracted, guardHits: 0 },
+        },
+      }).catch(() => {});
     }
 
-    const shouldNotifyCh = !calledNotifyManagerCh && !promiseIntercepted && (
-      promisedForwardingRegex.test(replyText) || newContactProvidedCh
+    const shouldNotifyCh = !calledNotifyManagerCh && (
+      guardForcesNotify || (!promiseIntercepted && (
+        promisedForwardingRegex.test(replyText) || newContactProvidedCh
+      ))
     );
 
     if (shouldNotifyCh) {

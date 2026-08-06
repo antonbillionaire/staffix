@@ -25,7 +25,6 @@ import {
   updateClientAfterMessage,
   updateConversationMessageCount,
   extractClientName,
-  extractPhone,
 } from "@/lib/ai-memory";
 import { bookingToolDefinitions } from "@/lib/booking-tools";
 import { salesToolDefinitions, executeSalesTool, notifyManagerByTelegram } from "@/lib/sales-tools";
@@ -35,6 +34,8 @@ import { salesToolDefinitions, executeSalesTool, notifyManagerByTelegram } from 
 const SALES_TOOL_NAME_SET = new Set(salesToolDefinitions.map((t) => t.name));
 import { buildSalesSystemPrompt, isSalesMode } from "@/lib/sales-prompt";
 import { botPromisedHandoffRegex } from "@/lib/handoff-detector";
+import { detectPhone, type PhoneCountry } from "@/lib/phone-parser";
+import { evaluateHandoffGuard } from "@/lib/handoff-guard";
 import {
   loadRoutableStaff,
   buildRouteToSpecialistTool,
@@ -483,7 +484,12 @@ export async function generateAIResponse(
     //     не знал. Теперь второй заход тоже уведомит — с телефоном И контекстом переписки.
     const promisedForwardingRegex = botPromisedHandoffRegex();
     const calledNotifyManager = calledToolNames.includes("notify_manager");
-    const extractedPhoneEarly = extractPhone(userMessage);
+    // Расширенный phone-parser знает про Business.country (узбекские номера
+    // без +998 и т.п.) + возвращает incomplete=true если клиент прислал
+    // короткий номер — guard попросит уточнить вместо тупого шаблона.
+    const bizCountry = (businessContext.country || undefined) as PhoneCountry;
+    const phoneDetectionTg = detectPhone(userMessage, bizCountry);
+    const extractedPhoneEarly = phoneDetectionTg.phone;
 
     // Смотрим ЛЮБОЙ сохранённый телефон клиента (не только когда пришёл в этом
     // turn'e) — нужно для hard-code guard ниже. Раньше проверяли только когда
@@ -502,26 +508,57 @@ export async function generateAIResponse(
     const clientHadPhoneBefore = !!clientPhoneOnRecord;
     const newContactProvided = !!extractedPhoneEarly && !clientHadPhoneBefore;
     const hasPhoneNowTg = !!(extractedPhoneEarly || clientPhoneOnRecord);
-    const botPromisedTg = promisedForwardingRegex.test(assistantMessage);
 
-    // ⚠️ HARD-CODE GUARD (июль 2026, AY 16 июля): промпт-правило может протечь.
-    // Если бот пообещал «менеджер свяжется» БЕЗ телефона и не вызвал
-    // notify_manager сам — ПЕРЕХВАТЫВАЕМ ответ. Клиент видит запрос номера,
-    // эскалация не отправляется (менеджер отработает когда телефон реально
-    // придёт через newContactProvided trigger).
+    // ⚠️ HARD-CODE GUARD (переработан 6 августа 2026 после OLLEE conv-10):
+    // Правило `feedback_bot_never_escalate_without_phone` — но одна и та же
+    // фраза срабатывала до 6 раз подряд. Теперь через handoff-guard.ts:
+    //   - Неполный номер → просим уточнить
+    //   - 3+ срабатываний → реально зовём notify_manager (LLM зациклился)
+    //   - Иначе → вариативная фраза с именем клиента
+    // Счётчик guardHits хранится в Conversation.extractedInfo между вызовами.
+    const prevExtractedTg = conversation.extractedInfo || {};
+    const previousGuardHitsTg = typeof prevExtractedTg.guardHits === "number" ? prevExtractedTg.guardHits : 0;
+    const guardResultTg = evaluateHandoffGuard({
+      botReplyText: assistantMessage,
+      phoneDetection: phoneDetectionTg,
+      hasPhoneOnRecord: hasPhoneNowTg,
+      calledNotifyManager,
+      promisedForwardingRegex,
+      clientName: userName || clientContext?.name || null,
+      previousGuardHits: previousGuardHitsTg,
+    });
+
     let promiseInterceptedTg = false;
-    if (botPromisedTg && !calledNotifyManager && !hasPhoneNowTg) {
+    let guardForcesNotifyTg = false;
+    if (guardResultTg.intercepted) {
       console.warn(
-        `[Webhook] HARD-CODE GUARD: prompt leaked promise without phone — intercepting. business=${businessId}`
+        `[Webhook] HANDOFF GUARD (${guardResultTg.logReason}): business=${businessId} hits=${previousGuardHitsTg}→${guardResultTg.newGuardHits}`
       );
-      assistantMessage =
-        "Отлично! Чтобы менеджер мог с Вами связаться и всё подробно рассказать — " +
-        "подскажите, пожалуйста, Ваш номер телефона и удобное время для звонка.";
+      assistantMessage = guardResultTg.overrideReply!;
       promiseInterceptedTg = true;
+      guardForcesNotifyTg = !!guardResultTg.forceNotifyManager;
+
+      // Персистим счётчик для следующего turn'а
+      prisma.conversation.update({
+        where: { id: conversation.id },
+        data: {
+          extractedInfo: { ...prevExtractedTg, guardHits: guardResultTg.newGuardHits },
+        },
+      }).catch((e) => console.error("[Webhook] guardHits persist failed:", e));
+    } else if (previousGuardHitsTg > 0) {
+      // Guard не сработал — сбрасываем счётчик (клиент вернулся в нормальный диалог)
+      prisma.conversation.update({
+        where: { id: conversation.id },
+        data: {
+          extractedInfo: { ...prevExtractedTg, guardHits: 0 },
+        },
+      }).catch(() => {});
     }
 
-    const shouldNotify = !calledNotifyManager && !promiseInterceptedTg && (
-      promisedForwardingRegex.test(assistantMessage) || newContactProvided
+    const shouldNotify = !calledNotifyManager && (
+      guardForcesNotifyTg || (!promiseInterceptedTg && (
+        promisedForwardingRegex.test(assistantMessage) || newContactProvided
+      ))
     );
 
     if (shouldNotify) {
@@ -603,9 +640,12 @@ export async function generateAIResponse(
     // 10. Счётчик сообщений в разговоре
     await updateConversationMessageCount(conversation.id);
 
-    // 11. Извлекаем имя/телефон из текста и обновляем клиента
+    // 11. Извлекаем имя/телефон из текста и обновляем клиента.
+    // Используем detectPhone с country (расширенный парсер) чтобы сохранять
+    // и локальные форматы (узб. 9 цифр без +998), которые старый extractPhone
+    // пропускал — из-за чего клиенты OLLEE «теряли» номер после разговора.
     const extractedName = extractClientName(userMessage);
-    const extractedPhone = extractPhone(userMessage);
+    const extractedPhone = detectPhone(userMessage, bizCountry).phone;
 
     await updateClientAfterMessage(businessId, telegramId, extractedName || userName, telegramUsername);
 

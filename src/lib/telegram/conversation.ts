@@ -21,6 +21,8 @@ export async function getOrCreateConversation(
   id: string;
   messages: Array<{ role: string; content: string }>;
   contextRefreshSoftWarning: boolean;
+  /** JSON-словарь для персистенции между turn'ами (например guardHits для handoff-guard). */
+  extractedInfo: Record<string, unknown> | null;
 }> {
   try {
     // Шаг 4 плана оптимизации себестоимости (21 июля 2026):
@@ -90,6 +92,7 @@ export async function getOrCreateConversation(
         id: conversation.id,
         messages: messagesAsc,
         contextRefreshSoftWarning: softWarning,
+        extractedInfo: (conversation.extractedInfo as Record<string, unknown> | null) || null,
       };
     }
 
@@ -111,7 +114,7 @@ export async function getOrCreateConversation(
       })
       .catch((e) => console.error("[Webhook] totalConversations increment error:", e));
 
-    return { id: conversation.id, messages: [], contextRefreshSoftWarning: false };
+    return { id: conversation.id, messages: [], contextRefreshSoftWarning: false, extractedInfo: null };
   } catch (error) {
     console.error("Error getting conversation:", error);
     throw error;
