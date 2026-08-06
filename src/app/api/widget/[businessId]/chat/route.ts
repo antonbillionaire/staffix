@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
+import { stripMarkdown } from "@/lib/strip-markdown";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -174,7 +175,11 @@ export async function POST(
       message,
       body.name || undefined
     );
-    reply = aiResp.text;
+    // stripMarkdown применяется ко всем исходящим ответам во всех каналах
+    // (TG/WA/IG/FB — там уже давно в sendXXXMessage). Веб-виджет упустили —
+    // клиенты OLLEE и других sales-бизнесов видели буквальные "**BB-крем**"
+    // и "## Категории". Аудит 6 августа 2026 (bug-6).
+    reply = stripMarkdown(aiResp.text);
     images = aiResp.imageUrls.slice(0, 5);
   } catch (e) {
     console.error(`[widget-chat] AI failed for biz=${businessId}:`, e);
