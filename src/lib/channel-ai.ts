@@ -811,6 +811,21 @@ export async function generateChannelAIResponse(
       console.error("[Channel AI] Memory load error (non-fatal):", memErr);
     }
 
+    // Cart memory (6 августа 2026, OLLEE conv-9 fix): подмешиваем текущее
+    // состояние корзины в системный промпт если оно есть. formatCartForPrompt
+    // возвращает пустую строку если корзина пуста или устарела (>1 час).
+    try {
+      const savedExtracted = (conv.extractedInfo as Record<string, unknown> | null) || {};
+      const savedCart = savedExtracted.cart as import("@/lib/cart-extractor").CartSnapshot | undefined;
+      if (savedCart) {
+        const { formatCartForPrompt } = await import("@/lib/cart-extractor");
+        const cartBlock = formatCartForPrompt(savedCart);
+        if (cartBlock) systemBase += "\n\n" + cartBlock;
+      }
+    } catch (cartErr) {
+      console.warn("[Channel AI] cart context load failed:", cartErr);
+    }
+
     // Parse existing history — strip any "— staffix.io" signatures so Claude doesn't copy them
     const history = ((conv.history as HistoryMessage[]) || []).map((m) =>
       m.role === "assistant"
@@ -1394,6 +1409,37 @@ export async function generateChannelAIResponse(
           where: { id: conv.id },
           data: { needsSummary: true },
         }).catch(() => {});
+      }
+
+      // Cart memory (6 августа 2026, OLLEE conv-9 fix): async обновление
+      // extractedInfo.cart через Haiku-экстрактор. Не блокирует ответ клиенту
+      // (клиент уже получил текст выше). Следующий turn AI увидит корзину
+      // в системном промпте и не будет пересобирать состав с нуля.
+      // Sales-mode only — в service-mode (клиника/салон) корзины не бывает,
+      // экономим Haiku-вызов.
+      if (biz.dashboardMode === "sales") {
+        (async () => {
+          try {
+            const { extractCartFromMessages } = await import("@/lib/cart-extractor");
+            const snapshot = await extractCartFromMessages(
+              updatedHistory as unknown as Array<{ role: string; content: string }>,
+              businessId
+            );
+            if (snapshot) {
+              const existingExtracted = (conv.extractedInfo as Record<string, unknown> | null) || {};
+              await prisma.channelConversation.update({
+                where: { id: conv.id },
+                // Prisma требует InputJsonValue; наш CartSnapshot — plain
+                // JSON-safe object, кастом устраняем strict-index-signature.
+                data: {
+                  extractedInfo: { ...existingExtracted, cart: snapshot } as unknown as import("@prisma/client").Prisma.JsonObject,
+                },
+              });
+            }
+          } catch (e) {
+            console.warn(`[Channel AI] cart-extractor async failed: conv=${conv.id}`, e);
+          }
+        })();
       }
     } catch (saveErr) {
       console.error(`[Channel AI] SAVE FAILED: conv=${conv.id}`, saveErr);

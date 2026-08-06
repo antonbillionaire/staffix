@@ -248,10 +248,27 @@ export async function generateAIResponse(
     }
     const correctionsSection = correctionsBlock ? `\n\n${correctionsBlock}` : "";
 
+    // Cart memory (6 августа 2026, OLLEE conv-9 fix): загружаем сохранённое
+    // состояние корзины и показываем модели в variable-tail. Это критично
+    // против «плавающих сумм» в длинных диалогах — модель видит источник
+    // правды и не пересобирает состав с нуля.
+    let cartSection = "";
+    try {
+      const savedExtracted = conversation.extractedInfo || {};
+      const savedCart = savedExtracted.cart as import("@/lib/cart-extractor").CartSnapshot | undefined;
+      if (savedCart) {
+        const { formatCartForPrompt } = await import("@/lib/cart-extractor");
+        const block = formatCartForPrompt(savedCart);
+        if (block) cartSection = "\n\n" + block;
+      }
+    } catch (e) {
+      console.warn("[TG AI] cart context load failed:", e);
+    }
+
     // Все «дрейфующие» куски (дата, refreshNotice, routing) пакуем в
     // переменный хвост, рядом с клиентским контекстом. Стабильный префикс
     // остаётся неизменным от вызова к вызову — Anthropic держит его в кэше.
-    const variableTail = systemPrompt.variable + systemHint + refreshNotice + routingPromptSection + correctionsSection;
+    const variableTail = systemPrompt.variable + systemHint + refreshNotice + routingPromptSection + correctionsSection + cartSection;
     // Шаг 2 плана оптимизации (21 июля 2026): умный cache_control — для
     // sparse traffic write cache тратит впустую (2× дороже чем без кэша).
     // pickCacheStrategy смотрит активность бизнеса/клиента и решает где
@@ -639,6 +656,36 @@ export async function generateAIResponse(
 
     // 10. Счётчик сообщений в разговоре
     await updateConversationMessageCount(conversation.id);
+
+    // Cart memory (6 августа 2026, OLLEE conv-9 fix): async обновление
+    // extractedInfo.cart через Haiku-экстрактор. Не блокирует ответ клиенту
+    // (клиент уже получил текст через webhook). Sales-mode only.
+    if (businessContext.dashboardMode === "sales" && !assistantIsFallback) {
+      (async () => {
+        try {
+          const { extractCartFromMessages } = await import("@/lib/cart-extractor");
+          // Берём последние 6 сообщений диалога + сегодняшний turn
+          const recent = [
+            ...conversation.messages,
+            { role: "user", content: userMessage },
+            { role: "assistant", content: assistantMessage },
+          ].slice(-6);
+          const snapshot = await extractCartFromMessages(recent, businessId);
+          if (snapshot) {
+            const existingExtracted = conversation.extractedInfo || {};
+            await prisma.conversation.update({
+              where: { id: conversation.id },
+              data: {
+                // Prisma InputJsonValue не принимает strict interfaces — кастим.
+                extractedInfo: { ...existingExtracted, cart: snapshot } as unknown as import("@prisma/client").Prisma.JsonObject,
+              },
+            });
+          }
+        } catch (e) {
+          console.warn(`[TG AI] cart-extractor async failed: conv=${conversation.id}`, e);
+        }
+      })();
+    }
 
     // 11. Извлекаем имя/телефон из текста и обновляем клиента.
     // Используем detectPhone с country (расширенный парсер) чтобы сохранять
