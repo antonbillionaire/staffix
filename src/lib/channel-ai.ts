@@ -1034,9 +1034,10 @@ export async function generateChannelAIResponse(
       // Причина: главный ответ клиенту (первый вызов Sonnet) остаётся качественным,
       // а промежуточные итерации (search_products → check → следующий шаг) — это
       // структурная работа с результатами тулзов, где Haiku справляется на 90%+
-      // за 3× меньшую цену ($1/$5 vs $3/$15 per Mtok). Кэши моделей раздельные,
-      // поэтому первая итерация будет cache_create на Haiku префиксе — cache-warmer
-      // уже прогревает Haiku для активных бизнесов, следующие итерации hit.
+      // за 2× меньшую цену ($1/$5 vs $2/$10 per Mtok — Sonnet 5 introductory
+      // pricing стал постоянным 12 августа 2026, было $3/$15). Кэши моделей
+      // раздельные, поэтому первая итерация будет cache_create на Haiku префиксе —
+      // cache-warmer уже прогревает Haiku для активных бизнесов, дальше hit.
       try {
         response = await callClaudeWithRetry({
           model: "claude-haiku-4-5-20251001",

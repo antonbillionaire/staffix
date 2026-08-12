@@ -35,10 +35,14 @@
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
-// Цены за 1M токенов, USD (2026-06, см. _АНАЛИЗ/01_Модель_себестоимости.md).
-// cacheWrite — 1h TTL (самый дорогой), cacheRead — 10× дешевле обычного входа.
+// Цены за 1M токенов, USD.
+// Sonnet 5 (12 августа 2026): $2 in / $10 out — introductory pricing стал
+// постоянным, отменили запланированный переход на $3/$15 с 1 сентября.
+// cacheWrite: pricing derived from Anthropic docs: 1h TTL = 2× input,
+// cacheRead = 0.1× input (обе ставки не менялись).
+// Haiku 4.5: без изменений.
 const PRICE = {
-  sonnet: { in: 3, out: 15, cacheWrite1h: 6,   cacheRead: 0.30 },
+  sonnet: { in: 2, out: 10, cacheWrite1h: 4,   cacheRead: 0.20 },
   haiku:  { in: 1, out: 5,  cacheWrite1h: 2.5, cacheRead: 0.10 },
 };
 const USD_KZT = 485;
