@@ -15,6 +15,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
+import { candidateSkus, photoPriority } from "@/lib/product-sku-matcher";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -48,12 +49,6 @@ async function getUserBusinessId(): Promise<string | null> {
   return business?.id || null;
 }
 
-function stripExt(filename: string): string {
-  const parts = filename.split(/[\\/]/);
-  const base = parts[parts.length - 1] || filename;
-  const dotIdx = base.lastIndexOf(".");
-  return (dotIdx > 0 ? base.slice(0, dotIdx) : base).trim();
-}
 
 export async function POST(request: NextRequest) {
   const businessId = await getUserBusinessId();
@@ -116,28 +111,61 @@ export async function POST(request: NextRequest) {
 
   interface MatchResult {
     file: string;
-    status: "matched" | "unmatched" | "update_failed";
+    status: "matched" | "unmatched" | "update_failed" | "duplicate";
     productId?: string;
     productName?: string;
     imageUrl?: string;
   }
 
-  const results: MatchResult[] = body.uploads.map((u) => {
-    const sku = stripExt(u.filename);
-    const product = skuToProduct.get(sku);
-    if (!product) {
-      return { file: u.filename, status: "unmatched" };
+  // Первый проход: находим товар для каждого файла через candidateSkus
+  // (exact match → fallback без _NNN суффикса). Файл с меньшим суффиксом
+  // считается главным фото — если у одного товара 3 файла _001/_002/_003,
+  // берём _001. duplicate = сматчен, но не главное фото → в БД не пишем.
+  const preliminary = body.uploads.map((u) => {
+    const candidates = candidateSkus(u.filename);
+    let product: { id: string; name: string } | undefined;
+    for (const sku of candidates) {
+      const found = skuToProduct.get(sku);
+      if (found) {
+        product = found;
+        break;
+      }
     }
+    return { upload: u, product, priority: photoPriority(u.filename) };
+  });
+
+  // Для каждого productId оставляем файл с минимальным priority (0 = без
+  // суффикса, 1 = _001, ...). Остальные помечаем duplicate — в отчёте они
+  // "сматчены", но БД трогать не будем.
+  const bestByProduct = new Map<string, { filename: string; priority: number }>();
+  for (const p of preliminary) {
+    if (!p.product) continue;
+    const cur = bestByProduct.get(p.product.id);
+    if (!cur || p.priority < cur.priority) {
+      bestByProduct.set(p.product.id, {
+        filename: p.upload.filename,
+        priority: p.priority,
+      });
+    }
+  }
+
+  const results: MatchResult[] = preliminary.map((p) => {
+    if (!p.product) {
+      return { file: p.upload.filename, status: "unmatched" };
+    }
+    const winner = bestByProduct.get(p.product.id);
+    const isWinner = winner?.filename === p.upload.filename;
     return {
-      file: u.filename,
-      status: "matched",
-      productId: product.id,
-      productName: product.name,
-      imageUrl: u.url,
+      file: p.upload.filename,
+      status: isWinner ? "matched" : "duplicate",
+      productId: p.product.id,
+      productName: p.product.name,
+      imageUrl: p.upload.url,
     };
   });
 
   // Батчами обновляем Product.imageUrl — не забиваем connection pool Prisma.
+  // duplicate не апдейтим (главное фото уже выбрано выше).
   const UPDATE_CONCURRENCY = 5;
   const toUpdate = results.filter((r) => r.status === "matched");
   for (let i = 0; i < toUpdate.length; i += UPDATE_CONCURRENCY) {
@@ -162,6 +190,7 @@ export async function POST(request: NextRequest) {
   }
 
   const matched = results.filter((r) => r.status === "matched");
+  const duplicates = results.filter((r) => r.status === "duplicate");
   const unmatched = results.filter((r) => r.status === "unmatched");
   const failed = results.filter((r) => r.status === "update_failed");
 
@@ -173,12 +202,26 @@ export async function POST(request: NextRequest) {
     success: true,
     totalFiles: body.uploads.length,
     matchedCount: matched.length,
+    duplicateCount: duplicates.length,
     unmatchedCount: unmatched.length,
     invalidCount: 0,
     failedCount: failed.length,
     unmatchedSample: unmatched.slice(0, 10).map((r) => r.file),
+    // Топ-10 сматченных с именами товаров — Farrukh (11 августа) писал что
+    // «не увидел имена» когда всё unmatched; теперь при успехе показываем
+    // на UI карточки товаров, к которым фото привязались.
+    matchedSample: matched.slice(0, 10).map((r) => ({
+      file: r.file,
+      product: r.productName || "",
+    })),
+    duplicateSample: duplicates.slice(0, 10).map((r) => ({
+      file: r.file,
+      product: r.productName || "",
+    })),
     message: `Загружено фото: ${matched.length}${
-      unmatched.length > 0 ? ` · Не сматчено: ${unmatched.length}` : ""
-    }${failed.length > 0 ? ` · Ошибок: ${failed.length}` : ""}`,
+      duplicates.length > 0 ? ` · Пропущено дублей: ${duplicates.length}` : ""
+    }${unmatched.length > 0 ? ` · Не сматчено: ${unmatched.length}` : ""}${
+      failed.length > 0 ? ` · Ошибок: ${failed.length}` : ""
+    }`,
   });
 }

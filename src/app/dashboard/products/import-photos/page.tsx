@@ -38,10 +38,13 @@ interface UploadResult {
   success: boolean;
   totalFiles: number;
   matchedCount: number;
+  duplicateCount?: number;
   unmatchedCount: number;
   invalidCount: number;
   failedCount: number;
   unmatchedSample: string[];
+  matchedSample?: Array<{ file: string; product: string }>;
+  duplicateSample?: Array<{ file: string; product: string }>;
   message: string;
 }
 
@@ -325,7 +328,7 @@ export default function ImportProductPhotosPage() {
         </Link>
 
         <h1 className={`text-2xl font-semibold mb-2 ${text}`}>Массовая загрузка фото</h1>
-        <p className={`text-sm mb-6 ${sub}`}>
+        <p className={`text-sm mb-2 ${sub}`}>
           Загрузите ZIP-архив или несколько картинок сразу. Мы сопоставим каждое фото с
           товаром по имени файла — имя должно совпадать со штрихкодом или артикулом (например{" "}
           <code
@@ -334,6 +337,17 @@ export default function ImportProductPhotosPage() {
             8809722156116.jpg
           </code>{" "}
           привяжется к товару со штрихкодом 8809722156116).
+        </p>
+        <p className={`text-xs mb-6 ${sub} opacity-80`}>
+          Поддерживаем суффиксы вариантов:{" "}
+          <code className={`${isDark ? "bg-gray-800" : "bg-gray-100"} px-1 py-0.5 rounded`}>
+            8809722156116_001.jpg
+          </code>
+          ,{" "}
+          <code className={`${isDark ? "bg-gray-800" : "bg-gray-100"} px-1 py-0.5 rounded`}>
+            8809722156116-2.jpg
+          </code>{" "}
+          — тоже привяжутся к товару 8809722156116 (главное фото = наименьший номер).
         </p>
 
         <div
@@ -462,6 +476,15 @@ export default function ImportProductPhotosPage() {
                 variant={result.unmatchedCount > 0 ? "warn" : "ok"}
                 isDark={isDark}
               />
+              {result.duplicateCount ? (
+                <Stat
+                  label="Пропущено дублей"
+                  value={result.duplicateCount}
+                  total={result.totalFiles}
+                  variant="warn"
+                  isDark={isDark}
+                />
+              ) : null}
               {result.failedCount > 0 && (
                 <Stat
                   label="Ошибок"
@@ -472,6 +495,69 @@ export default function ImportProductPhotosPage() {
                 />
               )}
             </div>
+
+            {result.matchedSample && result.matchedSample.length > 0 && (
+              <div
+                className={`mt-3 p-3 rounded-lg text-xs ${
+                  isDark
+                    ? "bg-green-500/10 border border-green-500/30 text-green-200"
+                    : "bg-green-50 border border-green-200 text-green-800"
+                }`}
+              >
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-medium mb-1">Привязано к товарам:</p>
+                    <ul className="space-y-0.5">
+                      {result.matchedSample.map((m) => (
+                        <li key={m.file} className="flex gap-2">
+                          <span className="opacity-60 truncate flex-shrink-0 max-w-[45%]">
+                            {m.file}
+                          </span>
+                          <span className="opacity-40">→</span>
+                          <span className="font-medium truncate">{m.product}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {result.matchedCount > result.matchedSample.length && (
+                      <p className="mt-1 italic opacity-70">
+                        ...и ещё {result.matchedCount - result.matchedSample.length}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {result.duplicateSample && result.duplicateSample.length > 0 && (
+              <div
+                className={`mt-3 p-3 rounded-lg text-xs ${
+                  isDark
+                    ? "bg-blue-500/10 border border-blue-500/30 text-blue-200"
+                    : "bg-blue-50 border border-blue-200 text-blue-800"
+                }`}
+              >
+                <p className="font-medium mb-1">
+                  Пропущено (у товара уже выбрано главное фото):
+                </p>
+                <ul className="space-y-0.5">
+                  {result.duplicateSample.map((m) => (
+                    <li key={m.file} className="flex gap-2">
+                      <span className="opacity-60 truncate flex-shrink-0 max-w-[45%]">
+                        {m.file}
+                      </span>
+                      <span className="opacity-40">→</span>
+                      <span className="truncate">{m.product}</span>
+                    </li>
+                  ))}
+                </ul>
+                {(result.duplicateCount || 0) > result.duplicateSample.length && (
+                  <p className="mt-1 italic opacity-70">
+                    ...и ещё {(result.duplicateCount || 0) - result.duplicateSample.length}
+                  </p>
+                )}
+              </div>
+            )}
 
             {result.unmatchedSample.length > 0 && (
               <div
