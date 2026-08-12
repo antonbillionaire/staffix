@@ -1,6 +1,24 @@
 /**
  * POST /api/import/product-photos (30 июля 2026)
  *
+ * ⚠️ DEPRECATED (12 августа 2026): фронт больше не вызывает этот endpoint.
+ * Он ломался на любом ZIP > 4.5 MB — это hard-лимит body serverless-функций
+ * Vercel'а, наш `MAX_TOTAL_SIZE = 100 MB` никогда не срабатывал (Vercel
+ * отбивал 413 раньше). Клиенты OLLEE (Farrukh) наступили на это 11 августа
+ * и увидели «Unexpected token 'R', "Request En..." is not valid JSON» —
+ * фронт JSON.parse'ил plain-text 413 от Vercel'а.
+ *
+ * Новый flow: см. ./token/route.ts + ./commit/route.ts — прямой upload из
+ * браузера в Vercel Blob (@vercel/blob/client.upload), потом JSON-commit
+ * на бэк для матчинга. Тело commit'а — только URL'ы, в 4.5 MB вписывается
+ * с гигантским запасом.
+ *
+ * Endpoint пока не удаляю — вдруг новый flow где-то встанет, откатимся
+ * заменой fetch-URL на фронте. Удалим ~19 августа, если жалоб не будет.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * Оригинальное описание (для истории):
+ *
  * Массовая загрузка фото товаров. Принимает ZIP-архив ИЛИ множественные
  * файлы через multipart/form-data. Матчит каждый файл к товару по имени
  * (basename без расширения) — сравнивает с Product.sku (штрихкод/EAN тоже
