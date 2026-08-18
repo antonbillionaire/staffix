@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, X, User, Loader2, Camera, CalendarDays, MessageCircle, BedDouble } from "lucide-react";
+import { Plus, Pencil, Trash2, X, User, Loader2, Camera, CalendarDays, MessageCircle, BedDouble, Users } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import PageHint from "@/components/PageHint";
+import {
+  parseTelegramInput,
+  formatTelegramInput,
+} from "@/lib/telegram-input-parser";
 
 interface Staff {
   id: string;
@@ -104,11 +108,18 @@ export default function StaffPage() {
     specialization: "" as string,      // свободный текст ("Терапевт", "Барбер-стилист") — для отображения
     routingDescription: "" as string,  // описание для AI smart routing (режим ai_smart)
     photo: "",
-    telegramUsername: "",
+    // Единое поле «Telegram» — принимает `@username` (личный чат сотрудника,
+    // старая логика) ИЛИ `-5530519186` / `-1001234567890` (chat_id рабочей
+    // группы, куда бот пишет уведомления, — новая логика с 18 авг 2026).
+    // На сервере парсер `parseTelegramInput` раскладывает в telegramUsername
+    // и telegramChatId (одно из них null).
+    telegramInput: "",
     notificationsEnabled: true,
     baseRate: "" as string | number,
     commissionPercent: "" as string | number,
   });
+  // Live-валидация Telegram-поля для мгновенной обратной связи
+  const [telegramInputError, setTelegramInputError] = useState<string | null>(null);
 
   // Schedule modal
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
@@ -216,7 +227,7 @@ export default function StaffPage() {
     specialization: "",
     routingDescription: "",
     photo: "",
-    telegramUsername: "",
+    telegramInput: "",
     notificationsEnabled: true,
     baseRate: "" as string | number,
     commissionPercent: "" as string | number,
@@ -232,7 +243,10 @@ export default function StaffPage() {
         specialization: split.specialization,
         routingDescription: person.routingDescription || "",
         photo: person.photo || "",
-        telegramUsername: person.telegramUsername || "",
+        telegramInput: formatTelegramInput(
+          person.telegramUsername,
+          person.telegramChatId
+        ),
         notificationsEnabled: person.notificationsEnabled,
         baseRate: person.baseRate ?? "",
         commissionPercent: person.commissionPercent ?? "",
@@ -241,6 +255,7 @@ export default function StaffPage() {
       setEditingStaff(null);
       setFormData({ ...defaultFormData });
     }
+    setTelegramInputError(null);
     setIsModalOpen(true);
   };
 
@@ -248,10 +263,17 @@ export default function StaffPage() {
     setIsModalOpen(false);
     setEditingStaff(null);
     setFormData({ ...defaultFormData });
+    setTelegramInputError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Финальная валидация Telegram-поля — даже если пользователь не потрогал onChange
+    const parsed = parseTelegramInput(formData.telegramInput);
+    if (parsed.error) {
+      setTelegramInputError(parsed.error);
+      return;
+    }
     setSaving(true);
 
     try {
@@ -572,17 +594,32 @@ export default function StaffPage() {
                   </span>
                 </label>
               )}
-              {/* Telegram status */}
-              {person.telegramUsername && (
+              {/* Telegram status — личный чат (username) ИЛИ рабочая группа (chatId без username) */}
+              {(person.telegramUsername || person.telegramChatId) && (
                 <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/5">
-                  <MessageCircle className="h-3.5 w-3.5 text-blue-400" />
-                  <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                    {person.telegramUsername}
-                  </span>
-                  <span className={`ml-auto text-xs flex items-center gap-1 ${person.telegramChatId ? "text-green-400" : isDark ? "text-gray-600" : "text-gray-400"}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${person.telegramChatId ? "bg-green-400" : isDark ? "bg-gray-600" : "bg-gray-400"}`} />
-                    {person.telegramChatId ? t("staffPage.connected") : t("staffPage.notConnected")}
-                  </span>
+                  {person.telegramUsername ? (
+                    <>
+                      <MessageCircle className="h-3.5 w-3.5 text-blue-400" />
+                      <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                        @{person.telegramUsername}
+                      </span>
+                      <span className={`ml-auto text-xs flex items-center gap-1 ${person.telegramChatId ? "text-green-400" : isDark ? "text-gray-600" : "text-gray-400"}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${person.telegramChatId ? "bg-green-400" : isDark ? "bg-gray-600" : "bg-gray-400"}`} />
+                        {person.telegramChatId ? t("staffPage.connected") : t("staffPage.notConnected")}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Users className="h-3.5 w-3.5 text-blue-400" />
+                      <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                        Группа {person.telegramChatId}
+                      </span>
+                      <span className="ml-auto text-xs flex items-center gap-1 text-green-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                        {t("staffPage.connected")}
+                      </span>
+                    </>
+                  )}
                 </div>
               )}
               {/* Ссылка продавца для клиентов */}
@@ -591,7 +628,7 @@ export default function StaffPage() {
                   юрфирмах с несколькими менеджерами тоже нужна привязка
                   лида к конкретному человеку. */}
               {botUsername && (
-                <div className={`mt-2 pt-2 ${person.telegramUsername ? "" : "mt-3 pt-3"} border-t ${isDark ? "border-white/5" : "border-gray-100"}`}>
+                <div className={`mt-2 pt-2 ${person.telegramUsername || person.telegramChatId ? "" : "mt-3 pt-3"} border-t ${isDark ? "border-white/5" : "border-gray-100"}`}>
                   <div className="flex items-center gap-2">
                     <span className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>
                       {t("staffPage.sellerLink") || "Ссылка для клиентов:"}
@@ -703,20 +740,33 @@ export default function StaffPage() {
                 </p>
               </div>
 
-              {/* Telegram Username */}
+              {/* Telegram — @username личного чата или chat_id рабочей группы */}
               <div>
                 <label className={`block text-sm font-medium ${isDark ? "text-gray-300" : "text-gray-700"} mb-1`}>
                   Telegram
                 </label>
                 <input
                   type="text"
-                  value={formData.telegramUsername}
-                  onChange={(e) =>
-                    setFormData({ ...formData, telegramUsername: e.target.value })
-                  }
-                  placeholder="@username"
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isDark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-300"}`}
+                  value={formData.telegramInput}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setFormData({ ...formData, telegramInput: next });
+                    // Live-парсер: показываем ошибку сразу если формат странный
+                    const parsed = parseTelegramInput(next);
+                    setTelegramInputError(parsed.error);
+                  }}
+                  placeholder="@username или -5530519186"
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    telegramInputError
+                      ? "border-red-500"
+                      : isDark
+                        ? "bg-white/5 border-white/10 text-white placeholder-gray-500"
+                        : "border-gray-300"
+                  }`}
                 />
+                {telegramInputError && (
+                  <p className="text-xs mt-1 text-red-500">{telegramInputError}</p>
+                )}
                 <p className={`text-xs mt-1 ${isDark ? "text-gray-500" : "text-gray-400"}`}>
                   {t("staffPage.telegramHint")}
                 </p>

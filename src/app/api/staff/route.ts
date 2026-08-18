@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { parseTelegramInput } from "@/lib/telegram-input-parser";
 
 async function getUserId(): Promise<string | null> {
   const session = await auth();
@@ -62,10 +63,25 @@ export async function POST(request: Request) {
     }
 
     const data = await request.json();
-    const { name, role, specialization, routingDescription, photo, telegramUsername, notificationsEnabled, baseRate, commissionPercent } = data;
+    const { name, role, specialization, routingDescription, photo, telegramUsername, telegramInput, notificationsEnabled, baseRate, commissionPercent } = data;
 
     if (!name) {
       return NextResponse.json({ error: "Имя обязательно" }, { status: 400 });
+    }
+
+    // Поле «Telegram» на форме теперь принимает два формата — @username или
+    // -chatId группы. Парсер разделяет одно на два поля БД. Обратная
+    // совместимость: если клиент шлёт только `telegramUsername` (как раньше),
+    // мимо парсера — прямая запись.
+    let tgUsername: string | null | undefined = telegramUsername ?? undefined;
+    let tgChatId: bigint | null = null;
+    if (typeof telegramInput === "string") {
+      const parsed = parseTelegramInput(telegramInput);
+      if (parsed.error) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+      tgUsername = parsed.username;
+      tgChatId = parsed.chatId ? BigInt(parsed.chatId) : null;
     }
 
     // Роль обязательна — без неё Staff не получает уведомлений (фильтры по role: { in: [...] }).
@@ -88,7 +104,8 @@ export async function POST(request: Request) {
             ? routingDescription.trim()
             : null,
         photo: photo || null,
-        telegramUsername: telegramUsername || null,
+        telegramUsername: tgUsername || null,
+        telegramChatId: tgChatId,
         notificationsEnabled: notificationsEnabled !== undefined ? notificationsEnabled : true,
         baseRate: baseRate !== undefined && baseRate !== null && baseRate !== "" ? Math.round(Number(baseRate)) : null,
         commissionPercent: commissionPercent !== undefined && commissionPercent !== null && commissionPercent !== "" ? Number(commissionPercent) : null,

@@ -183,9 +183,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Inline buttons
+    // Inline buttons — работают и в личных чатах, и в групповых
+    // (сотрудник может нажать «Принять запись» на уведомлении в группе).
     if (update.callback_query) {
       await handleCallbackQuery(botToken, business.id, update.callback_query);
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── Group chat guard (18 августа 2026) ────────────────────────────────
+    // Если сообщение прилетело из группового чата (group/supergroup/channel),
+    // бот НЕ отвечает как AI — только выдаёт chat.id по команде /id или
+    // /chatid и молча игнорит всё остальное. Логика: групповой чат нужен
+    // ТОЛЬКО как приёмник исходящих уведомлений сотрудников. Разговор с
+    // ботом (welcome, AI-ответы, обработка контактов и т.п.) — только в
+    // приватном чате «бот ↔ клиент».
+    //
+    // Без этого guard'а как только бот попадает в группу с privacy mode
+    // OFF (обязательное условие чтобы бот видел /id), каждое сообщение
+    // менеджеров пойдёт в generateAIResponse — за минуты сожжётся месячная
+    // квота подписки. Раньше группы просто не поддерживались, теперь
+    // поддерживаются, но только как «одностороннее радио».
+    if (update.message && update.message.chat.type !== "private") {
+      const text = update.message.text?.trim() || "";
+      // Разбираем первое слово (может быть /id, /id@botname, /chatid, /chatid@botname)
+      const firstToken = text.split(/\s+/)[0]?.toLowerCase().split("@")[0] || "";
+      if (firstToken === "/id" || firstToken === "/chatid") {
+        // sendTelegramMessage сам применит stripMarkdown — используем plain text.
+        // ID отдельной строкой чтобы владелец мог одним двойным кликом выделить.
+        await sendTelegramMessage(
+          botToken,
+          update.message.chat.id,
+          `Chat ID этой группы:\n${update.message.chat.id}\n\n` +
+            `Скопируйте это значение и вставьте в поле «Telegram» сотрудника ` +
+            `в дашборде Staffix — уведомления будут приходить сюда.`
+        );
+      }
+      // Всё остальное в группах молча игнорируем — ни AI, ни Client, ни лимиты
       return NextResponse.json({ ok: true });
     }
 

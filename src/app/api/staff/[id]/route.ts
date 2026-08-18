@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { parseTelegramInput } from "@/lib/telegram-input-parser";
 
 async function getUserId(): Promise<string | null> {
   const session = await auth();
@@ -28,7 +29,21 @@ export async function PUT(
 
     const { id } = await params;
     const data = await request.json();
-    const { name, role, specialization, routingDescription, photo, telegramUsername, notificationsEnabled, baseRate, commissionPercent, acceptsLeads } = data;
+    const { name, role, specialization, routingDescription, photo, telegramUsername, telegramInput, notificationsEnabled, baseRate, commissionPercent, acceptsLeads } = data;
+
+    // Разбор поля Telegram: @username → telegramUsername, -chatId → telegramChatId.
+    // Если владелец пришлёт `telegramInput === ""` — сбрасываем оба поля
+    // (владелец очистил привязку). Undefined → не трогаем существующее.
+    let tgUsernameUpdate: string | null | undefined = telegramUsername !== undefined ? (telegramUsername || null) : undefined;
+    let tgChatIdUpdate: bigint | null | undefined = undefined;
+    if (typeof telegramInput === "string") {
+      const parsed = parseTelegramInput(telegramInput);
+      if (parsed.error) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+      tgUsernameUpdate = parsed.username;
+      tgChatIdUpdate = parsed.chatId ? BigInt(parsed.chatId) : null;
+    }
 
     const person = await prisma.staff.findUnique({
       where: { id },
@@ -68,7 +83,8 @@ export async function PUT(
               : null
             : undefined,
         photo: photo !== undefined ? (photo || null) : undefined,
-        telegramUsername: telegramUsername !== undefined ? (telegramUsername || null) : undefined,
+        telegramUsername: tgUsernameUpdate,
+        telegramChatId: tgChatIdUpdate,
         notificationsEnabled: notificationsEnabled !== undefined ? notificationsEnabled : undefined,
         baseRate: baseRate !== undefined ? (baseRate === null || baseRate === "" ? null : Math.round(Number(baseRate))) : undefined,
         commissionPercent: commissionPercent !== undefined ? (commissionPercent === null || commissionPercent === "" ? null : Number(commissionPercent)) : undefined,
