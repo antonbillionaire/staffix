@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
+import {
+  parseSignedRequest,
+  processMetaDataDeletion,
+  isDeletionStatsEmpty,
+} from "@/lib/meta-data-deletion";
 
 /**
  * Meta Data Deletion Callback.
@@ -8,43 +13,29 @@ import { prisma } from "@/lib/prisma";
  * We must delete their data and return a confirmation URL + code.
  *
  * Docs: https://developers.facebook.com/docs/development/create-an-app/app-dashboard/data-deletion-callback/
+ *
+ * Обрабатываем ОБА сценария — они не взаимоисключающие:
+ *
+ * 1. Owner-branch: `user_id` = Meta ID владельца бизнеса на нашей платформе
+ *    (тот, кто в дашборде подключал FB Page / IG Business Account через
+ *    Meta OAuth). Чистим соединения бизнеса и разговоры Meta-каналов. Это
+ *    старая логика — оставлена как есть.
+ *
+ * 2. End-user branch (добавлено 26 августа 2026 после письма Meta про
+ *    непокрытые запросы): `user_id` = ASID (App-Scoped ID) конечного
+ *    клиента — человека, который писал в IG DM / FB Messenger в бота
+ *    одного из наших бизнесов. Резолвим ASID через Graph API в PSID/IGSID,
+ *    удаляем 6 таблиц (Client, ChannelClient, ChannelConversation,
+ *    ChannelMessage, Lead, SalesLead) + обфусцируем Order + очищаем Task.
+ *
+ * Оба пути запускаются один за другим — они идемпотентные и работают
+ * с разными данными, конфликта нет. Если оба возвращают пустой результат
+ * (ни владельца, ни end-user'а не нашли) — всё равно отвечаем Мете
+ * успехом с confirmation_code (см. FAQ: «если ID нет в базе, можете
+ * игнорировать» — но ответ endpoint'а всё равно обязан быть валидным).
  */
 
-interface ParsedSignedRequest {
-  user_id: string;
-  algorithm: string;
-  issued_at: number;
-}
-
-function parseSignedRequest(signedRequest: string, appSecret: string): ParsedSignedRequest | null {
-  const [encodedSig, payload] = signedRequest.split(".");
-  if (!encodedSig || !payload) return null;
-
-  // Decode signature
-  const sig = Buffer.from(encodedSig.replace(/-/g, "+").replace(/_/g, "/"), "base64");
-
-  // Compute expected signature
-  const expectedSig = crypto
-    .createHmac("sha256", appSecret)
-    .update(payload)
-    .digest();
-
-  if (!crypto.timingSafeEqual(sig, expectedSig)) {
-    console.error("[Meta Data Deletion] Signature verification failed");
-    return null;
-  }
-
-  const decoded = JSON.parse(
-    Buffer.from(payload.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf-8")
-  );
-
-  if (decoded.algorithm?.toUpperCase() !== "HMAC-SHA256") {
-    console.error("[Meta Data Deletion] Unexpected algorithm:", decoded.algorithm);
-    return null;
-  }
-
-  return decoded;
-}
+const META_APP_ID = "1875270986685772";
 
 export async function POST(request: Request) {
   try {
@@ -66,99 +57,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid signed_request" }, { status: 400 });
     }
 
-    const metaUserId = parsed.user_id;
-    console.log(`[Meta Data Deletion] Request for Meta user_id: ${metaUserId}`);
+    const userId = parsed.user_id;
+    console.log(`[Meta Data Deletion] Request for Meta user_id: ${userId}`);
 
-    // Generate a unique confirmation code
     const confirmationCode = crypto.randomUUID();
 
-    // Find businesses connected via this specific Meta user ID
-    const businesses = await prisma.business.findMany({
-      where: {
-        metaUserId: metaUserId,
-      },
-      select: { id: true, name: true, fbPageId: true, igBusinessAccountId: true },
-    });
+    // ── 1. Owner-branch ────────────────────────────────────────────────
+    // Владелец бизнеса удалил Staffix из своих Meta apps. Чистим соединения
+    // и разговоры Meta-каналов у всех его бизнесов.
+    const ownerStats = await deleteOwnerMetaConnections(userId);
 
-    if (businesses.length === 0) {
-      console.log(`[Meta Data Deletion] No businesses found for Meta user_id: ${metaUserId}`);
+    // ── 2. End-user branch (26 августа 2026) ──────────────────────────
+    // Конечный клиент (writing to some business's bot via IG/FB) запросил
+    // удаление. Резолвим ASID → PSID/IGSID через Graph API, чистим данные.
+    let endUserStats;
+    try {
+      endUserStats = await processMetaDataDeletion(userId, META_APP_ID, appSecret);
+    } catch (e) {
+      console.error("[Meta Data Deletion] end-user branch failed:", e);
+      endUserStats = { pageScopedIds: [], stats: null };
     }
 
-    let deletedCount = 0;
-    // Полный список Meta-каналов включая legacy-имя "messenger" (историческое
-    // значение для FB Messenger — часть кодовой базы писала так). Раньше
-    // удалялись только "facebook"|"instagram", записи с "messenger" копились
-    // и нарушали контракт Meta data-deletion.
-    const META_CHANNELS = ["facebook", "instagram", "messenger"] as const;
+    console.log(
+      `[Meta Data Deletion] Completed. code=${confirmationCode}` +
+        ` owner_businesses_cleared=${ownerStats.businessesCleared}` +
+        ` resolved_page_scoped_ids=${endUserStats.pageScopedIds.length}` +
+        ` end_user_stats=${JSON.stringify(endUserStats.stats)}`
+    );
 
-    for (const biz of businesses) {
-      // Delete channel conversations from Meta channels
-      await prisma.channelConversation.deleteMany({
-        where: {
-          businessId: biz.id,
-          channel: { in: META_CHANNELS as unknown as string[] },
-        },
-      });
-
-      // Delete channel messages from Meta channels
-      await prisma.channelMessage.deleteMany({
-        where: {
-          businessId: biz.id,
-          channel: { in: META_CHANNELS as unknown as string[] },
-        },
-      });
-
-      // Delete channel clients (PII: names, phones, notes из Meta-разговоров).
-      // Раньше эта таблица не чистилась — нарушение обязательства удалить всё.
-      // Модель ChannelClient не хранит `channel`, фильтруем по lastChannel
-      // (последний канал контакта) — этого достаточно чтобы поймать всех
-      // клиентов пришедших через FB Messenger/IG DM.
-      await prisma.channelClient.deleteMany({
-        where: {
-          businessId: biz.id,
-          lastChannel: { in: META_CHANNELS as unknown as string[] },
-        },
-      });
-
-      // Delete leads originating from Meta channels — contact info + adId.
-      await prisma.lead.deleteMany({
-        where: {
-          businessId: biz.id,
-          channel: { in: META_CHANNELS as unknown as string[] },
-        },
-      });
-
-      // Delete channel connections for Meta channels
-      await prisma.channelConnection.deleteMany({
-        where: {
-          businessId: biz.id,
-          channel: { in: META_CHANNELS as unknown as string[] },
-        },
-      });
-
-      // Clear Meta connection fields
-      await prisma.business.update({
-        where: { id: biz.id },
-        data: {
-          fbPageId: null,
-          fbPageAccessToken: null,
-          fbActive: false,
-          igBusinessAccountId: null,
-          igUsername: null,
-          igActive: false,
-          metaUserId: null,
-          metaUserAccessToken: null,
-          metaTokenExpiresAt: null,
-        },
-      });
-
-      deletedCount++;
-      console.log(`[Meta Data Deletion] Cleared Meta data for business ${biz.id} (${biz.name})`);
+    // Если ничего не нашли ни в owner, ни в end-user ветке — по FAQ Meta
+    // это ок (ID не в нашей БД), но всё равно должны вернуть валидный ответ.
+    if (
+      ownerStats.businessesCleared === 0 &&
+      endUserStats.stats &&
+      isDeletionStatsEmpty(endUserStats.stats)
+    ) {
+      console.log(`[Meta Data Deletion] No matching data found for user_id ${userId} — ack anyway`);
     }
 
-    console.log(`[Meta Data Deletion] Completed. Affected businesses: ${deletedCount}, code: ${confirmationCode}`);
-
-    // Meta expects this exact response format
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://staffix.io";
     return NextResponse.json({
       url: `${appUrl}/meta/deletion-status?code=${confirmationCode}`,
@@ -168,4 +104,78 @@ export async function POST(request: Request) {
     console.error("[Meta Data Deletion] Error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
+}
+
+/**
+ * Owner-branch: чистит Meta-соединения у бизнесов, привязанных к этому
+ * Meta user ID через OAuth (Business.metaUserId). Это старая логика,
+ * извлечена в отдельную функцию для читаемости.
+ *
+ * ChannelClient чистим ТОЛЬКО когда `lastChannel` = Meta-канал — это грубее
+ * чем end-user branch (может задеть клиента, чей последний контакт был через
+ * IG, но реально идентичность в TG). Оставлено потому что это owner-flow —
+ * владелец удалил соединение целиком, у нас нет обязательства сохранять
+ * клиентов от которых пропал канал.
+ */
+async function deleteOwnerMetaConnections(
+  metaUserId: string
+): Promise<{ businessesCleared: number }> {
+  const businesses = await prisma.business.findMany({
+    where: { metaUserId },
+    select: { id: true, name: true },
+  });
+
+  const META_CHANNELS = ["facebook", "instagram", "messenger"] as const;
+
+  for (const biz of businesses) {
+    await prisma.channelConversation.deleteMany({
+      where: {
+        businessId: biz.id,
+        channel: { in: META_CHANNELS as unknown as string[] },
+      },
+    });
+    await prisma.channelMessage.deleteMany({
+      where: {
+        businessId: biz.id,
+        channel: { in: META_CHANNELS as unknown as string[] },
+      },
+    });
+    await prisma.channelClient.deleteMany({
+      where: {
+        businessId: biz.id,
+        lastChannel: { in: META_CHANNELS as unknown as string[] },
+      },
+    });
+    await prisma.lead.deleteMany({
+      where: {
+        businessId: biz.id,
+        channel: { in: META_CHANNELS as unknown as string[] },
+      },
+    });
+    await prisma.channelConnection.deleteMany({
+      where: {
+        businessId: biz.id,
+        channel: { in: META_CHANNELS as unknown as string[] },
+      },
+    });
+    await prisma.business.update({
+      where: { id: biz.id },
+      data: {
+        fbPageId: null,
+        fbPageAccessToken: null,
+        fbActive: false,
+        igBusinessAccountId: null,
+        igUsername: null,
+        igActive: false,
+        metaUserId: null,
+        metaUserAccessToken: null,
+        metaTokenExpiresAt: null,
+      },
+    });
+    console.log(
+      `[Meta Data Deletion] Cleared Meta owner data for business ${biz.id} (${biz.name})`
+    );
+  }
+
+  return { businessesCleared: businesses.length };
 }
