@@ -312,7 +312,21 @@ export async function deleteEndUserMetaData(
 
 /**
  * Полный сценарий обработки одного deletion request'а: резолв ASID → удаление.
- * Возвращает статистику + список page-scoped IDs, которые нашли (для логов).
+ * Возвращает статистику + список page-scoped IDs, которые пробовали (для логов).
+ *
+ * Двойной source of truth для ID'ов:
+ *  1. Graph API `ids_for_pages` + `ids_for_business` — работает если user_id
+ *     в signed_request это ASID (Facebook Login users, Messenger через FB
+ *     login и т.п.).
+ *  2. Raw user_id как fallback — Meta для IG Messaging API часто шлёт
+ *     напрямую IGSID (Instagram-scoped ID, префикс `17841...`), не ASID.
+ *     Graph API отказывает на такой ID (26 августа 2026: получили
+ *     `nonexisting field` для эндпоинтов `ids_for_pages`/`ids_for_business`
+ *     от IGSID `17841476160054569`). Direct match по нашим колонкам
+ *     `instagramId`/`fbPsid` — единственный способ его найти.
+ *
+ * Ложных срабатываний нет: ASID глобален, в наших `instagramId`/`fbPsid`
+ * его быть не может (там только page-scoped ID'ы наших конкретных страниц).
  */
 export async function processMetaDataDeletion(
   asid: string,
@@ -320,7 +334,9 @@ export async function processMetaDataDeletion(
   appSecret: string
 ): Promise<{ pageScopedIds: string[]; stats: DeletionStats }> {
   const resolved = await resolveMetaAsidToPageScopedIds(asid, appId, appSecret);
-  const pageScopedIds = resolved.map((r) => r.id);
+  // Дедуп через Set — если Graph API вернул тот же ID что raw (маловероятно
+  // но возможно на границе), избегаем дубля в SQL `IN`.
+  const pageScopedIds = Array.from(new Set([asid, ...resolved.map((r) => r.id)]));
   const stats = await deleteEndUserMetaData(pageScopedIds);
   return { pageScopedIds, stats };
 }

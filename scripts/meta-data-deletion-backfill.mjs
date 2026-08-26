@@ -265,9 +265,14 @@ async function main() {
     for (let i = 0; i < asids.length; i++) {
       const asid = asids[i];
       console.log(`\n[${i + 1}/${asids.length}] ASID ${asid}`);
-      const pageScopedIds = await resolveAsidToPageScopedIds(asid);
-      console.log(`  Резолвили → ${pageScopedIds.length} page-scoped IDs: ${pageScopedIds.join(", ") || "(нет)"}`);
-      grandTotals.pageScopedIdsResolved += pageScopedIds.length;
+      const resolvedFromGraph = await resolveAsidToPageScopedIds(asid);
+      // Fallback: raw user_id тоже пробуем как page-scoped ID напрямую —
+      // для IG Messaging API Meta шлёт IGSID, а не ASID (см. lib/meta-data-deletion.ts).
+      const pageScopedIds = Array.from(new Set([asid, ...resolvedFromGraph]));
+      console.log(
+        `  Graph API вернул: ${resolvedFromGraph.length}. Пробуем ${pageScopedIds.length} ID: ${pageScopedIds.join(", ")}`
+      );
+      grandTotals.pageScopedIdsResolved += resolvedFromGraph.length;
       grandTotals.asidsProcessed++;
 
       if (pageScopedIds.length === 0) continue;
