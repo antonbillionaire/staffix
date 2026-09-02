@@ -255,6 +255,15 @@ async function sendIGText(
   text: string
 ): Promise<boolean> {
   try {
+    // decrypt() — envelope encryption; passthrough для plaintext.
+    // Симметрично с sendWhatsAppText: если upstream getPageAccessToken упал
+    // и мы откатились на исходный (зашифрованный) baseToken, здесь всё
+    // равно расшифруем перед отправкой. Иначе Meta вернёт
+    // «Cannot parse access token» (тот же класс бага, что был в
+    // /api/auth/meta/pages/route.ts — регрессия июльского шифрования).
+    const { decrypt } = await import("@/lib/crypto");
+    const token = decrypt(pageAccessToken) || pageAccessToken;
+
     // IG DM limit is 1000 chars per message; split if needed.
     const chunks: string[] = [];
     let remaining = text;
@@ -271,7 +280,7 @@ async function sendIGText(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${pageAccessToken}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           recipient: { id: recipientId },

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { getUserPages } from "@/lib/meta-oauth";
+import { decrypt } from "@/lib/crypto";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -35,7 +36,23 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const pages = await getUserPages(business.metaUserAccessToken);
+    // Токен в БД зашифрован (envelope AES-256-GCM формата v1:iv:ct:tag).
+    // decrypt() расшифровывает, для старых plaintext-записей passthrough.
+    // Пропуск decrypt здесь (регрессия июля 2026 при roll-out шифрования)
+    // проявлялся у пользователей с ≥2 FB-страницами: Meta возвращала
+    // «Invalid OAuth access token - Cannot parse access token» когда мы
+    // передавали `v1:...` вместо реального токена. Одностраничные проходили,
+    // потому что select-page/route.ts правильно расшифровывал (ветка callback
+    // с одной страницей вообще не идёт через этот endpoint).
+    const decryptedToken = decrypt(business.metaUserAccessToken);
+    if (!decryptedToken) {
+      return NextResponse.json(
+        { error: "Meta token empty. Please reconnect." },
+        { status: 404 }
+      );
+    }
+
+    const pages = await getUserPages(decryptedToken);
 
     // Return only safe fields — no tokens
     const safePages = pages.map((p) => ({
@@ -51,9 +68,17 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ pages: safePages });
   } catch (err) {
-    console.error("GET /api/auth/meta/pages error:", err);
+    // Sanitize: раньше raw Meta error message летел в UI (нарушение
+    // CLAUDE.md «не раскрывать детали инфраструктуры»). Ekaterina Yun
+    // видела «Invalid OAuth access token - Cannot parse access token» —
+    // технически правдиво, но пользователю бесполезно и раскрывает
+    // внутрянку. Оригинал остаётся в бэкенд-логах для диагностики.
+    console.error("[Meta OAuth] GET /api/auth/meta/pages failed:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to fetch pages" },
+      {
+        error:
+          "Не удалось получить список Facebook-страниц. Попробуйте переподключить Facebook в настройках.",
+      },
       { status: 500 }
     );
   }
