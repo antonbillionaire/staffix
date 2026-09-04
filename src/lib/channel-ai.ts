@@ -1422,18 +1422,24 @@ export async function generateChannelAIResponse(
         (async () => {
           try {
             const { extractCartFromMessages } = await import("@/lib/cart-extractor");
+            // Prev discussed передаём чтобы за длинный диалог не потерять
+            // товары упомянутые за пределами окна из 6 сообщений (OLLEE-fix
+            // 4 сентября 2026).
+            const existingExtractedForPrev = (conv.extractedInfo as Record<string, unknown> | null) || {};
+            const prevCart = existingExtractedForPrev.cart as import("@/lib/cart-extractor").CartSnapshot | undefined;
+            const previousDiscussed = prevCart?.discussedProducts ?? [];
             const snapshot = await extractCartFromMessages(
               updatedHistory as unknown as Array<{ role: string; content: string }>,
-              businessId
+              businessId,
+              previousDiscussed
             );
             if (snapshot) {
-              const existingExtracted = (conv.extractedInfo as Record<string, unknown> | null) || {};
               await prisma.channelConversation.update({
                 where: { id: conv.id },
                 // Prisma требует InputJsonValue; наш CartSnapshot — plain
                 // JSON-safe object, кастом устраняем strict-index-signature.
                 data: {
-                  extractedInfo: { ...existingExtracted, cart: snapshot } as unknown as import("@prisma/client").Prisma.JsonObject,
+                  extractedInfo: { ...existingExtractedForPrev, cart: snapshot } as unknown as import("@prisma/client").Prisma.JsonObject,
                 },
               });
             }

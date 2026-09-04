@@ -670,9 +670,14 @@ export async function generateAIResponse(
             { role: "user", content: userMessage },
             { role: "assistant", content: assistantMessage },
           ].slice(-6);
-          const snapshot = await extractCartFromMessages(recent, businessId);
+          // prev discussed — товары упомянутые за пределами окна из 6 сообщений,
+          // чтобы за длинный диалог не потерять давно названные позиции
+          // (OLLEE-fix 4 сентября 2026).
+          const existingExtracted = (conversation.extractedInfo || {}) as Record<string, unknown>;
+          const prevCart = existingExtracted.cart as import("@/lib/cart-extractor").CartSnapshot | undefined;
+          const previousDiscussed = prevCart?.discussedProducts ?? [];
+          const snapshot = await extractCartFromMessages(recent, businessId, previousDiscussed);
           if (snapshot) {
-            const existingExtracted = conversation.extractedInfo || {};
             await prisma.conversation.update({
               where: { id: conversation.id },
               data: {

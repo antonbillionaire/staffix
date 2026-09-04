@@ -102,8 +102,110 @@ describe("normalizeCartSnapshot", () => {
   });
 });
 
+describe("normalizeCartSnapshot — discussedProducts (OLLEE-fix 4 сент 2026)", () => {
+  it("Пустой input → пустой discussedProducts", () => {
+    const r = normalizeCartSnapshot({ items: [] });
+    expect(r!.discussedProducts).toEqual([]);
+  });
+
+  it("Товары в корзине автоматически попадают в discussedProducts", () => {
+    const r = normalizeCartSnapshot({
+      items: [
+        { name: "BB-крем", price: 145000, quantity: 1 },
+        { name: "Пенка", price: 75000, quantity: 1 },
+      ],
+    });
+    expect(r!.discussedProducts).toContain("BB-крем");
+    expect(r!.discussedProducts).toContain("Пенка");
+  });
+
+  it("Явный discussedProducts от Haiku парсится", () => {
+    const r = normalizeCartSnapshot({
+      items: [],
+      discussedProducts: ["Гидрофильное масло", "Мицеллярная вода", "Энзимная пудра"],
+    });
+    expect(r!.discussedProducts).toEqual([
+      "Гидрофильное масло",
+      "Мицеллярная вода",
+      "Энзимная пудра",
+    ]);
+  });
+
+  it("Merge с previousDiscussed — предыдущие сохраняются, новые в конец", () => {
+    const r = normalizeCartSnapshot(
+      {
+        items: [],
+        discussedProducts: ["Тонер", "Крем SPF"],
+      },
+      ["Гидрофильное масло", "Мицеллярная вода"]
+    );
+    expect(r!.discussedProducts).toEqual([
+      "Гидрофильное масло",
+      "Мицеллярная вода",
+      "Тонер",
+      "Крем SPF",
+    ]);
+  });
+
+  it("Dedup case-insensitive — одинаковые названия в разных регистрах не дублируются", () => {
+    const r = normalizeCartSnapshot(
+      {
+        items: [],
+        discussedProducts: ["Гидрофильное масло", "гидрофильное масло", "ГИДРОФИЛЬНОЕ МАСЛО"],
+      },
+      ["Гидрофильное масло"]
+    );
+    expect(r!.discussedProducts).toHaveLength(1);
+  });
+
+  it("Обрезка длинных названий до 100 символов", () => {
+    const longName = "A".repeat(200);
+    const r = normalizeCartSnapshot({
+      items: [],
+      discussedProducts: [longName],
+    });
+    expect(r!.discussedProducts[0]).toHaveLength(100);
+  });
+
+  it("Слишком короткие названия (<2 символов) отбрасываются", () => {
+    const r = normalizeCartSnapshot({
+      items: [],
+      discussedProducts: ["A", "  ", "", "Валид"],
+    });
+    expect(r!.discussedProducts).toEqual(["Валид"]);
+  });
+
+  it("Лимит 30 в discussedProducts", () => {
+    const many = Array.from({ length: 50 }, (_, i) => `Товар ${i}`);
+    const r = normalizeCartSnapshot({
+      items: [],
+      discussedProducts: many,
+    });
+    expect(r!.discussedProducts).toHaveLength(30);
+  });
+
+  it("previousDiscussed без нового ввода — сохраняется полностью", () => {
+    const r = normalizeCartSnapshot(
+      { items: [] },
+      ["Гидрофильное масло", "Мицеллярная вода"]
+    );
+    expect(r!.discussedProducts).toEqual([
+      "Гидрофильное масло",
+      "Мицеллярная вода",
+    ]);
+  });
+
+  it("Мусорные значения в discussedProducts игнорируются (не строки)", () => {
+    const r = normalizeCartSnapshot({
+      items: [],
+      discussedProducts: [123, null, undefined, { name: "obj" }, "Валид"],
+    });
+    expect(r!.discussedProducts).toEqual(["Валид"]);
+  });
+});
+
 describe("formatCartForPrompt", () => {
-  it("Пустая корзина → пустая строка", () => {
+  it("Пустая корзина + пустой discussed → пустая строка", () => {
     expect(formatCartForPrompt(null)).toBe("");
     expect(
       formatCartForPrompt({
@@ -111,6 +213,7 @@ describe("formatCartForPrompt", () => {
         total: 0,
         currency: "сум",
         status: "browsing",
+        discussedProducts: [],
         updatedAt: new Date().toISOString(),
       })
     ).toBe("");
@@ -123,6 +226,7 @@ describe("formatCartForPrompt", () => {
       total: 100,
       currency: "сум",
       status: "assembling",
+      discussedProducts: ["Крем"],
       updatedAt: oldTimestamp,
     });
     expect(result).toBe("");
@@ -137,6 +241,7 @@ describe("formatCartForPrompt", () => {
       total: 295000,
       currency: "сум",
       status: "assembling",
+      discussedProducts: ["BB-крем", "Пенка"],
       updatedAt: new Date().toISOString(),
     });
     expect(result).toContain("BB-крем × 1 = 145000 сум");
@@ -151,6 +256,7 @@ describe("formatCartForPrompt", () => {
       total: 100,
       currency: "сум",
       status: "confirmed",
+      discussedProducts: ["Крем"],
       updatedAt: new Date().toISOString(),
     });
     expect(result).toContain("подтвердил заказ");
@@ -163,8 +269,43 @@ describe("formatCartForPrompt", () => {
       total: 100,
       currency: "сум",
       status: "ordered",
+      discussedProducts: ["Крем"],
       updatedAt: new Date().toISOString(),
     });
     expect(result).toContain("заказ уже создан");
+  });
+
+  it("Пустая корзина + непустой discussed → показывается только блок обсуждали", () => {
+    const result = formatCartForPrompt({
+      items: [],
+      total: 0,
+      currency: "сум",
+      status: "browsing",
+      discussedProducts: ["Гидрофильное масло", "Мицеллярная вода", "Пенка"],
+      updatedAt: new Date().toISOString(),
+    });
+    expect(result).toContain("УЖЕ ОБСУЖДАЛИ");
+    expect(result).toContain("Гидрофильное масло");
+    expect(result).toContain("Мицеллярная вода");
+    expect(result).toContain("Пенка");
+    expect(result).not.toContain("ТЕКУЩАЯ КОРЗИНА");
+  });
+
+  it("Корзина + discussed → оба блока в одном ответе", () => {
+    const result = formatCartForPrompt({
+      items: [{ name: "BB-крем", price: 145000, quantity: 1 }],
+      total: 145000,
+      currency: "сум",
+      status: "assembling",
+      discussedProducts: ["BB-крем", "Гидрофильное масло", "Мицеллярная вода"],
+      updatedAt: new Date().toISOString(),
+    });
+    expect(result).toContain("ТЕКУЩАЯ КОРЗИНА");
+    expect(result).toContain("УЖЕ ОБСУЖДАЛИ");
+    expect(result).toContain("Гидрофильное масло");
+    // Обсуждали блок должен идти ПОСЛЕ корзины
+    const cartIdx = result.indexOf("ТЕКУЩАЯ КОРЗИНА");
+    const discussedIdx = result.indexOf("УЖЕ ОБСУЖДАЛИ");
+    expect(discussedIdx).toBeGreaterThan(cartIdx);
   });
 });
