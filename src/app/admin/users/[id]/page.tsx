@@ -336,6 +336,7 @@ export default function AdminUserDetailPage({
   const { user, business, subscription, timeline } = data;
 
   return (
+    <>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
@@ -823,6 +824,142 @@ export default function AdminUserDetailPage({
         </div>
       </div>
     </div>
+
+    {/* Модалка «Продлить подписку» — 4 сентября 2026, admin quick-action.
+        Заменяет фиксированную кнопку «+7 дней»: даёт выбрать любое число
+        дней/сообщений + опциональный сброс счётчика. Backend endpoints
+        (extend_trial / add_messages / reset_messages) без изменений. */}
+    {extendModalOpen && data && (
+      <div
+        className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+        onClick={() => !extendSubmitting && setExtendModalOpen(false)}
+      >
+        <div
+          className="bg-[#12122a] border border-white/10 rounded-xl max-w-lg w-full p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-lg font-semibold text-white">Продлить подписку</h3>
+            <button
+              onClick={() => !extendSubmitting && setExtendModalOpen(false)}
+              disabled={extendSubmitting}
+              className="text-gray-400 hover:text-white disabled:opacity-50"
+            >
+              ✕
+            </button>
+          </div>
+          <p className="text-sm text-gray-400 mb-5">
+            {data.business?.name || data.user.email} —{" "}
+            {data.subscription
+              ? `${data.subscription.plan}, ${data.subscription.messagesUsed}/${data.subscription.messagesLimit} сообщ., ${data.subscription.daysLeft ?? "?"} дн. осталось`
+              : "нет подписки"}
+          </p>
+
+          {/* Дни */}
+          <div className="mb-5">
+            <label className="text-sm text-white mb-2 block">
+              Продлить срок на:
+            </label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {DAY_PRESETS.map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setExtendDays(d)}
+                  className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
+                    extendDays === d
+                      ? "bg-blue-500/30 border-blue-500 text-blue-200"
+                      : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/10"
+                  }`}
+                >
+                  +{d} дн.
+                </button>
+              ))}
+            </div>
+            <input
+              type="number"
+              min={0}
+              max={3650}
+              value={extendDays}
+              onChange={(e) => setExtendDays(Math.max(0, Math.min(3650, parseInt(e.target.value, 10) || 0)))}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white text-sm focus:outline-none focus:border-blue-500"
+              placeholder="Или ввести число дней вручную"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Новая дата окончания = сейчас + N дней. 0 = не продлевать.
+            </p>
+          </div>
+
+          {/* Сообщения */}
+          <div className="mb-5">
+            <label className="text-sm text-white mb-2 block">
+              Добавить сообщений к лимиту:
+            </label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {MSG_PRESETS.map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setExtendMessages(m)}
+                  className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
+                    extendMessages === m
+                      ? "bg-green-500/30 border-green-500 text-green-200"
+                      : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/10"
+                  }`}
+                >
+                  {m === 0 ? "0" : `+${m}`}
+                </button>
+              ))}
+            </div>
+            <input
+              type="number"
+              min={0}
+              max={1_000_000}
+              value={extendMessages}
+              onChange={(e) => setExtendMessages(Math.max(0, Math.min(1_000_000, parseInt(e.target.value, 10) || 0)))}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white text-sm focus:outline-none focus:border-green-500"
+              placeholder="Или ввести количество вручную"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Прибавляется к текущему messagesLimit. 0 = не менять лимит.
+            </p>
+          </div>
+
+          {/* Сброс счётчика */}
+          <div className="mb-6">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={extendResetCounter}
+                onChange={(e) => setExtendResetCounter(e.target.checked)}
+                className="w-4 h-4 rounded border-white/20 bg-white/5 text-yellow-500 focus:ring-yellow-500"
+              />
+              <span className="text-sm text-white">
+                Сбросить счётчик использованных сообщений (messagesUsed = 0)
+              </span>
+            </label>
+          </div>
+
+          {/* Кнопки */}
+          <div className="flex gap-3">
+            <button
+              onClick={() => setExtendModalOpen(false)}
+              disabled={extendSubmitting}
+              className="flex-1 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-md text-white text-sm disabled:opacity-50"
+            >
+              Отмена
+            </button>
+            <button
+              onClick={submitExtend}
+              disabled={extendSubmitting}
+              className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-md text-white text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {extendSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              Применить
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -1071,138 +1208,6 @@ function DiagnosticButton({ businessId }: { businessId: string }) {
               {JSON.stringify(data, null, 2)}
             </pre>
           </details>
-        </div>
-      )}
-
-      {/* Модалка «Продлить подписку» — 4 сентября 2026, admin quick-action */}
-      {extendModalOpen && data && (
-        <div
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => !extendSubmitting && setExtendModalOpen(false)}
-        >
-          <div
-            className="bg-[#12122a] border border-white/10 rounded-xl max-w-lg w-full p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="text-lg font-semibold text-white">Продлить подписку</h3>
-              <button
-                onClick={() => !extendSubmitting && setExtendModalOpen(false)}
-                disabled={extendSubmitting}
-                className="text-gray-400 hover:text-white disabled:opacity-50"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="text-sm text-gray-400 mb-5">
-              {data.business?.name || data.user.email} —{" "}
-              {data.subscription
-                ? `${data.subscription.plan}, ${data.subscription.messagesUsed}/${data.subscription.messagesLimit} сообщ., ${data.subscription.daysLeft ?? "?"} дн. осталось`
-                : "нет подписки"}
-            </p>
-
-            {/* Дни */}
-            <div className="mb-5">
-              <label className="text-sm text-white mb-2 block">
-                Продлить срок на:
-              </label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {DAY_PRESETS.map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => setExtendDays(d)}
-                    className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
-                      extendDays === d
-                        ? "bg-blue-500/30 border-blue-500 text-blue-200"
-                        : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/10"
-                    }`}
-                  >
-                    +{d} дн.
-                  </button>
-                ))}
-              </div>
-              <input
-                type="number"
-                min={0}
-                max={3650}
-                value={extendDays}
-                onChange={(e) => setExtendDays(Math.max(0, Math.min(3650, parseInt(e.target.value, 10) || 0)))}
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white text-sm focus:outline-none focus:border-blue-500"
-                placeholder="Или ввести число дней вручную"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Новая дата окончания = сейчас + N дней. 0 = не продлевать.
-              </p>
-            </div>
-
-            {/* Сообщения */}
-            <div className="mb-5">
-              <label className="text-sm text-white mb-2 block">
-                Добавить сообщений к лимиту:
-              </label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {MSG_PRESETS.map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setExtendMessages(m)}
-                    className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
-                      extendMessages === m
-                        ? "bg-green-500/30 border-green-500 text-green-200"
-                        : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/10"
-                    }`}
-                  >
-                    {m === 0 ? "0" : `+${m}`}
-                  </button>
-                ))}
-              </div>
-              <input
-                type="number"
-                min={0}
-                max={1_000_000}
-                value={extendMessages}
-                onChange={(e) => setExtendMessages(Math.max(0, Math.min(1_000_000, parseInt(e.target.value, 10) || 0)))}
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white text-sm focus:outline-none focus:border-green-500"
-                placeholder="Или ввести количество вручную"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Прибавляется к текущему messagesLimit. 0 = не менять лимит.
-              </p>
-            </div>
-
-            {/* Сброс счётчика */}
-            <div className="mb-6">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={extendResetCounter}
-                  onChange={(e) => setExtendResetCounter(e.target.checked)}
-                  className="w-4 h-4 rounded border-white/20 bg-white/5 text-yellow-500 focus:ring-yellow-500"
-                />
-                <span className="text-sm text-white">
-                  Сбросить счётчик использованных сообщений (messagesUsed = 0)
-                </span>
-              </label>
-            </div>
-
-            {/* Кнопки */}
-            <div className="flex gap-3">
-              <button
-                onClick={() => setExtendModalOpen(false)}
-                disabled={extendSubmitting}
-                className="flex-1 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-md text-white text-sm disabled:opacity-50"
-              >
-                Отмена
-              </button>
-              <button
-                onClick={submitExtend}
-                disabled={extendSubmitting}
-                className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-md text-white text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {extendSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                Применить
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </>
