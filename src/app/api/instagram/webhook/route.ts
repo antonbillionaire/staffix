@@ -383,10 +383,15 @@ async function processIGMessage(
   const pageToken = await getPageAccessToken(pageId, effectiveIGToken).catch(() => effectiveIGToken);
   console.log(`[IG Webhook] Token: effectiveLen=${effectiveIGToken.length}, pageTokenLen=${pageToken.length}, pageId=${pageId}`);
 
-  // Check subscription limits
-  const { allowed: subAllowed } = await checkSubscriptionLimit(business.id);
+  // Check subscription limits — silent (4 сент 2026, Anton): раньше слали
+  // клиенту «Извините, временно не можем обработать» — владелец не хочет
+  // чтобы бот рекламировал его проблемы с подпиской перед клиентами. Тихий
+  // выход, владелец узнаёт через dashboard-баннер и email-напоминания.
+  const { allowed: subAllowed, reason: subReason } = await checkSubscriptionLimit(business.id);
   if (!subAllowed) {
-    await sendIGMessage(pageId, pageToken, senderId, "Извините, временно не можем обработать ваш запрос. Свяжитесь с нами напрямую.");
+    console.log(
+      `[IG Webhook] Subscription blocked (reason=${subReason}) for business=${business.id} — silent (no reply to client)`
+    );
     return;
   }
 

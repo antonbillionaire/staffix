@@ -248,14 +248,14 @@ async function processBusinessFBMessage(
     // Convert System User token → Page Access Token (required for Messenger API)
     const fbToken = await getPageAccessToken(msg.pageId, baseFbToken).catch(() => baseFbToken);
 
-    // Check message limit
-    const { allowed } = await checkSubscriptionLimit(businessId);
+    // Check message limit — silent (4 сент 2026, Anton): раньше слали
+    // клиенту «Извините, временно не можем обработать» — владелец не хочет
+    // чтобы бот рекламировал его проблемы с подпиской перед клиентами.
+    // Тихий выход, владелец узнаёт через dashboard-баннер и email-напоминания.
+    const { allowed, reason } = await checkSubscriptionLimit(businessId);
     if (!allowed) {
-      await sendFBMessage(
-        fbToken,
-        msg.senderId,
-        "Извините, временно не можем обработать ваш запрос. Свяжитесь с нами напрямую.",
-        msg.pageId
+      console.log(
+        `[FB Webhook] Subscription blocked (reason=${reason}) for business=${businessId} — silent (no reply to client)`
       );
       return;
     }

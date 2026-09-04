@@ -548,20 +548,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Лимит сообщений / статус подписки
+    // Лимит сообщений / статус подписки — 4 сентября 2026 (Anton): бот должен
+    // ПОЛНОСТЬЮ молчать когда подписка кончилась / лимит исчерпан / suspended.
+    // Раньше отправляли клиенту заглушку «лимит исчерпан, обратитесь к
+    // администратору» — владельцу это выглядело как реклама его же
+    // проблем перед его же клиентами. Теперь тихий return, клиент видит
+    // ноль реакции. Владелец узнаёт через дашборд-баннер и email-напоминания.
     const { allowed, reason } = await checkSubscriptionLimit(business.id);
-
     if (!allowed) {
-      // Suspended (PayPro charge failed) → owner needs to fix card. Apologize
-      // without exposing internals. Expired / limit_reached → similar apology;
-      // the customer doesn't need the technical reason, the owner sees it in
-      // the dashboard banner and email.
-      const errorMsg =
-        reason === "suspended"
-          ? "Бот временно недоступен. Пожалуйста, свяжитесь с нами напрямую."
-          : "К сожалению, лимит сообщений исчерпан. Пожалуйста, обратитесь к администратору.";
-
-      await sendTelegramMessage(botToken, chatId, errorMsg);
+      console.log(
+        `[TG Webhook] Subscription blocked (reason=${reason}) for business=${business.id} — silent (no reply to client)`
+      );
       return NextResponse.json({ ok: true });
     }
 

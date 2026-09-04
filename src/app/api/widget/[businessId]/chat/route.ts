@@ -23,6 +23,7 @@ import { prisma } from "@/lib/prisma";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
 import { stripMarkdown } from "@/lib/strip-markdown";
+import { checkSubscriptionLimit } from "@/lib/subscription-check";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -159,6 +160,19 @@ export async function POST(
       },
       200
     );
+  }
+
+  // Подписка кончилась / лимит сообщений исчерпан / suspended → бот молчит
+  // (4 сент 2026, Anton). Владелец не хочет чтобы бот рекламировал его
+  // проблемы с оплатой перед клиентами на его же сайте. Возвращаем пустой
+  // reply — виджет-фронт покажет ссылки на мессенджеры внизу без нового
+  // сообщения бота.
+  const subStatus = await checkSubscriptionLimit(businessId);
+  if (!subStatus.allowed) {
+    console.log(
+      `[widget-chat] Subscription blocked (reason=${subStatus.reason}) for business=${businessId} — silent`
+    );
+    return jsonWithCors({ reply: "" });
   }
 
   // ── Генерация AI-ответа через тот же channel-ai движок ───────────

@@ -206,14 +206,15 @@ async function processWAMessage(
     if (!waToken) return;
     console.log(`[WA Webhook] Token source: ${envToken ? 'ENV' : 'DB'}`);
 
-    // Check message limit
+    // Check message limit — silent when expired/limit_reached/suspended
+    // (4 сент 2026): раньше слали клиенту «Извините, временно не можем
+    // обработать» — владелец не хочет чтобы бот рекламировал его проблемы
+    // с подпиской перед клиентами. Тихий выход, владелец узнаёт через
+    // dashboard-баннер и email-напоминания.
     const { allowed, reason } = await checkSubscriptionLimit(businessId);
     if (!allowed) {
-      await sendWAMessage(
-        business.waPhoneNumberId,
-        waToken,
-        msg.waId,
-        "Извините, временно не можем обработать ваш запрос. Пожалуйста, свяжитесь с нами напрямую."
+      console.log(
+        `[WA Webhook] Subscription blocked (reason=${reason}) for business=${businessId} — silent (no reply to client)`
       );
       return;
     }
