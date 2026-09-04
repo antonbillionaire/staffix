@@ -109,6 +109,18 @@ export async function POST(request: Request) {
       const sender = messaging.sender as Record<string, string> | undefined;
       const message = messaging.message as Record<string, unknown> | undefined;
 
+      // Reaction events (лайк/эмодзи на конкретное сообщение бота) приходят
+      // отдельным полем `reaction`, без `message`. Не отвечаем — эмодзи на
+      // наше сообщение не требует ответа, иначе получится «пинг-понг лайков».
+      // Логируем для дебага (OLLEE-fb #14).
+      if (messaging.reaction) {
+        const reaction = messaging.reaction as Record<string, unknown>;
+        console.log(
+          `[IG Webhook] Reaction event: sender=${sender?.id} action=${reaction.action} emoji=${reaction.emoji} — silent`
+        );
+        continue;
+      }
+
       if (!sender?.id || !message) continue;
       if (message.is_echo) continue;
 
@@ -132,18 +144,54 @@ export async function POST(request: Request) {
         }
       }
 
-      // Handle non-text messages (images, stickers, failed audio transcription)
+      // Handle non-text messages (4 сентября 2026, OLLEE-fb #14):
+      // раньше на всё без текста уходил один и тот же ответ «не распознаю»,
+      // включая отметки в сторис и реперпосты рекламы — клиенты OLLEE
+      // жаловались. Теперь различаем:
+      //   - story_mention (отметили @бренд в сторис) → шаблон «Спасибо!»
+      //   - share (репостнули пост/рекламу в сторис) → шаблон «Спасибо!»
+      //   - media (image/video/sticker без текста) → старый fallback
+      //   - empty — тихо игнорим (dedup / echo)
       if (!messageText) {
         const messageId = String(message.mid || "");
         if (!(await markWebhookProcessed(messageId))) continue;
-        // Find business to reply
+
+        const { classifyIGMessage, getIGTemplateReply } = await import("@/lib/ig-event-classifier");
+        const eventType = classifyIGMessage(message);
+        const templateReply = getIGTemplateReply(eventType);
+
+        if (!templateReply) {
+          console.log(
+            `[IG Webhook] event type=${eventType} — no template reply, silent ignore (sender=${sender.id})`
+          );
+          continue;
+        }
+
+        // Найти бизнес и отправить шаблон. Не расходуем subscription-лимит
+        // (шаблоны — не AI-ответы, не влияют на квоту сообщений).
         const biz = await prisma.business.findFirst({
-          where: { OR: [{ igBusinessAccountId: accountId, igActive: true }, { fbPageId: accountId, igActive: true }] },
-          select: { fbPageAccessToken: true, fbPageId: true },
+          where: {
+            OR: [
+              { igBusinessAccountId: accountId, igActive: true },
+              { fbPageId: accountId, igActive: true },
+            ],
+          },
+          select: { fbPageAccessToken: true, fbPageId: true, botActive: true },
         });
-        if (biz?.fbPageAccessToken && biz.fbPageId) {
-          const pgToken = await getPageAccessToken(biz.fbPageId, biz.fbPageAccessToken).catch(() => biz.fbPageAccessToken!);
-          await sendIGMessage(biz.fbPageId, pgToken, sender.id, "Извините, я не распознаю изображения и файлы. Опишите вопрос текстом или отправьте голосовое сообщение — я отвечу.").catch(() => {});
+        if (biz?.botActive && biz?.fbPageAccessToken && biz.fbPageId) {
+          const pgToken = await getPageAccessToken(biz.fbPageId, biz.fbPageAccessToken).catch(
+            () => biz.fbPageAccessToken!
+          );
+          await sendIGMessage(biz.fbPageId, pgToken, sender.id, templateReply).catch((e) =>
+            console.error(`[IG Webhook] template reply send failed (${eventType}):`, e)
+          );
+          console.log(
+            `[IG Webhook] event type=${eventType} → template reply sent (sender=${sender.id})`
+          );
+        } else {
+          console.log(
+            `[IG Webhook] event type=${eventType} → business not found / paused (account=${accountId})`
+          );
         }
         continue;
       }
