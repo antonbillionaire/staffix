@@ -23,6 +23,8 @@ import {
   BarChart3,
   ListTodo,
   AlertCircle,
+  Pause,
+  Play,
 } from "lucide-react";
 
 type Period = "day" | "week" | "month" | "all";
@@ -84,6 +86,31 @@ export default function DashboardPage() {
     clientChannelId: string | null;
   }>>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
+
+  // Bot pause/activate toggle (5 сент 2026 по запросу Anton'а): плашка сверху
+  // дашборда с кнопкой которая переключает Business.botActive. Все webhooks
+  // (TG/WA/IG/FB/веб) проверяют этот флаг и молча пропускают входящие когда
+  // false. Одна кнопка = бот замолчал/заговорил во всех каналах сразу.
+  const [botToggling, setBotToggling] = useState(false);
+  const toggleBotActive = async () => {
+    if (!bizData || botToggling) return;
+    const next = !bizData.botActive;
+    setBotToggling(true);
+    try {
+      const res = await fetch("/api/business/bot-active", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ botActive: next }),
+      });
+      if (res.ok) {
+        setBizData({ ...bizData, botActive: next });
+      }
+    } catch (e) {
+      console.error("Bot toggle failed:", e);
+    } finally {
+      setBotToggling(false);
+    }
+  };
 
   const refreshTasks = async () => {
     try {
@@ -252,6 +279,72 @@ export default function DashboardPage() {
         <h1 className={`text-2xl font-bold ${textPrimary} mb-1`}>{t("dashboard.welcomeTitle")}</h1>
         <p className={textSecondary}>{t("dashboard.welcomeSubtitle")}</p>
       </div>
+
+      {/* Bot pause/activate — глобальный toggle для всех каналов */}
+      {bizData && (
+        <div
+          className={`rounded-xl p-4 flex items-center gap-4 border ${
+            bizData.botActive
+              ? isDark
+                ? "bg-green-500/10 border-green-500/30"
+                : "bg-green-50 border-green-200"
+              : isDark
+                ? "bg-amber-500/10 border-amber-500/40"
+                : "bg-amber-50 border-amber-200"
+          }`}
+        >
+          <div
+            className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+              bizData.botActive
+                ? isDark ? "bg-green-500/20" : "bg-green-100"
+                : isDark ? "bg-amber-500/20" : "bg-amber-100"
+            }`}
+          >
+            {bizData.botActive ? (
+              <CheckCircle2 className={isDark ? "h-5 w-5 text-green-400" : "h-5 w-5 text-green-600"} />
+            ) : (
+              <Pause className={isDark ? "h-5 w-5 text-amber-400" : "h-5 w-5 text-amber-600"} />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className={`font-semibold ${bizData.botActive ? (isDark ? "text-green-300" : "text-green-700") : (isDark ? "text-amber-300" : "text-amber-700")}`}>
+              {bizData.botActive
+                ? "Бот активен во всех каналах"
+                : "Бот на паузе — не отвечает клиентам ни в одном канале"}
+            </p>
+            <p className={`text-xs mt-0.5 ${textSecondary}`}>
+              {bizData.botActive
+                ? "Одна кнопка отключит бота в Telegram, WhatsApp, Instagram, Facebook и виджете сразу"
+                : "Клиенты пишут, но бот молчит. Нажмите «Активировать» когда готовы отвечать снова"}
+            </p>
+          </div>
+          <button
+            onClick={toggleBotActive}
+            disabled={botToggling}
+            className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-50 flex-shrink-0 ${
+              bizData.botActive
+                ? "bg-amber-500 hover:bg-amber-600 text-white"
+                : "bg-green-500 hover:bg-green-600 text-white"
+            }`}
+            title={
+              bizData.botActive
+                ? "Поставить бота на паузу во всех каналах"
+                : "Активировать бота во всех каналах"
+            }
+          >
+            {botToggling ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : bizData.botActive ? (
+              <Pause className="h-4 w-4" />
+            ) : (
+              <Play className="h-4 w-4" />
+            )}
+            <span className="hidden sm:inline">
+              {bizData.botActive ? "На паузу" : "Активировать"}
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* ── CHANNELS ── */}
       <div>

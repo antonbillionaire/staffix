@@ -1593,53 +1593,120 @@ export async function notifyManagerByTelegram(
       }
     }
 
-    // Целевой получатель: привязанный менеджер > владелец
-    const targetChatId = assignedManagerChatId ?? business.ownerTelegramChatId;
-    const targetLabel = assignedManagerChatId
-      ? `assigned manager "${assignedManagerName || "?"}"`
-      : "owner";
+    // Целевые получатели (5 сент 2026, OLLEE-fb):
+    // 1) Привязанный менеджер клиента (если есть) — приоритет
+    // 2) Иначе — broadcast всем staff бизнеса с ролью admin/manager/operator,
+    //    у кого включены уведомления и настроен telegramChatId (личный /start
+    //    или chat_id рабочей группы). Раньше здесь был fallback только на
+    //    ownerTelegramChatId — из-за этого:
+    //      - для WA/IG/FB клиентов (clientTelegramId=0) блок assignedStaff
+    //        вообще пропускался → всегда шло только владельцу
+    //      - для TG клиентов без assignedStaffId — тоже только владельцу
+    //    В итоге staff которых владелец добавил и настроил TG — никогда не
+    //    получали эскалаций из мессенджеров. Теперь получают.
+    // 3) Если ни один staff не настроен И ownerTelegramChatId тоже нет —
+    //    только запись в дашборд.
+
+    const escalationRoles = ["admin", "manager", "operator", "master", "doctor"];
+    interface Target { chatId: bigint; label: string; }
+    const targets: Target[] = [];
+
+    if (assignedManagerChatId) {
+      targets.push({
+        chatId: assignedManagerChatId,
+        label: `assigned manager "${assignedManagerName || "?"}"`,
+      });
+    } else {
+      // Fallback: broadcast всем подходящим staff
+      try {
+        const staffList = await prisma.staff.findMany({
+          where: {
+            businessId,
+            role: { in: escalationRoles },
+            notificationsEnabled: true,
+            telegramChatId: { not: null },
+          },
+          select: { id: true, name: true, telegramChatId: true },
+        });
+        for (const s of staffList) {
+          if (s.telegramChatId != null) {
+            targets.push({
+              chatId: s.telegramChatId,
+              label: `staff "${s.name}"`,
+            });
+          }
+        }
+      } catch (e) {
+        console.warn(`${tag} staff broadcast lookup failed:`, e);
+      }
+
+      // Если нет вообще ни одного staff — старый fallback на владельца
+      if (targets.length === 0 && business.ownerTelegramChatId) {
+        targets.push({
+          chatId: business.ownerTelegramChatId,
+          label: "owner (fallback: no configured staff)",
+        });
+      }
+    }
 
     let telegramDelivered = false;
     let telegramReason = "";
+    const deliveredTo: string[] = [];
+    const failedTo: string[] = [];
+
     if (!business.botToken) {
       telegramReason = "no botToken";
       console.warn(`${tag} TG skip: no botToken`);
-    } else if (!targetChatId) {
-      telegramReason = "no chatId — neither assigned manager nor owner has /start'ed the bot";
+    } else if (targets.length === 0) {
+      telegramReason =
+        "no chatId — no assigned manager, no configured staff, and owner has not /start'ed the bot";
       console.warn(`${tag} TG skip: ${telegramReason}`);
     } else {
-      try {
-        const text =
-          `${urgencyLabel} — требуется помощь менеджера\n\n` +
-          `${clientLabel}\n` +
-          `Вопрос: ${reason}\n\n` +
-          `Клиент ждёт ответа в Telegram.`;
+      const text =
+        `${urgencyLabel} — требуется помощь менеджера\n\n` +
+        `${clientLabel}\n` +
+        `Вопрос: ${reason}\n\n` +
+        `Клиент ждёт ответа в мессенджере.`;
 
-        console.log(`${tag} TG sending to ${targetLabel} chat=${targetChatId}`);
-        const tgResponse = await fetch(
-          `https://api.telegram.org/bot${business.botToken}/sendMessage`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chat_id: targetChatId.toString(),
-              text,
-              // НЕ передаём parse_mode — plain text всегда доходит без эскейпа.
-            }),
+      // Шлём последовательно чтобы TG rate-limit не бил сразу по всем.
+      // Каждая отправка независимая — падение одного не блокирует остальных.
+      for (const target of targets) {
+        try {
+          console.log(`${tag} TG sending to ${target.label} chat=${target.chatId}`);
+          const tgResponse = await fetch(
+            `https://api.telegram.org/bot${business.botToken}/sendMessage`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: target.chatId.toString(),
+                text,
+                // НЕ передаём parse_mode — plain text всегда доходит без эскейпа.
+              }),
+            }
+          );
+
+          if (tgResponse.ok) {
+            telegramDelivered = true;
+            deliveredTo.push(target.label);
+            console.log(`${tag} TG DELIVERED to ${target.label}`);
+          } else {
+            const body = await tgResponse.text().catch(() => "");
+            const errMsg = `${tgResponse.status}: ${body.slice(0, 150)}`;
+            failedTo.push(`${target.label} (${errMsg})`);
+            console.error(`${tag} TG FAILED to ${target.label}: ${errMsg}`);
           }
-        );
-
-        if (tgResponse.ok) {
-          telegramDelivered = true;
-          console.log(`${tag} TG DELIVERED to ${targetLabel}`);
-        } else {
-          const body = await tgResponse.text().catch(() => "");
-          telegramReason = `TG API ${tgResponse.status}: ${body.slice(0, 200)}`;
-          console.error(`${tag} TG FAILED: ${telegramReason}`);
+        } catch (e) {
+          const errMsg = e instanceof Error ? e.message : String(e);
+          failedTo.push(`${target.label} (${errMsg})`);
+          console.error(`${tag} TG fetch error to ${target.label}:`, e);
         }
-      } catch (e) {
-        telegramReason = e instanceof Error ? e.message : String(e);
-        console.error(`${tag} TG fetch error:`, e);
+      }
+
+      if (deliveredTo.length === 0) {
+        telegramReason = `all ${targets.length} target(s) failed: ${failedTo.join("; ").slice(0, 200)}`;
+      } else if (failedTo.length > 0) {
+        telegramReason = `delivered to ${deliveredTo.length}/${targets.length}; partial fail: ${failedTo.join("; ").slice(0, 150)}`;
       }
     }
 
@@ -1654,7 +1721,7 @@ export async function notifyManagerByTelegram(
       type: "notification_sent",
       severity: telegramDelivered ? "info" : dashboardCreated ? "warn" : "error",
       summary: telegramDelivered
-        ? `Уведомление менеджеру (${assignedManagerName || "владелец"}) доставлено в Telegram`
+        ? `Уведомление доставлено в Telegram: ${deliveredTo.slice(0, 3).join(", ")}${deliveredTo.length > 3 ? " и ещё " + (deliveredTo.length - 3) : ""}`
         : dashboardCreated
           ? `Уведомление сохранено в дашборде (Telegram-доставка не прошла)`
           : `Уведомление НЕ доставлено`,
@@ -1662,8 +1729,10 @@ export async function notifyManagerByTelegram(
         tool: "notify_manager",
         reason: reason?.slice(0, 200) || null,
         urgency: urgency || "normal",
-        target: assignedManagerName ? "assigned_manager" : "owner",
+        target: assignedManagerChatId ? "assigned_manager" : "staff_broadcast",
         targetName: assignedManagerName,
+        deliveredTo,
+        failedTo,
         telegramDelivered,
         dashboardCreated,
         deliveryError: telegramReason || null,
