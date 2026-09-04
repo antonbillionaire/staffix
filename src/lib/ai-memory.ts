@@ -404,18 +404,26 @@ export function buildSystemPrompt(
     casual: "Общайся неформально и легко, как с другом.",
   };
 
-  // Language instruction for AI
-  const langMap: Record<string, string> = {
-    ru: "Отвечай на русском языке.",
-    en: "Respond in English.",
-    uz: "O'zbek tilida javob ber. (Respond in Uzbek)",
-    kz: "Қазақ тілінде жауап бер. (Respond in Kazakh)",
-    kg: "Кыргыз тилинде жооп бер. (Respond in Kyrgyz)",
-    tj: "Бо забони тоҷикӣ ҷавоб деҳ. (Respond in Tajik)",
-    am: "Հայերեն պատdelays. (Respond in Armenian)",
-    ge: "უპასუხე ქართულად. (Respond in Georgian)",
+  // Language instruction for AI (4 сентября 2026, OLLEE-fb): раньше здесь
+  // была жёсткая инструкция «Отвечай на русском языке» — Sonnet 5 её строго
+  // следовал и отвечал по-русски клиентам которые писали на узбекском
+  // (в т.ч. на кириллице, где легко перепутать с русским: те же буквы +
+  // ў, қ, ғ, ҳ). У Right Flight работало потому что там модель раньше была
+  // мягче. Теперь инструкция АДАПТИВНАЯ — язык клиента определяется по
+  // каждому его сообщению, `business.language` даёт только дефолт для
+  // случаев когда сообщение слишком короткое (эмодзи, «ок»).
+  const langLabel: Record<string, string> = {
+    ru: "русский",
+    en: "английский",
+    uz: "узбекский",
+    kz: "казахский",
+    kg: "киргизский",
+    tj: "таджикский",
+    am: "армянский",
+    ge: "грузинский",
   };
-  const langInstruction = langMap[business.language] || langMap.ru;
+  const defaultLang = langLabel[business.language] || "русский";
+  const langInstruction = `Всегда отвечай на том же языке, на котором в последнем сообщении написал клиент — русский, узбекский (латиница или кириллица), казахский, английский. Определяй язык клиента заново на каждое его сообщение. Узбекский на кириллице использует буквы русского алфавита + ў, қ, ғ, ҳ — не путай его с русским. Дефолтный язык бизнеса — ${defaultLang} (используй его если сообщение слишком короткое чтобы определить язык, например одно слово «ок» или эмодзи).`;
 
   const businessTypeLabel = business.businessTypes.length > 0
     ? business.businessTypes.join(", ")
@@ -475,7 +483,6 @@ ${business.aiRules}
 
 ## Язык общения:
 ${langInstruction}
-Если клиент пишет на другом языке — отвечай на языке клиента.
 
 ## О компании:
 - Тип бизнеса: ${businessTypeLabel}
