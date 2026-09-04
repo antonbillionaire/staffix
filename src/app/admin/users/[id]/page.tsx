@@ -106,6 +106,92 @@ export default function AdminUserDetailPage({
   const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // Модалка ручного продления подписки — открывает форму с пресетами дней и
+  // сообщений, чекбоксом сброса счётчика. Применяет всё выбранное одним
+  // сабмитом (в цепочке 3 отдельных вызова к существующему API — extend_trial,
+  // add_messages, reset_messages).
+  const [extendModalOpen, setExtendModalOpen] = useState(false);
+  const [extendDays, setExtendDays] = useState<number>(30);
+  const [extendMessages, setExtendMessages] = useState<number>(0);
+  const [extendResetCounter, setExtendResetCounter] = useState<boolean>(false);
+  const [extendSubmitting, setExtendSubmitting] = useState(false);
+
+  const DAY_PRESETS = [7, 14, 30, 60, 90, 180];
+  const MSG_PRESETS = [0, 100, 500, 1000, 5000];
+
+  const submitExtend = async () => {
+    if (extendSubmitting) return;
+    if (extendDays <= 0 && extendMessages <= 0 && !extendResetCounter) {
+      setMessage({ type: "error", text: "Выберите что продлить или добавить" });
+      return;
+    }
+    setExtendSubmitting(true);
+    setMessage(null);
+    try {
+      // Выполняем последовательно чтобы каждый вызов увидел актуальную запись.
+      // Ошибка любого шага прервёт остальное — выводим что успело выполниться.
+      const steps: Array<{ label: string; run: () => Promise<Response> }> = [];
+      if (extendDays > 0) {
+        steps.push({
+          label: `+${extendDays} дней`,
+          run: () =>
+            fetch(`/api/admin/users/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "extend_trial", data: { days: extendDays } }),
+            }),
+        });
+      }
+      if (extendMessages > 0) {
+        steps.push({
+          label: `+${extendMessages} сообщений`,
+          run: () =>
+            fetch(`/api/admin/users/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "add_messages", data: { messages: extendMessages } }),
+            }),
+        });
+      }
+      if (extendResetCounter) {
+        steps.push({
+          label: "сброс счётчика",
+          run: () =>
+            fetch(`/api/admin/users/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "reset_messages" }),
+            }),
+        });
+      }
+
+      const done: string[] = [];
+      for (const step of steps) {
+        const res = await step.run();
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          setMessage({
+            type: "error",
+            text: `Сбой на шаге «${step.label}»: ${err.error || res.status}. Выполнено: ${done.join(", ") || "ничего"}`,
+          });
+          return;
+        }
+        done.push(step.label);
+      }
+      setMessage({ type: "success", text: `Подписка обновлена: ${done.join(", ")}` });
+      setExtendModalOpen(false);
+      // Сбрасываем форму к разумным дефолтам
+      setExtendDays(30);
+      setExtendMessages(0);
+      setExtendResetCounter(false);
+      fetchUser();
+    } catch {
+      setMessage({ type: "error", text: "Ошибка выполнения" });
+    } finally {
+      setExtendSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     fetchUser();
   }, [id]);
@@ -540,15 +626,16 @@ export default function AdminUserDetailPage({
             <h2 className="text-lg font-semibold text-white mb-4">Быстрые действия</h2>
             <div className="space-y-3">
               <button
-                onClick={() => performAction("extend_trial", { days: 7 })}
-                disabled={actionLoading !== null}
+                onClick={() => setExtendModalOpen(true)}
+                disabled={actionLoading !== null || extendSubmitting}
                 className="flex items-center justify-between w-full px-4 py-3 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-lg text-blue-400 transition-colors disabled:opacity-50"
+                title="Открыть модалку — выбрать сколько дней/сообщений добавить"
               >
                 <div className="flex items-center gap-2">
                   <Plus className="h-4 w-4" />
-                  <span>+7 дней триала</span>
+                  <span>Продлить подписку</span>
                 </div>
-                {actionLoading === "extend_trial" && <Loader2 className="h-4 w-4 animate-spin" />}
+                {extendSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
               </button>
 
               <button
@@ -984,6 +1071,138 @@ function DiagnosticButton({ businessId }: { businessId: string }) {
               {JSON.stringify(data, null, 2)}
             </pre>
           </details>
+        </div>
+      )}
+
+      {/* Модалка «Продлить подписку» — 4 сентября 2026, admin quick-action */}
+      {extendModalOpen && data && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => !extendSubmitting && setExtendModalOpen(false)}
+        >
+          <div
+            className="bg-[#12122a] border border-white/10 rounded-xl max-w-lg w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-lg font-semibold text-white">Продлить подписку</h3>
+              <button
+                onClick={() => !extendSubmitting && setExtendModalOpen(false)}
+                disabled={extendSubmitting}
+                className="text-gray-400 hover:text-white disabled:opacity-50"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-sm text-gray-400 mb-5">
+              {data.business?.name || data.user.email} —{" "}
+              {data.subscription
+                ? `${data.subscription.plan}, ${data.subscription.messagesUsed}/${data.subscription.messagesLimit} сообщ., ${data.subscription.daysLeft ?? "?"} дн. осталось`
+                : "нет подписки"}
+            </p>
+
+            {/* Дни */}
+            <div className="mb-5">
+              <label className="text-sm text-white mb-2 block">
+                Продлить срок на:
+              </label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {DAY_PRESETS.map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setExtendDays(d)}
+                    className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
+                      extendDays === d
+                        ? "bg-blue-500/30 border-blue-500 text-blue-200"
+                        : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/10"
+                    }`}
+                  >
+                    +{d} дн.
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                min={0}
+                max={3650}
+                value={extendDays}
+                onChange={(e) => setExtendDays(Math.max(0, Math.min(3650, parseInt(e.target.value, 10) || 0)))}
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white text-sm focus:outline-none focus:border-blue-500"
+                placeholder="Или ввести число дней вручную"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Новая дата окончания = сейчас + N дней. 0 = не продлевать.
+              </p>
+            </div>
+
+            {/* Сообщения */}
+            <div className="mb-5">
+              <label className="text-sm text-white mb-2 block">
+                Добавить сообщений к лимиту:
+              </label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {MSG_PRESETS.map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setExtendMessages(m)}
+                    className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
+                      extendMessages === m
+                        ? "bg-green-500/30 border-green-500 text-green-200"
+                        : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/10"
+                    }`}
+                  >
+                    {m === 0 ? "0" : `+${m}`}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                min={0}
+                max={1_000_000}
+                value={extendMessages}
+                onChange={(e) => setExtendMessages(Math.max(0, Math.min(1_000_000, parseInt(e.target.value, 10) || 0)))}
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white text-sm focus:outline-none focus:border-green-500"
+                placeholder="Или ввести количество вручную"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Прибавляется к текущему messagesLimit. 0 = не менять лимит.
+              </p>
+            </div>
+
+            {/* Сброс счётчика */}
+            <div className="mb-6">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={extendResetCounter}
+                  onChange={(e) => setExtendResetCounter(e.target.checked)}
+                  className="w-4 h-4 rounded border-white/20 bg-white/5 text-yellow-500 focus:ring-yellow-500"
+                />
+                <span className="text-sm text-white">
+                  Сбросить счётчик использованных сообщений (messagesUsed = 0)
+                </span>
+              </label>
+            </div>
+
+            {/* Кнопки */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setExtendModalOpen(false)}
+                disabled={extendSubmitting}
+                className="flex-1 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-md text-white text-sm disabled:opacity-50"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={submitExtend}
+                disabled={extendSubmitting}
+                className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-md text-white text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {extendSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                Применить
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>
