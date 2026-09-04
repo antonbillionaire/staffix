@@ -1572,25 +1572,55 @@ export async function notifyManagerByTelegram(
     //    хочет видеть только то, что менеджер не закрыл сам.
     let assignedManagerChatId: bigint | null = null;
     let assignedManagerName: string | null = null;
-    if (clientTelegramId > BigInt(0)) {
-      try {
-        const client = await prisma.client.findUnique({
+
+    // Поиск привязанного менеджера — по любому channel-id клиента.
+    // Раньше искали только через Client.telegramId → для WA/IG/FB
+    // (clientTelegramId=0) блок пропускался, привязка менеджера
+    // игнорировалась. 5 сент 2026 добавили поиск по channelInfo
+    // (whatsappId / instagramId / fbPsid) — теперь если владелец
+    // выбрал менеджера в карточке клиента /dashboard/customers/[id],
+    // эскалация из WA/IG/FB идёт именно ему, не в broadcast.
+    try {
+      let client: { assignedStaffId: string | null } | null = null;
+      if (clientTelegramId > BigInt(0)) {
+        client = await prisma.client.findUnique({
           where: { businessId_telegramId: { businessId, telegramId: clientTelegramId } },
           select: { assignedStaffId: true },
         });
-        if (client?.assignedStaffId) {
-          const staff = await prisma.staff.findUnique({
-            where: { id: client.assignedStaffId },
-            select: { telegramChatId: true, name: true, notificationsEnabled: true },
+      } else if (channelInfo) {
+        // Клиент из мессенджера — ищем по соответствующему channel-id.
+        // Формат ChannelClient-id зависит от канала:
+        //   whatsapp — wa_id (обычно = phone без +)
+        //   instagram — Instagram scoped user ID (IGSID)
+        //   facebook / messenger — Facebook Page-Scoped ID (PSID)
+        const channelToField: Record<string, "whatsappId" | "instagramId" | "fbPsid" | null> = {
+          whatsapp: "whatsappId",
+          instagram: "instagramId",
+          facebook: "fbPsid",
+          messenger: "fbPsid",
+          web: null, // веб-визитеры пока без persistent identity
+        };
+        const field = channelToField[channelInfo.channel];
+        if (field) {
+          client = await prisma.client.findFirst({
+            where: { businessId, [field]: channelInfo.channelClientId },
+            select: { assignedStaffId: true },
           });
-          if (staff?.telegramChatId && staff.notificationsEnabled !== false) {
-            assignedManagerChatId = staff.telegramChatId;
-            assignedManagerName = staff.name;
-          }
         }
-      } catch (e) {
-        console.warn(`${tag} assignedStaff lookup failed:`, e);
       }
+
+      if (client?.assignedStaffId) {
+        const staff = await prisma.staff.findUnique({
+          where: { id: client.assignedStaffId },
+          select: { telegramChatId: true, name: true, notificationsEnabled: true },
+        });
+        if (staff?.telegramChatId && staff.notificationsEnabled !== false) {
+          assignedManagerChatId = staff.telegramChatId;
+          assignedManagerName = staff.name;
+        }
+      }
+    } catch (e) {
+      console.warn(`${tag} assignedStaff lookup failed:`, e);
     }
 
     // Целевые получатели (5 сент 2026, OLLEE-fb):
