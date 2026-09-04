@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
           })),
           conversationId: conv.id,
           clientName: conv.clientName,
+          humanTakeoverUntil: conv.humanTakeoverUntil?.toISOString() ?? null,
         });
       }
 
@@ -95,6 +96,7 @@ export async function GET(request: NextRequest) {
         })),
         conversationId: conversation.id,
         clientName: conversation.clientName,
+        humanTakeoverUntil: conversation.humanTakeoverUntil?.toISOString() ?? null,
       });
     }
 
@@ -129,6 +131,7 @@ export async function GET(request: NextRequest) {
         })),
         conversationId: conversation.id,
         clientName: conversation.clientName,
+        humanTakeoverUntil: conversation.humanTakeoverUntil?.toISOString() ?? null,
       });
     }
 

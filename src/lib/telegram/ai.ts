@@ -169,6 +169,21 @@ export async function generateAIResponse(
     // 5. Получаем историю разговора
     const conversation = await getOrCreateConversation(businessId, telegramId, userName);
 
+    // Human takeover (4 сентября 2026, OLLEE-fb #13): менеджер отвечает
+    // клиенту вручную через дашборд — бот молчит на входящие. Сохраняем
+    // сообщение клиента в history чтобы менеджер видел, но НЕ вызываем AI.
+    // Флаг сам протухнет через HUMAN_TAKEOVER_MINUTES (дефолт 30), либо
+    // менеджер снимет досрочно через /api/messages/return-to-bot.
+    const { isBotSilenced } = await import("@/lib/human-takeover");
+    if (isBotSilenced(conversation.humanTakeoverUntil)) {
+      await saveMessage(conversation.id, "user", userMessage);
+      await updateConversationMessageCount(conversation.id);
+      console.log(
+        `[Webhook] Human takeover active for conv=${conversation.id} — saving user msg, skipping AI reply (until ${conversation.humanTakeoverUntil?.toISOString()})`
+      );
+      return { text: "", imageUrls: [] };
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const recentMessages: any[] = [
       ...conversation.messages.map((m) => ({

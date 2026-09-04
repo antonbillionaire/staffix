@@ -682,6 +682,29 @@ export async function generateChannelAIResponse(
 
     if (!biz) return { text: "Извините, произошла ошибка. Пожалуйста, свяжитесь с нами напрямую.", imageUrls: [] };
 
+    // Human takeover (4 сентября 2026, OLLEE-fb #13): менеджер отвечает
+    // клиенту вручную через дашборд — бот молчит на входящие. Сохраняем
+    // сообщение клиента в history чтобы менеджер видел, но НЕ вызываем AI.
+    // Флаг сам протухнет через HUMAN_TAKEOVER_MINUTES (дефолт 30) или менеджер
+    // снимет досрочно через /api/messages/return-to-bot.
+    const { isBotSilenced } = await import("@/lib/human-takeover");
+    if (isBotSilenced(conv.humanTakeoverUntil)) {
+      const existingHistory = (conv.history as Array<{ role: string; content: string }>) || [];
+      const nextHistory = [...existingHistory, { role: "user", content: userMessage }];
+      await prisma.channelConversation.update({
+        where: { id: conv.id },
+        data: {
+          history: nextHistory,
+          messageCount: { increment: 1 },
+          updatedAt: new Date(),
+        },
+      });
+      console.log(
+        `[Channel AI] Human takeover active for conv=${conv.id} (${channel}) — saving user msg, skipping AI (until ${conv.humanTakeoverUntil?.toISOString()})`
+      );
+      return { text: "", imageUrls: [] };
+    }
+
     // Sprint 3 Step 2: shadow write в единый Client. Помимо ChannelClient
     // (который остаётся для history-совместимости) сразу заводим/обновляем
     // строку в Client через новый helper. Владелец видит WA/IG/FB клиентов

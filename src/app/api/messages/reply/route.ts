@@ -16,6 +16,7 @@ import { sendTelegramMessage } from "@/lib/telegram/api";
 import { sendFBMessage, getPageAccessToken } from "@/lib/facebook-utils";
 import { stripMarkdown } from "@/lib/strip-markdown";
 import { checkSubscriptionLimit, incrementMessageCount } from "@/lib/subscription-check";
+import { computeTakeoverExpiry } from "@/lib/human-takeover";
 
 const META_API_BASE = "https://graph.facebook.com/v21.0";
 
@@ -170,9 +171,15 @@ export async function POST(request: NextRequest) {
             content: cleanText,
           },
         });
+        // Ставим/продлеваем human takeover: пока менеджер отвечает — бот
+        // молчит на входящие клиента в этом диалоге. Каждое новое ручное
+        // сообщение сдвигает дедлайн вперёд.
         await prisma.conversation.update({
           where: { id: conversation.id },
-          data: { updatedAt: new Date() },
+          data: {
+            updatedAt: new Date(),
+            humanTakeoverUntil: computeTakeoverExpiry(),
+          },
         });
       }
     } else {
@@ -194,6 +201,8 @@ export async function POST(request: NextRequest) {
             history,
             messageCount: { increment: 1 },
             updatedAt: new Date(),
+            // Human takeover — см. коммент в telegram-ветке выше.
+            humanTakeoverUntil: computeTakeoverExpiry(),
           },
         });
       }

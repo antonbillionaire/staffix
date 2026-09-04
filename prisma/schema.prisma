@@ -552,6 +552,13 @@ model Conversation {
   // в следующем ответе бота, чтобы новые данные имели приоритет над старыми ответами
   needsContextRefresh Boolean @default(false)
 
+  // Human takeover (4 сентября 2026, OLLEE-fb #13): менеджер отвечает через
+  // дашборд → бот молчит до этого времени. Каждое новое ручное сообщение
+  // менеджера продлевает окно (см. lib/human-takeover.ts). Кнопка «Вернуть боту»
+  // в UI ставит null досрочно. Входящие клиента всё равно сохраняются в history,
+  // просто без ответа бота — менеджер видит что клиент писал.
+  humanTakeoverUntil DateTime?
+
   // Silent-follow-up nudge (28 июля 2026): cron client-bot-follow-up шлёт
   // ОДИН мягкий follow-up если бот задал вопрос, а клиент не ответил в
   // течение ~45 минут. nudgeCount ≥ 1 → больше не тревожим этот диалог.
@@ -1594,6 +1601,13 @@ model ChannelConversation {
 
   // Флаг: база знаний изменилась — обрезать history в следующем ответе бота
   needsContextRefresh Boolean @default(false)
+
+  // Human takeover (4 сентября 2026, OLLEE-fb #13): менеджер отвечает через
+  // дашборд → бот молчит до этого времени. Каждое новое ручное сообщение
+  // менеджера продлевает окно (см. lib/human-takeover.ts). Кнопка «Вернуть боту»
+  // в UI ставит null досрочно. Входящие клиента всё равно сохраняются в history,
+  // просто без ответа бота — менеджер видит что клиент писал.
+  humanTakeoverUntil DateTime?
 
   // Silent-follow-up nudge (28 июля 2026) — см. Conversation.nudgeCount.
   nudgeCount   Int       @default(0)

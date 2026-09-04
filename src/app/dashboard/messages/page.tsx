@@ -17,6 +17,8 @@ import {
   Send,
   ThumbsDown,
   X,
+  Hand,
+  RotateCcw,
 } from "lucide-react";
 
 interface ConversationItem {
@@ -84,6 +86,34 @@ export default function MessagesPage() {
   const [replyText, setReplyText] = useState("");
   const [replySending, setReplySending] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
+
+  // Human takeover (4 сентября 2026, OLLEE-fb #13): менеджер ответил вручную →
+  // бот молчит в этом диалоге до истечения окна (обычно now + 30 мин). При
+  // активном флаге показываем бейдж «Бот на паузе до HH:MM» и кнопку
+  // «Вернуть боту» которая обнуляет флаг через /api/messages/return-to-bot.
+  const [humanTakeoverUntil, setHumanTakeoverUntil] = useState<Date | null>(null);
+  const [returningToBot, setReturningToBot] = useState(false);
+  const isBotTakeoverActive =
+    humanTakeoverUntil !== null && humanTakeoverUntil.getTime() > Date.now();
+
+  const handleReturnToBot = async () => {
+    if (!selectedClient || !selectedChannel || returningToBot) return;
+    setReturningToBot(true);
+    try {
+      const res = await fetch("/api/messages/return-to-bot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: selectedClient, channel: selectedChannel }),
+      });
+      if (res.ok) {
+        setHumanTakeoverUntil(null);
+      }
+    } catch (e) {
+      console.error("Return to bot error:", e);
+    } finally {
+      setReturningToBot(false);
+    }
+  };
 
   const handleSendReply = async () => {
     if (!selectedClient || !selectedChannel) return;
@@ -192,6 +222,9 @@ export default function MessagesPage() {
         const data = await res.json();
         setMessages(data.messages || []);
         setClientName(data.clientName || null);
+        setHumanTakeoverUntil(
+          data.humanTakeoverUntil ? new Date(data.humanTakeoverUntil) : null
+        );
       }
     } catch (error) {
       console.error("Error fetching messages:", error);
@@ -370,7 +403,7 @@ export default function MessagesPage() {
                 }`}>
                   <ChannelIcon channel={selectedChannel || "telegram"} className="h-5 w-5" />
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className={`font-medium ${textPrimary}`}>
                     {clientName || `${t("messages.clientNumber")}${selectedClient.slice(-4)}`}
                   </p>
@@ -378,6 +411,38 @@ export default function MessagesPage() {
                     {CHANNEL_META[selectedChannel || "telegram"]?.label || "Telegram"} &middot; {selectedClient}
                   </p>
                 </div>
+                {isBotTakeoverActive && humanTakeoverUntil && (
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className={`px-2 py-1 rounded-md flex items-center gap-1.5 text-xs ${
+                      isDark ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                             : "bg-amber-50 text-amber-700 border border-amber-200"
+                    }`}>
+                      <Hand className="h-3.5 w-3.5" />
+                      <span className="hidden md:inline">
+                        Бот на паузе до {humanTakeoverUntil.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      <span className="md:hidden">
+                        {humanTakeoverUntil.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleReturnToBot}
+                      disabled={returningToBot}
+                      className={`px-2 py-1 rounded-md flex items-center gap-1 text-xs font-medium transition ${
+                        isDark ? "bg-blue-500/20 hover:bg-blue-500/30 text-blue-300"
+                               : "bg-blue-100 hover:bg-blue-200 text-blue-700"
+                      } disabled:opacity-50`}
+                      title="Вернуть боту сейчас — бот снова будет отвечать на сообщения клиента"
+                    >
+                      {returningToBot ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      )}
+                      <span className="hidden sm:inline">Вернуть боту</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Messages */}
