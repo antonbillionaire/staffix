@@ -26,6 +26,13 @@ vi.mock("@/lib/prisma", () => ({
     client: {
       upsert: vi.fn(),
     },
+    review: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      update: vi.fn(),
+    },
+    automationSettings: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
   },
 }));
 
@@ -264,7 +271,11 @@ describe("Instagram Webhook POST", () => {
     expect(generateChannelAIResponse).not.toHaveBeenCalled();
   });
 
-  it("expired subscription -> fallback message sent instead of AI", async () => {
+  it("expired subscription -> silent (no reply, no AI)", async () => {
+    // 4 сентября 2026 (Anton): бот полностью молчит когда подписка кончилась —
+    // раньше слали клиенту «Извините, временно не можем обработать» через
+    // /messages Meta API; теперь ноль — владелец не хочет рекламировать
+    // проблемы с оплатой перед клиентами.
     vi.mocked(checkSubscriptionLimit).mockResolvedValueOnce({ allowed: false, reason: "expired" });
     vi.mocked(prisma.business.findFirst).mockResolvedValue({
       id: "biz-1",
@@ -283,11 +294,11 @@ describe("Instagram Webhook POST", () => {
 
     expect(res.status).toBe(200);
     expect(generateChannelAIResponse).not.toHaveBeenCalled();
-    // Fallback message sent via fetch to Meta API
+    // No customer-facing message sent to Meta /messages
     const messageCalls = mockFetch.mock.calls.filter(
       (c: unknown[]) => typeof c[0] === "string" && (c[0] as string).includes("/messages")
     );
-    expect(messageCalls.length).toBeGreaterThan(0);
+    expect(messageCalls.length).toBe(0);
   });
 });
 
@@ -349,7 +360,8 @@ describe("WhatsApp Webhook POST", () => {
     expect(res.status).toBe(401);
   });
 
-  it("expired subscription -> fallback message sent", async () => {
+  it("expired subscription -> silent (no reply, no AI)", async () => {
+    // Silent when subscription expired/limit_reached/suspended (4 сент 2026, Anton)
     vi.mocked(checkSubscriptionLimit).mockResolvedValueOnce({ allowed: false, reason: "expired" });
     vi.mocked(parseWAWebhook).mockReturnValueOnce({
       waId: "79991234567",
@@ -378,10 +390,7 @@ describe("WhatsApp Webhook POST", () => {
 
     expect(res.status).toBe(200);
     expect(generateChannelAIResponse).not.toHaveBeenCalled();
-    expect(sendWAMessage).toHaveBeenCalledWith(
-      "phone-123", "wa-token", "79991234567",
-      expect.stringContaining("временно не можем")
-    );
+    expect(sendWAMessage).not.toHaveBeenCalled();
   });
 });
 
@@ -442,7 +451,8 @@ describe("Facebook Webhook POST", () => {
     expect(res.status).toBe(401);
   });
 
-  it("expired subscription -> fallback message sent", async () => {
+  it("expired subscription -> silent (no reply, no AI)", async () => {
+    // Silent when subscription expired/limit_reached/suspended (4 сент 2026, Anton)
     vi.mocked(checkSubscriptionLimit).mockResolvedValueOnce({ allowed: false, reason: "expired" });
     vi.mocked(parseFBWebhookAll).mockReturnValueOnce([
       { senderId: "fb-user-1", pageId: "fb-page-1", text: "Hello", messageId: "fb-msg-2" },
@@ -465,11 +475,7 @@ describe("Facebook Webhook POST", () => {
 
     expect(res.status).toBe(200);
     expect(generateChannelAIResponse).not.toHaveBeenCalled();
-    expect(sendFBMessage).toHaveBeenCalledWith(
-      expect.any(String), "fb-user-1",
-      expect.stringContaining("временно не можем"),
-      "fb-page-1"
-    );
+    expect(sendFBMessage).not.toHaveBeenCalled();
   });
 });
 
@@ -572,7 +578,12 @@ describe("Telegram Webhook POST", () => {
     expect(res.status).toBe(401);
   });
 
-  it("expired subscription -> sends limit reached message", async () => {
+  it("expired subscription -> silent (no reply)", async () => {
+    // 4 сент 2026 (Anton): бот молчит когда подписка кончилась. Раньше слал
+    // клиенту «лимит сообщений исчерпан» через Telegram API — владелец не
+    // хочет чтобы это видели его же клиенты.
+    vi.mocked(checkSubscriptionLimit).mockResolvedValueOnce({ allowed: false, reason: "expired" });
+
     vi.mocked(prisma.business.findUnique).mockResolvedValue({
       id: "biz-tg",
       name: "Test Biz",
@@ -606,10 +617,11 @@ describe("Telegram Webhook POST", () => {
     const res = await POST(req as never);
 
     expect(res.status).toBe(200);
-    // Telegram handler sends fallback via fetch to Telegram API
-    const tgCalls = mockFetch.mock.calls.filter(
-      (c: unknown[]) => typeof c[0] === "string" && (c[0] as string).includes("api.telegram.org")
+    // No /sendMessage call — bot must be fully silent when subscription
+    // is expired. (Other TG API paths like /setWebhook are irrelevant here.)
+    const sendMessageCalls = mockFetch.mock.calls.filter(
+      (c: unknown[]) => typeof c[0] === "string" && (c[0] as string).includes("/sendMessage")
     );
-    expect(tgCalls.length).toBeGreaterThan(0);
+    expect(sendMessageCalls.length).toBe(0);
   });
 });
