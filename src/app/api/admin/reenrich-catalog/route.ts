@@ -28,10 +28,16 @@ import { prisma } from "@/lib/prisma";
 import { enrichProduct } from "@/lib/catalog-enricher";
 import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 
-export const maxDuration = 60;
+// Vercel Pro поддерживает до 300 сек — берём максимум. Первый прогон
+// admin'ом на OLLEE с limit=25 упёрся в 60-сек таймаут (25 × ~3 сек = 75).
+// С 300 сек уложимся при любом разумном batch size.
+export const maxDuration = 300;
 
 const DEFAULT_LIMIT = 10;
-const MAX_LIMIT = 25;
+const MAX_LIMIT = 40;
+// Пауза между вызовами Haiku — защита от Anthropic rate limit при большом batch.
+// 300 мс × 40 товаров = 12 сек накладных, приемлемо.
+const HAIKU_DELAY_MS = 300;
 
 /**
  * Канонический набор stage-slug'ов (в lowercase) — если ни один из них
@@ -128,7 +134,11 @@ export async function POST(request: NextRequest) {
   let enrichedCount = 0;
   const errors: string[] = [];
 
-  for (const p of batch) {
+  for (let i = 0; i < batch.length; i++) {
+    const p = batch[i];
+    // Пауза перед КАЖДЫМ вызовом кроме первого — размазываем нагрузку на Haiku,
+    // чтобы не влететь в 429 при большом batch.
+    if (i > 0) await new Promise((r) => setTimeout(r, HAIKU_DELAY_MS));
     try {
       // ТРЮК: передаём existingTags:[] чтобы enrichProduct не сработал early-return
       // (skip if description на нужном языке И tags>=3). Реально дёрнет Haiku и
