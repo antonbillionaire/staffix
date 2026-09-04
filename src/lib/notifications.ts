@@ -331,6 +331,14 @@ interface BookingNotificationData {
   time: string; // "HH:MM"
   bookingId: string;
   staffId?: string | null;
+  /**
+   * Client.id — если передан, sendBookingNotification подтянет
+   * assignedStaffId клиента и включит его в получатели (Fix 5 из audit'а
+   * 5 сент 2026). Полезно для sales-mode когда клиент привязан к продавцу,
+   * а запись оформляется на мастера услуги — продавец тоже должен знать
+   * что «его» клиент записался.
+   */
+  clientId?: string | null;
 }
 
 export async function sendBookingNotification(
@@ -409,36 +417,74 @@ export async function sendBookingNotification(
       }
     }
 
-    // 3. Send Telegram to assigned staff (master)
+    // Собираем сет уже уведомлённых staff id — чтобы не дублировать
+    // одному человеку (например если мастер = assigned продавец, или
+    // manager это тот же person что assigned).
+    const notifiedStaffIds = new Set<string>();
+
+    // 3. Send Telegram to assigned master (staffId — тот кто делает услугу)
     if (data.staffId) {
       const staff = await prisma.staff.findUnique({
         where: { id: data.staffId },
-        select: { telegramChatId: true, notificationsEnabled: true },
+        select: { id: true, telegramChatId: true, notificationsEnabled: true },
       });
 
       if (staff?.telegramChatId && staff.notificationsEnabled) {
         sendTelegramMsg(business.botToken, staff.telegramChatId, staffMsg).catch(
           (err) => console.error("Failed to notify staff:", err)
         );
+        notifiedStaffIds.add(staff.id);
       }
     }
 
-    // 4. Also notify admin/manager staff about all bookings
-    const adminStaff = await prisma.staff.findMany({
+    // 3b. Send Telegram to assigned SELLER (Client.assignedStaffId — продавец
+    // из sales-mode, может отличаться от мастера услуги). Fix 5 из audit'а
+    // 5 сент 2026: раньше игнорировался, продавец не знал что «его» клиент
+    // записался. Требует переданный data.clientId.
+    if (data.clientId) {
+      try {
+        const client = await prisma.client.findUnique({
+          where: { id: data.clientId },
+          select: { assignedStaffId: true },
+        });
+        if (client?.assignedStaffId && !notifiedStaffIds.has(client.assignedStaffId)) {
+          const seller = await prisma.staff.findUnique({
+            where: { id: client.assignedStaffId },
+            select: { id: true, telegramChatId: true, notificationsEnabled: true },
+          });
+          if (seller?.telegramChatId && seller.notificationsEnabled) {
+            sendTelegramMsg(business.botToken, seller.telegramChatId, ownerMsg).catch(
+              (err) => console.error("Failed to notify assigned seller:", err)
+            );
+            notifiedStaffIds.add(seller.id);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to lookup Client.assignedStaffId:", e);
+      }
+    }
+
+    // 4. Также уведомляем admin/manager/operator/master/doctor (широкий
+    // broadcast — консистентно с notifyManagerByTelegram и notifyNewOrder
+    // после audit'а 5 сент 2026). Раньше был только admin+manager — в
+    // бизнесах где основной контакт с клиентом — operator, они пропускались.
+    const BOOKING_NOTIFY_ROLES = ["admin", "manager", "operator", "master", "doctor"];
+    const excludeIds = Array.from(notifiedStaffIds);
+    const broadcastStaff = await prisma.staff.findMany({
       where: {
         businessId,
         telegramChatId: { not: null },
         notificationsEnabled: true,
-        role: { in: ["admin", "manager"] },
-        ...(data.staffId ? { id: { not: data.staffId } } : {}),
+        role: { in: BOOKING_NOTIFY_ROLES },
+        ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
       },
       select: { telegramChatId: true },
     });
 
-    for (const admin of adminStaff) {
-      if (admin.telegramChatId) {
-        sendTelegramMsg(business.botToken, admin.telegramChatId, ownerMsg).catch(
-          (err) => console.error("Failed to notify admin staff:", err)
+    for (const s of broadcastStaff) {
+      if (s.telegramChatId) {
+        sendTelegramMsg(business.botToken, s.telegramChatId, ownerMsg).catch(
+          (err) => console.error("Failed to notify broadcast staff:", err)
         );
       }
     }

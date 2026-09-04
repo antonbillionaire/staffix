@@ -297,6 +297,33 @@ export async function executeRouteToSpecialist(params: {
       `[ai-routing] business=${params.businessId} routed to staff=${staff.id} (${staff.name}) ${alreadyAssignedToOther ? "[multi-route, main stays " + currentMainStaffName + "]" : "[primary]"}. Reason: ${params.reason.slice(0, 100)}`
     );
 
+    // Dashboard bell (Fix 6 из audit'а 5 сент): раньше route_to_specialist
+    // писал только activity log — если у staff нет TG и у owner тоже нет,
+    // назначение молча терялось. Теперь всегда есть запись в
+    // /dashboard/notifications с указанием специалиста и причины.
+    try {
+      await prisma.notification.create({
+        data: {
+          businessId: params.businessId,
+          type: "specialist_assigned",
+          title: alreadyAssignedToOther
+            ? `📩 Доп. запрос специалисту ${staff.name}`
+            : `📩 Клиент направлен ${staff.name}`,
+          message: `${clientLabel}\nПричина: ${params.reason}${alreadyAssignedToOther ? `\nОсновной менеджер клиента: ${currentMainStaffName || "—"}` : ""}`,
+          metadata: {
+            staffId: staff.id,
+            staffName: staff.name,
+            clientTelegramId: params.clientTelegramId.toString(),
+            reason: params.reason,
+            telegramDelivered: delivered,
+            multiRoute: alreadyAssignedToOther,
+          },
+        },
+      });
+    } catch (e) {
+      console.error("[ai-routing] dashboard notification failed:", e);
+    }
+
     // Activity log: направление + статус доставки уведомления
     logActivityFireAndForget({
       businessId: params.businessId,

@@ -25,37 +25,51 @@ export async function createEscalationTask(params: {
   try {
     let clientId: string | null = null;
     let resolvedClientName = params.clientName?.trim() || "клиент";
-
-    // Для TG подтягиваем ещё @username — чтобы в заголовке задачи было
-    // видно куда именно писать («связаться с @ann_matveeva»), а не просто
-    // «связаться с клиентом» без опознавательных знаков.
     let telegramUsername: string | null = null;
-    if (params.clientTelegramId) {
-      const client = await prisma.client.findUnique({
-        where: {
-          businessId_telegramId: {
-            businessId: params.businessId,
-            telegramId: params.clientTelegramId,
+    let assignedStaffId: string | null = null;
+
+    // Lookup клиента и его assignedStaffId — по TG или по каналу (Fix 8 из
+    // audit'а 5 сент 2026): раньше искали только по clientTelegramId, для
+    // WA/IG/FB-клиентов Task всегда создавалась без привязки к продавцу.
+    // Теперь если передан clientChannel + clientChannelId, ищем Client по
+    // whatsappId/instagramId/fbPsid.
+    try {
+      let client:
+        | { id: string; name: string | null; telegramUsername: string | null; assignedStaffId: string | null }
+        | null = null;
+      if (params.clientTelegramId) {
+        client = await prisma.client.findUnique({
+          where: {
+            businessId_telegramId: {
+              businessId: params.businessId,
+              telegramId: params.clientTelegramId,
+            },
           },
-        },
-        select: { id: true, name: true, telegramUsername: true, assignedStaffId: true },
-      });
+          select: { id: true, name: true, telegramUsername: true, assignedStaffId: true },
+        });
+      } else if (params.clientChannel && params.clientChannelId) {
+        const channelToField: Record<string, "whatsappId" | "instagramId" | "fbPsid" | null> = {
+          whatsapp: "whatsappId",
+          instagram: "instagramId",
+          facebook: "fbPsid",
+          messenger: "fbPsid",
+        };
+        const field = channelToField[params.clientChannel];
+        if (field) {
+          client = await prisma.client.findFirst({
+            where: { businessId: params.businessId, [field]: params.clientChannelId },
+            select: { id: true, name: true, telegramUsername: true, assignedStaffId: true },
+          });
+        }
+      }
       if (client) {
         clientId = client.id;
         if (client.name) resolvedClientName = client.name;
         if (client.telegramUsername) telegramUsername = client.telegramUsername;
+        assignedStaffId = client.assignedStaffId ?? null;
       }
-    }
-
-    // Fall back to assigned seller if client has one — keeps the lead with
-    // the rep who already owns the relationship.
-    let assignedStaffId: string | null = null;
-    if (clientId) {
-      const c = await prisma.client.findUnique({
-        where: { id: clientId },
-        select: { assignedStaffId: true },
-      });
-      assignedStaffId = c?.assignedStaffId ?? null;
+    } catch (e) {
+      console.warn("createEscalationTask client lookup failed:", e);
     }
 
     const isUrgent = params.urgency === "urgent";

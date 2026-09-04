@@ -245,7 +245,11 @@ export async function POST(request: Request) {
               BigInt(0),
               `Негативная эмодзи-реакция клиента в Instagram: "${messageText.slice(0, 100)}"`,
               undefined,
-              "urgent"
+              "urgent",
+              // channelInfo — чтобы assignedStaff нашёлся по Client.instagramId
+              // и в Notification.metadata попал реальный senderId (не 0).
+              // Fix 4 из audit'а 5 сент.
+              { channel: "instagram", channelClientId: sender.id },
             );
             const { createEscalationTask } = await import("@/lib/tasks");
             await createEscalationTask({

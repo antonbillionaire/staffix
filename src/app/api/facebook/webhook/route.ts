@@ -403,6 +403,35 @@ async function processLeadAdEvent(evt: {
     await incrementMessageCount(business.id);
   }
 
+  // Уведомить менеджеров о новом лиде с рекламы (5 сент 2026 — audit findings).
+  // Раньше Lead создавался в БД, клиенту летело приветствие, но менеджер
+  // о лиде не узнавал вообще — виден был только в /dashboard/leads, куда
+  // владелец редко заходит. Теперь через notifyManagerByTelegram: dashboard
+  // Notification + TG-пинг assignedStaff (если есть) / всех manager staff /
+  // владельцу. channelInfo передаётся чтобы Notification содержал реальные
+  // координаты клиента (phone/email/leadId).
+  try {
+    const { notifyManagerByTelegram } = await import("@/lib/sales-tools");
+    const urgencyLabel = leadSource === "instagram_ad" ? "IG Ad" : "Lead Form";
+    const contactParts: string[] = [];
+    if (phone) contactParts.push(`тел. ${phone}`);
+    if (email) contactParts.push(`email ${email}`);
+    const contactStr = contactParts.length > 0 ? ` (${contactParts.join(", ")})` : "";
+    const reason = `Новый лид с рекламы (${urgencyLabel})${contactStr}. Форма ${evt.formId}. Уже отправлено приветствие${phone && business.waActive ? " в WhatsApp" : ""}. Свяжитесь с клиентом.`;
+
+    await notifyManagerByTelegram(
+      business.id,
+      BigInt(0),
+      reason,
+      clientName,
+      "normal",
+      { channel, channelClientId: clientId },
+    );
+  } catch (e) {
+    console.error(`[LeadAds] notifyManager failed:`, e);
+    // Не блокируем pipeline — лид уже сохранён в БД, приветствие отправлено.
+  }
+
   console.log(`[LeadAds] Lead ${evt.leadId} processed for business ${business.id}`);
 }
 

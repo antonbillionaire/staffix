@@ -1406,17 +1406,22 @@ async function notifyNewOrder(
       }
     }
 
-    // Уведомляем сотрудников при создании заказа:
+    // Уведомляем сотрудников при создании заказа (Fix 3 из audit'а 5 сент):
     // 1) Назначенному продавцу/менеджеру (если есть) — он отвечает за этот заказ.
-    // 2) Всем admin (контроль) — но НЕ operator: оператор получит уведомление позже,
-    //    когда менеджер подтвердит заказ (notifyWarehouseOrderConfirmed).
+    // 2) Всем admin + manager + operator + master + doctor (контроль/приём заказа).
+    //    Раньше был только admin, поэтому если у бизнеса нет ни одного admin
+    //    и не назначен продавец — заказ шёл только владельцу. Теперь широкий
+    //    broadcast как в notifyManagerByTelegram.
+    //    warehouse специально исключён — он получает push отдельно, когда
+    //    менеджер подтвердит заказ (notifyWarehouseOrderConfirmed).
+    const ORDER_NOTIFY_ROLES = ["admin", "manager", "operator", "master", "doctor"];
     const staffMembers = await prisma.staff.findMany({
       where: {
         businessId,
         telegramChatId: { not: null },
         OR: [
           ...(assignedStaffId ? [{ id: assignedStaffId }] : []),
-          { notificationsEnabled: true, role: "admin" },
+          { notificationsEnabled: true, role: { in: ORDER_NOTIFY_ROLES } },
         ],
       },
       select: { id: true, telegramChatId: true, name: true },

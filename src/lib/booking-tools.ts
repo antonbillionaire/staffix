@@ -400,7 +400,10 @@ async function notifyBooking(
   time: string,
   bookingId: string,
   staffId?: string | null,
-  clientPhone?: string | null
+  clientPhone?: string | null,
+  // Client.id — если известен, sendBookingNotification подтянет
+  // Client.assignedStaffId и добавит продавца в получатели (Fix 5).
+  clientId?: string | null,
 ): Promise<void> {
   sendBookingNotification(businessId, type, {
     clientName,
@@ -411,6 +414,7 @@ async function notifyBooking(
     time,
     bookingId,
     staffId,
+    clientId,
   }).catch((err) => console.error("Notification error:", err));
 }
 
@@ -695,6 +699,9 @@ export async function createBooking(
 
     const booking = { id: txResult.bookingId };
 
+    // Client.id вынесен во внешний scope — используется в notifyBooking ниже.
+    let upsertedClientId: string | null = null;
+
     // Update client record (only if we have a telegramId-compatible identifier)
     if (clientTelegramId) {
       // Check first so we know whether this is a brand-new lead — if yes,
@@ -734,6 +741,7 @@ export async function createBooking(
         },
         select: { id: true, name: true, loyaltyVisits: true },
       });
+      upsertedClientId = upsertedClient.id;
 
       // B16: если у бизнеса включена программа лояльности типа "visits"
       // (каждый N-й визит — награда) и клиент достиг порога — уведомляем
@@ -750,8 +758,10 @@ export async function createBooking(
       promoteDealStageByTelegram(businessId, clientTelegramId, "consultation_booked").catch(() => {});
     }
 
-    // Send notification to business owner and staff via Telegram + Dashboard (non-blocking)
-    notifyBooking(businessId, "new_booking", clientName, serviceName, staffName, dateStr, time, booking.id, actualStaffId, clientPhone);
+    // Send notification to business owner and staff via Telegram + Dashboard (non-blocking).
+    // clientId (upsertedClient.id) — чтобы sendBookingNotification включил
+    // assignedStaff клиента (продавца из sales-mode) в получатели.
+    notifyBooking(businessId, "new_booking", clientName, serviceName, staffName, dateStr, time, booking.id, actualStaffId, clientPhone, upsertedClientId);
 
     // Dispatch booking_confirmed CRM event (bookings are auto-confirmed on creation)
     dispatchCrmEvent(businessId, "booking_confirmed", {

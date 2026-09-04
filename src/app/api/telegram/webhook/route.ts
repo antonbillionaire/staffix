@@ -362,6 +362,24 @@ export async function POST(request: NextRequest) {
         chatId,
         `Спасибо! Ваш номер ${phone} сохранён. Чем могу помочь?`
       );
+
+      // Уведомить менеджеров о новом контакте (Fix 8 из audit'а 5 сент):
+      // раньше при share-контакта телефон сохранялся молча — расчёт был что
+      // AI следующим turn'ом позовёт notify_manager, но это не гарантировано.
+      // Теперь через notifyManagerByTelegram — dashboard-запись + broadcast
+      // всем manager staff / fallback на owner.
+      try {
+        const { notifyManagerByTelegram } = await import("@/lib/sales-tools");
+        await notifyManagerByTelegram(
+          business.id,
+          telegramId,
+          `Клиент поделился телефоном: ${phone}${message.contact.first_name ? ` (${message.contact.first_name})` : ""}. Можно связываться.`,
+          message.contact.first_name || userName,
+          "normal",
+        );
+      } catch (e) {
+        console.error("[TG Webhook] contact notify failed:", e);
+      }
       return NextResponse.json({ ok: true });
     }
 
@@ -402,12 +420,16 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Уведомляем сотрудников с включёнными уведомлениями
+      // Уведомляем сотрудников с включёнными уведомлениями. Фильтр по роли
+      // (Fix 7 из audit'а 5 сент) — раньше broadcast был всем staff без
+      // фильтра, включая склад/мастеров которые не занимаются доставкой.
+      // Теперь только admin/manager/operator — те кто реально едут к клиенту.
       const staffWithNotify = await prisma.staff.findMany({
         where: {
           businessId: business.id,
           notificationsEnabled: true,
           telegramChatId: { not: null },
+          role: { in: ["admin", "manager", "operator"] },
         },
         select: { telegramChatId: true },
       });
@@ -419,6 +441,30 @@ export async function POST(request: NextRequest) {
             `📍 ${clientName} отправил геолокацию`
           );
         }
+      }
+
+      // Dashboard bell — safety net если ни у кого из staff нет TG.
+      // Кнопки карт в dashboard-нотификации не отобразятся, но клиент
+      // хотя бы виден в /dashboard/notifications.
+      try {
+        await prisma.notification.create({
+          data: {
+            businessId: business.id,
+            type: "location_shared",
+            title: `📍 ${clientName} отправил геолокацию`,
+            message: `Клиент ждёт подтверждения доставки.\nКоординаты: ${latitude}, ${longitude}\nGoogle: ${googleLink}`,
+            metadata: {
+              clientTelegramId: telegramId.toString(),
+              clientName,
+              latitude,
+              longitude,
+              googleLink,
+              yandexLink,
+            },
+          },
+        });
+      } catch (e) {
+        console.error("[Webhook] location dashboard notify failed:", e);
       }
 
       await sendTelegramMessage(
@@ -528,19 +574,28 @@ export async function POST(request: NextRequest) {
               : `Спасибо за честный отзыв! 🙏\n\nМы всегда стремимся стать лучше и обязательно обратим внимание на ваши слова.`;
           await sendTelegramMessage(botToken, chatId, clientMsg);
 
-          const ownerChatId = bizOwner?.ownerTelegramChatId;
-          if (ownerChatId) {
-            const stars = "⭐".repeat(pendingReview.rating);
-            const bookingInfo = pendingReview.bookingId
-              ? ` (запись #${pendingReview.bookingId.slice(-6)})`
-              : "";
-            const emoji = pendingReview.rating <= 2 ? "⚠️" : "📝";
-            const label = pendingReview.rating <= 2 ? "Низкая оценка" : "Средняя оценка";
-            await sendTelegramMessage(
-              botToken,
-              Number(ownerChatId),
-              `${emoji} ${label} от клиента!\n\nКлиент: ${pendingReview.clientName || "Неизвестен"}\nОценка: ${stars}\nКомментарий: "${userMessage}"${bookingInfo}\n\nРекомендуем связаться с клиентом и уточнить детали.`
+          // Уведомить менеджеров о плохом отзыве (Fix 2 из audit'а 5 сент):
+          // раньше слали только owner TG — если у владельца нет TG или клиент
+          // на другом канале, staff не узнают. Теперь через notifyManagerByTelegram:
+          // dashboard-запись + broadcast всем manager staff + fallback на owner.
+          const stars = "⭐".repeat(pendingReview.rating);
+          const bookingInfo = pendingReview.bookingId
+            ? ` (запись #${pendingReview.bookingId.slice(-6)})`
+            : "";
+          const emoji = pendingReview.rating <= 2 ? "⚠️" : "📝";
+          const label = pendingReview.rating <= 2 ? "Низкая оценка" : "Средняя оценка";
+          const urgency = pendingReview.rating <= 2 ? "urgent" : "normal";
+          try {
+            const { notifyManagerByTelegram } = await import("@/lib/sales-tools");
+            await notifyManagerByTelegram(
+              business.id,
+              telegramId,
+              `${emoji} ${label} от клиента: ${stars}\nКомментарий: "${userMessage}"${bookingInfo}\nРекомендуем связаться с клиентом и уточнить детали.`,
+              pendingReview.clientName || undefined,
+              urgency,
             );
+          } catch (e) {
+            console.error("[TG Webhook] low-rating notify failed:", e);
           }
         }
 
