@@ -1483,25 +1483,15 @@ export async function generateChannelAIResponse(
       technical: { preview: replyText.substring(0, 120) },
     });
 
-    // Собираем imageUrls из последней пачки tool_results — фото товаров,
-    // которые webhook приложит отдельными сообщениями после текста.
-    // Формат идентичен telegram/ai.ts: {product:{imageUrl}} или {products:[{imageUrl}]}.
-    const imageUrls: string[] = [];
-    for (const tr of lastToolResults) {
-      try {
-        const content = typeof tr.content === "string" ? JSON.parse(tr.content) : tr.content;
-        if (content?.products && Array.isArray(content.products)) {
-          for (const p of content.products) {
-            if (p?.imageUrl && typeof p.imageUrl === "string") imageUrls.push(p.imageUrl);
-          }
-        }
-        if (content?.product?.imageUrl && typeof content.product.imageUrl === "string") {
-          imageUrls.push(content.product.imageUrl);
-        }
-      } catch {
-        /* not JSON / unexpected shape — skip silently */
-      }
-    }
+    // Собираем imageUrls из последней пачки tool_results и фильтруем — оставляем
+    // только те товары, которые бот РЕАЛЬНО упомянул в текстовом ответе
+    // (по имени / SKU / стему). OLLEE-fb #3 (4 сентября 2026): раньше все
+    // фото из tool_result уходили клиенту — если бот в тексте рекомендовал
+    // 2 продукта, а search_products вернул 5, клиент получал 5 картинок и
+    // не понимал что чему соответствует.
+    const { collectProductCandidates, filterImagesByMention } = await import("@/lib/product-image-filter");
+    const candidates = collectProductCandidates(lastToolResults);
+    const imageUrls = filterImagesByMention(replyText, candidates);
 
     return { text: replyText, imageUrls };
   } catch (e) {

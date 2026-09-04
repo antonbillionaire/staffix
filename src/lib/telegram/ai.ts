@@ -728,23 +728,13 @@ export async function generateAIResponse(
       });
     }
 
-    // imageUrls из tool-результатов (фото товаров)
-    const imageUrls: string[] = [];
-    for (const tr of lastToolResults) {
-      try {
-        const content = typeof tr.content === "string" ? JSON.parse(tr.content) : tr.content;
-        if (content?.products) {
-          for (const p of content.products) {
-            if (p.imageUrl) imageUrls.push(p.imageUrl);
-          }
-        }
-        if (content?.product?.imageUrl) {
-          imageUrls.push(content.product.imageUrl);
-        }
-      } catch {
-        /* not JSON, skip */
-      }
-    }
+    // imageUrls из tool-результатов (фото товаров) — фильтр по тому что
+    // бот РЕАЛЬНО написал в assistantMessage. OLLEE-fb #3 (4 сентября 2026):
+    // раньше слали все фото из последней пачки search_products, теперь только
+    // упомянутые в тексте (максимум 3). См. lib/product-image-filter.ts.
+    const { collectProductCandidates, filterImagesByMention } = await import("@/lib/product-image-filter");
+    const candidates = collectProductCandidates(lastToolResults);
+    const imageUrls = filterImagesByMention(assistantMessage, candidates);
 
     return { text: assistantMessage, imageUrls };
   } catch (error: unknown) {
