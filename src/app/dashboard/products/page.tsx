@@ -215,14 +215,14 @@ export default function ProductsPage() {
   const [enriching, setEnriching] = useState(false);
   const [enrichProgress, setEnrichProgress] = useState<string>("");
 
-  // ──── Прогресс автоматического (фонового) обогащения каталога ────
-  // Cron каждые 30 мин добивает товары без тегов. Плашка показывает что идёт фон,
-  // чтобы пользователь понимал что не нужно жать кнопку «Обогатить» вручную.
+  // ──── Статус обогащения каталога ────
+  // До 5 сент 2026 фоновый cron автоматически добивал товары без тегов.
+  // Cron убран (Haiku-взрыв 3-4 сент, $11/день). Теперь обогащение только
+  // ручное — плашка подсказывает нажать кнопку «Обогатить каталог».
   const [enrichStatus, setEnrichStatus] = useState<{
     total: number;
     enriched: number;
     remaining: number;
-    estimatedHours: number;
   } | null>(null);
 
   useEffect(() => {
@@ -237,7 +237,6 @@ export default function ProductsPage() {
           total: data.total || 0,
           enriched: data.enriched || 0,
           remaining: data.remaining || 0,
-          estimatedHours: data.estimatedHours || 0,
         });
       } catch {
         // тихо — плашка не критичная фича
@@ -515,7 +514,7 @@ export default function ProductsPage() {
           </div>
         </div>
 
-        {/* Плашка прогресса автообогащения */}
+        {/* Плашка «есть необогащённые товары — нажмите кнопку» */}
         {enrichStatus && enrichStatus.remaining > 0 && enrichStatus.total > 0 && (
           <div
             className={`mb-6 rounded-xl border p-4 ${
@@ -528,21 +527,13 @@ export default function ProductsPage() {
               <span className="text-xl leading-6">✨</span>
               <div className="flex-1 min-w-0">
                 <p className={`text-sm font-medium ${isDark ? "text-purple-300" : "text-purple-900"}`}>
-                  Каталог обогащается в фоне: {enrichStatus.enriched.toLocaleString("ru-RU")} из{" "}
+                  Необогащённых товаров: {enrichStatus.remaining.toLocaleString("ru-RU")} из{" "}
                   {enrichStatus.total.toLocaleString("ru-RU")}
-                  {enrichStatus.estimatedHours > 0 && (
-                    <>
-                      {" "}
-                      · готово примерно через{" "}
-                      {enrichStatus.estimatedHours < 2
-                        ? "час"
-                        : `${enrichStatus.estimatedHours} ч`}
-                    </>
-                  )}
                 </p>
                 <p className={`mt-1 text-xs ${isDark ? "text-purple-400/80" : "text-purple-700"}`}>
-                  Можно закрыть вкладку — обогащение идёт автоматически. Каждый товар получит русские
-                  теги и описание, чтобы бот лучше находил его в чате.
+                  Нажмите кнопку <b>«Обогатить каталог»</b> выше — AI добавит русские теги и
+                  описание, чтобы бот лучше находил товары в чате. Можно закрывать вкладку и
+                  запускать позже.
                 </p>
                 {/* Прогресс-бар */}
                 <div

@@ -30,7 +30,10 @@ export async function POST(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     // Дефолт 12: при ~3с/товар укладывается в Vercel timeout 60с с запасом.
     // Раньше было 30 — большие каталоги (4000+ товаров) ловили timeout.
-    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "12", 10), 1), 30);
+    // Max 20 (5 сент 2026, Anton): safety net против случайного вызова с
+    // большим лимитом через DevTools — cost per batch виден заранее и не
+    // превышает ~20 Haiku-вызовов. UI всё равно жмёт 12 в цикле.
+    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "12", 10), 1), 20);
 
     // Кандидаты — товары без тегов (ключевой признак необогащения).
     // Дополнительно: tags пуст ИЛИ имеет меньше 3 элементов.

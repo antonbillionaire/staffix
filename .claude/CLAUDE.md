@@ -268,7 +268,6 @@ SaaS-платформа для бизнесов: AI-сотрудник кото�
 | `/api/cron/broadcasts` | каждые 5 мин | Рассылки клиентам |
 | `/api/cron/automations` | каждые 15 мин | Напоминания за 24ч/2ч, отзывы, реактивация |
 | `/api/cron/cache-warmer` | каждые 30 мин | Прогрев Anthropic prompt cache (Sonnet + Haiku) в рабочие часы |
-| `/api/cron/enrich-catalog` | каждые 30 мин | AI-обогащение описаний товаров/услуг |
 | `/api/cron/victor-follow-up` | каждые 30 мин | Проактивный ping от sales-бота Виктора по молчащим лидам |
 | `/api/cron/summarize` | каждые 2 часа | AI summarization диалогов |
 | `/api/cron/admin-automations` | каждый час | Trial/subscription expiring, messages_low |
