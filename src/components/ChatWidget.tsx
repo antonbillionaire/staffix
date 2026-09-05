@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, Loader2, Bot } from "lucide-react";
+import { useHideOnScrollDown } from "@/hooks/useHideOnScrollDown";
 
 interface Message {
   id: string;
@@ -24,6 +25,11 @@ export default function ChatWidget() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Автоскрытие FAB при скролле вниз (5 сент 2026, Anton): раньше на
+  // мобиле кнопки чата поддержки и AI-помощника перекрывали формы внизу
+  // страницы. Скрываем при scroll-down, показываем при scroll-up / у верха.
+  // Не применяется когда чат открыт — тогда надо видеть кнопку закрытия.
+  const shouldHide = useHideOnScrollDown() && !isOpen;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -100,7 +106,9 @@ export default function ChatWidget() {
       {/* Chat Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg hover:opacity-90 transition-all hover:scale-105 z-50"
+        className={`fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg hover:opacity-90 hover:scale-105 z-50 transition-all duration-200 ${
+          shouldHide ? "translate-y-24 opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
+        }`}
         title="Онлайн помощник"
       >
         {isOpen ? (

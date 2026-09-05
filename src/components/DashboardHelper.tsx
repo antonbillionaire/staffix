@@ -19,6 +19,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Sparkles, X, Send as SendIcon, Loader2, MessageCircleQuestion } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useHideOnScrollDown } from "@/hooks/useHideOnScrollDown";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -91,6 +92,12 @@ export default function DashboardHelper() {
   const [sending, setSending] = useState(false);
   const [mounted, setMounted] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Автоскрытие FAB при скролле вниз (5 сент 2026, Anton): floating-кнопка
+  // Helper'а перекрывала формы дашборда на мобиле. Скрываем на scroll-down,
+  // показываем на scroll-up / у верха страницы. Не применяется когда панель
+  // открыта — тогда нам всё равно, панель поверх кнопки.
+  const scrolledDown = useHideOnScrollDown();
+  const hideTrigger = scrolledDown && !open;
 
   // При первом монтировании — восстанавливаем состояние из localStorage
   useEffect(() => {
@@ -211,12 +218,16 @@ export default function DashboardHelper() {
   return (
     <>
       {/* Кнопка-триггер. Сдвигаем над ChatWidget'ом поддержки (bottom-6 right-6,
-          56x56) — Helper выше, чтобы обе кнопки видны и не перекрывались. */}
+          56x56) — Helper выше, чтобы обе кнопки видны и не перекрывались.
+          При scroll-down уезжает за экран (transform+opacity), чтоб не
+          перекрывать формы дашборда. */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
           aria-label="Открыть помощник"
-          className="fixed right-6 z-[9998] rounded-full bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg hover:scale-110 transition-transform flex items-center justify-center text-white"
+          className={`fixed right-6 z-[9998] rounded-full bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg hover:scale-110 flex items-center justify-center text-white transition-all duration-200 ${
+            hideTrigger ? "translate-y-24 opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
+          }`}
           style={{ width: 52, height: 52, bottom: 96 }}
         >
           <Sparkles className="h-6 w-6" />
