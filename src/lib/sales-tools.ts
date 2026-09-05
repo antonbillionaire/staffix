@@ -1372,79 +1372,75 @@ async function notifyNewOrder(
       `💰 <b>Итого: ${order.totalPrice.toLocaleString("ru-RU")}</b>\n\n` +
       `🔗 Управление: staffix.io/dashboard/orders`;
 
-    // Уведомление владельцу
-    if (business.ownerTelegramChatId) {
-      console.log(`[Notify] Sending order #${order.orderNumber} to owner chatId=${business.ownerTelegramChatId}`);
-      const ownerRes = await fetch(
-        `https://api.telegram.org/bot${business.botToken}/sendMessage`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: business.ownerTelegramChatId.toString(),
-            text: message,
-            parse_mode: "HTML",
-          }),
-        }
-      );
-      if (!ownerRes.ok) {
-        console.error(`[Notify] Failed to send to owner:`, await ownerRes.text());
-      }
-    } else {
-      console.log(`[Notify] No ownerTelegramChatId for business ${businessId} — owner needs to /start the bot`);
-    }
+    // Кому уходит уведомление о заказе (5 сент 2026, Anton):
+    // - Если у клиента назначен менеджер (assignedStaffId передан) → ТОЛЬКО ему.
+    //   Ни владельцу, ни команде broadcast — тихая работа с своим клиентом.
+    // - Иначе → владельцу (TG + WA если настроено). Никакого broadcast'а.
+    // Раньше слали и владельцу, и всем менеджерам одновременно с каждого заказа —
+    // спам команде. Теперь один получатель на заказ.
+    // Dashboard notification (запись в колокольчике) остаётся всегда — safety net.
 
-    // WhatsApp уведомление владельцу (if WA connected and phone available)
-    if (business.waActive && business.waPhoneNumberId && business.waAccessToken && business.phone) {
-      const ownerPhone = business.phone.replace(/[\s\-()]/g, "");
-      if (ownerPhone.length >= 10) {
-        const plainMessage = message.replace(/<[^>]+>/g, "");
-        const { sendWAMessage } = await import("./whatsapp-utils");
-        sendWAMessage(business.waPhoneNumberId, business.waAccessToken, ownerPhone, plainMessage).catch(
-          (e) => console.error("[Notify] Owner WA notify error:", e)
-        );
+    let assignedRecipientChatId: bigint | null = null;
+    let assignedRecipientName: string | null = null;
+    if (assignedStaffId) {
+      const assigned = await prisma.staff.findUnique({
+        where: { id: assignedStaffId },
+        select: { telegramChatId: true, name: true, notificationsEnabled: true },
+      });
+      if (assigned?.telegramChatId && assigned.notificationsEnabled !== false) {
+        assignedRecipientChatId = assigned.telegramChatId;
+        assignedRecipientName = assigned.name;
       }
     }
 
-    // Уведомляем сотрудников при создании заказа (Fix 3 из audit'а 5 сент):
-    // 1) Назначенному продавцу/менеджеру (если есть) — он отвечает за этот заказ.
-    // 2) Всем admin + manager + operator + master + doctor (контроль/приём заказа).
-    //    Раньше был только admin, поэтому если у бизнеса нет ни одного admin
-    //    и не назначен продавец — заказ шёл только владельцу. Теперь широкий
-    //    broadcast как в notifyManagerByTelegram.
-    //    warehouse специально исключён — он получает push отдельно, когда
-    //    менеджер подтвердит заказ (notifyWarehouseOrderConfirmed).
-    const ORDER_NOTIFY_ROLES = ["admin", "manager", "operator", "master", "doctor"];
-    const staffMembers = await prisma.staff.findMany({
-      where: {
-        businessId,
-        telegramChatId: { not: null },
-        OR: [
-          ...(assignedStaffId ? [{ id: assignedStaffId }] : []),
-          { notificationsEnabled: true, role: { in: ORDER_NOTIFY_ROLES } },
-        ],
-      },
-      select: { id: true, telegramChatId: true, name: true },
-    });
-    const sentChatIds = new Set<string>();
-    for (const staff of staffMembers) {
-      if (!staff.telegramChatId) continue;
-      const chatIdStr = staff.telegramChatId.toString();
-      if (sentChatIds.has(chatIdStr)) continue; // на случай если один человек и admin, и assigned seller
-      sentChatIds.add(chatIdStr);
-      console.log(`[Notify] Sending order #${order.orderNumber} to staff ${staff.name} chatId=${chatIdStr}`);
+    if (assignedRecipientChatId) {
+      // Персональный пинг назначенному менеджеру, без владельца/команды.
+      console.log(`[Notify] Order #${order.orderNumber} → assigned "${assignedRecipientName}" chat=${assignedRecipientChatId}`);
       await fetch(
         `https://api.telegram.org/bot${business.botToken}/sendMessage`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            chat_id: chatIdStr,
+            chat_id: assignedRecipientChatId.toString(),
             text: message,
             parse_mode: "HTML",
           }),
         }
-      ).catch((e) => console.error(`[Notify] Staff notify error:`, e));
+      ).catch((e) => console.error(`[Notify] Assigned staff notify error:`, e));
+    } else {
+      // Fallback владельцу — TG + WA если настроены.
+      if (business.ownerTelegramChatId) {
+        console.log(`[Notify] Order #${order.orderNumber} → owner chat=${business.ownerTelegramChatId} (no assigned manager)`);
+        const ownerRes = await fetch(
+          `https://api.telegram.org/bot${business.botToken}/sendMessage`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: business.ownerTelegramChatId.toString(),
+              text: message,
+              parse_mode: "HTML",
+            }),
+          }
+        );
+        if (!ownerRes.ok) {
+          console.error(`[Notify] Failed to send to owner:`, await ownerRes.text());
+        }
+      } else {
+        console.log(`[Notify] Order #${order.orderNumber} → no assigned manager and no ownerTelegramChatId; only dashboard notification`);
+      }
+
+      if (business.waActive && business.waPhoneNumberId && business.waAccessToken && business.phone) {
+        const ownerPhone = business.phone.replace(/[\s\-()]/g, "");
+        if (ownerPhone.length >= 10) {
+          const plainMessage = message.replace(/<[^>]+>/g, "");
+          const { sendWAMessage } = await import("./whatsapp-utils");
+          sendWAMessage(business.waPhoneNumberId, business.waAccessToken, ownerPhone, plainMessage).catch(
+            (e) => console.error("[Notify] Owner WA notify error:", e)
+          );
+        }
+      }
     }
 
     // Отправить кнопки оплаты клиенту (если есть платёжные методы)

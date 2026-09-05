@@ -399,30 +399,20 @@ export async function sendBookingNotification(
 
     if (!shouldNotify || !business.botToken) return;
 
-    // 2. Send Telegram to owner
-    if (business.ownerTelegramChatId) {
-      sendTelegramMsg(business.botToken, business.ownerTelegramChatId, ownerMsg).catch(
-        (err) => console.error("Failed to notify owner via TG:", err)
-      );
-    }
+    // Кому уходит уведомление о записи (5 сент 2026, Anton):
+    // - Мастер услуги (Booking.staffId) — ВСЕГДА (это его расписание, он
+    //   обязан знать что у него запись, иначе не подготовится).
+    // - Продавец клиента (Client.assignedStaffId) — если есть И это НЕ тот
+    //   же человек что мастер (не дублируем).
+    // - Владелец (TG + WA) — ТОЛЬКО если ни мастер, ни продавец не назначены.
+    //   Fallback чтобы запись не пропала совсем.
+    // - Никаких broadcast'ов остальной команде. Раньше все admin/manager
+    //   получали пинг на каждую запись — спам.
+    // Dashboard notification (запись в колокольчике) остаётся всегда — safety net.
 
-    // 2b. Send WhatsApp to owner (if WA connected and phone available)
-    if (business.waActive && business.waPhoneNumberId && business.waAccessToken && business.phone) {
-      const ownerPhone = business.phone.replace(/[\s\-()]/g, "");
-      if (ownerPhone.length >= 10) {
-        const plainMsg = ownerMsg.replace(/<[^>]+>/g, "");
-        sendWAMessage(business.waPhoneNumberId, business.waAccessToken, ownerPhone, plainMsg).catch(
-          (err) => console.error("Failed to notify owner via WA:", err)
-        );
-      }
-    }
-
-    // Собираем сет уже уведомлённых staff id — чтобы не дублировать
-    // одному человеку (например если мастер = assigned продавец, или
-    // manager это тот же person что assigned).
     const notifiedStaffIds = new Set<string>();
 
-    // 3. Send Telegram to assigned master (staffId — тот кто делает услугу)
+    // Мастер услуги
     if (data.staffId) {
       const staff = await prisma.staff.findUnique({
         where: { id: data.staffId },
@@ -431,16 +421,13 @@ export async function sendBookingNotification(
 
       if (staff?.telegramChatId && staff.notificationsEnabled) {
         sendTelegramMsg(business.botToken, staff.telegramChatId, staffMsg).catch(
-          (err) => console.error("Failed to notify staff:", err)
+          (err) => console.error("Failed to notify master:", err)
         );
         notifiedStaffIds.add(staff.id);
       }
     }
 
-    // 3b. Send Telegram to assigned SELLER (Client.assignedStaffId — продавец
-    // из sales-mode, может отличаться от мастера услуги). Fix 5 из audit'а
-    // 5 сент 2026: раньше игнорировался, продавец не знал что «его» клиент
-    // записался. Требует переданный data.clientId.
+    // Продавец клиента (может отличаться от мастера — sales-mode)
     if (data.clientId) {
       try {
         const client = await prisma.client.findUnique({
@@ -464,28 +451,23 @@ export async function sendBookingNotification(
       }
     }
 
-    // 4. Также уведомляем admin/manager/operator/master/doctor (широкий
-    // broadcast — консистентно с notifyManagerByTelegram и notifyNewOrder
-    // после audit'а 5 сент 2026). Раньше был только admin+manager — в
-    // бизнесах где основной контакт с клиентом — operator, они пропускались.
-    const BOOKING_NOTIFY_ROLES = ["admin", "manager", "operator", "master", "doctor"];
-    const excludeIds = Array.from(notifiedStaffIds);
-    const broadcastStaff = await prisma.staff.findMany({
-      where: {
-        businessId,
-        telegramChatId: { not: null },
-        notificationsEnabled: true,
-        role: { in: BOOKING_NOTIFY_ROLES },
-        ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
-      },
-      select: { telegramChatId: true },
-    });
-
-    for (const s of broadcastStaff) {
-      if (s.telegramChatId) {
-        sendTelegramMsg(business.botToken, s.telegramChatId, ownerMsg).catch(
-          (err) => console.error("Failed to notify broadcast staff:", err)
+    // Fallback: если никого из назначенных не уведомили — пингуем владельца.
+    // Иначе владелец не получает пинги по каждой записи (тихо у себя дома,
+    // менеджер сам её обрабатывает).
+    if (notifiedStaffIds.size === 0) {
+      if (business.ownerTelegramChatId) {
+        sendTelegramMsg(business.botToken, business.ownerTelegramChatId, ownerMsg).catch(
+          (err) => console.error("Failed to notify owner via TG:", err)
         );
+      }
+      if (business.waActive && business.waPhoneNumberId && business.waAccessToken && business.phone) {
+        const ownerPhone = business.phone.replace(/[\s\-()]/g, "");
+        if (ownerPhone.length >= 10) {
+          const plainMsg = ownerMsg.replace(/<[^>]+>/g, "");
+          sendWAMessage(business.waPhoneNumberId, business.waAccessToken, ownerPhone, plainMsg).catch(
+            (err) => console.error("Failed to notify owner via WA:", err)
+          );
+        }
       }
     }
   } catch (error) {
