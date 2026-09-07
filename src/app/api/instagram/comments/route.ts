@@ -146,7 +146,13 @@ export async function POST(request: NextRequest) {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       console.error("[IG Comments] Reply error:", err);
-      return NextResponse.json({ error: "Failed to reply to comment", details: err }, { status: 500 });
+      // Возвращаем человеко-читаемую причину от Meta — раньше UI показывал
+      // generic "Failed to reply", владелец не понимал что чинить.
+      // Добавлено 7 сент 2026 по симметрии с /api/messages/reply.
+      return NextResponse.json(
+        { error: buildFriendlyIGCommentError(err), details: err },
+        { status: 502 }
+      );
     }
 
     const data = await res.json();
@@ -155,6 +161,28 @@ export async function POST(request: NextRequest) {
     console.error("[IG Comments] POST error:", error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
+}
+
+/**
+ * Человеко-читаемое сообщение из ответа Meta для UI /dashboard/comments.
+ * Формат ответа Meta: { error: { message, code, error_subcode, type } }.
+ * Типичные ошибки для reply на comment:
+ *   190 — токен истёк / отозван
+ *   200 — недостаточно прав (нужен instagram_manage_comments Advanced Access)
+ *   100 — invalid parameter (обычно commentId уже удалён/hidden)
+ *   613 — rate limit
+ */
+function buildFriendlyIGCommentError(err: unknown): string {
+  if (!err || typeof err !== "object") return "Instagram отклонил ответ на комментарий";
+  const e = (err as { error?: { message?: string; code?: number } }).error;
+  if (!e) return "Instagram отклонил ответ на комментарий";
+  const code = e.code;
+  const msg = e.message || "unknown";
+  if (code === 190) return "Instagram: токен канала истёк. Переподключите Instagram в разделе «Каналы».";
+  if (code === 200) return "Instagram: недостаточно прав. Проверьте что для приложения одобрено разрешение instagram_manage_comments (Advanced Access).";
+  if (code === 100) return "Instagram: комментарий недоступен (возможно удалён или скрыт). Обновите страницу.";
+  if (code === 613) return "Instagram: превышен лимит запросов. Подождите пару минут и попробуйте снова.";
+  return `Instagram отклонил ответ (код ${code ?? "—"}): ${msg}`;
 }
 
 // DELETE /api/instagram/comments — delete a comment

@@ -40,6 +40,10 @@ export default function CommentsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
+  // Ошибка отправки ответа/скрытия/удаления — раньше их вообще не показывали
+  // (только console.error), владелец не понимал почему кнопка ничего не делает.
+  // Добавлено 7 сент 2026: показывать причину от Meta прямо в UI.
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const isDark = theme === "dark";
   const cardBg = isDark ? "bg-[#12122a]" : "bg-white";
@@ -68,6 +72,7 @@ export default function CommentsPage() {
 
   const hideComment = async (commentId: string, hide: boolean) => {
     setActionLoading(commentId);
+    setActionError(null);
     try {
       const res = await fetch("/api/instagram/comments", {
         method: "PATCH",
@@ -83,9 +88,13 @@ export default function CommentsPage() {
             ),
           }))
         );
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setActionError(data.error || (hide ? "Не удалось скрыть комментарий" : "Не удалось показать комментарий"));
       }
     } catch (e) {
       console.error("Hide comment error:", e);
+      setActionError("Ошибка сети — не удалось связаться с сервером");
     } finally {
       setActionLoading(null);
     }
@@ -94,6 +103,7 @@ export default function CommentsPage() {
   const replyToComment = async (commentId: string) => {
     if (!replyText.trim()) return;
     setActionLoading(commentId);
+    setActionError(null);
     try {
       const res = await fetch("/api/instagram/comments", {
         method: "POST",
@@ -105,9 +115,13 @@ export default function CommentsPage() {
         setReplyText("");
         // Refresh to show new reply
         fetchComments();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setActionError(data.error || "Не удалось отправить ответ");
       }
     } catch (e) {
       console.error("Reply error:", e);
+      setActionError("Ошибка сети — не удалось связаться с сервером");
     } finally {
       setActionLoading(null);
     }
@@ -116,6 +130,7 @@ export default function CommentsPage() {
   const deleteComment = async (commentId: string) => {
     if (!confirm("Удалить комментарий? Это действие нельзя отменить.")) return;
     setActionLoading(commentId);
+    setActionError(null);
     try {
       const res = await fetch("/api/instagram/comments", {
         method: "DELETE",
@@ -129,9 +144,13 @@ export default function CommentsPage() {
             comments: post.comments.filter((c) => c.id !== commentId),
           }))
         );
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setActionError(data.error || "Не удалось удалить комментарий");
       }
     } catch (e) {
       console.error("Delete comment error:", e);
+      setActionError("Ошибка сети — не удалось связаться с сервером");
     } finally {
       setActionLoading(null);
     }
@@ -170,6 +189,21 @@ export default function CommentsPage() {
           Обновить
         </button>
       </div>
+
+      {/* Плашка ошибки Meta API — показывается 8 секунд, кликом закрывается */}
+      {actionError && (
+        <div
+          className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 flex items-start gap-3 cursor-pointer"
+          onClick={() => setActionError(null)}
+          title="Нажмите чтобы закрыть"
+        >
+          <span className="text-red-400 text-xl leading-6">⚠️</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-red-400">Instagram отклонил действие</p>
+            <p className="text-xs text-red-300 mt-1 break-words">{actionError}</p>
+          </div>
+        </div>
+      )}
 
       {posts.length === 0 ? (
         <div className={`${cardBg} border ${borderColor} rounded-xl p-12 text-center`}>

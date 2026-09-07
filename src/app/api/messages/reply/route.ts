@@ -92,6 +92,12 @@ export async function POST(request: NextRequest) {
     // ─── Route by channel ──────────────────────────────────────────────────
 
     let sent = false;
+    // metaError — детали ответа Meta API когда сообщение отклонено. Раньше
+    // возвращали generic "Instagram API rejected the message", владельцу
+    // приходилось лезть в Vercel логи. Теперь текст ошибки Meta уходит в UI
+    // как есть — сразу видна причина (24h window / invalid token / spam
+    // и т.п.). Добавлено 7 сент 2026 по запросу владельца OLLEE.
+    let metaError: { code?: number; type?: string; message?: string; subcode?: number } | null = null;
     let errorMessage: string | null = null;
 
     if (channel === "telegram") {
@@ -115,8 +121,12 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      sent = await sendWhatsAppText(phoneNumberId, token, clientId, cleanText);
-      if (!sent) errorMessage = "WhatsApp API rejected the message";
+      const result = await sendWhatsAppText(phoneNumberId, token, clientId, cleanText);
+      sent = result.ok;
+      if (!sent) {
+        metaError = result.metaError;
+        errorMessage = "WhatsApp API rejected the message";
+      }
     } else if (channel === "facebook") {
       const pageToken = business.fbPageAccessToken;
       const pageId = business.fbPageId;
@@ -142,14 +152,27 @@ export async function POST(request: NextRequest) {
         business.fbPageId || igAccountId,
         baseToken
       ).catch(() => baseToken);
-      sent = await sendIGText(igAccountId, pageToken, clientId, cleanText);
-      if (!sent) errorMessage = "Instagram API rejected the message";
+      const result = await sendIGText(igAccountId, pageToken, clientId, cleanText);
+      sent = result.ok;
+      if (!sent) {
+        metaError = result.metaError;
+        errorMessage = "Instagram API rejected the message";
+      }
     }
 
     if (!sent) {
-      console.error(`[Manual Reply] Failed (${channel}, business=${business.id}):`, errorMessage);
+      console.error(`[Manual Reply] Failed (${channel}, business=${business.id}):`, errorMessage, metaError);
+      // Строим человеко-читаемое сообщение из ответа Meta если он есть.
+      // Формат Meta: error.message + error.code + error.error_subcode (опц).
+      // Для типичных ошибок даём подсказку что делать.
+      const userMessage = metaError?.message
+        ? buildFriendlyMetaErrorMessage(metaError, channel)
+        : errorMessage || "Failed to send message";
       return NextResponse.json(
-        { error: errorMessage || "Failed to send message" },
+        {
+          error: userMessage,
+          metaError, // сырые детали для отладки, UI может показать в details если нужно
+        },
         { status: 502 }
       );
     }
@@ -221,12 +244,75 @@ export async function POST(request: NextRequest) {
 
 // ─── Channel-specific senders ────────────────────────────────────────────────
 
+/** Возвращаемое значение сендеров: ok + опциональная детализация ошибки Meta. */
+type SendResult = {
+  ok: boolean;
+  metaError: { code?: number; type?: string; message?: string; subcode?: number } | null;
+};
+
+/** Извлекает поля error из ответа Meta Graph API. Формат:
+ *  { error: { message, type, code, error_subcode, fbtrace_id } }
+ *  При отсутствии error возвращает null (значит fetch упал по другой причине). */
+function extractMetaError(json: unknown): SendResult["metaError"] {
+  if (!json || typeof json !== "object") return null;
+  const err = (json as { error?: Record<string, unknown> }).error;
+  if (!err || typeof err !== "object") return null;
+  return {
+    code: typeof err.code === "number" ? err.code : undefined,
+    type: typeof err.type === "string" ? err.type : undefined,
+    message: typeof err.message === "string" ? err.message : undefined,
+    subcode: typeof err.error_subcode === "number" ? err.error_subcode : undefined,
+  };
+}
+
+/**
+ * Человеко-читаемое сообщение об ошибке Meta для владельца дашборда.
+ * Ловит частые кейсы (24h window, invalid token, permissions), остальное
+ * показывает как есть — сырое сообщение Meta плюс код.
+ * Добавлено 7 сент 2026 — раньше владелец видел только "Instagram API rejected".
+ */
+function buildFriendlyMetaErrorMessage(
+  metaError: NonNullable<SendResult["metaError"]>,
+  channel: string
+): string {
+  const channelLabel =
+    channel === "instagram" ? "Instagram" :
+    channel === "whatsapp" ? "WhatsApp" :
+    channel === "facebook" ? "Facebook" : channel;
+  const code = metaError.code;
+  const msg = metaError.message || "unknown";
+
+  // Частые кейсы Meta:
+  //  10 / subcode 2534014 — outside 24h messaging window
+  //  190 — invalid/expired token
+  //  200 — permission denied
+  //  551 — user unavailable / user blocked
+  //  613 — rate limit
+  if (code === 10 || /outside.*allowed.*window|24.hour/i.test(msg)) {
+    return `${channelLabel}: клиент не писал более 24 часов — вне окна для ручного ответа. Дождитесь пока клиент напишет сам, или отправьте через официальный шаблон/тег.`;
+  }
+  if (code === 190) {
+    return `${channelLabel}: токен канала недействителен или истёк. Переподключите канал в разделе «Каналы» дашборда.`;
+  }
+  if (code === 200) {
+    return `${channelLabel}: недостаточно прав. Проверьте разрешения приложения (Advanced Access для instagram_manage_messages / pages_messaging).`;
+  }
+  if (code === 551) {
+    return `${channelLabel}: клиент недоступен (заблокировал бота, удалил чат, или его аккаунт неактивен).`;
+  }
+  if (code === 613) {
+    return `${channelLabel}: превышен лимит сообщений. Подождите несколько минут и попробуйте снова.`;
+  }
+  // Fallback — как есть с кодом чтобы можно было гуглить
+  return `${channelLabel} отклонил сообщение (код ${code ?? "—"}): ${msg}`;
+}
+
 async function sendWhatsAppText(
   phoneNumberId: string,
   accessToken: string,
   recipientPhone: string,
   text: string
-): Promise<boolean> {
+): Promise<SendResult> {
   try {
     // decrypt() — envelope encryption; passthrough для plaintext
     const { decrypt } = await import("@/lib/crypto");
@@ -248,12 +334,12 @@ async function sendWhatsAppText(
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       console.error("[Manual Reply] WA send error:", err);
-      return false;
+      return { ok: false, metaError: extractMetaError(err) };
     }
-    return true;
+    return { ok: true, metaError: null };
   } catch (e) {
     console.error("[Manual Reply] WA send exception:", e);
-    return false;
+    return { ok: false, metaError: null };
   }
 }
 
@@ -262,7 +348,7 @@ async function sendIGText(
   pageAccessToken: string,
   recipientId: string,
   text: string
-): Promise<boolean> {
+): Promise<SendResult> {
   try {
     // decrypt() — envelope encryption; passthrough для plaintext.
     // Симметрично с sendWhatsAppText: если upstream getPageAccessToken упал
@@ -300,12 +386,12 @@ async function sendIGText(
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         console.error("[Manual Reply] IG send error:", err);
-        return false;
+        return { ok: false, metaError: extractMetaError(err) };
       }
     }
-    return true;
+    return { ok: true, metaError: null };
   } catch (e) {
     console.error("[Manual Reply] IG send exception:", e);
-    return false;
+    return { ok: false, metaError: null };
   }
 }
