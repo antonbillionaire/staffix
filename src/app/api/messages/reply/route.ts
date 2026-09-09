@@ -140,19 +140,32 @@ export async function POST(request: NextRequest) {
       if (!sent) errorMessage = "Facebook API rejected the message";
     } else if (channel === "instagram") {
       const baseToken = business.fbPageAccessToken;
-      const igAccountId = business.igBusinessAccountId || business.fbPageId;
-      if (!baseToken || !igAccountId) {
+      // IG DM API требует Page ID (FB Page с подключённым IG Business Account),
+      // а НЕ Instagram Business Account ID. Оба хранятся у нас в БД, но это
+      // разные объекты Meta Graph API.
+      //   fbPageId          — объект типа Page (например 904739952733272)
+      //   igBusinessAccountId — объект типа IGUser (например 17841448967020589)
+      // POST /{PAGE_ID}/messages имеет capability отправки DM. POST на
+      // IGUser — не имеет (код 3 "Application does not have the capability").
+      //
+      // Проверено 7 сент 2026: webhook (instagram/webhook/route.ts) использует
+      // именно fbPageId и успешно отправляет 6.3K сообщений (метрика Meta).
+      // Manual reply до этого приоритезировал igBusinessAccountId → 100%
+      // отклонений с кодом 3.
+      //
+      // Fallback на igBusinessAccountId оставляем на случай если бизнес
+      // подключён через новый Instagram Business Login (без FB Page) — там
+      // endpoint работает через IGUser.
+      const targetId = business.fbPageId || business.igBusinessAccountId;
+      if (!baseToken || !targetId) {
         return NextResponse.json(
           { error: "Instagram not connected" },
           { status: 400 }
         );
       }
       // Convert to Page Access Token (required for IG Messages API)
-      const pageToken = await getPageAccessToken(
-        business.fbPageId || igAccountId,
-        baseToken
-      ).catch(() => baseToken);
-      const result = await sendIGText(igAccountId, pageToken, clientId, cleanText);
+      const pageToken = await getPageAccessToken(targetId, baseToken).catch(() => baseToken);
+      const result = await sendIGText(targetId, pageToken, clientId, cleanText);
       sent = result.ok;
       if (!sent) {
         metaError = result.metaError;
