@@ -272,7 +272,6 @@ SaaS-платформа для бизнесов: AI-сотрудник кото�
 | `/api/cron/summarize` | каждые 2 часа | AI summarization диалогов |
 | `/api/cron/admin-automations` | каждый час | Trial/subscription expiring, messages_low |
 | `/api/cron/paypro-reconciliation` | каждый час | Сверка платежей с PayPro |
-| `/api/cron/ai-learning` | каждые 6 часов | AI learning и генерация инсайтов |
 | `/api/cron/partner-earnings-unlock` | ежедневно 06:00 | Разблокировка партнёрских начислений по истечении holdback |
 | `/api/cron/meta-insights` | ежедневно 07:00 | Стягивание Meta ad insights |
 | `/api/cron/subscription-reminders` | ежедневно 09:00 | Напоминания об окончании подписок |
