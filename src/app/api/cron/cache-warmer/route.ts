@@ -34,7 +34,12 @@ import { checkCronAuth } from "@/lib/cron-auth";
 
 export const maxDuration = 300;
 
-const WARM_LOOKBACK_DAYS = 7;
+// 11 сент 2026: с 7 → 2 дней. Окно 7 дней грело кэши "когда-то активных"
+// бизнесов у которых кэш всё равно истёк из-за 1h TTL и любой warm-write
+// был чистой переплатой (cache_create $6/M на Sonnet). Окно 2 дня оставляет
+// только бизнесы у которых кэш реально может быть жив к моменту первого
+// сообщения клиента (при активной работе клиент пишет каждые пару часов).
+const WARM_LOOKBACK_DAYS = 2;
 const MAX_BUSINESSES_PER_RUN = 100; // safety cap
 
 const SUPPORTED_CHANNELS = ["instagram", "whatsapp", "facebook"] as const;
