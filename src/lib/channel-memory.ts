@@ -6,6 +6,7 @@
 
 import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
+import { trackClaudeUsage } from "@/lib/claude-retry";
 
 // ========================================
 // LAZY ANTHROPIC CLIENT
@@ -277,6 +278,9 @@ ${messagesText}`,
         },
       ],
     });
+    // Tracking для client-cost-report — раньше эти Haiku-вызовы были невидимы
+    // (11 сент 2026, задача сверить видимый расход с реальным Anthropic billing).
+    if (response.usage) trackClaudeUsage(conversation.businessId, response.usage);
 
     const text = response.content[0].type === "text" ? response.content[0].text : null;
     if (!text) return null;
@@ -381,6 +385,7 @@ ${summariesText}`,
         },
       ],
     });
+    if (response.usage) trackClaudeUsage(client.businessId, response.usage);
 
     const text = response.content[0].type === "text" ? response.content[0].text : null;
     if (!text) return null;

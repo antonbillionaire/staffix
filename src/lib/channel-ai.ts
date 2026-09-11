@@ -810,7 +810,7 @@ export async function generateChannelAIResponse(
     //   systemDocs  — блок «Справочные документы» только с выбранными файлами.
     //                 Кэшируется на 5m — при повторе того же запроса hit,
     //                 при смене темы дешёвый write.
-    const pickedDocs = await pickRelevantDocuments(userMessage, biz.documents);
+    const pickedDocs = await pickRelevantDocuments(userMessage, biz.documents, businessId);
     if (pickedDocs.length !== biz.documents.length) {
       console.log(
         `[Channel AI] doc matcher: ${biz.documents.length} → ${pickedDocs.length} for biz=${businessId}`
@@ -1650,6 +1650,7 @@ export async function warmChannelCache(
       messages: [{ role: "user" as const, content: "ping" }],
     }).then((r) => {
       logClaudeUsage(`warm/${channel}/sonnet`, r.usage, { biz: businessId });
+      if (r.usage) trackClaudeUsage(businessId, r.usage);
       return r.usage;
     }).catch((e) => {
       console.error(`[warm/sonnet] biz=${businessId}:`, e);
@@ -1662,6 +1663,7 @@ export async function warmChannelCache(
       messages: [{ role: "user" as const, content: "ping" }],
     }).then((r) => {
       logClaudeUsage(`warm/${channel}/haiku`, r.usage, { biz: businessId });
+      if (r.usage) trackClaudeUsage(businessId, r.usage);
       return r.usage;
     }).catch((e) => {
       console.error(`[warm/haiku] biz=${businessId}:`, e);
@@ -1751,6 +1753,7 @@ export async function warmTelegramCache(
       messages: [{ role: "user" as const, content: "ping" }],
     }).then((r) => {
       logClaudeUsage(`warm/telegram/sonnet`, r.usage, { biz: businessId });
+      if (r.usage) trackClaudeUsage(businessId, r.usage);
       return r.usage;
     }).catch((e) => {
       console.error(`[warm/telegram/sonnet] biz=${businessId}:`, e);
@@ -1763,6 +1766,7 @@ export async function warmTelegramCache(
       messages: [{ role: "user" as const, content: "ping" }],
     }).then((r) => {
       logClaudeUsage(`warm/telegram/haiku`, r.usage, { biz: businessId });
+      if (r.usage) trackClaudeUsage(businessId, r.usage);
       return r.usage;
     }).catch((e) => {
       console.error(`[warm/telegram/haiku] biz=${businessId}:`, e);

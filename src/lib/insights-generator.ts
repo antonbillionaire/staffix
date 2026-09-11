@@ -166,7 +166,8 @@ export function detectLang(text: string): Lang {
  */
 async function clusterQuestions(
   questions: string[],
-  theme: "faq" | "escalation"
+  theme: "faq" | "escalation",
+  businessId: string
 ): Promise<Array<{ question: string; examples: string[] }>> {
   if (questions.length < MIN_OCCURRENCES) return [];
 
@@ -211,6 +212,10 @@ ${questions.slice(0, 200).map((q, i) => `${i + 1}. ${q}`).join("\n")}`;
       max_tokens: 2000,
       messages: [{ role: "user", content: prompt }],
     });
+    if (response.usage) {
+      const { trackClaudeUsage } = await import("@/lib/claude-retry");
+      trackClaudeUsage(businessId, response.usage);
+    }
 
     const text = response.content
       .filter((b) => b.type === "text")
@@ -305,7 +310,7 @@ async function generateFaqSuggestions(
 
   if (dontKnowQuestions.length < MIN_OCCURRENCES) return { created: 0, skipped: 0 };
 
-  const clusters = await clusterQuestions(dontKnowQuestions, "faq");
+  const clusters = await clusterQuestions(dontKnowQuestions, "faq", businessId);
   if (clusters.length === 0) return { created: 0, skipped: 0 };
 
   const existing = await loadRecentInsightKeys(businessId, "faq_suggestion", "question");
@@ -351,7 +356,7 @@ async function generateEscalationPatterns(
 
   if (escalatedQuestions.length < MIN_OCCURRENCES) return { created: 0, skipped: 0 };
 
-  const clusters = await clusterQuestions(escalatedQuestions, "escalation");
+  const clusters = await clusterQuestions(escalatedQuestions, "escalation", businessId);
   if (clusters.length === 0) return { created: 0, skipped: 0 };
 
   const existing = await loadRecentInsightKeys(businessId, "escalation_pattern", "question");

@@ -74,6 +74,10 @@ export async function normalizeProductQuery(
       max_tokens: 100,
       messages: [{ role: "user", content: prompt }],
     });
+    if (response.usage) {
+      const { trackClaudeUsage } = await import("@/lib/claude-retry");
+      trackClaudeUsage(businessId, response.usage);
+    }
 
     const text = response.content
       .filter((b) => b.type === "text")

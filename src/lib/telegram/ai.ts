@@ -108,7 +108,7 @@ export async function generateAIResponse(
       autoDescription: d.autoDescription,
       extractedText: d.extractedText,
     }));
-    const pickedDocs = await pickRelevantDocuments(userMessage, docPool);
+    const pickedDocs = await pickRelevantDocuments(userMessage, docPool, businessId);
     if (pickedDocs.length !== docPool.length) {
       console.log(`[Webhook] doc matcher: ${docPool.length} → ${pickedDocs.length} for business=${businessId}`);
     }

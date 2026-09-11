@@ -23,7 +23,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { callClaudeWithRetry, logClaudeUsage } from "@/lib/claude-retry";
+import { callClaudeWithRetry, logClaudeUsage, trackClaudeUsage } from "@/lib/claude-retry";
 
 export interface CartItem {
   name: string;
@@ -130,6 +130,7 @@ export async function extractCartFromMessages(
       messages: [{ role: "user", content: recent }],
     });
     logClaudeUsage("cart-extractor", response.usage, { biz: businessId });
+    if (response.usage) trackClaudeUsage(businessId, response.usage);
 
     const textBlock = response.content.find((b): b is Anthropic.TextBlock => b.type === "text");
     if (!textBlock) return null;

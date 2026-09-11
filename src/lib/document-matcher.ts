@@ -44,7 +44,8 @@ const MIN_DOCS_TO_MATCH = 3;
  */
 export async function pickRelevantDocuments(
   userMessage: string,
-  docs: DocDescriptor[]
+  docs: DocDescriptor[],
+  businessId?: string
 ): Promise<DocDescriptor[]> {
   // Мало документов — экономия не окупает Haiku-вызов
   if (docs.length < MIN_DOCS_TO_MATCH) return docs;
@@ -97,6 +98,10 @@ ${indexLines}
         setTimeout(() => reject(new Error("matcher timeout")), MATCHER_TIMEOUT_MS)
       ),
     ]);
+    if (businessId && response.usage) {
+      const { trackClaudeUsage } = await import("@/lib/claude-retry");
+      trackClaudeUsage(businessId, response.usage);
+    }
 
     const textBlock = response.content.find((c) => c.type === "text");
     const answer = textBlock && "text" in textBlock ? textBlock.text.trim().toLowerCase() : "";

@@ -837,6 +837,10 @@ ${messagesText}
         },
       ],
     });
+    if (response.usage) {
+      const { trackClaudeUsage } = await import("@/lib/claude-retry");
+      trackClaudeUsage(conversation.businessId, response.usage);
+    }
 
     const summary =
       response.content[0].type === "text" ? response.content[0].text : null;
@@ -970,6 +974,10 @@ JSON:`,
         },
       ],
     });
+    if (response.usage) {
+      const { trackClaudeUsage } = await import("@/lib/claude-retry");
+      trackClaudeUsage(businessId, response.usage);
+    }
 
     const raw = response.content[0].type === "text" ? response.content[0].text.trim() : "";
     if (!raw) return { updated: 0 };
@@ -1102,6 +1110,10 @@ ${contextText}
         },
       ],
     });
+    if (response.usage) {
+      const { trackClaudeUsage } = await import("@/lib/claude-retry");
+      trackClaudeUsage(businessId, response.usage);
+    }
 
     const summary =
       response.content[0].type === "text" ? response.content[0].text : null;

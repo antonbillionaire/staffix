@@ -109,7 +109,8 @@ export function lastMessageIsBotQuestion(history: HistoryMessage[]): boolean {
 async function generateNudgeText(
   recent: HistoryMessage[],
   clientName: string | null,
-  businessName: string
+  businessName: string,
+  businessId: string
 ): Promise<string | null> {
   try {
     const response = await anthropic.messages.create({
@@ -123,6 +124,10 @@ async function generateNudgeText(
         },
       ],
     });
+    if (response.usage) {
+      const { trackClaudeUsage } = await import("@/lib/claude-retry");
+      trackClaudeUsage(businessId, response.usage);
+    }
 
     const text = response.content
       .filter((b) => b.type === "text")
@@ -191,7 +196,7 @@ async function processTelegramConversations(since: Date, until: Date): Promise<P
       continue;
     }
 
-    const text = await generateNudgeText(chrono, conv.clientName, conv.business.name);
+    const text = await generateNudgeText(chrono, conv.clientName, conv.business.name, conv.business.id);
     if (!text) { r.errors++; continue; }
 
     const send = await sendAutomationMessage(conv.business.botToken, conv.clientTelegramId, stripMarkdown(text));
@@ -267,7 +272,7 @@ async function processChannelConversations(since: Date, until: Date): Promise<Pr
         r.skippedNoCredentials++;
         continue;
       }
-      const text = await generateNudgeText(history, conv.clientName, conv.business.name);
+      const text = await generateNudgeText(history, conv.clientName, conv.business.name, conv.business.id);
       if (!text) { r.errors++; continue; }
       const envToken = process.env.WHATSAPP_ACCESS_TOKEN;
       const waToken = envToken || conv.business.waAccessToken;
@@ -283,7 +288,7 @@ async function processChannelConversations(since: Date, until: Date): Promise<Pr
         r.skippedNoCredentials++;
         continue;
       }
-      const text = await generateNudgeText(history, conv.clientName, conv.business.name);
+      const text = await generateNudgeText(history, conv.clientName, conv.business.name, conv.business.id);
       if (!text) { r.errors++; continue; }
       const ok = await sendIGDirect(conv.business.igBusinessAccountId, conv.business.fbPageAccessToken, conv.clientId, text);
       if (ok) {
@@ -297,7 +302,7 @@ async function processChannelConversations(since: Date, until: Date): Promise<Pr
         r.skippedNoCredentials++;
         continue;
       }
-      const text = await generateNudgeText(history, conv.clientName, conv.business.name);
+      const text = await generateNudgeText(history, conv.clientName, conv.business.name, conv.business.id);
       if (!text) { r.errors++; continue; }
       const ok = await sendFBMessage(conv.business.fbPageAccessToken, conv.clientId, text, conv.business.fbPageId || undefined);
       if (ok) {
