@@ -1570,11 +1570,12 @@ export async function notifyManagerByTelegram(
       console.warn(`${tag} client lookup for label failed:`, e);
     }
 
-    // Единый формат для всех каналов:
-    //   TG — "👤 Мария (@masha) · Staffix ID: cxvz..."
-    //   IG — "👤 Мария (IG) · Staffix ID: cxvz..."
-    //   FB — "👤 Мария (FB) · Staffix ID: cxvz..."
-    //   WA — "👤 Мария (WA) · Staffix ID: cxvz..."
+    // Единый формат для всех каналов (11 сент 2026, Anton — расширено с
+    // native channel ID):
+    //   TG — "👤 Мария (@masha, TG: 123456789) · Staffix ID: cxvz..."
+    //   IG — "👤 Мария (IG: 178414489...) · Staffix ID: cxvz..."
+    //   FB — "👤 Мария (FB: 891234567...) · Staffix ID: cxvz..."
+    //   WA — "👤 Мария (WA: 998901234567) · Staffix ID: cxvz..."
     // Если имени нет — заменяем на channelClientId/telegramId (лучше чем "Клиент").
     // Если Client в БД не найден — Staffix ID не показываем.
     const channelBadge: Record<string, string> = {
@@ -1586,6 +1587,10 @@ export async function notifyManagerByTelegram(
     };
     const channel = channelInfo?.channel ?? (clientTelegramId > BigInt(0) ? "telegram" : null);
     const badge = channel ? channelBadge[channel] : null;
+    // Native channel ID — из channelInfo (для WA/IG/FB) или из clientTelegramId (для TG).
+    const nativeChannelId =
+      channelInfo?.channelClientId ??
+      (clientTelegramId > BigInt(0) ? clientTelegramId.toString() : null);
     // Имя приоритет: явный clientName из tool → resolvedClient.name → fallback
     const displayName =
       clientName?.trim() ||
@@ -1593,15 +1598,22 @@ export async function notifyManagerByTelegram(
       (channel === "telegram" && resolvedClient?.telegramUsername
         ? `@${resolvedClient.telegramUsername}`
         : null) ||
-      (channelInfo ? `Клиент ${channelInfo.channelClientId}` : `Клиент ${clientTelegramId}`);
-    // Для TG показываем @username в скобках только если есть И оно не совпадает с displayName
+      "Клиент";
+    // Секция канала — badge + native ID + опционально TG @username:
+    //   TG с username → "TG: 123456789, @masha"
+    //   TG без username → "TG: 123456789"
+    //   IG/FB/WA → "IG: 17841..." и т.п.
     const tgHandle =
       channel === "telegram" && resolvedClient?.telegramUsername
         ? `@${resolvedClient.telegramUsername}`
         : null;
-    const handleSuffix = tgHandle && tgHandle !== displayName ? ` (${tgHandle})` : badge ? ` (${badge})` : "";
+    const channelParts: string[] = [];
+    if (badge && nativeChannelId) channelParts.push(`${badge}: ${nativeChannelId}`);
+    else if (badge) channelParts.push(badge);
+    if (tgHandle) channelParts.push(tgHandle);
+    const channelSuffix = channelParts.length > 0 ? ` (${channelParts.join(", ")})` : "";
     const staffixIdSuffix = resolvedClient?.id ? ` · Staffix ID: ${resolvedClient.id}` : "";
-    const clientLabel = `👤 ${displayName}${handleSuffix}${staffixIdSuffix}`;
+    const clientLabel = `👤 ${displayName}${channelSuffix}${staffixIdSuffix}`;
 
     // 1) Всегда оставляем запись в дашборде, даже если Telegram владельца не настроен —
     //    иначе эскалация превращается в ложь боту ("я передал" → никто не получил).
