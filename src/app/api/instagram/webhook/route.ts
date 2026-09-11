@@ -122,7 +122,21 @@ export async function POST(request: Request) {
       }
 
       if (!sender?.id || !message) continue;
-      if (message.is_echo) continue;
+      // Echo messages — приходят когда наш Page отправляет сообщение (наш
+      // бот сам себе, ИЛИ менеджер отвечает клиенту через IG-приложение /
+      // Meta Business Suite). 11 сент 2026, итерация 1: логируем app_id +
+      // sender для калибровки фильтра. Наш Meta App ID = 1875270986685772
+      // (см. CLAUDE.md). Следующая итерация: если app_id ≠ наш → включать
+      // human takeover, чтобы бот молчал пока менеджер работает с клиентом.
+      if (message.is_echo) {
+        const appId = (message as Record<string, unknown>).app_id;
+        const mid = (message as Record<string, unknown>).mid;
+        const text = (message as Record<string, unknown>).text;
+        console.log(
+          `[IG Echo Observe] accountId=${accountId} senderId=${sender.id} app_id=${appId ?? "null"} mid=${mid ?? "null"} text="${String(text || "").slice(0, 60)}"`
+        );
+        continue;
+      }
 
       let messageText = (message.text as string | undefined) || "";
 

@@ -184,8 +184,20 @@ export function parseFBWebhookAll(body: Record<string, unknown>): FBIncomingMess
         const recipient = messaging.recipient as Record<string, string>;
         const message = messaging.message as Record<string, unknown>;
 
-        // Skip echo messages (bot's own messages)
-        if (message?.is_echo) continue;
+        // Echo messages — приходят когда Page отправляет сообщение (наш бот
+        // или менеджер через FB-Inbox / Meta Business Suite / IG app).
+        // 11 сент 2026, итерация 1: логируем app_id + sender для калибровки
+        // фильтра "наш бот vs человек" по реальным данным.
+        // Наш Meta App ID = 1875270986685772 (см. CLAUDE.md).
+        // Следующая итерация: включить human takeover если app_id ≠ наш.
+        if (message?.is_echo) {
+          const appId = (message as Record<string, unknown>).app_id;
+          const mid = (message as Record<string, unknown>).mid;
+          console.log(
+            `[FB Echo Observe] pageId=${recipient?.id} senderId=${sender?.id} app_id=${appId ?? "null"} mid=${mid ?? "null"} text="${String(message.text || "").slice(0, 60)}"`
+          );
+          continue;
+        }
         if (!message) continue;
 
         // Detect audio attachment for transcription
