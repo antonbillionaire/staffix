@@ -604,15 +604,18 @@ async function handleChannelToolCall(
         // Раньше здесь была inline-реализация, которая молча падала без
         // ownerTelegramChatId и не оставляла никакого следа.
         const { notifyManagerByTelegram } = await import("@/lib/sales-tools");
-        // Для канальных клиентов (WA/IG/FB) у нас нет bigint telegramId, передаём 0n —
-        // в дашборде видно clientName + channel; внутри функция использует поле только
-        // как fallback для подписи "Клиент (ID: ...)".
+        // Для канальных клиентов (WA/IG/FB) у нас нет bigint telegramId, передаём 0n
+        // и channelInfo — функция сама подтянет Client (name/id/assignedStaff) по
+        // соответствующему channel-id (whatsappId/instagramId/fbPsid).
+        // Anton (11 сент 2026): до этого фикса channelInfo не передавался →
+        // эскалация приходила как "Клиент ID 0", менеджер не понимал кто пишет.
         const result = await notifyManagerByTelegram(
           businessId,
           BigInt(0),
           toolInput.reason,
           toolInput.client_name,
-          toolInput.urgency
+          toolInput.urgency,
+          { channel, channelClientId: clientId }
         );
         // Persist the escalation as a Task too — same rationale as in
         // src/app/api/telegram/webhook/route.ts: don't lose the lead if

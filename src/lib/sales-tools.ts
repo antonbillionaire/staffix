@@ -1530,12 +1530,78 @@ export async function notifyManagerByTelegram(
 
     const isUrgent = urgency === "urgent";
     const urgencyLabel = isUrgent ? "🚨 СРОЧНО" : "📩 Новый запрос";
-    // Для не-TG клиентов лейбл через channelInfo, а не через фейковый ID=0.
-    const clientLabel = clientName
-      ? `👤 ${clientName}`
-      : channelInfo
-      ? `👤 Клиент (${channelInfo.channel}: ${channelInfo.channelClientId})`
-      : `👤 Клиент (ID: ${clientTelegramId})`;
+
+    // Client lookup — вытаскиваем name/username/id одним запросом (11 сент 2026,
+    // Anton): раньше эскалация приходила как "Клиент ID 0" когда notify вызывался
+    // без clientName и без внутреннего Client-lookup. Теперь всегда пытаемся найти
+    // Client по каналу и показать менеджеру полезное:
+    //   name (или "Клиент") + метка канала + Staffix ID
+    // Второй lookup для assignedStaff ниже переиспользует эту же переменную —
+    // сократит один SELECT.
+    let resolvedClient: {
+      id: string;
+      name: string | null;
+      telegramUsername: string | null;
+      assignedStaffId: string | null;
+    } | null = null;
+    try {
+      if (clientTelegramId > BigInt(0)) {
+        resolvedClient = await prisma.client.findUnique({
+          where: { businessId_telegramId: { businessId, telegramId: clientTelegramId } },
+          select: { id: true, name: true, telegramUsername: true, assignedStaffId: true },
+        });
+      } else if (channelInfo) {
+        const channelToField: Record<string, "whatsappId" | "instagramId" | "fbPsid" | null> = {
+          whatsapp: "whatsappId",
+          instagram: "instagramId",
+          facebook: "fbPsid",
+          messenger: "fbPsid",
+          web: null,
+        };
+        const field = channelToField[channelInfo.channel];
+        if (field) {
+          resolvedClient = await prisma.client.findFirst({
+            where: { businessId, [field]: channelInfo.channelClientId },
+            select: { id: true, name: true, telegramUsername: true, assignedStaffId: true },
+          });
+        }
+      }
+    } catch (e) {
+      console.warn(`${tag} client lookup for label failed:`, e);
+    }
+
+    // Единый формат для всех каналов:
+    //   TG — "👤 Мария (@masha) · Staffix ID: cxvz..."
+    //   IG — "👤 Мария (IG) · Staffix ID: cxvz..."
+    //   FB — "👤 Мария (FB) · Staffix ID: cxvz..."
+    //   WA — "👤 Мария (WA) · Staffix ID: cxvz..."
+    // Если имени нет — заменяем на channelClientId/telegramId (лучше чем "Клиент").
+    // Если Client в БД не найден — Staffix ID не показываем.
+    const channelBadge: Record<string, string> = {
+      telegram: "TG",
+      whatsapp: "WA",
+      instagram: "IG",
+      facebook: "FB",
+      messenger: "FB",
+    };
+    const channel = channelInfo?.channel ?? (clientTelegramId > BigInt(0) ? "telegram" : null);
+    const badge = channel ? channelBadge[channel] : null;
+    // Имя приоритет: явный clientName из tool → resolvedClient.name → fallback
+    const displayName =
+      clientName?.trim() ||
+      resolvedClient?.name?.trim() ||
+      (channel === "telegram" && resolvedClient?.telegramUsername
+        ? `@${resolvedClient.telegramUsername}`
+        : null) ||
+      (channelInfo ? `Клиент ${channelInfo.channelClientId}` : `Клиент ${clientTelegramId}`);
+    // Для TG показываем @username в скобках только если есть И оно не совпадает с displayName
+    const tgHandle =
+      channel === "telegram" && resolvedClient?.telegramUsername
+        ? `@${resolvedClient.telegramUsername}`
+        : null;
+    const handleSuffix = tgHandle && tgHandle !== displayName ? ` (${tgHandle})` : badge ? ` (${badge})` : "";
+    const staffixIdSuffix = resolvedClient?.id ? ` · Staffix ID: ${resolvedClient.id}` : "";
+    const clientLabel = `👤 ${displayName}${handleSuffix}${staffixIdSuffix}`;
 
     // 1) Всегда оставляем запись в дашборде, даже если Telegram владельца не настроен —
     //    иначе эскалация превращается в ложь боту ("я передал" → никто не получил).
@@ -1574,45 +1640,13 @@ export async function notifyManagerByTelegram(
     let assignedManagerChatId: bigint | null = null;
     let assignedManagerName: string | null = null;
 
-    // Поиск привязанного менеджера — по любому channel-id клиента.
-    // Раньше искали только через Client.telegramId → для WA/IG/FB
-    // (clientTelegramId=0) блок пропускался, привязка менеджера
-    // игнорировалась. 5 сент 2026 добавили поиск по channelInfo
-    // (whatsappId / instagramId / fbPsid) — теперь если владелец
-    // выбрал менеджера в карточке клиента /dashboard/customers/[id],
-    // эскалация из WA/IG/FB идёт именно ему, не в broadcast.
+    // Поиск привязанного менеджера — переиспользуем resolvedClient
+    // (загруженный выше для формирования clientLabel).
+    // Раньше здесь был дублирующий client lookup, схлопнули 11 сент 2026.
     try {
-      let client: { assignedStaffId: string | null } | null = null;
-      if (clientTelegramId > BigInt(0)) {
-        client = await prisma.client.findUnique({
-          where: { businessId_telegramId: { businessId, telegramId: clientTelegramId } },
-          select: { assignedStaffId: true },
-        });
-      } else if (channelInfo) {
-        // Клиент из мессенджера — ищем по соответствующему channel-id.
-        // Формат ChannelClient-id зависит от канала:
-        //   whatsapp — wa_id (обычно = phone без +)
-        //   instagram — Instagram scoped user ID (IGSID)
-        //   facebook / messenger — Facebook Page-Scoped ID (PSID)
-        const channelToField: Record<string, "whatsappId" | "instagramId" | "fbPsid" | null> = {
-          whatsapp: "whatsappId",
-          instagram: "instagramId",
-          facebook: "fbPsid",
-          messenger: "fbPsid",
-          web: null, // веб-визитеры пока без persistent identity
-        };
-        const field = channelToField[channelInfo.channel];
-        if (field) {
-          client = await prisma.client.findFirst({
-            where: { businessId, [field]: channelInfo.channelClientId },
-            select: { assignedStaffId: true },
-          });
-        }
-      }
-
-      if (client?.assignedStaffId) {
+      if (resolvedClient?.assignedStaffId) {
         const staff = await prisma.staff.findUnique({
-          where: { id: client.assignedStaffId },
+          where: { id: resolvedClient.assignedStaffId },
           select: { telegramChatId: true, name: true, notificationsEnabled: true },
         });
         if (staff?.telegramChatId && staff.notificationsEnabled !== false) {
