@@ -817,10 +817,26 @@ export async function generateChannelAIResponse(
       );
     }
     const parts = buildChannelSystemPromptParts(biz, channel, pickedDocs);
-    let systemBase = parts.base;
-    const systemDocs = parts.docs;
+    // ВАЖНО (11 сент 2026, cache-invalidation fix):
+    //
+    // До этого фикса clientContext/corrections/cart подмешивались в
+    // `systemBase` — а этот systemBase шёл в ЕДИНЫЙ cache_control-блок с
+    // ttl=1h. Cart обновляется fire-and-forget после КАЖДОГО ответа бота
+    // (строка 1447 ниже) → на каждый следующий turn cart новый → cache_key
+    // нового stable-блока другой → cache_create ($6/M Sonnet) вместо
+    // cache_read ($0.30/M) — переплата ×20 на префиксе.
+    //
+    // Раскладка теперь как в telegram/ai.ts:295-311 (там уже правильно):
+    //   stable → docs → variable
+    // Cart и per-client context живут ТОЛЬКО в variable-блоке (5m TTL),
+    // stable-блок (rules + catalog + FAQ, ~7-15K токенов) не инвалидируется
+    // никогда. Cache-warmer в этом же файле греет тот же stable-блок
+    // (parts.base), теперь его прогрев наконец совпадает с prod cache_key.
+    const stableBlock = parts.base;
+    const docsBlock = parts.docs;
 
     // AI Learning: load client context and corrections (non-blocking on failure)
+    let variableTail = "";
     try {
       const { buildChannelClientContext, buildClientContextBlock, loadActiveCorrections } = await import("@/lib/channel-memory");
       const [clientContext, corrections] = await Promise.all([
@@ -828,25 +844,25 @@ export async function generateChannelAIResponse(
         loadActiveCorrections(businessId).catch(() => ""),
       ]);
       if (clientContext) {
-        systemBase += "\n\n" + buildClientContextBlock(clientContext);
+        variableTail += "\n\n" + buildClientContextBlock(clientContext);
       }
       if (corrections) {
-        systemBase += "\n\n" + corrections;
+        variableTail += "\n\n" + corrections;
       }
     } catch (memErr) {
       console.error("[Channel AI] Memory load error (non-fatal):", memErr);
     }
 
     // Cart memory (6 августа 2026, OLLEE conv-9 fix): подмешиваем текущее
-    // состояние корзины в системный промпт если оно есть. formatCartForPrompt
-    // возвращает пустую строку если корзина пуста или устарела (>1 час).
+    // состояние корзины. formatCartForPrompt возвращает пустую строку если
+    // корзина пуста ИЛИ устарела (>1 час) — тогда variableTail не растёт.
     try {
       const savedExtracted = (conv.extractedInfo as Record<string, unknown> | null) || {};
       const savedCart = savedExtracted.cart as import("@/lib/cart-extractor").CartSnapshot | undefined;
       if (savedCart) {
         const { formatCartForPrompt } = await import("@/lib/cart-extractor");
         const cartBlock = formatCartForPrompt(savedCart);
-        if (cartBlock) systemBase += "\n\n" + cartBlock;
+        if (cartBlock) variableTail += "\n\n" + cartBlock;
       }
     } catch (cartErr) {
       console.warn("[Channel AI] cart context load failed:", cartErr);
@@ -901,7 +917,10 @@ export async function generateChannelAIResponse(
     }
 
     if (refreshSoftWarning) {
-      systemBase += `\n\n⚠️ ВНИМАНИЕ — БАЗА ЗНАНИЙ ОБНОВЛЕНА (правило приоритета фактов)
+      // Warning приклеивается к variable-блоку (динамическая часть), а не к
+      // stable — иначе бы single-shot добавление сломало 1h-кэш префикса
+      // после каждого reset needsContextRefresh (11 сент 2026 фикс).
+      variableTail += `\n\n⚠️ ВНИМАНИЕ — БАЗА ЗНАНИЙ ОБНОВЛЕНА (правило приоритета фактов)
 База знаний этого бизнеса (FAQ / услуги / товары / документы) только что была изменена владельцем. Это перебивает любую информацию, которую ты помнишь о ценах, датах, услугах или остатках товаров.
 
 ИСТОЧНИК ИСТИНЫ для фактов о бизнесе — ТОЛЬКО разделы текущего системного промпта выше:
@@ -960,24 +979,38 @@ export async function generateChannelAIResponse(
     // pickCacheStrategy определяет по активности бизнеса/клиента.
     const cacheStrategy = await pickCacheStrategy(businessId, clientId);
     console.log(`[Channel AI] cache strategy: ${cacheStrategy.reason} → stable=${cacheStrategy.stableTTL} docs=${cacheStrategy.docsTTL ?? "off"}`);
-    // system: массив с блоками — base с адаптивным TTL, docs может быть без
-    // cache_control если matcher выдаёт разные наборы или бизнес quiet.
+    // Порядок cache-блоков: stable → docs → variable. Каждый последующий
+    // cache_key = hash(всех предыдущих + этого) — если stable не изменился,
+    // stable-кэш валиден. Если stable+docs те же — их общий кэш валиден.
+    // Variable меняется каждым turn (per-client + cart), обновляется только
+    // хвост, stable-префикс (~7-15K токенов) сохраняется в кэше.
     const systemBlocks: Anthropic.TextBlockParam[] = [
       {
         type: "text",
-        text: systemBase,
+        text: stableBlock,
         cache_control: { type: "ephemeral", ttl: cacheStrategy.stableTTL },
       },
     ];
-    if (systemDocs) {
+    if (docsBlock) {
       if (cacheStrategy.docsTTL) {
         systemBlocks.push({
           type: "text",
-          text: systemDocs,
+          text: docsBlock,
           cache_control: { type: "ephemeral", ttl: cacheStrategy.docsTTL },
         });
       } else {
-        systemBlocks.push({ type: "text", text: systemDocs });
+        systemBlocks.push({ type: "text", text: docsBlock });
+      }
+    }
+    if (variableTail.trim()) {
+      if (cacheStrategy.variableTTL) {
+        systemBlocks.push({
+          type: "text",
+          text: variableTail,
+          cache_control: { type: "ephemeral", ttl: cacheStrategy.variableTTL },
+        });
+      } else {
+        systemBlocks.push({ type: "text", text: variableTail });
       }
     }
     // Параметр thinking — только для Sonnet 5. Haiku 4.5 его не поддерживает
@@ -1584,6 +1617,12 @@ export async function warmChannelCache(
   // от запроса к запросу через lazy-loading (см. pickRelevantDocuments), греть
   // его бессмысленно — cache_key будет другой на реальном трафике.
   // Пустой массив docSubset → docs = "" → в warmer уходит только base.
+  //
+  // 11 сент 2026: после cache-invalidation fix (см. верх generateChannelAIResponse)
+  // prod stable-блок теперь = `parts.base` тоже (clientContext/corrections/cart
+  // вынесены в variable). Cache_key warmer'а наконец совпадает с prod
+  // cache_key байт-в-байт → warmer действительно сохраняет production cache_read'ы,
+  // а не пишет собственный изолированный кэш.
   const parts = buildChannelSystemPromptParts(biz, channel, []);
   if (parts.base.length < 4096) return null;
 
