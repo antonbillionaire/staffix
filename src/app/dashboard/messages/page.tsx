@@ -29,6 +29,8 @@ interface ConversationItem {
   lastMessageRole: string;
   lastMessageAt: string;
   totalMessages: number;
+  // Прочитано/непрочитано (11 сент 2026, Anton): красная точка в списке.
+  unread?: boolean;
   // Backwards compatibility
   clientTelegramId?: string;
 }
@@ -216,6 +218,15 @@ export default function MessagesPage() {
     setLoadingMessages(true);
     setSelectedClient(clientId);
     setSelectedChannel(channel);
+    // Оптимистично помечаем прочитанным в UI, чтобы красная точка гасла
+    // моментально при клике (сервер тоже пометит в GET, polling подхватит).
+    setConversations((prev) =>
+      prev.map((c) =>
+        (c.clientId || c.clientTelegramId) === clientId && c.channel === channel
+          ? { ...c, unread: false }
+          : c
+      )
+    );
     try {
       const res = await fetch(`/api/conversations?clientId=${encodeURIComponent(clientId)}&channel=${channel}`);
       if (res.ok) {
@@ -273,7 +284,18 @@ export default function MessagesPage() {
   return (
     <div className="h-[calc(100vh-80px)] sm:h-[calc(100vh-100px)] flex flex-col">
       <div className="mb-4">
-        <h1 className={`text-2xl font-bold ${textPrimary}`}>{t("messages.title")}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className={`text-2xl font-bold ${textPrimary}`}>{t("messages.title")}</h1>
+          {/* Счётчик непрочитанных диалогов (11 сент 2026, Anton). */}
+          {conversations.some((c) => c.unread) && (
+            <span
+              className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 rounded-full bg-red-500 text-white text-xs font-semibold"
+              title="Диалогов с новыми сообщениями"
+            >
+              {conversations.filter((c) => c.unread).length}
+            </span>
+          )}
+        </div>
         <p className={textSecondary}>{t("messages.subtitle")}</p>
       </div>
 
@@ -357,7 +379,16 @@ export default function MessagesPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <p className={`font-medium text-sm ${textPrimary} truncate`}>
+                            {/* Красная точка = непрочитано. Гаснет когда менеджер
+                                открывает диалог (mark-read автоматически в GET). */}
+                            {item.unread && (
+                              <span
+                                className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"
+                                aria-label="Непрочитано"
+                                title="Есть новые сообщения"
+                              />
+                            )}
+                            <p className={`text-sm truncate ${textPrimary} ${item.unread ? "font-bold" : "font-medium"}`}>
                               {getDisplayName(item)}
                             </p>
                             <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${
@@ -370,7 +401,7 @@ export default function MessagesPage() {
                             {formatTime(item.lastMessageAt)}
                           </span>
                         </div>
-                        <p className={`text-xs ${textSecondary} truncate mt-0.5`}>
+                        <p className={`text-xs truncate mt-0.5 ${item.unread ? textPrimary : textSecondary}`}>
                           {item.lastMessageRole === "assistant" ? t("messages.botPrefix") : ""}
                           {item.lastMessage}
                         </p>

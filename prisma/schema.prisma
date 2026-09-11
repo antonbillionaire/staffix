@@ -565,6 +565,13 @@ model Conversation {
   nudgeCount   Int       @default(0)
   nudgeSentAt  DateTime?
 
+  // Прочитано/непрочитано на странице /dashboard/messages (11 сент 2026, Anton):
+  // менеджер открыл диалог → выставляется now(). Логика unread:
+  //   unread = updatedAt > lastReadByOwnerAt  (или lastReadByOwnerAt IS NULL)
+  // При миграции для существующих conversation значение = updatedAt чтобы
+  // не завалить менеджера пометками на весь исторический архив.
+  lastReadByOwnerAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1612,6 +1619,9 @@ model ChannelConversation {
   // Silent-follow-up nudge (28 июля 2026) — см. Conversation.nudgeCount.
   nudgeCount   Int       @default(0)
   nudgeSentAt  DateTime?
+
+  // Прочитано/непрочитано (11 сент 2026) — см. Conversation.lastReadByOwnerAt.
+  lastReadByOwnerAt DateTime?
 
   businessId String
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)

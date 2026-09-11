@@ -10,6 +10,15 @@ interface UnifiedConversation {
   lastMessageRole: string;
   lastMessageAt: string;
   totalMessages: number;
+  // Прочитано/непрочитано (11 сент 2026, Anton): красная точка в списке
+  // диалогов — есть ли активность после последнего mark-read.
+  unread: boolean;
+}
+
+/** unread = updatedAt > lastReadByOwnerAt (или lastReadByOwnerAt IS NULL). */
+function computeUnread(updatedAt: Date, lastReadByOwnerAt: Date | null): boolean {
+  if (!lastReadByOwnerAt) return true;
+  return updatedAt.getTime() > lastReadByOwnerAt.getTime();
 }
 
 // GET /api/conversations — unified list across all channels
@@ -54,6 +63,13 @@ export async function GET(request: NextRequest) {
           return NextResponse.json({ messages: [], clientName: null });
         }
 
+        // Автоматически помечаем прочитанным при открытии диалога
+        // (11 сент 2026, Anton): менеджер открыл — красная точка гаснет.
+        // Fire-and-forget: если UPDATE упал, чтение UI не сломается.
+        prisma.channelConversation
+          .update({ where: { id: conv.id }, data: { lastReadByOwnerAt: new Date() } })
+          .catch((e) => console.warn("[messages] mark-read failed:", e));
+
         // History is stored as JSON array [{role, content}]
         const history = (conv.history as Array<{ role: string; content: string }>) || [];
         return NextResponse.json({
@@ -86,6 +102,11 @@ export async function GET(request: NextRequest) {
       if (!conversation) {
         return NextResponse.json({ messages: [] });
       }
+
+      // Автоматически помечаем прочитанным (см. коммент выше про channel-conv).
+      prisma.conversation
+        .update({ where: { id: conversation.id }, data: { lastReadByOwnerAt: new Date() } })
+        .catch((e) => console.warn("[messages] mark-read failed:", e));
 
       return NextResponse.json({
         messages: conversation.messages.map((m) => ({
@@ -170,9 +191,12 @@ export async function GET(request: NextRequest) {
           lastMessageRole: lastMsg?.role || "user",
           lastMessageAt: lastMsg?.createdAt?.toISOString() || conv.updatedAt.toISOString(),
           totalMessages: (existing?.totalMessages || 0) + conv._count.messages,
+          unread: computeUnread(conv.updatedAt, conv.lastReadByOwnerAt),
         });
       } else if (existing) {
         existing.totalMessages += conv._count.messages;
+        // Если хотя бы один conversation этого клиента непрочитан — весь клиент unread
+        if (computeUnread(conv.updatedAt, conv.lastReadByOwnerAt)) existing.unread = true;
       }
     }
     allConversations.push(...tgMap.values());
@@ -202,13 +226,16 @@ export async function GET(request: NextRequest) {
         lastMessageRole: lastMsg?.role || "user",
         lastMessageAt: conv.updatedAt.toISOString(),
         totalMessages: conv.messageCount || history.length,
+        unread: computeUnread(conv.updatedAt, conv.lastReadByOwnerAt),
       });
     }
 
-    // Sort all by last message time
-    allConversations.sort(
-      (a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
-    );
+    // Сортировка (11 сент 2026, Anton): непрочитанные вверху всегда, внутри
+    // групп — по свежести. Так менеджер сразу видит с чем работать.
+    allConversations.sort((a, b) => {
+      if (a.unread !== b.unread) return a.unread ? -1 : 1;
+      return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+    });
 
     // Filter by channel if specified
     const filtered = channel
