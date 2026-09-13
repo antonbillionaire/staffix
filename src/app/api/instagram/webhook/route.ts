@@ -122,19 +122,34 @@ export async function POST(request: Request) {
       }
 
       if (!sender?.id || !message) continue;
-      // Echo messages — приходят когда наш Page отправляет сообщение (наш
-      // бот сам себе, ИЛИ менеджер отвечает клиенту через IG-приложение /
-      // Meta Business Suite). 11 сент 2026, итерация 1: логируем app_id +
-      // sender для калибровки фильтра. Наш Meta App ID = 1875270986685772
-      // (см. CLAUDE.md). Следующая итерация: если app_id ≠ наш → включать
-      // human takeover, чтобы бот молчал пока менеджер работает с клиентом.
+      // Echo messages — приходят когда наш Page отправляет сообщение. Два
+      // источника: (1) наш собственный бот, (2) менеджер отвечает клиенту
+      // руками через IG-приложение / Meta Business Suite / Page Inbox.
+      //
+      // 14 сент 2026 (Anton, OLLEE): во втором случае надо включать human
+      // takeover — иначе бот продолжает встревать в разговор который уже
+      // ведёт живой менеджер (скриншот из Staffix TEAM, диалог Адины).
+      //
+      // Различаем по ТЕКСТУ, а не по message.app_id: наш бот сохраняет свой
+      // ответ в ChannelConversation.history ДО того как Meta присылает echo
+      // (1-3 сек), значит если текст echo уже лежит в последних ответах
+      // бота — это наш собственный. Если нет — писал человек.
+      // Текстовое сравнение надёжнее app_id: не зависит от того что Meta
+      // кладёт в это поле для разных клиентов (Business Suite / мобильное
+      // приложение / Page Inbox могут слать разные значения).
       if (message.is_echo) {
+        const recipient = messaging.recipient as Record<string, string> | undefined;
+        const echoText = String((message as Record<string, unknown>).text || "").trim();
         const appId = (message as Record<string, unknown>).app_id;
         const mid = (message as Record<string, unknown>).mid;
-        const text = (message as Record<string, unknown>).text;
         console.log(
-          `[IG Echo Observe] accountId=${accountId} senderId=${sender.id} app_id=${appId ?? "null"} mid=${mid ?? "null"} text="${String(text || "").slice(0, 60)}"`
+          `[IG Echo] accountId=${accountId} recipient=${recipient?.id ?? "?"} app_id=${appId ?? "null"} mid=${mid ?? "null"} text="${echoText.slice(0, 60)}"`
         );
+        // Echo без текста (менеджер отправил фото/стикер, либо наш sendIGImage)
+        // сопоставить с history нельзя — не рискуем ставить takeover вслепую.
+        if (echoText && recipient?.id) {
+          await applyManagerEchoTakeover(accountId, recipient.id, echoText);
+        }
         continue;
       }
 
@@ -190,8 +205,17 @@ export async function POST(request: Request) {
               { fbPageId: accountId, igActive: true },
             ],
           },
-          select: { fbPageAccessToken: true, fbPageId: true, botActive: true },
+          select: { id: true, fbPageAccessToken: true, fbPageId: true, botActive: true },
         });
+        // Human takeover (14 сент 2026): менеджер уже ведёт этот диалог —
+        // шаблон «Спасибо за упоминание!» посреди живого разговора выглядит
+        // как будто в чат влез третий участник.
+        if (biz && (await isIGConversationSilenced(biz.id, sender.id))) {
+          console.log(
+            `[IG Webhook] event type=${eventType} → human takeover active, template suppressed (sender=${sender.id})`
+          );
+          continue;
+        }
         if (biz?.botActive && biz?.fbPageAccessToken && biz.fbPageId) {
           const pgToken = await getPageAccessToken(biz.fbPageId, biz.fbPageAccessToken).catch(
             () => biz.fbPageAccessToken!
@@ -233,6 +257,15 @@ export async function POST(request: Request) {
         });
         if (!biz?.fbPageAccessToken || !biz.fbPageId) {
           console.log(`[IG Webhook] emoji-only ${emojiClass} → biz not found or no token`);
+          continue;
+        }
+        // Human takeover (14 сент 2026): пока менеджер ведёт диалог, бот не
+        // отвечает даже на эмодзи. Клиент поставил 👍 в ответ менеджеру —
+        // ботовское «Спасибо!» здесь только мешает.
+        if (await isIGConversationSilenced(biz.id, sender.id)) {
+          console.log(
+            `[IG Webhook] emoji-only ${emojiClass} → human takeover active, suppressed (sender=${sender.id})`
+          );
           continue;
         }
         const pgToken = await getPageAccessToken(biz.fbPageId, biz.fbPageAccessToken).catch(
@@ -331,6 +364,123 @@ export async function POST(request: Request) {
   }
 
   return respond200();
+}
+
+/**
+ * Обработка echo-события: менеджер ответил клиенту напрямую из Instagram
+ * (мобильное приложение / Meta Business Suite / Page Inbox), минуя дашборд
+ * Staffix. Включаем human takeover чтобы бот замолчал в этом диалоге.
+ *
+ * 14 сент 2026 (Anton, OLLEE): без этого бот встревал в разговор который
+ * уже ведёт живой менеджер — клиент получал два ответа, менеджерский и
+ * ботовский, часто противоречащих друг другу.
+ *
+ * Как отличаем echo нашего бота от echo менеджера:
+ *   Наш бот пишет свой ответ в ChannelConversation.history СРАЗУ после
+ *   успешной отправки, а Meta присылает echo через 1-3 секунды. Значит
+ *   если текст echo уже лежит среди последних ответов бота — echo наш.
+ *   Если такого текста в истории нет — писал человек.
+ *
+ * Почему не по message.app_id: разные клиенты Meta (Business Suite, IG
+ * app, Page Inbox) кладут туда разные значения, а на некоторых события
+ * поле вообще отсутствует. Текстовое сравнение не зависит от этого.
+ *
+ * Fire-and-forget по духу: любая ошибка логируется и глотается — echo
+ * не должен ронять обработку вебхука.
+ */
+/**
+ * Активен ли human takeover в IG-диалоге с этим клиентом.
+ *
+ * 14 сент 2026 (Anton): шаблонные ответы (story mention / share) и
+ * emoji-шорткаты отправлялись в обход generateChannelAIResponse, где
+ * проверка takeover уже была, — поэтому бот встревал репликами
+ * «Спасибо!» / «Спасибо большое за упоминание!» прямо посреди разговора
+ * менеджера с клиентом. Теперь оба пути спрашивают здесь.
+ *
+ * Fail-open: при ошибке БД возвращаем false (бот отвечает) — лучше
+ * лишняя реплика чем немой бот из-за сбоя запроса.
+ */
+async function isIGConversationSilenced(
+  businessId: string,
+  clientId: string
+): Promise<boolean> {
+  try {
+    const conv = await prisma.channelConversation.findFirst({
+      where: { businessId, channel: "instagram", clientId },
+      select: { humanTakeoverUntil: true },
+    });
+    if (!conv) return false;
+    const { isBotSilenced } = await import("@/lib/human-takeover");
+    return isBotSilenced(conv.humanTakeoverUntil);
+  } catch (e) {
+    console.warn("[IG Webhook] takeover check failed (fail-open):", e);
+    return false;
+  }
+}
+
+async function applyManagerEchoTakeover(
+  accountId: string,
+  clientId: string,
+  echoText: string
+): Promise<void> {
+  try {
+    const biz = await prisma.business.findFirst({
+      where: {
+        OR: [
+          { igBusinessAccountId: accountId, igActive: true },
+          { fbPageId: accountId, igActive: true },
+        ],
+      },
+      select: { id: true },
+    });
+    if (!biz) return;
+
+    const conv = await prisma.channelConversation.findFirst({
+      where: { businessId: biz.id, channel: "instagram", clientId },
+      select: { id: true, history: true },
+    });
+    if (!conv) return;
+
+    const history = (conv.history as Array<{ role: string; content: string }>) || [];
+    // Сравниваем с последними тремя ответами бота: за это окно гарантированно
+    // попадает наш только что отправленный текст, но не «прилипают» старые
+    // совпадения из давней части диалога.
+    const recentBotTexts = history
+      .filter((m) => m.role === "assistant")
+      .slice(-3)
+      .map((m) => (m.content || "").trim());
+
+    // Префиксное сравнение по 80 символам — Meta может обрезать/склеивать
+    // длинные сообщения, точное равенство ловит не все наши собственные echo.
+    const head = echoText.slice(0, 80);
+    const isOwnBotEcho = recentBotTexts.some(
+      (t) => t === echoText || t.startsWith(head) || echoText.startsWith(t.slice(0, 80))
+    );
+
+    if (isOwnBotEcho) {
+      console.log(`[IG Echo] own bot message — no takeover (conv=${conv.id})`);
+      return;
+    }
+
+    const { computeTakeoverExpiry } = await import("@/lib/human-takeover");
+    const until = computeTakeoverExpiry();
+    await prisma.channelConversation.update({
+      where: { id: conv.id },
+      data: {
+        humanTakeoverUntil: until,
+        // Кладём сообщение менеджера в историю — иначе в дашборде диалог
+        // выглядит с дырой, а бот при возврате не знает что уже сказали.
+        history: [...history, { role: "assistant", content: echoText }],
+        messageCount: { increment: 1 },
+        updatedAt: new Date(),
+      },
+    });
+    console.log(
+      `[IG Echo] MANAGER replied from Instagram → takeover ON until ${until.toISOString()} (conv=${conv.id})`
+    );
+  } catch (e) {
+    console.error("[IG Echo] takeover handling failed:", e);
+  }
 }
 
 async function processIGMessage(
