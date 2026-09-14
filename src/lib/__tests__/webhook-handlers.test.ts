@@ -56,7 +56,11 @@ vi.mock("@/lib/meta-webhook-verify", () => ({
 vi.mock("@/lib/facebook-utils", () => ({
   getPageAccessToken: vi.fn().mockResolvedValue("page-token"),
   parseFBWebhookAll: vi.fn().mockReturnValue([]),
+  // Echo-события (менеджер ответил из Business Suite) — по умолчанию пусто,
+  // тесты про takeover мокают отдельно.
+  parseFBEchoes: vi.fn().mockReturnValue([]),
   sendFBMessage: vi.fn().mockResolvedValue(true),
+  sendFBImage: vi.fn().mockResolvedValue(true),
   sendFBTyping: vi.fn().mockResolvedValue(true),
   parseLeadgenEvents: vi.fn().mockReturnValue([]),
   fetchLeadAdData: vi.fn().mockResolvedValue(null),

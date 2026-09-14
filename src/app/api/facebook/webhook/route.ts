@@ -17,7 +17,7 @@ export const maxDuration = 60;
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { parseFBWebhookAll, sendFBMessage, sendFBImage, sendFBTyping, parseLeadgenEvents, fetchLeadAdData, getPageAccessToken } from "@/lib/facebook-utils";
+import { parseFBWebhookAll, parseFBEchoes, sendFBMessage, sendFBImage, sendFBTyping, parseLeadgenEvents, fetchLeadAdData, getPageAccessToken } from "@/lib/facebook-utils";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
 import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
@@ -120,6 +120,15 @@ export async function POST(request: Request) {
     } catch (e) {
       console.error("[FB Webhook] Lead Ad processing error:", e);
     }
+  }
+
+  // Echo-события: Page отправил сообщение. Если это был живой менеджер
+  // (Business Suite / Page Inbox / мобильный Messenger), а не наш бот —
+  // включаем human takeover чтобы бот не встревал в разговор.
+  // 14 сент 2026 (Anton, OLLEE) — тот же фикс что сделан для Instagram.
+  const echoes = parseFBEchoes(body);
+  for (const echo of echoes) {
+    await applyManagerEchoTakeover(echo.pageId, echo.recipientId, echo.text, echo.appId);
   }
 
   const messages = parseFBWebhookAll(body);
@@ -285,6 +294,77 @@ async function processBusinessFBMessage(
     await incrementMessageCount(businessId);
   } catch (e) {
     console.error("processBusinessFBMessage error:", e);
+  }
+}
+
+// ─── Human takeover from manager's own replies ───────────────────────────────
+
+/**
+ * Менеджер ответил клиенту руками (Meta Business Suite / Page Inbox /
+ * мобильный Messenger), минуя дашборд Staffix. Включаем human takeover
+ * чтобы бот замолчал в этом диалоге.
+ *
+ * 14 сент 2026 (Anton, OLLEE): зеркало логики из instagram/webhook.
+ *
+ * Отличаем echo нашего бота от echo менеджера по ТЕКСТУ: бот пишет свой
+ * ответ в ChannelConversation.history сразу после успешной отправки, а
+ * Meta присылает echo через 1-3 секунды. Если текст уже есть среди
+ * последних ответов бота — echo наш. Если нет — писал человек.
+ *
+ * app_id не используем для решения (разные клиенты Meta заполняют его
+ * по-разному, иногда опускают) — только пишем в лог для диагностики.
+ */
+async function applyManagerEchoTakeover(
+  pageId: string,
+  clientId: string,
+  echoText: string,
+  appId: string | null
+): Promise<void> {
+  try {
+    const biz = await prisma.business.findFirst({
+      where: { fbPageId: pageId, fbActive: true },
+      select: { id: true },
+    });
+    if (!biz) return;
+
+    const conv = await prisma.channelConversation.findFirst({
+      where: { businessId: biz.id, channel: "facebook", clientId },
+      select: { id: true, history: true },
+    });
+    if (!conv) return;
+
+    const history = (conv.history as Array<{ role: string; content: string }>) || [];
+    const recentBotTexts = history
+      .filter((m) => m.role === "assistant")
+      .slice(-3)
+      .map((m) => (m.content || "").trim());
+
+    const head = echoText.slice(0, 80);
+    const isOwnBotEcho = recentBotTexts.some(
+      (t) => t === echoText || t.startsWith(head) || echoText.startsWith(t.slice(0, 80))
+    );
+
+    if (isOwnBotEcho) {
+      console.log(`[FB Echo] own bot message — no takeover (conv=${conv.id})`);
+      return;
+    }
+
+    const { computeTakeoverExpiry } = await import("@/lib/human-takeover");
+    const until = computeTakeoverExpiry();
+    await prisma.channelConversation.update({
+      where: { id: conv.id },
+      data: {
+        humanTakeoverUntil: until,
+        history: [...history, { role: "assistant", content: echoText }],
+        messageCount: { increment: 1 },
+        updatedAt: new Date(),
+      },
+    });
+    console.log(
+      `[FB Echo] MANAGER replied from Facebook (app_id=${appId ?? "null"}) → takeover ON until ${until.toISOString()} (conv=${conv.id})`
+    );
+  } catch (e) {
+    console.error("[FB Echo] takeover handling failed:", e);
   }
 }
 

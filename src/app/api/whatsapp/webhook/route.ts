@@ -96,7 +96,33 @@ export async function POST(request: Request) {
 
   // Parse incoming message
   const msg = parseWAWebhook(body);
-  if (!msg) return respond200();
+  if (!msg) {
+    // Диагностика (14 сент 2026, Anton): выясняем можно ли вообще поймать
+    // ответ менеджера из WhatsApp Business App. В обычном Cloud API исходящие
+    // приходят как `statuses` (sent/delivered/read) БЕЗ текста — поймать
+    // нельзя. Но в Coexistence-режиме (Meta 2025+, App и Cloud API делят
+    // один номер) ответы из приложения могут приходить как `messages` с
+    // from = номер бизнеса. Логируем форму payload'а чтобы понять что
+    // реально прилетает, прежде чем строить на этом takeover.
+    try {
+      const entry = (body.entry as Array<Record<string, unknown>>)?.[0];
+      const change = (entry?.changes as Array<Record<string, unknown>>)?.[0];
+      const value = (change?.value as Record<string, unknown>) || {};
+      const keys = Object.keys(value).filter((k) => k !== "metadata" && k !== "messaging_product");
+      const statuses = value.statuses as Array<Record<string, unknown>> | undefined;
+      if (keys.length > 0) {
+        console.log(
+          `[WA Observe] non-message event: fields=[${keys.join(",")}]` +
+            (statuses?.[0]
+              ? ` status=${statuses[0].status} recipient=${statuses[0].recipient_id}`
+              : "")
+        );
+      }
+    } catch {
+      /* диагностика не должна ломать вебхук */
+    }
+    return respond200();
+  }
 
   // Skip duplicate webhook deliveries (before any processing)
   if (!(await markWebhookProcessed(msg.messageId))) return respond200();

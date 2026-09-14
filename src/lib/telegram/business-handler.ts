@@ -216,8 +216,44 @@ export async function handleBusinessMessage(
     return;
   }
 
-  // Не отвечаем самому владельцу (он пишет в своих же чатах с клиентами руками)
+  // Владелец/менеджер пишет клиенту руками в своём Telegram.
+  //
+  // 14 сент 2026 (Anton, OLLEE): раньше просто молчали на это конкретное
+  // сообщение, но на СЛЕДУЮЩЕЕ сообщение клиента бот снова отвечал — и
+  // встревал в разговор который уже ведёт человек. Теперь включаем human
+  // takeover на HUMAN_TAKEOVER_MINUTES, как это делает manual reply из
+  // дашборда и echo-события в IG/FB.
+  //
+  // msg.chat.id — чат владельца с клиентом; для личных чатов совпадает с
+  // telegram-id клиента, по нему и ищем Conversation.
   if (BigInt(msg.from.id) === connection.ownerUserId) {
+    try {
+      const clientTelegramId = BigInt(msg.chat.id);
+      const conversation = await prisma.conversation.findFirst({
+        where: { businessId: connection.businessId, clientTelegramId },
+        select: { id: true },
+      });
+      if (conversation) {
+        const { computeTakeoverExpiry } = await import("@/lib/human-takeover");
+        const until = computeTakeoverExpiry();
+        await prisma.conversation.update({
+          where: { id: conversation.id },
+          data: { humanTakeoverUntil: until, updatedAt: new Date() },
+        });
+        // Сообщение менеджера — в историю, иначе бот при возврате не знает
+        // что клиенту уже ответили, и дашборд показывает диалог с дырой.
+        if (msg.text?.trim()) {
+          await prisma.message.create({
+            data: { conversationId: conversation.id, role: "assistant", content: msg.text.trim() },
+          });
+        }
+        console.log(
+          `[TG Business] OWNER replied manually → takeover ON until ${until.toISOString()} (conv=${conversation.id})`
+        );
+      }
+    } catch (e) {
+      console.error("[TG Business] takeover on owner message failed:", e);
+    }
     return;
   }
 

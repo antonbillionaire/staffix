@@ -184,20 +184,10 @@ export function parseFBWebhookAll(body: Record<string, unknown>): FBIncomingMess
         const recipient = messaging.recipient as Record<string, string>;
         const message = messaging.message as Record<string, unknown>;
 
-        // Echo messages — приходят когда Page отправляет сообщение (наш бот
-        // или менеджер через FB-Inbox / Meta Business Suite / IG app).
-        // 11 сент 2026, итерация 1: логируем app_id + sender для калибровки
-        // фильтра "наш бот vs человек" по реальным данным.
-        // Наш Meta App ID = 1875270986685772 (см. CLAUDE.md).
-        // Следующая итерация: включить human takeover если app_id ≠ наш.
-        if (message?.is_echo) {
-          const appId = (message as Record<string, unknown>).app_id;
-          const mid = (message as Record<string, unknown>).mid;
-          console.log(
-            `[FB Echo Observe] pageId=${recipient?.id} senderId=${sender?.id} app_id=${appId ?? "null"} mid=${mid ?? "null"} text="${String(message.text || "").slice(0, 60)}"`
-          );
-          continue;
-        }
+        // Echo — исходящее от Page (наш бот ИЛИ менеджер из Business Suite /
+        // Page Inbox). Здесь пропускаем: их разбирает parseFBEchoes()
+        // отдельно, чтобы включить human takeover (см. facebook/webhook).
+        if (message?.is_echo) continue;
         if (!message) continue;
 
         // Detect audio attachment for transcription
@@ -221,6 +211,64 @@ export function parseFBWebhookAll(body: Record<string, unknown>): FBIncomingMess
     console.error("parseFBWebhookAll error:", e);
   }
   return results;
+}
+
+/** Исходящее сообщение Page: либо наш бот, либо менеджер руками. */
+export interface FBEchoMessage {
+  /** PSID клиента — кому Page отправил сообщение. */
+  recipientId: string;
+  /** Page ID отправителя. */
+  pageId: string;
+  text: string;
+  messageId: string;
+  /** app_id из payload — не используем для решений, только для логов. */
+  appId: string | null;
+}
+
+/**
+ * Достаёт echo-сообщения (is_echo=true) из webhook-payload Facebook.
+ *
+ * 14 сент 2026 (Anton, OLLEE): когда менеджер отвечает клиенту руками —
+ * из Meta Business Suite, Page Inbox или мобильного Messenger — Meta шлёт
+ * нам echo. Раньше parseFBWebhookAll молча их выбрасывал, поэтому бот не
+ * знал что диалог уже ведёт человек и продолжал отвечать параллельно.
+ * Теперь webhook разбирает их отдельно и включает human takeover.
+ *
+ * Отличить наш бот от менеджера по app_id нельзя — разные клиенты Meta
+ * заполняют это поле по-разному, иногда не заполняют вовсе. Сравнение
+ * идёт по тексту с историей диалога (см. applyManagerEchoTakeover
+ * в facebook/webhook/route.ts) — тот же подход что для Instagram.
+ */
+export function parseFBEchoes(body: Record<string, unknown>): FBEchoMessage[] {
+  const echoes: FBEchoMessage[] = [];
+  try {
+    if (body.object !== "page") return echoes;
+
+    for (const entry of (body.entry as Array<Record<string, unknown>>) || []) {
+      for (const messaging of (entry.messaging as Array<Record<string, unknown>>) || []) {
+        const message = messaging.message as Record<string, unknown> | undefined;
+        if (!message?.is_echo) continue;
+
+        const sender = messaging.sender as Record<string, string> | undefined;
+        const recipient = messaging.recipient as Record<string, string> | undefined;
+        const text = String(message.text || "").trim();
+        // Echo без текста (фото/стикер) сопоставить с историей нельзя —
+        // не рискуем ставить takeover вслепую.
+        if (!text || !recipient?.id) continue;
+
+        echoes.push({
+          recipientId: recipient.id,
+          pageId: sender?.id || "",
+          text,
+          messageId: String(message.mid || ""),
+          appId: message.app_id != null ? String(message.app_id) : null,
+        });
+      }
+    }
+  } catch (e) {
+    console.error("parseFBEchoes error:", e);
+  }
+  return echoes;
 }
 
 /**
