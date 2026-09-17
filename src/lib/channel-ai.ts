@@ -35,6 +35,7 @@ import { callClaudeWithRetry, logClaudeUsage, trackClaudeUsage } from "@/lib/cla
 import { pickCacheStrategy } from "@/lib/cache-strategy";
 import { pickRelevantDocuments } from "@/lib/document-matcher";
 import { pickMainModel } from "@/lib/complexity-classifier";
+import { createTurnTracker } from "@/lib/ai-telemetry";
 // Anti-probe boundary — prepended to every WA/IG/FB user-bot system prompt
 // so it has the highest LLM attention weight.
 import { ANTI_PROBE_USER_BOT } from "@/lib/security-prompts";
@@ -675,6 +676,11 @@ export async function generateChannelAIResponse(
   userMessage: string,
   clientName?: string
 ): Promise<ChannelAIResponse> {
+  // Телеметрия оборота (Этап 1 research-плана). Заводится ДО try, чтобы
+  // латентность считалась от самого начала, а finish() в finally покрывал
+  // все 7 точек выхода — ручная расстановка однажды потеряет одну.
+  // Строка не пишется, если до вызова модели дело не дошло (см. finish()).
+  const turn = createTurnTracker({ businessId, channel, clientRef: clientId });
   try {
     console.log(`[Channel AI] START: business=${businessId}, channel=${channel}, clientId=${clientId}, name=${clientName}`);
     const [biz, conv] = await Promise.all([
@@ -682,6 +688,7 @@ export async function generateChannelAIResponse(
       getOrCreateChannelConv(businessId, channel, clientId, clientName),
     ]);
     console.log(`[Channel AI] Conv: id=${conv.id}, historyLen=${((conv.history as unknown[]) || []).length}`);
+    turn.setConversation(conv.id, clientId, biz?.dashboardMode === "sales");
 
     if (!biz) return { text: "Извините, произошла ошибка. Пожалуйста, свяжитесь с нами напрямую.", imageUrls: [] };
 
@@ -1029,6 +1036,8 @@ export async function generateChannelAIResponse(
     logClaudeUsage(`${channel}/main/${mainModel.complexity}`, response.usage, { biz: businessId, client: clientId, model: mainModel.model });
     // Main Sonnet-ответ — самый дорогой вызов оборота. Трекаем сразу.
     if (response.usage) trackClaudeUsage(businessId, response.usage);
+    turn.setModel(mainModel.model, mainModel.complexity ?? null);
+    turn.addUsage(response.usage);
 
     // Tool loop — process tool_use responses (max 5 iterations)
     let iterations = 0;
@@ -1042,12 +1051,16 @@ export async function generateChannelAIResponse(
 
     while (response.stop_reason === "tool_use" && iterations < maxIterations) {
       iterations++;
+      turn.addIteration();
 
       const toolUseBlocks = response.content.filter(
         (block) => block.type === "tool_use"
       );
       for (const b of toolUseBlocks) {
-        if (b.type === "tool_use") calledToolNames.push(b.name);
+        if (b.type === "tool_use") {
+          calledToolNames.push(b.name);
+          turn.addTool(b.name);
+        }
       }
 
       // Add assistant response to messages
@@ -1113,6 +1126,7 @@ export async function generateChannelAIResponse(
         // Каждая итерация — отдельный вызов Claude со своей ценой. Раньше
         // трекали только финальный response, теряли токены итераций tool-loop.
         if (response.usage) trackClaudeUsage(businessId, response.usage);
+        turn.addUsage(response.usage);
       } catch (apiError) {
         console.error("[Channel AI] API error after tool execution:", apiError);
         break;
@@ -1178,6 +1192,8 @@ export async function generateChannelAIResponse(
           client: clientId,
           orig_reason: reason,
         });
+        turn.markRecovery();
+        turn.addUsage(recovery.usage);
         replyText = collectText(recovery);
         if (replyText) {
           console.log(`[Channel AI] RECOVERY succeeded: "${replyText.slice(0, 80)}"`);
@@ -1317,6 +1333,9 @@ export async function generateChannelAIResponse(
       replyText = guardResult.overrideReply!;
       promiseIntercepted = true;
       guardForcesNotify = !!guardResult.forceNotifyManager;
+      // В телеметрию: 35 % эскалаций у OLLEE приходили именно отсюда —
+      // без этого поля долю перехватов видно только в логах Vercel.
+      turn.markSafetyNet("handoff_guard");
 
       // Персистим счётчик в extractedInfo для следующего turn'а
       prisma.channelConversation.update({
@@ -1569,12 +1588,20 @@ export async function generateChannelAIResponse(
       technical: { error: errMsg },
     });
 
+    // Клиент получил фолбэк вместо ответа — это надо видеть в статистике,
+    // иначе доля сбоев меряется только по логам Vercel.
+    turn.markEmptyResponse();
+
     // Specific message for Anthropic overload (529)
     if (errMsg.includes("overloaded") || errMsg.includes("529")) {
       return { text: "Извините, сервер AI временно перегружен. Пожалуйста, попробуйте через 1-2 минуты.", imageUrls: [] };
     }
 
     return { text: "Извините, произошла техническая ошибка. Пожалуйста, напишите нам позже.", imageUrls: [] };
+  } finally {
+    // Единственная точка записи телеметрии на все ветки выхода, включая
+    // исключения. finish() идемпотентен и сам решает, писать ли строку.
+    turn.finish();
   }
 }
 

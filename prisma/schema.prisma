@@ -2338,3 +2338,51 @@ model BusinessActivityLog {
   @@index([businessId, type, createdAt(sort: Desc)])
   @@index([businessId, severity, createdAt(sort: Desc)])
 }
+
+// ========================================
+// AI TELEMETRY — один оборот бота
+// ========================================
+
+/// Одна строка на оборот бота: входящее клиента → исходящее бота, включая
+/// весь tool-loop внутри. Заводится в Этапе 1 research-плана
+/// (RESEARCH_ORCHESTRATION_PLAN.md) — до неё было невозможно разложить расход
+/// и поведение по диалогу, модели или клиенту: trackClaudeUsage() пишет только
+/// кумулятивные счётчики на Business, а какая модель отвечала — видно лишь
+/// в эфемерных логах Vercel.
+///
+/// Пишется fire-and-forget: падение телеметрии не имеет права уронить ответ
+/// клиенту. Внешних ключей с каскадами нет намеренно — удаление бизнеса
+/// не должно тянуть за собой миллионы строк.
+///
+/// Фоновые вызовы (cache-warmer, суммаризация, cart-extractor) сюда НЕ пишутся:
+/// это не обороты диалога, они бы исказили метрики.
+model AiTurn {
+  id              String  @id @default(cuid())
+  businessId      String
+  channel         String // telegram | instagram | whatsapp | messenger | web
+  conversationKey String // Conversation.id или ChannelConversation.id
+  clientRef       String? // telegramId / ChannelClient.id — для сквозной аналитики
+
+  model      String // фактическая модель главного вызова
+  complexity String? // вердикт классификатора: simple | complex | null (гибрид выключен)
+  salesMode  Boolean @default(false)
+
+  tokensInput       Int      @default(0)
+  tokensOutput      Int      @default(0)
+  tokensCacheRead   Int      @default(0)
+  tokensCacheCreate Int      @default(0)
+  costUsd           Decimal? @db.Decimal(10, 6)
+
+  latencyMs      Int
+  iterations     Int      @default(0) // сколько кругов сделал tool-loop
+  toolsCalled    String[] @default([]) // имена вызванных инструментов
+  recoveryUsed   Boolean  @default(false)
+  safetyNetFired String? // null | notify_manager | phone_guard | handoff_guard
+  emptyResponse  Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([businessId, createdAt])
+  @@index([businessId, model])
+  @@index([conversationKey])
+}

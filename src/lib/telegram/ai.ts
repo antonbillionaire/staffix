@@ -16,6 +16,7 @@
  */
 
 import { callClaudeWithRetry, logClaudeUsage, trackClaudeUsage } from "@/lib/claude-retry";
+import { createTurnTracker } from "@/lib/ai-telemetry";
 import { pickCacheStrategy } from "@/lib/cache-strategy";
 import { prisma } from "@/lib/prisma";
 import {
@@ -66,6 +67,14 @@ export async function generateAIResponse(
     return { text: "Извините, сервис временно недоступен. Попробуйте позже.", imageUrls: [] };
   }
 
+  // Телеметрия оборота (Этап 1 research-плана). Зеркало channel-ai.ts:
+  // трекер до try, finish() в finally — в этой функции 11 точек выхода,
+  // ручная расстановка однажды потеряет одну.
+  const turn = createTurnTracker({
+    businessId,
+    channel: "telegram",
+    clientRef: telegramId.toString(),
+  });
   try {
     // 1. Загружаем контекст бизнеса
     console.log(`[Webhook] Building business context for ${businessId}...`);
@@ -168,6 +177,7 @@ export async function generateAIResponse(
 
     // 5. Получаем историю разговора
     const conversation = await getOrCreateConversation(businessId, telegramId, userName);
+    turn.setConversation(conversation.id, telegramId.toString(), salesMode);
 
     // Human takeover (4 сентября 2026, OLLEE-fb #13): менеджер отвечает
     // клиенту вручную через дашборд — бот молчит на входящие. Сохраняем
@@ -335,6 +345,8 @@ export async function generateAIResponse(
     // Main Sonnet-ответ. Раньше TG-бот вообще не трекал токены в БД
     // (только console.log). Теперь идёт в Business.tokensUsed*.
     if (response.usage) trackClaudeUsage(businessId, response.usage);
+    turn.setModel(mainModel.model, mainModel.complexity ?? null);
+    turn.addUsage(response.usage);
     console.log(`[Webhook] Claude response: stop_reason=${response.stop_reason}`);
 
     // 7. Цикл tool_use (до 5 итераций)
@@ -347,10 +359,14 @@ export async function generateAIResponse(
 
     while (response.stop_reason === "tool_use" && iterations < maxIterations) {
       iterations++;
+      turn.addIteration();
 
       const toolUseBlocks = response.content.filter((block) => block.type === "tool_use");
       for (const b of toolUseBlocks) {
-        if (b.type === "tool_use") calledToolNames.push(b.name);
+        if (b.type === "tool_use") {
+          calledToolNames.push(b.name);
+          turn.addTool(b.name);
+        }
       }
 
       recentMessages.push({
@@ -426,6 +442,7 @@ export async function generateAIResponse(
         logClaudeUsage("tg/tool-loop-haiku", response.usage, { biz: businessId, tg: telegramId, iter: iterations + 1 });
         // Каждая Haiku-итерация — отдельный billed вызов.
         if (response.usage) trackClaudeUsage(businessId, response.usage);
+        turn.addUsage(response.usage);
       } catch (apiError) {
         // Если API упал ПОСЛЕ успешного tool — собираем ответ из результатов
         console.error("[Webhook] API error after tool execution:", apiError);
@@ -479,6 +496,8 @@ export async function generateAIResponse(
           // tools намеренно опущены — форсируем текст
         });
         logClaudeUsage("tg/recovery", recovery.usage, { biz: businessId, tg: telegramId, orig_reason: reason });
+        turn.markRecovery();
+        turn.addUsage(recovery.usage);
         assistantMessage = collectText(recovery);
         if (assistantMessage) {
           console.log(`[Webhook] RECOVERY succeeded: "${assistantMessage.slice(0, 80)}"`);
@@ -569,6 +588,7 @@ export async function generateAIResponse(
       assistantMessage = guardResultTg.overrideReply!;
       promiseInterceptedTg = true;
       guardForcesNotifyTg = !!guardResultTg.forceNotifyManager;
+      turn.markSafetyNet("handoff_guard");
 
       // Персистим счётчик для следующего turn'а
       prisma.conversation.update({
@@ -741,6 +761,7 @@ export async function generateAIResponse(
     const errMsg = error instanceof Error ? error.message : String(error);
     const errStack = error instanceof Error ? error.stack : "";
     console.error(`[Webhook] generateAIResponse FAILED: ${errMsg}\n${errStack}`);
+    turn.markEmptyResponse();
 
     if (errMsg.includes("overloaded") || errMsg.includes("529")) {
       return {
@@ -753,5 +774,8 @@ export async function generateAIResponse(
       text: "Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте позже.",
       imageUrls: [],
     };
+  } finally {
+    // Единственная точка записи на все ветки выхода, включая исключения.
+    turn.finish();
   }
 }
