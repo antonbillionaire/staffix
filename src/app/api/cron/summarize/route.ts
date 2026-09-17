@@ -16,6 +16,7 @@ import {
   extractCustomFieldsFromConversation,
 } from "@/lib/ai-memory";
 import { checkCronAuth } from "@/lib/cron-auth";
+import { outcomeFromSilence } from "@/lib/conversation-outcome";
 
 // Максимум обработок за один запуск (чтобы не превысить timeout)
 const MAX_CONVERSATIONS = 10;
@@ -31,6 +32,7 @@ export async function GET(request: Request) {
       conversationsSummarized: 0,
       clientsUpdated: 0,
       customFieldsFilled: 0,
+      greyZoneClosed: 0,
       errors: [] as string[],
     };
 
@@ -178,6 +180,22 @@ export async function GET(request: Request) {
       results.errors.push(`Channel: ${channelErr}`);
     }
 
+    // 7. Серая зона: диалоги, где исход не определился фактом (Этап 2.3).
+    //
+    // Проверка 17 сентября 2026: 2473 диалога из 2554 короче 10 сообщений,
+    // а needsSummary ставится каждое 10-е — то есть 97 % диалогов до
+    // суммаризации не доходят и остаются без outcome навсегда.
+    //
+    // Сильные исходы (booked / ordered / lead_captured / escalated) ставятся
+    // по факту вызова инструмента прямо в обороте. Здесь закрываем остальное
+    // по времени и последнему говорящему — без единого вызова модели.
+    try {
+      results.greyZoneClosed = await closeGreyZoneOutcomes();
+    } catch (greyErr) {
+      console.error("Grey-zone outcome error:", greyErr);
+      results.errors.push(`GreyZone: ${greyErr}`);
+    }
+
     return NextResponse.json({
       success: true,
       ...results,
@@ -193,6 +211,85 @@ export async function GET(request: Request) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Проставляет исход диалогам, которые «затихли» и так и не получили его
+ * по факту вызова инструмента.
+ *
+ * Модель не вызывается: решение принимается по времени последней активности
+ * и по тому, кто говорил последним. Логика — в conversation-outcome.ts.
+ *
+ * Порог тишины — сутки. Короче ставить опасно: клиент, написавший утром
+ * и вернувшийся вечером, — не потеря.
+ */
+async function closeGreyZoneOutcomes(): Promise<number> {
+  const ABANDON_AFTER_MINUTES = 24 * 60;
+  const cutoff = new Date(Date.now() - ABANDON_AFTER_MINUTES * 60 * 1000);
+  const BATCH = 200;
+  let closed = 0;
+
+  // ─── Каналы (WA/IG/FB) ───────────────────────────────────────────────
+  const channelConvs = await prisma.channelConversation.findMany({
+    where: { outcome: null, updatedAt: { lt: cutoff } },
+    select: { id: true, history: true, updatedAt: true },
+    take: BATCH,
+  });
+
+  for (const conv of channelConvs) {
+    const history = (conv.history as Array<{ role: string; content: string }>) || [];
+    const last = history[history.length - 1];
+    const lastRole = last?.role === "assistant" ? "assistant" : last?.role === "user" ? "user" : null;
+    const minutes = (Date.now() - conv.updatedAt.getTime()) / 60000;
+
+    const outcome = outcomeFromSilence({
+      lastRole,
+      minutesSinceLastMessage: minutes,
+      abandonAfterMinutes: ABANDON_AFTER_MINUTES,
+    });
+    if (!outcome) continue;
+
+    await prisma.channelConversation
+      .update({ where: { id: conv.id }, data: { outcome } })
+      .then(() => {
+        closed++;
+      })
+      .catch(() => {});
+  }
+
+  // ─── Telegram ────────────────────────────────────────────────────────
+  const tgConvs = await prisma.conversation.findMany({
+    where: { outcome: null, updatedAt: { lt: cutoff } },
+    select: {
+      id: true,
+      updatedAt: true,
+      messages: { orderBy: { createdAt: "desc" }, take: 1, select: { role: true } },
+    },
+    take: BATCH,
+  });
+
+  for (const conv of tgConvs) {
+    const last = conv.messages[0];
+    const lastRole = last?.role === "assistant" ? "assistant" : last?.role === "user" ? "user" : null;
+    const minutes = (Date.now() - conv.updatedAt.getTime()) / 60000;
+
+    const outcome = outcomeFromSilence({
+      lastRole,
+      minutesSinceLastMessage: minutes,
+      abandonAfterMinutes: ABANDON_AFTER_MINUTES,
+    });
+    if (!outcome) continue;
+
+    await prisma.conversation
+      .update({ where: { id: conv.id }, data: { outcome } })
+      .then(() => {
+        closed++;
+      })
+      .catch(() => {});
+  }
+
+  if (closed > 0) console.log(`[summarize] grey-zone outcomes closed: ${closed}`);
+  return closed;
 }
 
 // POST тоже поддерживаем (для Vercel Cron)

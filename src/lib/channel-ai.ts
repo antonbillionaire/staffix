@@ -36,6 +36,7 @@ import { pickCacheStrategy } from "@/lib/cache-strategy";
 import { pickRelevantDocuments } from "@/lib/document-matcher";
 import { pickMainModel } from "@/lib/complexity-classifier";
 import { createTurnTracker } from "@/lib/ai-telemetry";
+import { outcomeFromTools, shouldUpgradeOutcome } from "@/lib/conversation-outcome";
 // Anti-probe boundary — prepended to every WA/IG/FB user-bot system prompt
 // so it has the highest LLM attention weight.
 import { ANTI_PROBE_USER_BOT } from "@/lib/security-prompts";
@@ -1498,6 +1499,21 @@ export async function generateChannelAIResponse(
     }
     const updatedHistory = historyEntries.slice(-40); // keep last 40 messages
 
+    // Исход по ФАКТУ вызванных инструментов (Этап 2 research-плана).
+    //
+    // Раньше outcome писала модель в суммаризации — на проде это дало
+    // 71 заполненную запись из 2554, и все со значением "answered".
+    // Заказ создан или нет, телефон получен или нет — это факт, спрашивать
+    // о нём модель незачем. Модели остаётся серая зона (см. conversation-outcome).
+    //
+    // Пишем синхронно здесь, а не в кроне: cron summarize берёт по 10 записей
+    // раз в два часа и при таком объёме диалогов очередь не разгребает.
+    const factOutcome = outcomeFromTools(calledToolNames, hasPhoneNowCh);
+    const outcomeUpdate =
+      factOutcome && shouldUpgradeOutcome(conv.outcome, factOutcome)
+        ? { outcome: factOutcome }
+        : {};
+
     try {
       await prisma.channelConversation.update({
         where: { id: conv.id },
@@ -1505,9 +1521,13 @@ export async function generateChannelAIResponse(
           history: updatedHistory,
           messageCount: { increment: 1 },
           clientName: clientName || conv.clientName,
+          ...outcomeUpdate,
         },
       });
-      console.log(`[Channel AI] SAVED: conv=${conv.id}, newHistoryLen=${updatedHistory.length}`);
+      console.log(
+        `[Channel AI] SAVED: conv=${conv.id}, newHistoryLen=${updatedHistory.length}` +
+          (factOutcome ? `, outcome=${factOutcome}` : "")
+      );
 
       // AI Learning: flag for summary every 10 messages
       if ((conv.messageCount + 1) % 10 === 0) {

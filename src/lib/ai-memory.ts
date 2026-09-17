@@ -5,6 +5,7 @@
 
 import { prisma } from "./prisma";
 import Anthropic from "@anthropic-ai/sdk";
+import { normalizeOutcome, shouldUpgradeOutcome } from "./conversation-outcome";
 
 // ========================================
 // HELPERS
@@ -836,15 +837,21 @@ export async function generateConversationSummary(
       messages: [
         {
           role: "user",
-          content: `Кратко опиши этот разговор в 1-2 предложениях. Укажи:
-- Что хотел клиент
-- Какой результат (записался/получил ответ/не решено)
-- Важные детали (если есть)
+          content: `Проанализируй разговор и верни JSON (без markdown):
+{
+  "summary": "краткое содержание в 1-2 предложениях",
+  "topic": "одно из: booking, inquiry, complaint, feedback, order, other",
+  "outcome": "одно из: answered, unresolved"
+}
+
+Про outcome: ставь "unresolved" только если бот НЕ смог помочь клиенту —
+не знал ответа, не нашёл товар, клиент остался без решения. Во всех
+остальных случаях "answered".
 
 Разговор:
 ${messagesText}
 
-Краткое содержание:`,
+JSON:`,
         },
       ],
     });
@@ -853,19 +860,46 @@ ${messagesText}
       trackClaudeUsage(conversation.businessId, response.usage);
     }
 
-    const summary =
-      response.content[0].type === "text" ? response.content[0].text : null;
+    const raw = response.content[0].type === "text" ? response.content[0].text : null;
+    if (!raw) return null;
 
-    if (summary) {
-      // Сохраняем summary
-      await prisma.conversation.update({
-        where: { id: conversationId },
-        data: {
-          summary,
-          needsSummary: false,
-        },
-      });
+    // Разбор JSON с фолбэком (Этап 2.1 research-плана): до этого TG-суммаризация
+    // писала только summary, поэтому у телеграм-диалогов не было ни topic,
+    // ни outcome — метрика цели по ним не считалась вообще.
+    // Формат и защита от мусора — как в channel-memory.ts.
+    let parsed: { summary: string; topic?: string; outcome?: string };
+    try {
+      const jsonText = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+      parsed = JSON.parse(jsonText);
+    } catch {
+      // Модель ответила прозой вместо JSON — берём текст как summary.
+      parsed = { summary: raw.slice(0, 500), topic: "other", outcome: "answered" };
     }
+
+    const summary = parsed.summary || raw.slice(0, 500);
+
+    // outcome из суммаризации — только для серой зоны. Сильные исходы
+    // (booked / ordered / lead_captured / escalated) ставятся по факту вызова
+    // инструмента в конце оборота, и перетирать их мнением модели нельзя.
+    const modelOutcome = normalizeOutcome(parsed.outcome);
+    const existing = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: { outcome: true },
+    });
+    const outcomeUpdate =
+      modelOutcome && shouldUpgradeOutcome(existing?.outcome, modelOutcome)
+        ? { outcome: modelOutcome }
+        : {};
+
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: {
+        summary,
+        topic: parsed.topic || "other",
+        needsSummary: false,
+        ...outcomeUpdate,
+      },
+    });
 
     return summary;
   } catch (error) {

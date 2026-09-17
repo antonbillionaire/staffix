@@ -25,6 +25,8 @@ export async function getOrCreateConversation(
   extractedInfo: Record<string, unknown> | null;
   /** Дата истечения human-takeover окна (см. lib/human-takeover.ts). null = бот работает как обычно. */
   humanTakeoverUntil: Date | null;
+  /** Текущий исход диалога — нужен чтобы не затирать сильный исход слабым (Этап 2). */
+  outcome: string | null;
 }> {
   try {
     // Шаг 4 плана оптимизации себестоимости (21 июля 2026):
@@ -96,6 +98,7 @@ export async function getOrCreateConversation(
         contextRefreshSoftWarning: softWarning,
         extractedInfo: (conversation.extractedInfo as Record<string, unknown> | null) || null,
         humanTakeoverUntil: conversation.humanTakeoverUntil ?? null,
+        outcome: conversation.outcome ?? null,
       };
     }
 
@@ -117,7 +120,7 @@ export async function getOrCreateConversation(
       })
       .catch((e) => console.error("[Webhook] totalConversations increment error:", e));
 
-    return { id: conversation.id, messages: [], contextRefreshSoftWarning: false, extractedInfo: null, humanTakeoverUntil: null };
+    return { id: conversation.id, messages: [], contextRefreshSoftWarning: false, extractedInfo: null, humanTakeoverUntil: null, outcome: null };
   } catch (error) {
     console.error("Error getting conversation:", error);
     throw error;

@@ -17,6 +17,7 @@
 
 import { callClaudeWithRetry, logClaudeUsage, trackClaudeUsage } from "@/lib/claude-retry";
 import { createTurnTracker } from "@/lib/ai-telemetry";
+import { outcomeFromTools, shouldUpgradeOutcome } from "@/lib/conversation-outcome";
 import { pickCacheStrategy } from "@/lib/cache-strategy";
 import { prisma } from "@/lib/prisma";
 import {
@@ -691,6 +692,18 @@ export async function generateAIResponse(
 
     // 10. Счётчик сообщений в разговоре
     await updateConversationMessageCount(conversation.id);
+
+    // Исход по ФАКТУ вызванных инструментов (Этап 2 research-плана).
+    // Зеркало channel-ai.ts — подробности там же. Короткая версия: заказ
+    // создан или нет, телефон получен или нет — это факт, спрашивать о нём
+    // модель незачем, она отвечает "answered" всегда.
+    const factOutcomeTg = outcomeFromTools(calledToolNames, hasPhoneNowTg);
+    if (factOutcomeTg && shouldUpgradeOutcome(conversation.outcome, factOutcomeTg)) {
+      prisma.conversation
+        .update({ where: { id: conversation.id }, data: { outcome: factOutcomeTg } })
+        .catch((e) => console.error("[Webhook] outcome update failed:", e));
+      console.log(`[Webhook] outcome=${factOutcomeTg} conv=${conversation.id}`);
+    }
 
     // Cart memory (6 августа 2026, OLLEE conv-9 fix): async обновление
     // extractedInfo.cart через Haiku-экстрактор. Не блокирует ответ клиенту
