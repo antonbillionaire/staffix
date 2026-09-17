@@ -37,6 +37,7 @@ import { pickRelevantDocuments } from "@/lib/document-matcher";
 import { pickMainModel } from "@/lib/complexity-classifier";
 import { createTurnTracker } from "@/lib/ai-telemetry";
 import { prefetchCatalogBlock } from "@/lib/catalog-prefetch";
+import { shouldSendAutoEscalation } from "@/lib/escalation-throttle";
 import { outcomeFromTools, shouldUpgradeOutcome } from "@/lib/conversation-outcome";
 // Anti-probe boundary — prepended to every WA/IG/FB user-bot system prompt
 // so it has the highest LLM attention weight.
@@ -1408,8 +1409,45 @@ export async function generateChannelAIResponse(
       ))
     );
 
-    if (shouldNotifyCh) {
+    // Ограничитель частоты (17 сент 2026): без него повторяющееся обещание
+    // бота даёт владельцу веер одинаковых уведомлений об одном клиенте.
+    // Модель-инициированный notify_manager сюда не попадает — глушим только
+    // авто-вызовы. См. escalation-throttle.ts.
+    const throttleState = {
+      lastAutoNotifyAt: typeof prevExtracted.lastAutoNotifyAt === "string" ? prevExtracted.lastAutoNotifyAt : null,
+      lastAutoNotifyPhone: typeof prevExtracted.lastAutoNotifyPhone === "string" ? prevExtracted.lastAutoNotifyPhone : null,
+    };
+    const throttle = shouldSendAutoEscalation({
+      trigger: newContactProvidedCh ? "new-contact" : "handoff-promise",
+      phone: extractedPhoneCh || channelClientPhoneOnRecord,
+      state: throttleState,
+      forced: guardForcesNotify,
+    });
+    if (shouldNotifyCh && !throttle.send) {
+      console.log(
+        `[Channel AI] SAFETY NET throttled (${throttle.reason}): business=${businessId} channel=${channel} conv=${conv.id}`
+      );
+    }
+
+    if (shouldNotifyCh && throttle.send) {
       const trigger = newContactProvidedCh ? "new-contact" : "handoff-promise";
+      // Отметку ставим ДО отправки: если уведомление упадёт, повтор через
+      // минуту всё равно нежелателен — окно всего 30 минут.
+      //
+      // guardHits переносим сюда же: guard пишет extractedInfo своим
+      // fire-and-forget запросом выше, и обе записи раскрывают prevExtracted.
+      // Без этой строки та из них, что долетит второй, вернула бы счётчик
+      // guard'а к прежнему значению.
+      prisma.channelConversation.update({
+        where: { id: conv.id },
+        data: {
+          extractedInfo: {
+            ...prevExtracted,
+            ...(promiseIntercepted ? { guardHits: guardResult.newGuardHits } : {}),
+            ...throttle.nextState,
+          },
+        },
+      }).catch((e) => console.error("[Channel AI] throttle state persist failed:", e));
 
       // Данные телефона взяли выше (channelClientPhoneOnRecord + extractedPhoneCh
       // + hasPhoneNowCh) — не дублируем запрос. После добавления HARD-CODE GUARD

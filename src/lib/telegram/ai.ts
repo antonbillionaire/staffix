@@ -36,6 +36,7 @@ import { salesToolDefinitions, executeSalesTool, notifyManagerByTelegram } from 
 const SALES_TOOL_NAME_SET = new Set(salesToolDefinitions.map((t) => t.name));
 import { buildSalesSystemPrompt, isSalesMode } from "@/lib/sales-prompt";
 import { prefetchCatalogBlock } from "@/lib/catalog-prefetch";
+import { shouldSendAutoEscalation } from "@/lib/escalation-throttle";
 import { botPromisedHandoffRegex } from "@/lib/handoff-detector";
 import { detectPhone, type PhoneCountry } from "@/lib/phone-parser";
 import { evaluateHandoffGuard } from "@/lib/handoff-guard";
@@ -645,8 +646,39 @@ export async function generateAIResponse(
       ))
     );
 
-    if (shouldNotify) {
+    // Ограничитель частоты авто-эскалаций — зеркало channel-ai.ts,
+    // подробности там же и в escalation-throttle.ts. Коротко: повторяющееся
+    // обещание бота не должно давать владельцу веер одинаковых уведомлений.
+    const throttleStateTg = {
+      lastAutoNotifyAt: typeof prevExtractedTg.lastAutoNotifyAt === "string" ? prevExtractedTg.lastAutoNotifyAt : null,
+      lastAutoNotifyPhone: typeof prevExtractedTg.lastAutoNotifyPhone === "string" ? prevExtractedTg.lastAutoNotifyPhone : null,
+    };
+    const throttleTg = shouldSendAutoEscalation({
+      trigger: newContactProvided ? "new-contact" : "handoff-promise",
+      phone: extractedPhoneEarly || clientPhoneOnRecord,
+      state: throttleStateTg,
+      forced: guardForcesNotifyTg,
+    });
+    if (shouldNotify && !throttleTg.send) {
+      console.log(
+        `[Webhook] SAFETY NET throttled (${throttleTg.reason}): business=${businessId} conv=${conversation.id}`
+      );
+    }
+
+    if (shouldNotify && throttleTg.send) {
       const trigger = newContactProvided ? "new-contact" : "handoff-promise";
+      // guardHits переносим сюда же — обе fire-and-forget записи раскрывают
+      // prevExtractedTg, и без этого вторая вернула бы счётчик к прежнему.
+      prisma.conversation.update({
+        where: { id: conversation.id },
+        data: {
+          extractedInfo: {
+            ...prevExtractedTg,
+            ...(promiseInterceptedTg ? { guardHits: guardResultTg.newGuardHits } : {}),
+            ...throttleTg.nextState,
+          },
+        },
+      }).catch((e) => console.error("[Webhook] throttle state persist failed:", e));
 
       // Телефон уже подтянули выше (clientPhoneOnRecord + hasPhoneNowTg).
       // После добавления HARD-CODE GUARD ветка handoff-promise без телефона
