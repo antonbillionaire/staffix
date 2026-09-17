@@ -151,11 +151,11 @@ model Business {
   clickMerchantId String? // Click Merchant ID
 
   // WhatsApp Business API (прямое подключение от Meta)
-  waPhoneNumberId    String?   // Meta Phone Number ID
-  waAccessToken      String?   // Meta User/System Access Token
-  waTokenExpiresAt   DateTime? // Когда истекает waAccessToken (~60 дней). Refresh cron продлевает.
-  waVerifyToken      String?   // Random secret для верификации webhook
-  waActive           Boolean   @default(false)
+  waPhoneNumberId  String? // Meta Phone Number ID
+  waAccessToken    String? // Meta User/System Access Token
+  waTokenExpiresAt DateTime? // Когда истекает waAccessToken (~60 дней). Refresh cron продлевает.
+  waVerifyToken    String? // Random secret для верификации webhook
+  waActive         Boolean   @default(false)
 
   // Facebook Messenger (прямое подключение страницы)
   fbPageId          String? // Facebook Page ID
@@ -201,10 +201,10 @@ model Business {
   // себестоимости) — без них per-client себестоимость считалась только по
   // нижней границе, кэш был "невидимой" статьёй расходов. Теперь
   // client-cost-report.mjs может считать полную цену без вилки Sonnet/Haiku.
-  tokensUsedInput       Int @default(0)
-  tokensUsedOutput      Int @default(0)
-  tokensCacheRead       Int @default(0) // cache_read_input_tokens (дешёвые, $0.30/M на Sonnet 5)
-  tokensCacheCreate     Int @default(0) // cache_creation_input_tokens ($3.75-6/M — самая дорогая статья)
+  tokensUsedInput   Int @default(0)
+  tokensUsedOutput  Int @default(0)
+  tokensCacheRead   Int @default(0) // cache_read_input_tokens (дешёвые, $0.30/M на Sonnet 5)
+  tokensCacheCreate Int @default(0) // cache_creation_input_tokens ($3.75-6/M — самая дорогая статья)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -265,9 +265,9 @@ model Business {
   // AI Learning
   botCorrections   BotCorrection[]
   aiInsightRecords AiInsight[]
-  metaInsights     MetaInsight[]   @relation("MetaInsightBusiness")
+  metaInsights     MetaInsight[]       @relation("MetaInsightBusiness")
   adInsights       AdCampaignInsight[] @relation("AdInsightBusiness")
-  loyaltyLedger    LoyaltyLedger[] @relation("LoyaltyLedgerBusiness")
+  loyaltyLedger    LoyaltyLedger[]     @relation("LoyaltyLedgerBusiness")
 
   // Программы лояльности (может быть несколько типов)
   loyaltyPrograms LoyaltyProgram[]
@@ -442,12 +442,12 @@ model Staff {
   // (записи, заказы, обычные уведомления) работают как раньше.
   routingDescription String? @db.Text
 
-  bookings            Booking[]
-  orders              Order[]
-  schedule            StaffSchedule[]
-  timeOffs            StaffTimeOff[]
+  bookings      Booking[]
+  orders        Order[]
+  schedule      StaffSchedule[]
+  timeOffs      StaffTimeOff[]
   // Задачи назначенные на сотрудника (Task.assignedStaffId → SetNull при удалении)
-  assignedTasks       Task[]               @relation("TaskAssignedStaff")
+  assignedTasks Task[]          @relation("TaskAssignedStaff")
 
   // Подключения бота к личному Telegram сотрудника (Telegram Business).
   // У одного сотрудника максимум одно активное подключение — TG всё равно
@@ -562,8 +562,8 @@ model Conversation {
   // Silent-follow-up nudge (28 июля 2026): cron client-bot-follow-up шлёт
   // ОДИН мягкий follow-up если бот задал вопрос, а клиент не ответил в
   // течение ~45 минут. nudgeCount ≥ 1 → больше не тревожим этот диалог.
-  nudgeCount   Int       @default(0)
-  nudgeSentAt  DateTime?
+  nudgeCount  Int       @default(0)
+  nudgeSentAt DateTime?
 
   // Прочитано/непрочитано на странице /dashboard/messages (11 сент 2026, Anton):
   // менеджер открыл диалог → выставляется now(). Логика unread:
@@ -571,6 +571,19 @@ model Conversation {
   // При миграции для существующих conversation значение = updatedAt чтобы
   // не завалить менеджера пометками на весь исторический архив.
   lastReadByOwnerAt DateTime?
+
+  // Стадия воронки как СОСТОЯНИЕ (Этап 4, 17 сент 2026). Раньше модель
+  // определяла её заново на каждом обороте и откатывалась назад от одного
+  // неудачного сообщения клиента. Нумерация 1..7 — ровно те стадии, что
+  // описаны в prompts/funnel-rules.ts, новых не заводим.
+  funnelStage          Int       @default(1)
+  funnelStageUpdatedAt DateTime?
+
+  // Что уже выяснено у клиента: чего хочет, для кого, бюджет, телефон,
+  // какие возражения были, что уже предлагали. Лекарство от «бот
+  // переспрашивает то, что клиент уже сказал». Форма — FunnelKnownFacts
+  // в lib/funnel-state.ts.
+  knownFacts Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1297,7 +1310,7 @@ model ChannelClient {
 
   // M19: бот больше не отвечает этому клиенту (owner-driven mute).
   // Аналог Client.botMuted для канальных клиентов, у которых нет TG-идентичности.
-  botMuted           Boolean   @default(false)
+  botMuted Boolean @default(false)
 
   businessId String
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -1617,11 +1630,16 @@ model ChannelConversation {
   humanTakeoverUntil DateTime?
 
   // Silent-follow-up nudge (28 июля 2026) — см. Conversation.nudgeCount.
-  nudgeCount   Int       @default(0)
-  nudgeSentAt  DateTime?
+  nudgeCount  Int       @default(0)
+  nudgeSentAt DateTime?
 
   // Прочитано/непрочитано (11 сент 2026) — см. Conversation.lastReadByOwnerAt.
   lastReadByOwnerAt DateTime?
+
+  // Стадия воронки и известные факты — см. Conversation.funnelStage.
+  funnelStage          Int       @default(1)
+  funnelStageUpdatedAt DateTime?
+  knownFacts           Json?
 
   businessId String
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
