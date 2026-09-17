@@ -21,6 +21,7 @@ import {
   Globe,
   Send,
   BarChart3,
+  Target,
   ListTodo,
   AlertCircle,
   Pause,
@@ -70,6 +71,15 @@ export default function DashboardPage() {
   const [statsLoading, setStatsLoading] = useState(false);
   const [bizData, setBizData] = useState<BizData | null>(null);
   const [statsData, setStatsData] = useState<StatsData | null>(null);
+  /** Результаты диалогов — метрика цели из research-плана (Этап 2.5). */
+  const [results, setResults] = useState<{
+    total: number;
+    success: number;
+    lost: number;
+    inProgress: number;
+    partnership: number;
+    successRate: number | null;
+  } | null>(null);
   const [period, setPeriod] = useState<Period>("week");
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
   const [tasks, setTasks] = useState<Array<{
@@ -193,6 +203,23 @@ export default function DashboardPage() {
       finally { setStatsLoading(false); }
     };
     fetchStats();
+  }, [period]);
+
+  // Результаты диалогов — метрика цели (Этап 2.5 research-плана).
+  // Отдельный запрос, а не поле в /stats: считается по другой логике
+  // (исключает партнёрку) и не должен задерживать основные цифры.
+  useEffect(() => {
+    const fetchResults = async () => {
+      try {
+        // «week» на свитчере — это 7 дней, у метрики исходов свои периоды
+        const p = period === "day" ? "day" : period === "week" ? "week" : "month";
+        const res = await fetch(`/api/dashboard/conversation-results?period=${p}`);
+        if (res.ok) setResults(await res.json());
+      } catch (err) {
+        console.error("Failed to fetch conversation results:", err);
+      }
+    };
+    fetchResults();
   }, [period]);
 
   if (loading) {
@@ -459,6 +486,60 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {/* ── РЕЗУЛЬТАТЫ ДИАЛОГОВ ──
+          Метрика цели из research-плана: сколько обращений довели до записи,
+          заказа или контакта. Партнёрские диалоги (блогеры, бартер) в расчёт
+          не входят — они не покупатели.
+          Показываем только когда есть завершённые диалоги: пустая карточка
+          с нулями на новом аккаунте выглядит как поломка. */}
+      {results && results.success + results.lost > 0 && (
+        <div>
+          <h2 className={`text-sm font-semibold uppercase tracking-wider ${textMuted} mb-3`}>
+            <Target className="inline h-4 w-4 mr-1" />
+            Результаты диалогов
+          </h2>
+          <div className={`${cardBg} border ${borderColor} rounded-xl p-5`}>
+            <div className="flex flex-wrap items-center gap-6">
+              {/* Главная цифра */}
+              <div>
+                <p className={`text-3xl font-bold ${textPrimary}`}>
+                  {results.successRate !== null ? `${results.successRate}%` : "—"}
+                </p>
+                <p className={`text-xs ${textMuted} mt-1`}>довели до результата</p>
+              </div>
+
+              {/* Разбивка */}
+              <div className="flex flex-wrap gap-5">
+                <div>
+                  <p className="text-xl font-semibold text-green-500">{results.success}</p>
+                  <p className={`text-xs ${textMuted}`}>записались, заказали<br />или оставили контакт</p>
+                </div>
+                <div>
+                  <p className="text-xl font-semibold text-amber-500">{results.lost}</p>
+                  <p className={`text-xs ${textMuted}`}>ушли<br />без результата</p>
+                </div>
+                {results.inProgress > 0 && (
+                  <div>
+                    <p className={`text-xl font-semibold ${textSecondary}`}>{results.inProgress}</p>
+                    <p className={`text-xs ${textMuted}`}>ещё в работе</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Партнёрские обращения считаем отдельно — владельцу полезно
+                видеть, что часть входящих это не покупатели. */}
+            {results.partnership > 0 && (
+              <p className={`text-xs ${textMuted} mt-4 pt-4 border-t ${borderColor}`}>
+                Ещё {results.partnership}{" "}
+                {results.partnership === 1 ? "обращение" : "обращений"} — предложения
+                о сотрудничестве от блогеров. В расчёт не входят.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── MY TASKS ── */}
       <div className={`${cardBg} border ${borderColor} rounded-xl p-5`}>
