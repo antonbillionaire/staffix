@@ -1251,6 +1251,33 @@ export async function generateChannelAIResponse(
         where: { id: channelClientRowId },
         data: { phone: extractedPhoneCh },
       }).catch((e) => console.error("[Channel AI] Failed to persist client phone:", e));
+
+      // Дублируем в единый Client (17 сент 2026, Anton — Этап 0 research-плана).
+      //
+      // ChannelClient — legacy-таблица канала; карточка клиента в дашборде
+      // (/dashboard/customers → /api/customers) читает Client. До этого фикса
+      // телефон оседал только в ChannelClient: за 30 дней бот собрал 60 номеров,
+      // а в Client их было 13 за всё время — менеджер открывал карточку и не
+      // видел контакта, хотя клиент его оставил.
+      //
+      // Ищем по channel-id, а не по phone: запись Client уже создана раньше
+      // в этом же обороте через findOrCreateClientForChannel.
+      const clientPhoneField: Record<string, "whatsappId" | "instagramId" | "fbPsid" | null> = {
+        whatsapp: "whatsappId",
+        instagram: "instagramId",
+        facebook: "fbPsid",
+        messenger: "fbPsid",
+        web: null,
+      };
+      const idField = clientPhoneField[channel];
+      if (idField) {
+        prisma.client
+          .updateMany({
+            where: { businessId, [idField]: clientId, phone: null },
+            data: { phone: extractedPhoneCh },
+          })
+          .catch((e) => console.error("[Channel AI] Failed to sync phone to Client:", e));
+      }
       // Обновляем локальную переменную — hard-code guard ниже должен видеть
       // что у нас теперь есть телефон, чтобы не перехватывать answer.
       channelClientPhoneOnRecord = extractedPhoneCh;

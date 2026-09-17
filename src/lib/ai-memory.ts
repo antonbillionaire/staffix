@@ -657,6 +657,17 @@ ${toneMap[business.aiTone || "friendly"] || toneMap.friendly}
       variable += `\n- Имя: ${client.name}`;
     }
 
+    // Телефон в промпт (17 сент 2026, Anton — Этап 0 research-плана).
+    // Симметрично channel-memory.ts:buildClientContextBlock — телефон грузился
+    // в ClientContext, но в текст промпта не выводился, из-за чего модель
+    // считала его отсутствующим и не вызывала create_booking/create_order.
+    // Правило владельца: телефон обязателен, полные данные собираются всегда.
+    if (client.phone) {
+      variable += `\n- Телефон: ${client.phone} (УЖЕ ПОЛУЧЕН — не переспрашивай, используй при записи/заказе)`;
+    } else {
+      variable += `\n- Телефон: НЕ ПОЛУЧЕН — обязательно попроси перед записью/заказом`;
+    }
+
     if (client.totalVisits > 0) {
       variable += `\n- Был у нас: ${client.totalVisits} раз(а)`;
     }
