@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isTeachableInsight } from "@/lib/insight-types";
 import { prisma } from "@/lib/prisma";
 import { markBusinessConversationsForRefresh } from "@/lib/knowledge-refresh";
 import { getCurrentBusinessId } from "@/lib/auth-helpers";
@@ -104,9 +105,18 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ insight });
     }
 
-    // accepted — для faq_suggestion создаём FAQ
+    // accepted — создаём FAQ из инсайта.
+    //
+    // 17 сентября 2026: раньше FAQ создавался ТОЛЬКО из `faq_suggestion`. У
+    // OLLEE все шесть инсайтов — `escalation_pattern` («бот часто передаёт
+    // менеджеру: какова цена товара», «какие варианты оплаты»), и владелец
+    // видел их с одной кнопкой «не актуально». Отсюда 3 коррекции и 0 FAQ на
+    // всю базу: научить бота было нечем.
+    //
+    // Все три типа ниже означают одно и то же — бот не смог ответить, и у
+    // инсайта есть `data.question`, на который владелец может дать ответ.
     let faqId: string | null = null;
-    if (existing.type === "faq_suggestion") {
+    if (isTeachableInsight(existing.type)) {
       // Берём данные либо из формы (приоритет), либо из data самого инсайта
       const insightData = (existing.data as { question?: string; answer?: string } | null) || {};
       const finalQuestion = (question ?? insightData.question ?? "").trim();

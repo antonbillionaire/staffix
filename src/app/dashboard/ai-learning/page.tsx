@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { isTeachableInsight } from "@/lib/insight-types";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
@@ -380,7 +381,12 @@ export default function AiLearningPage() {
               <div className="divide-y divide-white/5">
                 {insights.map((insight) => {
                   const editing = editingInsights[insight.id];
-                  const isFaqType = insight.type === "faq_suggestion";
+                  // Инсайт, из которого можно сделать FAQ: у всех трёх типов
+                  // есть data.question, и все три означают «бот не смог
+                  // ответить». Раньше кнопка была только у faq_suggestion —
+                  // у OLLEE все шесть инсайтов типа escalation_pattern, и
+                  // владелец мог только отклонить их, но не научить бота.
+                  const isFaqType = isTeachableInsight(insight.type);
                   const examples = insight.data?.examples || [];
                   return (
                     <div
