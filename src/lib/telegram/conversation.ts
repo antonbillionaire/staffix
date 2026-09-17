@@ -27,6 +27,12 @@ export async function getOrCreateConversation(
   humanTakeoverUntil: Date | null;
   /** Текущий исход диалога — нужен чтобы не затирать сильный исход слабым (Этап 2). */
   outcome: string | null;
+  /** Стадия воронки 1..7 как состояние, а не догадка модели (Этап 4). */
+  funnelStage: number;
+  /** Что уже выяснено о клиенте + служебный счётчик оборотов на стадии (Этап 4). */
+  knownFacts: unknown;
+  /** null = состояние ни разу не записывалось, стадию надо оценить (Этап 4). */
+  funnelStageUpdatedAt: Date | null;
 }> {
   try {
     // Шаг 4 плана оптимизации себестоимости (21 июля 2026):
@@ -99,6 +105,9 @@ export async function getOrCreateConversation(
         extractedInfo: (conversation.extractedInfo as Record<string, unknown> | null) || null,
         humanTakeoverUntil: conversation.humanTakeoverUntil ?? null,
         outcome: conversation.outcome ?? null,
+        funnelStage: conversation.funnelStage ?? 1,
+        knownFacts: conversation.knownFacts ?? null,
+        funnelStageUpdatedAt: conversation.funnelStageUpdatedAt ?? null,
       };
     }
 
@@ -120,7 +129,8 @@ export async function getOrCreateConversation(
       })
       .catch((e) => console.error("[Webhook] totalConversations increment error:", e));
 
-    return { id: conversation.id, messages: [], contextRefreshSoftWarning: false, extractedInfo: null, humanTakeoverUntil: null, outcome: null };
+    // Новый диалог: стадия 1 (приветствие), фактов ещё нет.
+    return { id: conversation.id, messages: [], contextRefreshSoftWarning: false, extractedInfo: null, humanTakeoverUntil: null, outcome: null, funnelStage: 1, knownFacts: null, funnelStageUpdatedAt: null };
   } catch (error) {
     console.error("Error getting conversation:", error);
     throw error;

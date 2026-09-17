@@ -25,6 +25,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { callClaudeWithRetry, logClaudeUsage, trackClaudeUsage } from "@/lib/claude-retry";
 
+import type { FunnelKnownFacts } from "@/lib/funnel-state";
+
 export interface CartItem {
   name: string;
   price: number;
@@ -60,6 +62,19 @@ export interface CartSnapshot {
   updatedAt: string;
 }
 
+/**
+ * Что экстрактор достаёт за один вызов Haiku (Этап 4, 17 сент 2026).
+ *
+ * Факты диалога извлекаются ТЕМ ЖЕ вызовом, что и корзина, а не отдельным:
+ * модель и так читает эти шесть сообщений, и платить за второй проход по ним
+ * незачем. `offered` в facts не запрашиваем — это те же discussedProducts,
+ * спрашивать одно и то же дважды значит получить два расходящихся ответа.
+ */
+export interface CartExtraction {
+  cart: CartSnapshot;
+  facts: Partial<FunnelKnownFacts>;
+}
+
 export const EMPTY_CART: CartSnapshot = {
   items: [],
   total: 0,
@@ -92,13 +107,21 @@ const EXTRACTOR_SYSTEM = `Ты — парсер состояния диалог�
 - Максимум 30 позиций.
 - Если бот в этом фрагменте ничего конкретного не называл — верни пустой массив [].
 
+Правила по facts (что выяснено о клиенте):
+- intent — чего клиент хочет, его словами, коротко («крем от акне», «подарок маме»). null если не понятно.
+- forWhom — для кого покупает («себе», «в подарок», «дочери»). null если не прозвучало.
+- budget — ценовые ожидания если клиент их назвал («до 200 000», «подешевле»). null если не прозвучало.
+- objections — что клиент возражал: «дорого», «подумаю», «нашёл дешевле», «не уверен что подойдёт». Пустой массив если возражений не было.
+- Ничего не додумывай. Не прозвучало — null или пустой массив. Пустое значение НЕ стирает то, что выяснили раньше.
+
 Верни СТРОГО JSON без markdown/пояснений:
 {
   "items": [{"name": "название", "price": число, "quantity": число, "currency": "сум"}],
   "total": число_сумма,
   "currency": "сум",
   "status": "browsing" | "assembling" | "confirmed" | "ordered",
-  "discussedProducts": ["Название 1", "Название 2"]
+  "discussedProducts": ["Название 1", "Название 2"],
+  "facts": {"intent": "строка или null", "forWhom": "строка или null", "budget": "строка или null", "objections": ["возражение"]}
 }`;
 
 /**
@@ -110,7 +133,7 @@ export async function extractCartFromMessages(
   messages: HistoryMessage[],
   businessId: string,
   previousDiscussed: string[] = []
-): Promise<CartSnapshot | null> {
+): Promise<CartExtraction | null> {
   if (messages.length < 2) return null;
 
   // Берём последние 6 сообщений — этого достаточно для актуального состояния,
@@ -143,7 +166,12 @@ export async function extractCartFromMessages(
     const parsed = JSON.parse(jsonText);
     // previousDiscussed передаётся чтобы за длинный диалог не потерять товары
     // упомянутые в давних turn'ах (окно Haiku всего 6 сообщений).
-    return normalizeCartSnapshot(parsed, previousDiscussed);
+    const cart = normalizeCartSnapshot(parsed, previousDiscussed);
+    // Корзина не разобралась — возвращаем null, как и раньше: caller оставит
+    // прежнее состояние. Факты без корзины отдавать не начинаем, чтобы у
+    // вызывающего кода остался ровно один признак «извлечение не удалось».
+    if (!cart) return null;
+    return { cart, facts: normalizeExtractedFacts(parsed?.facts, cart) };
   } catch (e) {
     // Fallback: не портим существующую корзину, просто возвращаем null.
     // Caller сохранит previous state как есть.
@@ -312,4 +340,40 @@ ${list}
   }
 
   return parts.join("\n\n");
+}
+
+/**
+ * Санитизация блока `facts` из ответа Haiku.
+ *
+ * `offered` берём из discussedProducts той же выдачи, а не отдельным полем:
+ * это один и тот же список, и два независимых ответа на один вопрос
+ * гарантированно начали бы расходиться.
+ *
+ * Значения не выдумываем: чего нет — того нет. Слияние с уже известным делает
+ * mergeKnownFacts, и там пустое значение НЕ затирает выясненное раньше.
+ */
+export function normalizeExtractedFacts(
+  raw: unknown,
+  cart: CartSnapshot
+): Partial<FunnelKnownFacts> {
+  const r =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  const text = (v: unknown): string | null => {
+    if (typeof v !== "string") return null;
+    const t = v.trim();
+    // Haiku иногда пишет строку "null" вместо null
+    if (!t || t.toLowerCase() === "null") return null;
+    return t.slice(0, 200);
+  };
+  return {
+    intent: text(r.intent),
+    forWhom: text(r.forWhom),
+    budget: text(r.budget),
+    objections: Array.isArray(r.objections)
+      ? r.objections.map(text).filter((x): x is string => !!x)
+      : [],
+    offered: cart.discussedProducts,
+  };
 }

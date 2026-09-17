@@ -1,9 +1,9 @@
 {
-  "savedAt": "2026-09-17T05:40:09.851Z",
+  "savedAt": "2026-09-17T06:03:50.136Z",
   "model": "claude-sonnet-5",
-  "passed": 16,
-  "total": 16,
-  "avgJudge": "1.69",
+  "passed": 19,
+  "total": 19,
+  "avgJudge": "1.63",
   "cases": [
     {
       "id": "order-all-data-present",
@@ -13,7 +13,7 @@
     {
       "id": "order-collects-missing-data",
       "passed": true,
-      "judgeScore": 2
+      "judgeScore": 1
     },
     {
       "id": "order-ready-no-phone",
@@ -38,12 +38,12 @@
     {
       "id": "silence-after-offer",
       "passed": true,
-      "judgeScore": 1
+      "judgeScore": 2
     },
     {
       "id": "already-discussed-product",
       "passed": true,
-      "judgeScore": 2
+      "judgeScore": 1
     },
     {
       "id": "uzbek-language",
@@ -73,7 +73,7 @@
     {
       "id": "prefetch-no-redundant-search",
       "passed": true,
-      "judgeScore": 2
+      "judgeScore": 1
     },
     {
       "id": "uzbek-latin-product",
@@ -82,6 +82,21 @@
     },
     {
       "id": "uzbek-cyrillic-script",
+      "passed": true,
+      "judgeScore": 2
+    },
+    {
+      "id": "stage-no-restart",
+      "passed": true,
+      "judgeScore": 2
+    },
+    {
+      "id": "stage-no-reasking-known",
+      "passed": true,
+      "judgeScore": 2
+    },
+    {
+      "id": "stage-stuck-changes-tactic",
       "passed": true,
       "judgeScore": 2
     }

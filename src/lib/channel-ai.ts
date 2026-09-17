@@ -38,6 +38,16 @@ import { pickMainModel } from "@/lib/complexity-classifier";
 import { createTurnTracker } from "@/lib/ai-telemetry";
 import { prefetchCatalogBlock } from "@/lib/catalog-prefetch";
 import { shouldSendAutoEscalation } from "@/lib/escalation-throttle";
+import {
+  parseKnownFacts,
+  mergeKnownFacts,
+  serializeKnownFacts,
+  readStageTurns,
+  validateStageTransition,
+  isFunnelStage,
+  bootstrapStage,
+} from "@/lib/funnel-state";
+import { buildFunnelStateBlock } from "@/lib/funnel-prompt";
 import { outcomeFromTools, shouldUpgradeOutcome } from "@/lib/conversation-outcome";
 // Anti-probe boundary — prepended to every WA/IG/FB user-bot system prompt
 // so it has the highest LLM attention weight.
@@ -445,6 +455,11 @@ async function handleChannelToolCall(
 ): Promise<string> {
   try {
     switch (toolName) {
+      // Стадию записывает код после оборота — см. funnel-state.ts. Модель
+      // здесь только сообщает о переходе, решение принимается не тут.
+      case "advance_stage":
+        return JSON.stringify({ success: true, noted: true });
+
       case "check_availability": {
         const results = await checkAvailability(
           businessId,
@@ -908,6 +923,26 @@ export async function generateChannelAIResponse(
     const prefetchBlock = await prefetchPromise;
     if (prefetchBlock) variableTail += `\n\n${prefetchBlock}`;
 
+    // Состояние воронки (Этап 4): где мы в разговоре и что уже выяснено.
+    // Модель больше не вычисляет стадию из истории — код ей её сообщает.
+    // Только sales-режим: воронка заказа в клинике про другое.
+    if (biz.dashboardMode === "sales") {
+      const storedStage = isFunnelStage(conv.funnelStage) ? conv.funnelStage : 1;
+      // Состояния ещё не было (диалог начался до Этапа 4) — оцениваем стадию
+      // по тому, что известно, иначе идущему разговору скажут «поздоровайся».
+      const stageNow =
+        conv.funnelStageUpdatedAt === null
+          ? bootstrapStage(conv.messageCount, parseKnownFacts(conv.knownFacts))
+          : storedStage;
+      variableTail +=
+        "\n\n" +
+        buildFunnelStateBlock(
+          stageNow,
+          readStageTurns(conv.knownFacts),
+          parseKnownFacts(conv.knownFacts)
+        );
+    }
+
     // Cart memory (6 августа 2026, OLLEE conv-9 fix): подмешиваем текущее
     // состояние корзины. formatCartForPrompt возвращает пустую строку если
     // корзина пуста ИЛИ устарела (>1 час) — тогда variableTail не растёт.
@@ -1090,6 +1125,10 @@ export async function generateChannelAIResponse(
     // Tool loop — process tool_use responses (max 5 iterations)
     let iterations = 0;
     const maxIterations = 5;
+    // Стадия воронки, о переходе на которую сообщила модель за этот оборот.
+    // null — модель ничего не сообщила, значит остаёмся где были.
+    let requestedStage: number | null = null;
+
     // Все tool-names вызванные за оборот — нужно для safety-net (см. ниже)
     const calledToolNames: string[] = [];
     // Последняя пачка tool_results — нужна для extraction imageUrls (фото
@@ -1108,6 +1147,14 @@ export async function generateChannelAIResponse(
         if (b.type === "tool_use") {
           calledToolNames.push(b.name);
           turn.addTool(b.name);
+          // Запрошенная стадия воронки (Этап 4). Берём последнюю за оборот:
+          // если модель дёрнула инструмент дважды, актуально финальное
+          // намерение. Валидация — после оборота, когда собраны факты.
+          if (b.name === "advance_stage") {
+            const raw = (b.input as Record<string, unknown> | null)?.stage;
+            const n = typeof raw === "number" ? raw : Number(raw);
+            if (Number.isFinite(n)) requestedStage = n;
+          }
         }
       }
 
@@ -1637,21 +1684,61 @@ export async function generateChannelAIResponse(
             const existingExtractedForPrev = (conv.extractedInfo as Record<string, unknown> | null) || {};
             const prevCart = existingExtractedForPrev.cart as import("@/lib/cart-extractor").CartSnapshot | undefined;
             const previousDiscussed = prevCart?.discussedProducts ?? [];
-            const snapshot = await extractCartFromMessages(
+            const extraction = await extractCartFromMessages(
               updatedHistory as unknown as Array<{ role: string; content: string }>,
               businessId,
               previousDiscussed
             );
-            if (snapshot) {
-              await prisma.channelConversation.update({
-                where: { id: conv.id },
-                // Prisma требует InputJsonValue; наш CartSnapshot — plain
-                // JSON-safe object, кастом устраняем strict-index-signature.
-                data: {
-                  extractedInfo: { ...existingExtractedForPrev, cart: snapshot } as unknown as import("@prisma/client").Prisma.JsonObject,
-                },
-              });
+
+            // Состояние воронки пишем ЗДЕСЬ же, одним запросом с корзиной
+            // (Этап 4). Отдельная запись означала бы вторую fire-and-forget
+            // мутацию той же строки — счётчик оборотов живёт внутри
+            // knownFacts, и записи затирали бы друг друга.
+            const prevFacts = parseKnownFacts(conv.knownFacts);
+            const mergedFacts = mergeKnownFacts(prevFacts, {
+              ...(extraction?.facts ?? {}),
+              // Телефон — из БД, а не из пересказа модели: источник правды тут
+              phone: extractedPhoneCh || channelClientPhoneOnRecord || null,
+            });
+
+            // Та же оценка, что и при сборке промпта: иначе идущий разговор
+            // считался бы стадией 1, и переход «назад» отклонялся бы зря.
+            const currentStage =
+              conv.funnelStageUpdatedAt === null
+                ? bootstrapStage(conv.messageCount, prevFacts)
+                : isFunnelStage(conv.funnelStage)
+                  ? conv.funnelStage
+                  : 1;
+            const transition =
+              requestedStage !== null
+                ? validateStageTransition(currentStage, requestedStage, mergedFacts)
+                : null;
+            const nextStage = transition ? transition.stage : currentStage;
+            const moved = nextStage !== currentStage;
+            // Стоим на месте — счётчик растёт, это и есть сигнал «топчемся».
+            const stageTurns = moved ? 0 : readStageTurns(conv.knownFacts) + 1;
+
+            if (transition && !transition.accepted) {
+              console.log(
+                `[Channel AI] stage transition rejected (${transition.reason}): conv=${conv.id} ${currentStage}→${requestedStage}`
+              );
             }
+
+            await prisma.channelConversation.update({
+              where: { id: conv.id },
+              // Prisma требует InputJsonValue; наши объекты — plain JSON-safe,
+              // каст устраняет strict-index-signature.
+              data: {
+                funnelStage: nextStage,
+                ...(moved ? { funnelStageUpdatedAt: new Date() } : {}),
+                knownFacts: serializeKnownFacts(mergedFacts, stageTurns) as unknown as import("@prisma/client").Prisma.JsonObject,
+                ...(extraction
+                  ? {
+                      extractedInfo: { ...existingExtractedForPrev, cart: extraction.cart } as unknown as import("@prisma/client").Prisma.JsonObject,
+                    }
+                  : {}),
+              },
+            });
           } catch (e) {
             console.warn(`[Channel AI] cart-extractor async failed: conv=${conv.id}`, e);
           }

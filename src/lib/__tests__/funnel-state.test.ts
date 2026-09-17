@@ -4,6 +4,7 @@ import {
   mergeKnownFacts,
   validateStageTransition,
   isFunnelStage,
+  bootstrapStage,
   FUNNEL_STAGES,
   type FunnelKnownFacts,
 } from "@/lib/funnel-state";
@@ -169,5 +170,37 @@ describe("mergeKnownFacts — выясненное не теряется", () =>
       facts = mergeKnownFacts(facts, { offered: [`Товар ${i}`] });
     }
     expect(facts.offered!.length).toBeLessThanOrEqual(10);
+  });
+});
+
+describe("bootstrapStage — диалоги, начавшиеся до Этапа 4", () => {
+  it("пустой диалог — стадия приветствия", () => {
+    expect(bootstrapStage(0, {})).toBe(1);
+  });
+
+  it("разговор уже идёт — НЕ приветствие", () => {
+    // Иначе после миграции бот поздоровался бы заново в каждом живом диалоге.
+    // Ровно это поймал эвал silence-after-offer.
+    expect(bootstrapStage(6, {})).toBeGreaterThan(1);
+  });
+
+  it("телефон уже есть — разговор дошёл до закрытия", () => {
+    expect(bootstrapStage(10, { phone: "+998901234567" })).toBe(5);
+  });
+
+  it("известно, чего хочет клиент — предложение", () => {
+    expect(bootstrapStage(4, { intent: "крем от акне" })).toBe(3);
+  });
+
+  it("товары уже показывали — тоже предложение", () => {
+    expect(bootstrapStage(4, { offered: ["Крем X"] })).toBe(3);
+  });
+
+  it("сообщения есть, но ничего не выяснено — выяснение потребности", () => {
+    expect(bootstrapStage(2, {})).toBe(2);
+  });
+
+  it("оценка осторожная: без телефона выше закрытия не поднимаемся", () => {
+    expect(bootstrapStage(50, { intent: "крем", offered: ["A", "B"] })).toBeLessThan(6);
   });
 });

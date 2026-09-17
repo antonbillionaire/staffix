@@ -37,6 +37,16 @@ const SALES_TOOL_NAME_SET = new Set(salesToolDefinitions.map((t) => t.name));
 import { buildSalesSystemPrompt, isSalesMode } from "@/lib/sales-prompt";
 import { prefetchCatalogBlock } from "@/lib/catalog-prefetch";
 import { shouldSendAutoEscalation } from "@/lib/escalation-throttle";
+import {
+  parseKnownFacts,
+  mergeKnownFacts,
+  serializeKnownFacts,
+  readStageTurns,
+  validateStageTransition,
+  isFunnelStage,
+  bootstrapStage,
+} from "@/lib/funnel-state";
+import { buildFunnelStateBlock } from "@/lib/funnel-prompt";
 import { botPromisedHandoffRegex } from "@/lib/handoff-detector";
 import { detectPhone, type PhoneCountry } from "@/lib/phone-parser";
 import { evaluateHandoffGuard } from "@/lib/handoff-guard";
@@ -326,7 +336,22 @@ export async function generateAIResponse(
     const prefetchBlock = await prefetchPromise;
     const prefetchSection = prefetchBlock ? `\n\n${prefetchBlock}` : "";
 
-    const variableTail = systemPrompt.variable + systemHint + refreshNotice + routingPromptSection + correctionsSection + prefetchSection + cartSection;
+    // Состояние воронки (Этап 4) — зеркало channel-ai.ts. Модель больше не
+    // вычисляет стадию из истории, код сообщает ей, где разговор находится.
+    const funnelSection = salesMode
+      ? "\n\n" +
+        buildFunnelStateBlock(
+          conversation.funnelStageUpdatedAt === null
+            ? bootstrapStage(conversation.messages.length, parseKnownFacts(conversation.knownFacts))
+            : isFunnelStage(conversation.funnelStage)
+              ? conversation.funnelStage
+              : 1,
+          readStageTurns(conversation.knownFacts),
+          parseKnownFacts(conversation.knownFacts)
+        )
+      : "";
+
+    const variableTail = systemPrompt.variable + systemHint + refreshNotice + routingPromptSection + correctionsSection + prefetchSection + funnelSection + cartSection;
     // Шаг 2 плана оптимизации (21 июля 2026): умный cache_control — для
     // sparse traffic write cache тратит впустую (2× дороже чем без кэша).
     // pickCacheStrategy смотрит активность бизнеса/клиента и решает где
@@ -389,6 +414,9 @@ export async function generateAIResponse(
     let lastToolResults: any[] = [];
     // Все tool-names вызванные за оборот — для safety-net проверки notify_manager
     const calledToolNames: string[] = [];
+    // Стадия воронки, о переходе на которую сообщила модель (Этап 4).
+    // null — не сообщала, остаёмся где были. Зеркало channel-ai.ts.
+    let requestedStage: number | null = null;
 
     while (response.stop_reason === "tool_use" && iterations < maxIterations) {
       iterations++;
@@ -399,6 +427,11 @@ export async function generateAIResponse(
         if (b.type === "tool_use") {
           calledToolNames.push(b.name);
           turn.addTool(b.name);
+          if (b.name === "advance_stage") {
+            const raw = (b.input as Record<string, unknown> | null)?.stage;
+            const n = typeof raw === "number" ? raw : Number(raw);
+            if (Number.isFinite(n)) requestedStage = n;
+          }
         }
       }
 
@@ -787,16 +820,51 @@ export async function generateAIResponse(
           const existingExtracted = (conversation.extractedInfo || {}) as Record<string, unknown>;
           const prevCart = existingExtracted.cart as import("@/lib/cart-extractor").CartSnapshot | undefined;
           const previousDiscussed = prevCart?.discussedProducts ?? [];
-          const snapshot = await extractCartFromMessages(recent, businessId, previousDiscussed);
-          if (snapshot) {
-            await prisma.conversation.update({
-              where: { id: conversation.id },
-              data: {
-                // Prisma InputJsonValue не принимает strict interfaces — кастим.
-                extractedInfo: { ...existingExtracted, cart: snapshot } as unknown as import("@prisma/client").Prisma.JsonObject,
-              },
-            });
+          const extraction = await extractCartFromMessages(recent, businessId, previousDiscussed);
+
+          // Состояние воронки пишем ЗДЕСЬ же, одним запросом с корзиной —
+          // счётчик оборотов живёт внутри knownFacts, и вторая параллельная
+          // запись той же строки затирала бы его. Зеркало channel-ai.ts.
+          const prevFacts = parseKnownFacts(conversation.knownFacts);
+          const mergedFacts = mergeKnownFacts(prevFacts, {
+            ...(extraction?.facts ?? {}),
+            phone: extractedPhoneEarly || clientPhoneOnRecord || null,
+          });
+
+          const currentStage =
+            conversation.funnelStageUpdatedAt === null
+              ? bootstrapStage(conversation.messages.length, prevFacts)
+              : isFunnelStage(conversation.funnelStage)
+                ? conversation.funnelStage
+                : 1;
+          const transition =
+            requestedStage !== null
+              ? validateStageTransition(currentStage, requestedStage, mergedFacts)
+              : null;
+          const nextStage = transition ? transition.stage : currentStage;
+          const moved = nextStage !== currentStage;
+          const stageTurns = moved ? 0 : readStageTurns(conversation.knownFacts) + 1;
+
+          if (transition && !transition.accepted) {
+            console.log(
+              `[TG AI] stage transition rejected (${transition.reason}): conv=${conversation.id} ${currentStage}→${requestedStage}`
+            );
           }
+
+          await prisma.conversation.update({
+            where: { id: conversation.id },
+            data: {
+              funnelStage: nextStage,
+              ...(moved ? { funnelStageUpdatedAt: new Date() } : {}),
+              // Prisma InputJsonValue не принимает strict interfaces — кастим.
+              knownFacts: serializeKnownFacts(mergedFacts, stageTurns) as unknown as import("@prisma/client").Prisma.JsonObject,
+              ...(extraction
+                ? {
+                    extractedInfo: { ...existingExtracted, cart: extraction.cart } as unknown as import("@prisma/client").Prisma.JsonObject,
+                  }
+                : {}),
+            },
+          });
         } catch (e) {
           console.warn(`[TG AI] cart-extractor async failed: conv=${conversation.id}`, e);
         }

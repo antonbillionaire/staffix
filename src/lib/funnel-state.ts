@@ -223,3 +223,27 @@ export function serializeKnownFacts(
 ): Record<string, unknown> {
   return { ...facts, [STAGE_TURNS_KEY]: Math.max(0, Math.floor(stageTurns)) };
 }
+
+/**
+ * Стадия для диалога, у которого состояния ещё нет.
+ *
+ * ЗАЧЕМ. Колонка добавлена со значением по умолчанию 1, то есть после миграции
+ * КАЖДЫЙ существующий диалог числится на стадии «приветствие» — включая те,
+ * что дошли до закрытия. Без этой функции блок состояния сказал бы боту
+ * «поздоровайся и выясни, зачем клиент пришёл» посреди оформления заказа.
+ * Эвал `silence-after-offer` поймал ровно это: бот поздоровался заново.
+ *
+ * Разметить историю задним числом нечем, поэтому берём осторожную оценку по
+ * тому, что уже известно. Ошибиться лучше в меньшую сторону: недооценённая
+ * стадия сдвинется вперёд на первом же обороте, переоценённая заставит бота
+ * закрывать сделку, которой не было.
+ */
+export function bootstrapStage(
+  messageCount: number,
+  facts: FunnelKnownFacts
+): FunnelStage {
+  if (messageCount <= 0) return 1;
+  if (cleanText(facts.phone)) return 5;
+  if (cleanText(facts.intent) || (facts.offered?.length ?? 0) > 0) return 3;
+  return 2;
+}

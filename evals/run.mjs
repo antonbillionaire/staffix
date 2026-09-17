@@ -83,6 +83,8 @@ const { salesToolDefinitions } = await import("../src/lib/sales-tools.ts");
 const { queryTokens, isStrongMatch, renderPrefetchBlock } = await import(
   "../src/lib/catalog-prefetch.ts"
 );
+const { buildFunnelStateBlock } = await import("../src/lib/funnel-prompt.ts");
+const { parseKnownFacts, bootstrapStage } = await import("../src/lib/funnel-state.ts");
 
 /**
  * Префетч каталога (Этап 3.5.2) — тот же код, что в проде, только источник
@@ -115,7 +117,21 @@ function buildPrefetchBlock(fixture, history) {
   return renderPrefetchBlock(tokens.join(" "), hits);
 }
 
-function buildSystemBlocks(fixture, clientPhone, history = []) {
+/**
+ * Состояние воронки (Этап 4) — тем же кодом, что в проде. Кейс задаёт
+ * `funnelStage` и `knownFacts`; по умолчанию это новый диалог на стадии 1.
+ * Без этого эвалы снова проверяли бы промпт, которого в рантайме нет.
+ */
+function buildFunnelBlock(c, clientPhone) {
+  const facts = parseKnownFacts({ ...(c.knownFacts ?? {}), phone: clientPhone ?? null });
+  // Кейс без явной стадии = диалог, у которого состояния ещё нет. В проде
+  // такими станут все существующие диалоги сразу после миграции, поэтому
+  // оцениваем стадию тем же кодом, а не подставляем 1.
+  const stage = c.funnelStage ?? bootstrapStage((c.history ?? []).length, facts);
+  return buildFunnelStateBlock(stage, c.stageTurns ?? 0, facts);
+}
+
+function buildSystemBlocks(fixture, clientPhone, history = [], caseDef = {}) {
   const { stable, docs, variable } = buildSalesSystemPrompt(fixture.business, {
     name: null,
     totalOrders: 0,
@@ -134,9 +150,11 @@ function buildSystemBlocks(fixture, clientPhone, history = []) {
   const prefetch = buildPrefetchBlock(fixture, history);
   const prefetchBlock = prefetch ? `\n\n${prefetch}` : "";
 
+  const funnelBlock = `\n\n${buildFunnelBlock(caseDef, clientPhone)}`;
+
   const blocks = [{ type: "text", text: stable }];
   if (docs.trim()) blocks.push({ type: "text", text: docs });
-  blocks.push({ type: "text", text: variable + clientBlock + prefetchBlock });
+  blocks.push({ type: "text", text: variable + clientBlock + prefetchBlock + funnelBlock });
   return blocks;
 }
 
@@ -180,7 +198,7 @@ function mockTool(name, input, fixture) {
 // ─── Прогон одного кейса ──────────────────────────────────────────────────
 async function runCase(c) {
   const fixture = getFixture(c.fixture);
-  const system = buildSystemBlocks(fixture, c.clientPhone, c.history);
+  const system = buildSystemBlocks(fixture, c.clientPhone, c.history, c);
   const messages = c.history.map((m) => ({ role: m.role, content: m.content }));
 
   const toolsCalled = [];
