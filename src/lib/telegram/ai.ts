@@ -35,6 +35,7 @@ import { salesToolDefinitions, executeSalesTool, notifyManagerByTelegram } from 
 // Именно этот Set используется чтобы отличить sales-tool от booking-tool при роутинге.
 const SALES_TOOL_NAME_SET = new Set(salesToolDefinitions.map((t) => t.name));
 import { buildSalesSystemPrompt, isSalesMode } from "@/lib/sales-prompt";
+import { prefetchCatalogBlock } from "@/lib/catalog-prefetch";
 import { botPromisedHandoffRegex } from "@/lib/handoff-detector";
 import { detectPhone, type PhoneCountry } from "@/lib/phone-parser";
 import { evaluateHandoffGuard } from "@/lib/handoff-guard";
@@ -135,6 +136,13 @@ export async function generateAIResponse(
     const cacheStrategyPromise = pickCacheStrategy(businessId, String(telegramId)).catch((e) => {
       console.warn("[Webhook] cache strategy failed, using defaults:", e);
       return { stableTTL: "1h" as const, docsTTL: "5m" as const, variableTTL: "5m" as const, reason: "promise_error_fallback" };
+    });
+    // Deterministic-first (Этап 3.5.2). Зеркало channel-ai.ts: поиск по
+    // каталогу выполняется кодом заранее и подмешивается в переменный хвост,
+    // чтобы вопрос о товаре не стоил лишнего вызова модели.
+    const prefetchPromise = prefetchCatalogBlock(businessId, userMessage).catch((e) => {
+      console.warn("[Webhook] catalog prefetch failed:", e);
+      return "";
     });
 
     const pickedDocs = await docsPromise;
@@ -313,7 +321,11 @@ export async function generateAIResponse(
     // Все «дрейфующие» куски (дата, refreshNotice, routing) пакуем в
     // переменный хвост, рядом с клиентским контекстом. Стабильный префикс
     // остаётся неизменным от вызова к вызову — Anthropic держит его в кэше.
-    const variableTail = systemPrompt.variable + systemHint + refreshNotice + routingPromptSection + correctionsSection + cartSection;
+    // Порядок кусков переменного хвоста постоянный — иначе TTL 5m не даёт hit.
+    const prefetchBlock = await prefetchPromise;
+    const prefetchSection = prefetchBlock ? `\n\n${prefetchBlock}` : "";
+
+    const variableTail = systemPrompt.variable + systemHint + refreshNotice + routingPromptSection + correctionsSection + prefetchSection + cartSection;
     // Шаг 2 плана оптимизации (21 июля 2026): умный cache_control — для
     // sparse traffic write cache тратит впустую (2× дороже чем без кэша).
     // pickCacheStrategy смотрит активность бизнеса/клиента и решает где

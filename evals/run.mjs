@@ -75,8 +75,42 @@ function getFixture(name) {
 // tsx резолвит "@/..." через tsconfig paths — импорт прод-кода как есть.
 const { buildSalesSystemPrompt } = await import("../src/lib/sales-prompt.ts");
 const { salesToolDefinitions } = await import("../src/lib/sales-tools.ts");
+const { queryTokens, isStrongMatch, renderPrefetchBlock } = await import(
+  "../src/lib/catalog-prefetch.ts"
+);
 
-function buildSystemBlocks(fixture, clientPhone) {
+/**
+ * Префетч каталога (Этап 3.5.2) — тот же код, что в проде, только источник
+ * товаров фикстура, а не БД. Без этого эвалы проверяли бы промпт, которого
+ * в рантайме не существует: там переменный блок несёт результат поиска.
+ */
+function buildPrefetchBlock(fixture, history) {
+  const lastUser = [...history].reverse().find((m) => m.role === "user");
+  if (!lastUser) return "";
+  const tokens = queryTokens(lastUser.content);
+  if (tokens.length === 0) return "";
+  const hits = (fixture.products || [])
+    .filter((p) => isStrongMatch(tokens, p))
+    .slice(0, 5)
+    .map((p) => ({
+      name: p.name,
+      price: p.price,
+      category: p.category ?? null,
+      // Формулировки те же, что отдаёт searchProducts в проде
+      // (LOW_STOCK_THRESHOLD = 5), иначе эвалы учатся на несуществующем тексте.
+      stockMessage:
+        p.stock === null || p.stock === undefined
+          ? "В наличии"
+          : p.stock === 0
+            ? "Нет в наличии"
+            : p.stock < 5
+              ? `Осталось ${p.stock} шт.`
+              : `В наличии (${p.stock}+ шт.)`,
+    }));
+  return renderPrefetchBlock(tokens.join(" "), hits);
+}
+
+function buildSystemBlocks(fixture, clientPhone, history = []) {
   const { stable, docs, variable } = buildSalesSystemPrompt(fixture.business, {
     name: null,
     totalOrders: 0,
@@ -92,9 +126,12 @@ function buildSystemBlocks(fixture, clientPhone) {
     ? `\n\n## ИНФОРМАЦИЯ О КЛИЕНТЕ\n- Телефон: ${clientPhone} (УЖЕ ПОЛУЧЕН — не переспрашивай, используй при оформлении заказа)`
     : `\n\n## ИНФОРМАЦИЯ О КЛИЕНТЕ\n- Телефон: НЕ ПОЛУЧЕН — обязательно попроси перед оформлением заказа`;
 
+  const prefetch = buildPrefetchBlock(fixture, history);
+  const prefetchBlock = prefetch ? `\n\n${prefetch}` : "";
+
   const blocks = [{ type: "text", text: stable }];
   if (docs.trim()) blocks.push({ type: "text", text: docs });
-  blocks.push({ type: "text", text: variable + clientBlock });
+  blocks.push({ type: "text", text: variable + clientBlock + prefetchBlock });
   return blocks;
 }
 
@@ -138,7 +175,7 @@ function mockTool(name, input, fixture) {
 // ─── Прогон одного кейса ──────────────────────────────────────────────────
 async function runCase(c) {
   const fixture = getFixture(c.fixture);
-  const system = buildSystemBlocks(fixture, c.clientPhone);
+  const system = buildSystemBlocks(fixture, c.clientPhone, c.history);
   const messages = c.history.map((m) => ({ role: m.role, content: m.content }));
 
   const toolsCalled = [];
@@ -321,6 +358,12 @@ for (const c of cases) {
     const mark = passed ? "✅" : "❌";
     const scorePart = j.score === null ? "" : ` судья ${j.score}/2`;
     console.log(`${mark}${scorePart}${fails.length ? `  ${fails.join("; ")}` : ""}`);
+    // Балл 1/2 — «ответ приемлем, но с изъяном». Раньше причина была видна
+    // только у упавших кейсов, то есть ровно то, что стоит чинить следующим,
+    // молчало. Печатаем замечание судьи и для проходных-но-неидеальных.
+    if (passed && j.score === 1 && j.reason) {
+      console.log(`     судья: ${j.reason}`);
+    }
   } catch (e) {
     results.push({ id: c.id, category: c.category, passed: false, error: String(e) });
     console.log(`💥 ошибка: ${e.message}`);
@@ -406,27 +449,9 @@ if (failed.length) {
 // ─── Baseline ─────────────────────────────────────────────────────────────
 const baselinesDir = path.join(__dirname, "baselines");
 
-if (saveAs) {
-  fs.mkdirSync(baselinesDir, { recursive: true });
-  const file = path.join(baselinesDir, `${saveAs}.json`);
-  fs.writeFileSync(
-    file,
-    JSON.stringify(
-      {
-        savedAt: new Date().toISOString(),
-        model: MAIN_MODEL,
-        passed: passedCount,
-        total: results.length,
-        avgJudge,
-        cases: results.map((r) => ({ id: r.id, passed: r.passed, judgeScore: r.judgeScore })),
-      },
-      null,
-      2
-    )
-  );
-  console.log(`\nBaseline сохранён: evals/baselines/${saveAs}.json`);
-}
-
+// Сравнение идёт ДО сохранения: при `--save baseline --compare baseline`
+// обратный порядок сравнивал бы прогон сам с собой и всегда показывал
+// «изменений нет».
 if (compareWith) {
   const file = path.join(baselinesDir, `${compareWith}.json`);
   if (!fs.existsSync(file)) {
@@ -451,6 +476,27 @@ if (compareWith) {
   if (improved.length) console.log(`\n  ✅ Починилось: ${improved.join(", ")}`);
   if (degraded.length) console.log(`\n  ❌ Сломалось: ${degraded.join(", ")}`);
   if (!improved.length && !degraded.length) console.log(`\n  Изменений в проходимости нет`);
+}
+
+if (saveAs) {
+  fs.mkdirSync(baselinesDir, { recursive: true });
+  const file = path.join(baselinesDir, `${saveAs}.json`);
+  fs.writeFileSync(
+    file,
+    JSON.stringify(
+      {
+        savedAt: new Date().toISOString(),
+        model: MAIN_MODEL,
+        passed: passedCount,
+        total: results.length,
+        avgJudge,
+        cases: results.map((r) => ({ id: r.id, passed: r.passed, judgeScore: r.judgeScore })),
+      },
+      null,
+      2
+    )
+  );
+  console.log(`\nBaseline сохранён: evals/baselines/${saveAs}.json`);
 }
 
 console.log("");

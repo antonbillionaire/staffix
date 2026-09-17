@@ -36,6 +36,7 @@ import { pickCacheStrategy } from "@/lib/cache-strategy";
 import { pickRelevantDocuments } from "@/lib/document-matcher";
 import { pickMainModel } from "@/lib/complexity-classifier";
 import { createTurnTracker } from "@/lib/ai-telemetry";
+import { prefetchCatalogBlock } from "@/lib/catalog-prefetch";
 import { outcomeFromTools, shouldUpgradeOutcome } from "@/lib/conversation-outcome";
 // Anti-probe boundary — prepended to every WA/IG/FB user-bot system prompt
 // so it has the highest LLM attention weight.
@@ -849,6 +850,14 @@ export async function generateChannelAIResponse(
       console.warn("[Channel AI] cache strategy failed, using defaults:", e);
       return { stableTTL: "1h" as const, docsTTL: "5m" as const, variableTTL: "5m" as const, reason: "promise_error_fallback" };
     });
+    // Deterministic-first (Этап 3.5.2): поиск по каталогу — это SQL, а не работа
+    // для модели. Прогоняем его здесь же, параллельно с остальной подготовкой,
+    // и подмешиваем результат в переменный блок промпта ниже. Вопрос «есть
+    // маска для лица?» перестаёт стоить лишнего вызова модели.
+    const prefetchPromise = prefetchCatalogBlock(businessId, userMessage).catch((e) => {
+      console.warn("[Channel AI] catalog prefetch failed:", e);
+      return "";
+    });
 
     const pickedDocs = await docsPromise;
     if (pickedDocs.length !== biz.documents.length) {
@@ -892,6 +901,11 @@ export async function generateChannelAIResponse(
     } catch (memErr) {
       console.error("[Channel AI] Memory load error (non-fatal):", memErr);
     }
+
+    // Префетч каталога — сразу после клиентского контекста, до корзины:
+    // порядок внутри переменного блока постоянный, иначе TTL 5m не даёт hit.
+    const prefetchBlock = await prefetchPromise;
+    if (prefetchBlock) variableTail += `\n\n${prefetchBlock}`;
 
     // Cart memory (6 августа 2026, OLLEE conv-9 fix): подмешиваем текущее
     // состояние корзины. formatCartForPrompt возвращает пустую строку если

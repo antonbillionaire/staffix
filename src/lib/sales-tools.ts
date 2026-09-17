@@ -234,7 +234,22 @@ export async function searchProducts(
   businessId: string,
   query: string,
   category?: string,
-  maxPrice?: number
+  maxPrice?: number,
+  /**
+   * skipAiFallback — не дёргать Haiku-нормализатор, когда raw SQL ничего не нашёл.
+   * Нужен для префетча (catalog-prefetch.ts): он выполняется на КАЖДОМ обороте,
+   * и включённый fallback означал бы вызов Haiku на каждое «спасибо» или
+   * «а доставка есть?». Модель, вызвав инструмент явно, fallback получает.
+   */
+  opts?: {
+    skipAiFallback?: boolean;
+    /**
+     * includeTags — отдать теги товара в результате. Нужен префетчу, чтобы
+     * отличить попадание в имя/тег от попадания в одно описание. Модели теги
+     * не показываем: она их не использует, а токены они едят.
+     */
+    includeTags?: boolean;
+  }
 ): Promise<SalesToolResult> {
   try {
     // Стоп-слова — предлоги/союзы которые не должны блокировать AND-поиск.
@@ -366,7 +381,7 @@ export async function searchProducts(
     // AI-fallback: если raw substring-поиск ничего не нашёл — опечатка или
     // другой язык (Клеопатра vs Cleopatra). Дёргаем Haiku с реальными названиями.
     let normalizedQuery: string | null = null;
-    if (products.length === 0 && query && query.trim().length >= 2) {
+    if (!opts?.skipAiFallback && products.length === 0 && query && query.trim().length >= 2) {
       const { normalizeProductQuery } = await import("./product-search-fallback");
       normalizedQuery = await normalizeProductQuery(query, businessId);
       if (normalizedQuery && normalizedQuery !== query) {
@@ -442,6 +457,7 @@ export async function searchProducts(
         shortDescription: p.description ? p.description.slice(0, 150) : null,
         imageUrl: p.imageUrl || null,
         productUrl: p.productUrl || null,
+        ...(opts?.includeTags ? { tags: p.tags } : {}),
       })),
     };
   } catch (error) {

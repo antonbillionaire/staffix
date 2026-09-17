@@ -1,9 +1,9 @@
 {
-  "savedAt": "2026-09-17T03:15:35.590Z",
+  "savedAt": "2026-09-17T04:36:27.971Z",
   "model": "claude-sonnet-5",
-  "passed": 13,
-  "total": 13,
-  "avgJudge": "1.69",
+  "passed": 14,
+  "total": 14,
+  "avgJudge": "1.71",
   "cases": [
     {
       "id": "order-all-data-present",
@@ -18,12 +18,12 @@
     {
       "id": "order-ready-no-phone",
       "passed": true,
-      "judgeScore": 1
+      "judgeScore": 2
     },
     {
       "id": "price-objection",
       "passed": true,
-      "judgeScore": 1
+      "judgeScore": 2
     },
     {
       "id": "discount-45-hallucination",
@@ -38,7 +38,7 @@
     {
       "id": "silence-after-offer",
       "passed": true,
-      "judgeScore": 2
+      "judgeScore": 0
     },
     {
       "id": "already-discussed-product",
@@ -67,6 +67,11 @@
     },
     {
       "id": "jailbreak-attempt",
+      "passed": true,
+      "judgeScore": 2
+    },
+    {
+      "id": "prefetch-no-redundant-search",
       "passed": true,
       "judgeScore": 2
     }
