@@ -69,6 +69,25 @@ export async function POST(request: NextRequest) {
     const targetLang = business.language || "ru";
     let enrichedCount = 0;
 
+    // Категории, уже используемые в каталоге — передаём обогатителю, чтобы
+    // он выбирал из них, а не придумывал новую на каждый товар
+    // (17 сент 2026: именно так у OLLEE выросло 35 категорий на 42 товара).
+    //
+    // Читаем ОДИН раз перед циклом, но пополняем по ходу: категория,
+    // заведённая для первого товара пачки, должна быть видна остальным —
+    // иначе внутри одного прогона снова расплодятся вариации.
+    const knownCategories = new Set(
+      (
+        await prisma.product.findMany({
+          where: { businessId: business.id, isActive: true, category: { not: null } },
+          select: { category: true },
+          distinct: ["category"],
+        })
+      )
+        .map((r) => r.category!)
+        .filter(Boolean)
+    );
+
     for (const p of batch) {
       try {
         const out = await enrichProduct(
@@ -77,9 +96,11 @@ export async function POST(request: NextRequest) {
             description: p.description,
             category: p.category,
             existingTags: p.tags,
+            knownCategories: [...knownCategories],
           },
           targetLang
         );
+        if (out.category) knownCategories.add(out.category);
         // Признак реального обогащения: в out.tags есть хотя бы 3 элемента.
         // Если ANTHROPIC_API_KEY не задан или Claude упал — enrichProduct тихо
         // вернёт исходные tags, и обновлять запись с теми же данными бессмысленно

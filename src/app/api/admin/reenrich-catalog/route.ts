@@ -134,6 +134,15 @@ export async function POST(request: NextRequest) {
   let enrichedCount = 0;
   const errors: string[] = [];
 
+  // Категории, уже существующие в каталоге — отдаём обогатителю, чтобы он
+  // выбирал из них, а не плодил вариации (17 сент 2026: так у OLLEE выросло
+  // 35 категорий на 42 товара). Берём из allProducts — лишний запрос не нужен.
+  // Пополняем по ходу цикла: категория, заведённая на первом товаре пачки,
+  // должна быть видна остальным.
+  const knownCategories = new Set(
+    allProducts.map((p) => p.category).filter((c): c is string => !!c)
+  );
+
   for (let i = 0; i < batch.length; i++) {
     const p = batch[i];
     // Пауза перед КАЖДЫМ вызовом кроме первого — размазываем нагрузку на Haiku,
@@ -149,9 +158,11 @@ export async function POST(request: NextRequest) {
           description: p.description,
           category: p.category,
           existingTags: [],
+          knownCategories: [...knownCategories],
         },
         targetLang
       );
+      if (out.category) knownCategories.add(out.category);
 
       // Мержим свежие теги от Haiku с существующими (case-insensitive dedup).
       // Не теряем то что уже было — просто добавляем stage-теги + новые синонимы.

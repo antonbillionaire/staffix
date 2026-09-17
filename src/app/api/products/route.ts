@@ -102,12 +102,26 @@ export async function POST(request: NextRequest) {
       select: { language: true },
     });
     const targetLang = businessForLang?.language || "ru";
+
+    // Существующие категории каталога — чтобы новый товар попал в одну из них,
+    // а не завёл очередную вариацию (17 сент 2026, см. catalog-enricher).
+    const knownCategories = (
+      await prisma.product.findMany({
+        where: { businessId, isActive: true, category: { not: null } },
+        select: { category: true },
+        distinct: ["category"],
+      })
+    )
+      .map((r) => r.category!)
+      .filter(Boolean);
+
     const enriched = await enrichProduct(
       {
         name,
         description,
         category,
         existingTags: tags || [],
+        knownCategories,
       },
       targetLang
     );

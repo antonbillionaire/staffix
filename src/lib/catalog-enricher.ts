@@ -24,6 +24,20 @@ export interface EnrichInput {
   description?: string | null;
   category?: string | null;
   existingTags?: string[];
+  /**
+   * Категории, уже используемые в каталоге этого бизнеса.
+   *
+   * Добавлено 17 сентября 2026. Без этого списка обогатитель придумывал
+   * категорию каждому товару независимо, не зная про остальные, и они
+   * расплодились: у OLLEE вышло 35 категорий на 42 товара — «Консилеры»
+   * и «Консилеры и корректоры», «Пудра для лица» и «Пудры для лица»,
+   * три разных названия для сывороток. У более крупных каталогов хуже:
+   * 719 категорий на 4156 товаров.
+   *
+   * Модель теперь выбирает из этого списка и заводит новую категорию
+   * только если ни одна не подходит.
+   */
+  knownCategories?: string[];
 }
 
 export interface EnrichOutput {
@@ -168,6 +182,23 @@ export async function enrichProduct(input: EnrichInput, targetLanguage: string =
 
 Бренд в name дублировать не обязательно, но в теги добавь и латиницу и кириллицу.
 
+${
+    (input.knownCategories?.length ?? 0) > 0
+      ? `
+## КАТЕГОРИЯ — ВЫБИРАЙ ИЗ СУЩЕСТВУЮЩИХ
+
+В каталоге этого бизнеса уже используются такие категории:
+${input.knownCategories!.map((c) => `- ${c}`).join("\n")}
+
+Правила:
+- ОБЯЗАТЕЛЬНО выбери подходящую из списка выше и верни её ДОСЛОВНО, символ в символ.
+- Новую категорию заводи ТОЛЬКО если товар не подходит ни к одной. Это редкий случай.
+- НЕ придумывай вариацию существующей: если есть «Макияж», не пиши «Макияж и косметика».
+  Если есть «Уход за лицом», не пиши «Средства по уходу за кожей лица».
+- Лучше более общая существующая категория, чем новая узкая.
+`
+      : ""
+  }
 Вход:
 - Name: ${input.name}
 - Description: ${input.description || "(нет)"}
@@ -207,9 +238,20 @@ export async function enrichProduct(input: EnrichInput, targetLanguage: string =
     const description = typeof parsed.description === "string" && parsed.description.trim()
       ? parsed.description.trim()
       : input.description ?? null;
-    const category = typeof parsed.category === "string" && parsed.category.trim()
-      ? parsed.category.trim()
-      : input.category ?? null;
+    // Категория клиента важнее выдумки модели (17 сентября 2026).
+    //
+    // Было наоборот: если модель вернула категорию, она затирала ту, что
+    // пришла из импорта. То есть владелец загружал CSV с нормальной
+    // разметкой, а обогатитель её размывал.
+    //
+    // Теперь модель может предложить категорию только когда своей нет,
+    // либо когда своя на другом языке и её нужно перевести (catNeedsTranslate).
+    const modelCategory =
+      typeof parsed.category === "string" && parsed.category.trim()
+        ? parsed.category.trim()
+        : null;
+    const ownCategory = input.category?.trim() || null;
+    const category = ownCategory && !catNeedsTranslate ? ownCategory : modelCategory ?? ownCategory;
 
     // Объединяем сгенерированные теги с существующими, дедуплицируем (case-insensitive)
     const generatedTags = Array.isArray(parsed.tags)
@@ -254,8 +296,13 @@ export async function enrichProductsBatch(
   delayMs: number = 200
 ): Promise<EnrichOutput[]> {
   const results: EnrichOutput[] = [];
+  // Копим категории по ходу пачки: категория, выбранная для первого товара,
+  // должна быть видна остальным — иначе внутри одного прогона снова
+  // расплодятся вариации одного и того же (см. knownCategories в EnrichInput).
+  const known = new Set<string>(inputs.flatMap((i) => i.knownCategories || []));
   for (const input of inputs) {
-    const out = await enrichProduct(input, targetLanguage);
+    const out = await enrichProduct({ ...input, knownCategories: [...known] }, targetLanguage);
+    if (out.category) known.add(out.category);
     results.push(out);
     if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
   }
