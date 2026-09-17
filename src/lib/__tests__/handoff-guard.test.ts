@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { evaluateHandoffGuard } from "../handoff-guard";
+import { botPromisedHandoffRegex } from "../handoff-detector";
 
 const REGEX = /менеджер\s+(свяжется|позвонит|перезвонит|расскажет|ответит)/i;
 const NO_PHONE = { phone: null, incomplete: false };
@@ -172,5 +173,94 @@ describe("evaluateHandoffGuard — ветка «первый перехват» 
       previousGuardHits: 4,
     });
     expect(r.newGuardHits).toBe(5);
+  });
+});
+
+// ─── Язык подменного ответа (17 сент 2026) ────────────────────────────────
+// Guard подменяет текст бота своей фразой. Пока детектор обещаний понимал
+// только русский, узбекские диалоги до подмены не доходили. Теперь доходят —
+// и узбекскому клиенту нельзя отвечать русским шаблоном.
+describe("evaluateHandoffGuard — отвечает на языке бота", () => {
+  // Настоящий детектор, а не самодельный regex: ломалась именно связка
+  // «детектор не увидел узбекское обещание → guard не сработал».
+  const UZ_REGEX = botPromisedHandoffRegex();
+
+  it("бот писал латиницей → подмена латиницей", () => {
+    const r = evaluateHandoffGuard({
+      botReplyText: "Menejer sizga bog'lanadi, sabr qiling.",
+      phoneDetection: NO_PHONE,
+      hasPhoneOnRecord: false,
+      calledNotifyManager: false,
+      promisedForwardingRegex: UZ_REGEX,
+      previousGuardHits: 0,
+    });
+    expect(r.intercepted).toBe(true);
+    expect(r.overrideReply).toMatch(/raqamingizni/i);
+    expect(r.overrideReply).not.toMatch(/[а-яё]/i);
+  });
+
+  it("бот писал узбекской кириллицей → подмена узбекской кириллицей", () => {
+    const r = evaluateHandoffGuard({
+      botReplyText: "Менеджеримиз сизга хабар беради",
+      phoneDetection: NO_PHONE,
+      hasPhoneOnRecord: false,
+      calledNotifyManager: false,
+      promisedForwardingRegex: UZ_REGEX,
+      previousGuardHits: 0,
+    });
+    expect(r.intercepted).toBe(true);
+    expect(r.overrideReply).toMatch(/рақамингизни/i);
+  });
+
+  it("бот писал по-русски → подмена по-русски, как было", () => {
+    const r = evaluateHandoffGuard({
+      botReplyText: "Менеджер свяжется с Вами в течение часа.",
+      phoneDetection: NO_PHONE,
+      hasPhoneOnRecord: false,
+      calledNotifyManager: false,
+      promisedForwardingRegex: /менеджер\s+свяжется/i,
+      previousGuardHits: 0,
+    });
+    expect(r.intercepted).toBe(true);
+    expect(r.overrideReply).toMatch(/номер телефона|ваш номер/i);
+  });
+
+  it("неполный номер в узбекском диалоге — просьба уточнить на узбекском", () => {
+    const r = evaluateHandoffGuard({
+      botReplyText: "Menejer sizga bog'lanadi",
+      phoneDetection: { phone: null, incomplete: true },
+      hasPhoneOnRecord: false,
+      calledNotifyManager: false,
+      promisedForwardingRegex: UZ_REGEX,
+      previousGuardHits: 0,
+    });
+    expect(r.logReason).toBe("incomplete-phone");
+    expect(r.overrideReply).toMatch(/to'liq emas/i);
+  });
+
+  it("зацикливание в узбекском диалоге — эскалация и фраза на узбекском", () => {
+    const r = evaluateHandoffGuard({
+      botReplyText: "Menejer sizga bog'lanadi",
+      phoneDetection: NO_PHONE,
+      hasPhoneOnRecord: false,
+      calledNotifyManager: false,
+      promisedForwardingRegex: UZ_REGEX,
+      previousGuardHits: 2,
+    });
+    expect(r.forceNotifyManager).toBe(true);
+    expect(r.overrideReply).toMatch(/menejerga uzatdim/i);
+  });
+
+  it("вызывающий может задать язык явно", () => {
+    const r = evaluateHandoffGuard({
+      botReplyText: "Менеджер свяжется с Вами.",
+      phoneDetection: NO_PHONE,
+      hasPhoneOnRecord: false,
+      calledNotifyManager: false,
+      promisedForwardingRegex: /менеджер\s+свяжется/i,
+      previousGuardHits: 0,
+      language: "uz-latn",
+    });
+    expect(r.overrideReply).toMatch(/raqamingizni/i);
   });
 });

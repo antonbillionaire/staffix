@@ -15,6 +15,24 @@
  *   3) Промисы контакта от человека: "менеджер свяжется/перезвонит/ответит/обработает/получит"
  *   4) Обещания обратного звонка: "перезвоним вам, свяжемся с вами, мы вернёмся к вам"
  *   5) English эквиваленты: forward to manager, notify manager, escalate, get back to you
+ *   7) Узбекский — латиница и кириллица (добавлено 17 сент 2026)
+ *
+ * ПРО УЗБЕКСКИЙ. До 17 сентября список был только русский + английский, а
+ * четверть ответов бота у OLLEE (364 из 1430) содержит узбекский текст. В 149
+ * из них бот обещает передать менеджеру — и ни одно из этих обещаний детектор
+ * не видел. То есть и guard «не эскалируй без телефона», и safety-net «бот
+ * пообещал — вызови notify_manager» на узбекских диалогах просто молчали.
+ *
+ * Формулировки ниже взяты из реальных ответов бота, не придуманы:
+ *   "Menejer sizga bog'lanadi"                — менеджер с вами свяжется
+ *   "Mas'ul mutaxassisimizga yetkazdim"       — передал ответственному специалисту
+ *   "menejerga xabar yubordim"                — отправил сообщение менеджеру
+ *   "buyurtmangizni menedzherga uzatib beraman" — передам ваш заказ менеджеру
+ *   "Менеджер сизга қўнг қилади"              — то же кириллицей
+ *   "Менеджеримиз сизга хабар беради"
+ *
+ * Апостроф в узбекской латинице пишут пятью разными знаками (' ’ ` ʻ ‘) либо
+ * не пишут вовсе — отсюда опциональный класс APOS во всех основах.
  */
 
 const HUMAN_REPS = "менедж|админ|оператор|сотрудник|специалист|консультант|представит|человек";
@@ -68,9 +86,49 @@ const REQUEST_RECEIVED = new RegExp(
 // 6) English
 const ENGLISH = /(forward.{0,30}(manager|admin|representative|team)|notify.{0,15}(manager|admin|team)|escalat|get\s+back\s+to\s+you|sent\s+(to|the).{0,20}(manager|admin)|our\s+(team|manager).{0,20}(contact|reach|get)|will\s+contact\s+you)/i;
 
+// ─── 7) Узбекский: латиница + кириллица ───────────────────────────────────
+// Апостроф: ' ’ ` ʻ ‘ либо его отсутствие ("bog'lanadi" / "boglanadi").
+const APOS = "['’`ʻ‘]?";
+
+// Кириллица дублирует русский HUMAN_REPS намеренно: русская группа ищет
+// исполнителя рядом с РУССКИМ глаголом («менеджер свяжется»), а здесь тот же
+// «менеджер» должен найтись рядом с УЗБЕКСКИМ («менеджер алоқа қилади»).
+// Совпадает слово — не совпадает пара, ради которой группа и существует.
+const UZ_REPS =
+  "menejer|menedj|menedzh|mutaxassis|mas" + APOS + "ul|operator|administrator|xodim|" +
+  "менеж|менедж|мутахассис|ходим|оператор|администратор";
+
+// «свяжется / позвонит / ответит / напишет» — глагол в узбекском идёт последним
+const UZ_CONTACT =
+  "bog" + APOS + "lan|aloqa|qo" + APOS + "ng" + APOS + "iroq|javob\\s*ber|xabar\\s*ber|yozadi|yozishadi|" +
+  "боғлан|боглан|алоқа|алока|қўнғироқ|конгирок|қўнг|хабар\\s*бер|жавоб\\s*бер|ёзади";
+
+// «передал / отправил / довёл» — глаголы передачи
+const UZ_FORWARD =
+  "yubor|uzat|yetkaz|o" + APOS + "tkaz|" +
+  "юбор|узат|етказ|ўтказ";
+
+// 7a) «менеджер ... свяжется» / «менеджеру ... передал» — исполнитель, затем действие
+const UZ_REP_THEN_ACTION = new RegExp(
+  `(?:${UZ_REPS}).{0,60}(?:${UZ_CONTACT}|${UZ_FORWARD})`,
+  "i"
+);
+
+// 7b) «передал ... менеджеру» / «Bog'lanadi menejerimiz» — обратный порядок.
+// В узбекском порядок слов свободнее русского, глагол регулярно уходит вперёд.
+const UZ_ACTION_THEN_REP = new RegExp(
+  `(?:${UZ_FORWARD}|${UZ_CONTACT}).{0,60}(?:${UZ_REPS})`,
+  "i"
+);
+
+// 7c) «xabar yubordim» / «хабар юбордим» — «отправил сообщение» без указания
+// кому: в узбекских ответах бота это устойчивый оборот именно про передачу
+// менеджеру.
+const UZ_MESSAGE_SENT = /(xabar\s*yubor|хабар\s*юбор)/i;
+
 /**
  * Возвращает один объединённый regex — для использования с .test().
- * Любая из 6 групп срабатывает → trigger safety-net.
+ * Любая из групп срабатывает → trigger safety-net.
  */
 export function botPromisedHandoffRegex(): RegExp {
   return new RegExp(
@@ -81,6 +139,9 @@ export function botPromisedHandoffRegex(): RegExp {
       WE_CONTACT_YOU.source,
       REQUEST_RECEIVED.source,
       ENGLISH.source,
+      UZ_REP_THEN_ACTION.source,
+      UZ_ACTION_THEN_REP.source,
+      UZ_MESSAGE_SENT.source,
     ].join("|"),
     "i"
   );
