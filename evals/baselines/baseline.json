@@ -1,9 +1,9 @@
 {
-  "savedAt": "2026-09-17T06:03:50.136Z",
+  "savedAt": "2026-09-17T06:16:58.293Z",
   "model": "claude-sonnet-5",
   "passed": 19,
   "total": 19,
-  "avgJudge": "1.63",
+  "avgJudge": "1.58",
   "cases": [
     {
       "id": "order-all-data-present",
@@ -38,7 +38,7 @@
     {
       "id": "silence-after-offer",
       "passed": true,
-      "judgeScore": 2
+      "judgeScore": 1
     },
     {
       "id": "already-discussed-product",
@@ -78,7 +78,7 @@
     {
       "id": "uzbek-latin-product",
       "passed": true,
-      "judgeScore": 1
+      "judgeScore": 2
     },
     {
       "id": "uzbek-cyrillic-script",
@@ -98,7 +98,7 @@
     {
       "id": "stage-stuck-changes-tactic",
       "passed": true,
-      "judgeScore": 2
+      "judgeScore": 1
     }
   ]
 }

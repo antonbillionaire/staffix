@@ -114,3 +114,31 @@ describe("buildStuckDirective — топтание на месте", () => {
     expect(b).toContain("РАЗГОВОР СТОИТ НА МЕСТЕ");
   });
 });
+
+describe("buildFunnelStateBlock — директива вытесняет тактику стадии", () => {
+  it("пока разговор идёт — обычная тактика на месте", () => {
+    const b = buildFunnelStateBlock(2, 0, EMPTY);
+    expect(b).toContain("Что делаешь на этой стадии");
+    expect(b).toContain("один вопрос за раз");
+  });
+
+  it("разговор встал — тактика стадии убрана, иначе промпт спорит сам с собой", () => {
+    // Стадия 2 велит уточнять, директива велит перестать уточнять. Два
+    // противоположных указания рядом — и модель слушает первое: эвал
+    // stage-stuck-changes-tactic падал ровно так.
+    const b = buildFunnelStateBlock(2, 5, EMPTY);
+    expect(b).not.toContain("Что делаешь на этой стадии");
+    expect(b).toContain("Хватит уточнять");
+  });
+
+  it("запреты остаются даже когда разговор встал — они про безопасность", () => {
+    const b = buildFunnelStateBlock(6, 5, EMPTY);
+    expect(b).toContain("Чего НЕ делаешь");
+    expect(b).toContain("это ложь клиенту");
+  });
+
+  it("директива идёт до запретов, а не в самом конце", () => {
+    const b = buildFunnelStateBlock(3, 5, EMPTY);
+    expect(b.indexOf("РАЗГОВОР СТОИТ НА МЕСТЕ")).toBeLessThan(b.indexOf("Чего НЕ делаешь"));
+  });
+});
