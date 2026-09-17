@@ -362,6 +362,7 @@ export async function buildBusinessContext(
 // context have strongest grip on behavior). Hides Staffix/Claude/Anthropic etc.
 import { ANTI_PROBE_USER_BOT } from "@/lib/security-prompts";
 import { HUMAN_TONE_PROMPT, HUMAN_TONE_REMINDER } from "@/lib/prompts/human-tone";
+import { buildLanguagePolicy } from "@/lib/prompts/language-policy";
 import { FUNNEL_RULES_PROMPT } from "@/lib/prompts/funnel-rules";
 
 /**
@@ -405,26 +406,10 @@ export function buildSystemPrompt(
     casual: "Общайся неформально и легко, как с другом.",
   };
 
-  // Language instruction for AI (4 сентября 2026, OLLEE-fb): раньше здесь
-  // была жёсткая инструкция «Отвечай на русском языке» — Sonnet 5 её строго
-  // следовал и отвечал по-русски клиентам которые писали на узбекском
-  // (в т.ч. на кириллице, где легко перепутать с русским: те же буквы +
-  // ў, қ, ғ, ҳ). У Right Flight работало потому что там модель раньше была
-  // мягче. Теперь инструкция АДАПТИВНАЯ — язык клиента определяется по
-  // каждому его сообщению, `business.language` даёт только дефолт для
-  // случаев когда сообщение слишком короткое (эмодзи, «ок»).
-  const langLabel: Record<string, string> = {
-    ru: "русский",
-    en: "английский",
-    uz: "узбекский",
-    kz: "казахский",
-    kg: "киргизский",
-    tj: "таджикский",
-    am: "армянский",
-    ge: "грузинский",
-  };
-  const defaultLang = langLabel[business.language] || "русский";
-  const langInstruction = `Всегда отвечай на том же языке, на котором в последнем сообщении написал клиент — русский, узбекский (латиница или кириллица), казахский, английский. Определяй язык клиента заново на каждое его сообщение. Узбекский на кириллице использует буквы русского алфавита + ў, қ, ғ, ҳ — не путай его с русским. Дефолтный язык бизнеса — ${defaultLang} (используй его если сообщение слишком короткое чтобы определить язык, например одно слово «ок» или эмодзи).`;
+  // Языковая политика вынесена в prompts/language-policy.ts (17 сент 2026):
+  // раньше она жила только здесь, то есть доставалась режиму услуг, а
+  // магазинам на sales-prompt.ts — нет. Причины и содержание правил — там же.
+  const langInstruction = buildLanguagePolicy(business.language);
 
   const businessTypeLabel = business.businessTypes.length > 0
     ? business.businessTypes.join(", ")

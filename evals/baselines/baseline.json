@@ -1,9 +1,9 @@
 {
-  "savedAt": "2026-09-17T04:36:27.971Z",
+  "savedAt": "2026-09-17T05:40:09.851Z",
   "model": "claude-sonnet-5",
-  "passed": 14,
-  "total": 14,
-  "avgJudge": "1.71",
+  "passed": 16,
+  "total": 16,
+  "avgJudge": "1.69",
   "cases": [
     {
       "id": "order-all-data-present",
@@ -18,12 +18,12 @@
     {
       "id": "order-ready-no-phone",
       "passed": true,
-      "judgeScore": 2
+      "judgeScore": 1
     },
     {
       "id": "price-objection",
       "passed": true,
-      "judgeScore": 2
+      "judgeScore": 1
     },
     {
       "id": "discount-45-hallucination",
@@ -38,7 +38,7 @@
     {
       "id": "silence-after-offer",
       "passed": true,
-      "judgeScore": 0
+      "judgeScore": 1
     },
     {
       "id": "already-discussed-product",
@@ -58,7 +58,7 @@
     {
       "id": "blogger-partnership",
       "passed": true,
-      "judgeScore": 1
+      "judgeScore": 2
     },
     {
       "id": "complaint",
@@ -72,6 +72,16 @@
     },
     {
       "id": "prefetch-no-redundant-search",
+      "passed": true,
+      "judgeScore": 2
+    },
+    {
+      "id": "uzbek-latin-product",
+      "passed": true,
+      "judgeScore": 1
+    },
+    {
+      "id": "uzbek-cyrillic-script",
       "passed": true,
       "judgeScore": 2
     }

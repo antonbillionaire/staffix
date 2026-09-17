@@ -7,6 +7,7 @@
  *   npm run eval -- --compare baseline     — сравнить с базовым прогоном
  *   npm run eval -- --no-judge             — только детерминированные проверки (бесплатно)
  *   npm run eval -- --no-retry             — не перепроверять упавшие кейсы
+ *   npm run eval -- --model claude-haiku-4-5-20251001  — прогнать другой моделью
  *
  * Чем отличается от scripts/qwen-offline-test.mjs: тот собирал УПРОЩЁННУЮ
  * копию промпта, то есть проверял не то, что работает в проде. Здесь промпт
@@ -37,7 +38,11 @@ const compareWith = getArg("compare");
 const noJudge = argv.includes("--no-judge");
 const noRetry = argv.includes("--no-retry");
 
-const MAIN_MODEL = "claude-sonnet-5";
+// --model позволяет прогнать тот же набор другой моделью и сравнить баллы.
+// Нужен чтобы отвечать на вопросы вида «узбекский плохой из-за модели или
+// из-за промпта?» замером, а не рассуждением. Судья всегда Sonnet: меняться
+// должно то, что проверяют, а не тот, кто проверяет.
+const MAIN_MODEL = getArg("model") || "claude-sonnet-5";
 const JUDGE_MODEL = "claude-sonnet-5";
 
 if (!process.env.ANTHROPIC_API_KEY) {
@@ -247,10 +252,40 @@ function checkDeterministic(c, out) {
   if (must.mentionsProduct && !text.toLowerCase().includes(String(must.mentionsProduct).toLowerCase())) {
     fails.push(`must: не упомянул "${must.mentionsProduct}"`);
   }
+  // respondsInUzbek: true | "latn" | "cyrl".
+  // Узбекский бывает на двух письменностях, и отвечать надо той же, которой
+  // написал клиент. Старая проверка считала ЛЮБУЮ кириллицу ошибкой — для
+  // клиента, написавшего «Салом! Юз учун крем борми?», это неверно.
   if (must.respondsInUzbek) {
-    // Кириллица в ответе на узбекский латиницей — признак ответа не на том языке
-    const cyrillicRatio = (text.match(/[а-яё]/gi) || []).length / Math.max(text.length, 1);
-    if (cyrillicRatio > 0.3) fails.push("must: ответил не на узбекском");
+    const script = must.respondsInUzbek === true ? "latn" : must.respondsInUzbek;
+    const cyrillicRatio = (text.match(/[а-яёўқғҳ]/gi) || []).length / Math.max(text.length, 1);
+    if (script === "latn") {
+      if (cyrillicRatio > 0.3) fails.push("must: ответил не узбекской латиницей");
+    } else {
+      // ў, қ, ғ, ҳ в русском алфавите отсутствуют — их наличие отличает
+      // узбекскую кириллицу от русского текста детерминированно.
+      if (cyrillicRatio < 0.3) fails.push("must: ответил не кириллицей");
+      if (!/[ўқғҳЎҚҒҲ]/.test(text)) fails.push("must: кириллица русская, не узбекская");
+    }
+  }
+
+  // Казахские слова в узбекском ответе — измеренный дефект: бот путает языки
+  // («Жақшан! 👍 Скриншотни юборинг»). Список короткий и однозначный.
+  if (must.respondsInUzbek && /(жақсы|жақшан|рахмет|сәлем|қалай ж|барлық)/i.test(text)) {
+    fails.push("mustNot: казахские слова в узбекском ответе");
+  }
+
+  // Русские обиходные слова посреди узбекской фразы — второй измеренный дефект
+  // («Менеджер сизга вскоре хабар беради»). Названия товаров сюда не попадают:
+  // список — только служебная лексика, которой в каталоге не бывает.
+  // Без \b намеренно: в JavaScript граница слова определяется через
+  // [A-Za-z0-9_], поэтому перед кириллической буквой её не бывает и
+  // `\bвскоре` не совпало бы никогда.
+  if (must.respondsInUzbek === "latn") {
+    const strayRu = text.match(
+      /(вскоре|оформить|оформим|доставка|скидка|наличие|пожалуйста|здравствуйте|спасибо|менеджер)/gi
+    );
+    if (strayRu) fails.push(`mustNot: русские слова в узбекском ответе (${[...new Set(strayRu)].join(", ")})`);
   }
 
   if (mustNot.toolsCalled) {

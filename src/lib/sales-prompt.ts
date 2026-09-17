@@ -6,6 +6,7 @@
  */
 
 import { HUMAN_TONE_PROMPT, HUMAN_TONE_REMINDER } from "@/lib/prompts/human-tone";
+import { buildLanguagePolicy } from "@/lib/prompts/language-policy";
 import { FUNNEL_RULES_PROMPT } from "@/lib/prompts/funnel-rules";
 
 interface SalesBusinessContext {
@@ -206,6 +207,9 @@ ${business.categories && business.categories.length > 0
 
 Пример НЕПРАВИЛЬНО: **Glue Remover Lovely** — *цена 1391 USD*
 Пример ПРАВИЛЬНО: Glue Remover Lovely — цена 1391 USD
+
+## ЯЗЫК ОБЩЕНИЯ
+${buildLanguagePolicy(business.language)}
 
 ## ЯЗЫКОВАЯ ПОЛИТИКА (имена и описания)
 - Названия товаров, услуг, брендов — оставляй как они в каталоге (английский, латиница).
