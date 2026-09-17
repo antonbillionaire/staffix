@@ -118,7 +118,26 @@ export async function generateAIResponse(
       autoDescription: d.autoDescription,
       extractedText: d.extractedText,
     }));
-    const pickedDocs = await pickRelevantDocuments(userMessage, docPool, businessId);
+    // Параллелизация подготовки (Этап 3.5.1). Зеркало channel-ai.ts —
+    // подробности там же. Коротко: три независимых подготовительных шага
+    // выполнялись последовательно и разнесены по коду на 200 строк; запуск
+    // одновременно даёт клиенту ответ на 0.5-1.5 секунды раньше при тех же
+    // токенах. Старт здесь, а не выше — до этой точки есть ранние выходы
+    // (botMuted, takeover), где платить за Haiku незачем.
+    const docsPromise = pickRelevantDocuments(userMessage, docPool, businessId).catch((e) => {
+      console.warn("[Webhook] doc matcher failed, using all docs:", e);
+      return docPool;
+    });
+    const mainModelPromise = pickMainModel(businessId, userMessage).catch((e) => {
+      console.warn("[Webhook] model picker failed, falling back to Sonnet:", e);
+      return { model: "claude-sonnet-5" as const, complexity: "off" as const };
+    });
+    const cacheStrategyPromise = pickCacheStrategy(businessId, String(telegramId)).catch((e) => {
+      console.warn("[Webhook] cache strategy failed, using defaults:", e);
+      return { stableTTL: "1h" as const, docsTTL: "5m" as const, variableTTL: "5m" as const, reason: "promise_error_fallback" };
+    });
+
+    const pickedDocs = await docsPromise;
     if (pickedDocs.length !== docPool.length) {
       console.log(`[Webhook] doc matcher: ${docPool.length} → ${pickedDocs.length} for business=${businessId}`);
     }
@@ -299,7 +318,7 @@ export async function generateAIResponse(
     // sparse traffic write cache тратит впустую (2× дороже чем без кэша).
     // pickCacheStrategy смотрит активность бизнеса/клиента и решает где
     // ставить cache_control, а где отправлять без кэша.
-    const cacheStrategy = await pickCacheStrategy(businessId, String(telegramId));
+    const cacheStrategy = await cacheStrategyPromise;
     console.log(`[TG AI] cache strategy: ${cacheStrategy.reason} → stable=${cacheStrategy.stableTTL} docs=${cacheStrategy.docsTTL ?? "off"} var=${cacheStrategy.variableTTL ?? "off"}`);
     // Порядок cache-блоков: stable → docs → variable. Порядок важен потому
     // что каждый последующий cache_key = hash(всех предыдущих + этого).
@@ -323,7 +342,7 @@ export async function generateAIResponse(
 
     // Hybrid routing: SIMPLE → Haiku 4.5, COMPLEX → Sonnet 5. Только для
     // бизнесов из AI_HYBRID_BUSINESS_IDS. Для остальных всегда Sonnet 5.
-    const mainModel = await pickMainModel(businessId, userMessage);
+    const mainModel = await mainModelPromise;
     console.log(
       `[Webhook] Calling Claude API for business=${businessId}, salesMode=${salesMode}, stableLen=${systemPrompt.stable.length}, docsLen=${systemPrompt.docs.length}, variableLen=${variableTail.length}, model=${mainModel.model}, complexity=${mainModel.complexity}`
     );

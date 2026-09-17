@@ -818,7 +818,39 @@ export async function generateChannelAIResponse(
     //   systemDocs  — блок «Справочные документы» только с выбранными файлами.
     //                 Кэшируется на 5m — при повторе того же запроса hit,
     //                 при смене темы дешёвый write.
-    const pickedDocs = await pickRelevantDocuments(userMessage, biz.documents, businessId);
+    // Параллелизация подготовки (Этап 3.5.1 research-плана, 17 сент 2026).
+    //
+    // Три подготовительных шага независимы друг от друга — каждый смотрит
+    // только на businessId / userMessage / clientId, — но выполнялись
+    // последовательно и разнесены по коду на 150 строк:
+    //   pickRelevantDocuments (Haiku-матчер)  ~300-600 мс
+    //   pickMainModel         (Haiku-классификатор, если гибрид включён)
+    //   pickCacheStrategy     (пара SQL-запросов)
+    //
+    // Запускаем одновременно, await'им в точках использования ниже. Клиент
+    // получает ответ на 0.5-1.5 секунды раньше, токены не меняются.
+    //
+    // Промисы стартуют ЗДЕСЬ, а не выше по функции: до этой точки есть ранние
+    // выходы (бот на паузе, human takeover, лимит подписки), и запуск раньше
+    // означал бы платить за Haiku в диалогах, где бот вообще не отвечает.
+    //
+    // .catch() на каждом — чтобы отложенный await не превратил сбой в
+    // unhandled rejection. Внутри у всех трёх свои fallback'и, но полагаться
+    // на это в параллельном запуске нельзя.
+    const docsPromise = pickRelevantDocuments(userMessage, biz.documents, businessId).catch((e) => {
+      console.warn("[Channel AI] doc matcher failed, using all docs:", e);
+      return biz.documents;
+    });
+    const mainModelPromise = pickMainModel(businessId, userMessage).catch((e) => {
+      console.warn("[Channel AI] model picker failed, falling back to Sonnet:", e);
+      return { model: "claude-sonnet-5" as const, complexity: "off" as const };
+    });
+    const cacheStrategyPromise = pickCacheStrategy(businessId, clientId).catch((e) => {
+      console.warn("[Channel AI] cache strategy failed, using defaults:", e);
+      return { stableTTL: "1h" as const, docsTTL: "5m" as const, variableTTL: "5m" as const, reason: "promise_error_fallback" };
+    });
+
+    const pickedDocs = await docsPromise;
     if (pickedDocs.length !== biz.documents.length) {
       console.log(
         `[Channel AI] doc matcher: ${biz.documents.length} → ${pickedDocs.length} for biz=${businessId}`
@@ -968,7 +1000,7 @@ export async function generateChannelAIResponse(
     // Hybrid model routing (июль 2026): SIMPLE запросы → Haiku 4.5,
     // COMPLEX → Sonnet 5. Только для бизнесов из AI_HYBRID_BUSINESS_IDS
     // (A/B тестируем на Right Flight). Для остальных — всегда Sonnet 5.
-    const mainModel = await pickMainModel(businessId, userMessage);
+    const mainModel = await mainModelPromise;
     console.log(
       `[Channel AI] model=${mainModel.model} complexity=${mainModel.complexity} biz=${businessId}`
     );
@@ -985,7 +1017,7 @@ export async function generateChannelAIResponse(
     // Шаг 2 плана оптимизации (21 июля 2026): умный cache_control.
     // Для sparse traffic write кэша тратит впустую (в 2× дороже чем без него);
     // pickCacheStrategy определяет по активности бизнеса/клиента.
-    const cacheStrategy = await pickCacheStrategy(businessId, clientId);
+    const cacheStrategy = await cacheStrategyPromise;
     console.log(`[Channel AI] cache strategy: ${cacheStrategy.reason} → stable=${cacheStrategy.stableTTL} docs=${cacheStrategy.docsTTL ?? "off"}`);
     // Порядок cache-блоков: stable → docs → variable. Каждый последующий
     // cache_key = hash(всех предыдущих + этого) — если stable не изменился,

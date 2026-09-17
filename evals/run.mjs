@@ -6,6 +6,7 @@
  *   npm run eval -- --save baseline        — сохранить как базовый прогон
  *   npm run eval -- --compare baseline     — сравнить с базовым прогоном
  *   npm run eval -- --no-judge             — только детерминированные проверки (бесплатно)
+ *   npm run eval -- --no-retry             — не перепроверять упавшие кейсы
  *
  * Чем отличается от scripts/qwen-offline-test.mjs: тот собирал УПРОЩЁННУЮ
  * копию промпта, то есть проверял не то, что работает в проде. Здесь промпт
@@ -34,6 +35,7 @@ const onlyCase = getArg("case");
 const saveAs = getArg("save");
 const compareWith = getArg("compare");
 const noJudge = argv.includes("--no-judge");
+const noRetry = argv.includes("--no-retry");
 
 const MAIN_MODEL = "claude-sonnet-5";
 const JUDGE_MODEL = "claude-sonnet-5";
@@ -325,15 +327,58 @@ for (const c of cases) {
   }
 }
 
+// ─── Перепроверка упавших ─────────────────────────────────────────────────
+//
+// Модель недетерминирована: один и тот же кейс может пройти и упасть в
+// соседних прогонах. Поймано на первом же применении эвалов к правке, которая
+// поведение вообще не меняла (параллелизация подготовки) — кейс complaint
+// упал один раз, а затем прошёл три раза подряд.
+//
+// Без перепроверки такой шум читается как регресс, и доверие к эвалам
+// теряется быстрее, чем они успевают принести пользу. Кейс, прошедший хотя бы
+// один из повторов, помечается FLAKY — это сигнал «проверь глазами», а не
+// «сломано».
+const RETRY_ATTEMPTS = 2;
+if (!noRetry) {
+  const toRetry = results.filter((r) => !r.passed && !r.error);
+  if (toRetry.length > 0) {
+    console.log(`\nПерепроверка упавших (${toRetry.length}) — модель недетерминирована...`);
+    for (const r of toRetry) {
+      const c = cases.find((x) => x.id === r.id);
+      for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
+        try {
+          const out = await runCase(c);
+          const fails = checkDeterministic(c, out);
+          const j = noJudge ? { score: null } : await judge(c, out);
+          if (fails.length === 0 && (j.score === null || j.score >= 1)) {
+            r.passed = true;
+            r.flaky = true;
+            r.flakyNote = `прошёл с попытки ${attempt + 1}`;
+            console.log(`  ${r.id.padEnd(30)} ⚠️  FLAKY — ${r.flakyNote}`);
+            break;
+          }
+        } catch {
+          /* повтор не удался — оставляем как есть */
+        }
+      }
+      if (!r.passed) console.log(`  ${r.id.padEnd(30)} ❌ стабильно падает`);
+    }
+  }
+}
+
 // ─── Отчёт ────────────────────────────────────────────────────────────────
 const passedCount = results.filter((r) => r.passed).length;
+const flakyCount = results.filter((r) => r.flaky).length;
 const judged = results.filter((r) => typeof r.judgeScore === "number");
 const avgJudge = judged.length
   ? (judged.reduce((s, r) => s + r.judgeScore, 0) / judged.length).toFixed(2)
   : "—";
 
 console.log(`\n${"─".repeat(60)}`);
-console.log(`Пройдено: ${passedCount}/${results.length}   Средний балл судьи: ${avgJudge}/2`);
+console.log(
+  `Пройдено: ${passedCount}/${results.length}   Средний балл судьи: ${avgJudge}/2` +
+    (flakyCount > 0 ? `   ⚠️ нестабильных: ${flakyCount}` : "")
+);
 
 const byCategory = {};
 for (const r of results) {
