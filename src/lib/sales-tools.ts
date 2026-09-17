@@ -298,26 +298,70 @@ export async function searchProducts(
         ? Prisma.sql`AND "price" <= ${maxPrice}`
         : Prisma.empty;
 
+    // Ранжирование по релевантности (17 сент 2026, Этап 3.5.2 research-плана).
+    //
+    // Было `ORDER BY "name" ASC` — выдача шла по алфавиту, и совпадение в
+    // описании весило столько же, сколько совпадение в названии. На реальном
+    // каталоге OLLEE это давало:
+    //   «маска»    → первым «Аргановое масло» (совпало только в тегах),
+    //                настоящие маски уходили вниз
+    //   «коллаген» → первым «Антивозрастной крем», а «Коллагеновый комплекс»
+    //                оказывался четвёртым
+    // Бот показывает клиенту первые 2-3 позиции, то есть на запрос «коллаген»
+    // человек не видел коллаген.
+    //
+    // Теперь вес зависит от того, ГДЕ нашлось слово. Порядок весов отражает,
+    // насколько поле говорит о сути товара: название — сильнее всего,
+    // описание — слабее всего (там слово может быть упомянуто вскользь).
+    // Считается в SQL, без модели и без дополнительных вызовов.
+    const scoreClauses: Prisma.Sql[] = queryWords.map((w) => {
+      const exact = w;
+      const prefix = `${w}%`;
+      const anywhere = `%${w}%`;
+      return Prisma.sql`(
+        CASE WHEN LOWER("name") = ${exact} THEN 100 ELSE 0 END
+        + CASE WHEN LOWER("name") LIKE ${prefix} THEN 50 ELSE 0 END
+        + CASE WHEN LOWER("name") LIKE ${anywhere} THEN 30 ELSE 0 END
+        + CASE WHEN EXISTS (SELECT 1 FROM unnest("tags") t WHERE LOWER(t) = ${exact}) THEN 20 ELSE 0 END
+        + CASE WHEN EXISTS (SELECT 1 FROM unnest("tags") t WHERE LOWER(t) LIKE ${anywhere}) THEN 15 ELSE 0 END
+        + CASE WHEN LOWER(COALESCE("category", '')) LIKE ${anywhere} THEN 8 ELSE 0 END
+        + CASE WHEN LOWER(COALESCE("description", '')) LIKE ${anywhere} THEN 3 ELSE 0 END
+      )`;
+    });
+    const relevanceScore =
+      scoreClauses.length > 0 ? Prisma.join(scoreClauses, " + ") : Prisma.sql`0`;
+
+    // Вторичная сортировка: при равной релевантности выше идёт то, что есть
+    // в наличии — предлагать клиенту отсутствующий товар хуже, чем имеющийся.
+    // Третичная — по имени, чтобы выдача была стабильной между вызовами.
     const idRows = await prisma.$queryRaw<Array<{ id: string }>>`
-      SELECT id FROM "Product"
+      SELECT id, (${relevanceScore}) AS relevance FROM "Product"
       WHERE "businessId" = ${businessId}
         AND "isActive" = true
         ${wordsWhere}
         ${categoryWhere}
         ${priceWhere}
-      ORDER BY "name" ASC
+      ORDER BY relevance DESC, ("stock" IS NULL OR "stock" > 0) DESC, "name" ASC
       LIMIT 20
     `;
 
     // Шаг 2 — догружаем полные объекты через стандартный findMany.
     // Это даёт корректную типизацию Product без явных type assertions.
-    let products =
-      idRows.length > 0
-        ? await prisma.product.findMany({
-            where: { id: { in: idRows.map((r) => r.id) } },
-            orderBy: { name: "asc" },
-          })
-        : [];
+    //
+    // ВАЖНО: findMany возвращает строки в своём порядке, поэтому порядок
+    // из idRows (по релевантности) восстанавливаем вручную. Раньше здесь
+    // стоял orderBy: name — сейчас он бы просто затёр ранжирование,
+    // посчитанное запросом выше.
+    let products = [] as Awaited<ReturnType<typeof prisma.product.findMany>>;
+    if (idRows.length > 0) {
+      const rankById = new Map(idRows.map((r, i) => [r.id, i]));
+      const rows = await prisma.product.findMany({
+        where: { id: { in: idRows.map((r) => r.id) } },
+      });
+      products = rows.sort(
+        (a, b) => (rankById.get(a.id) ?? 0) - (rankById.get(b.id) ?? 0)
+      );
+    }
 
     // AI-fallback: если raw substring-поиск ничего не нашёл — опечатка или
     // другой язык (Клеопатра vs Cleopatra). Дёргаем Haiku с реальными названиями.
