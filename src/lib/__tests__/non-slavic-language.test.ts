@@ -54,3 +54,42 @@ describe("isNonSlavicLanguage — русский и английский не т
     expect(isNonSlavicLanguage("")).toBe(false);
   });
 });
+
+describe("isNonSlavicLanguage — узбекская кириллица БЕЗ особых букв", () => {
+  it("«Она тилида гапирсанг булмайдими» — реальное сообщение клиента RIGHT FLIGHT", () => {
+    // 26 сент 2026: это ушло на Haiku, и бот сочинил, что работает только
+    // по-русски, хотя в базе знаний бизнеса написано обратное.
+    expect(isNonSlavicLanguage("Она тилида гапирсанг булмайдими ёки менсимайсанми")).toBe(true);
+  });
+
+  it("«Нархи канча экан» — самый частый вопрос в комментариях", () => {
+    expect(isNonSlavicLanguage("Нархи канча экан")).toBe(true);
+    expect(isNonSlavicLanguage("[Комментарий к посту] Нархи канча")).toBe(true);
+  });
+
+  it("приветствия и благодарности", () => {
+    expect(isNonSlavicLanguage("Ассалому алайкум, нархи канча экан?")).toBe(true);
+    expect(isNonSlavicLanguage("Асаломалекум бартер есть?")).toBe(true);
+    expect(isNonSlavicLanguage("Рахмат")).toBe(true);
+    expect(isNonSlavicLanguage("Яхши")).toBe(true);
+  });
+});
+
+describe("isNonSlavicLanguage — «нима» внутри русских слов НЕ считается", () => {
+  // Старый детектор искал подстроку без границ слова и гнал на Sonnet
+  // обычные русские сообщения. Граница задана классом кириллицы, а не :
+  // в JavaScript перед кириллической буквой границы слова не бывает.
+  it.each([
+    "Я не понимаю",
+    "Спасибо за внимание",
+    "Сколько времени занимает поездка между городами?",
+    "Менеджер не поднимает трубку",
+    "минимальный заказ какой?",
+  ])("«%s» — русское", (msg) => {
+    expect(isNonSlavicLanguage(msg)).toBe(false);
+  });
+
+  it("«бор» внутри «выбор» тоже не считается", () => {
+    expect(isNonSlavicLanguage("а выбор большой?")).toBe(false);
+  });
+});
