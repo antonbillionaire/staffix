@@ -468,6 +468,9 @@ async function applyManagerEchoTakeover(
       where: { id: conv.id },
       data: {
         humanTakeoverUntil: until,
+        // Длинный горизонт: менеджер отвечает из приложения Instagram — это
+        // такой же ручной разговор, как из кабинета (см. human-takeover.ts).
+        lastHumanReplyAt: new Date(),
         // Кладём сообщение менеджера в историю — иначе в дашборде диалог
         // выглядит с дырой, а бот при возврате не знает что уже сказали.
         history: [...history, { role: "assistant", content: echoText }],

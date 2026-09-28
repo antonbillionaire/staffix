@@ -715,8 +715,11 @@ export async function generateChannelAIResponse(
     // сообщение клиента в history чтобы менеджер видел, но НЕ вызываем AI.
     // Флаг сам протухнет через HUMAN_TAKEOVER_MINUTES (дефолт 30) или менеджер
     // снимет досрочно через /api/messages/return-to-bot.
-    const { isBotSilenced } = await import("@/lib/human-takeover");
-    if (isBotSilenced(conv.humanTakeoverUntil)) {
+    // Молчим, пока диалог ведёт человек: короткое окно takeover ИЛИ сутки
+    // после последнего ручного ответа. Одного окна мало — клиенты отвечают
+    // через часы, и бот вклинивался поверх менеджера (см. human-takeover.ts).
+    const { isBotOnHold } = await import("@/lib/human-takeover");
+    if (isBotOnHold(conv)) {
       const existingHistory = (conv.history as Array<{ role: string; content: string }>) || [];
       const nextHistory = [...existingHistory, { role: "user", content: userMessage }];
       await prisma.channelConversation.update({
@@ -728,7 +731,7 @@ export async function generateChannelAIResponse(
         },
       });
       console.log(
-        `[Channel AI] Human takeover active for conv=${conv.id} (${channel}) — saving user msg, skipping AI (until ${conv.humanTakeoverUntil?.toISOString()})`
+        `[Channel AI] Human handling conv=${conv.id} (${channel}) — saving user msg, skipping AI (takeoverUntil=${conv.humanTakeoverUntil?.toISOString() ?? "-"}, lastHumanReply=${conv.lastHumanReplyAt?.toISOString() ?? "-"})`
       );
       return { text: "", imageUrls: [] };
     }

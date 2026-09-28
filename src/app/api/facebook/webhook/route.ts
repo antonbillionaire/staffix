@@ -355,6 +355,8 @@ async function applyManagerEchoTakeover(
       where: { id: conv.id },
       data: {
         humanTakeoverUntil: until,
+        // См. instagram/webhook — ответ менеджера из приложения тоже держит бота
+        lastHumanReplyAt: new Date(),
         history: [...history, { role: "assistant", content: echoText }],
         messageCount: { increment: 1 },
         updatedAt: new Date(),

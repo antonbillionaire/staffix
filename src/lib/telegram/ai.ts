@@ -223,8 +223,10 @@ export async function generateAIResponse(
     // сообщение клиента в history чтобы менеджер видел, но НЕ вызываем AI.
     // Флаг сам протухнет через HUMAN_TAKEOVER_MINUTES (дефолт 30), либо
     // менеджер снимет досрочно через /api/messages/return-to-bot.
-    const { isBotSilenced } = await import("@/lib/human-takeover");
-    if (isBotSilenced(conversation.humanTakeoverUntil)) {
+    // См. channel-ai.ts: одного 30-минутного окна мало, клиенты отвечают
+    // через часы. Бот молчит сутки после ручного ответа менеджера.
+    const { isBotOnHold } = await import("@/lib/human-takeover");
+    if (isBotOnHold(conversation)) {
       await saveMessage(conversation.id, "user", userMessage);
       await updateConversationMessageCount(conversation.id);
       console.log(

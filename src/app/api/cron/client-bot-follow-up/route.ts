@@ -167,6 +167,19 @@ async function processTelegramConversations(since: Date, until: Date): Promise<P
       updatedAt: { gte: since, lte: until },
       nudgeCount: 0,
       outcome: { not: "escalated" },
+      // Диалог ведёт человек — автоматике сюда нельзя (29 сент 2026).
+      //
+      // Два независимых признака, оба нужны:
+      //   humanTakeoverUntil — менеджер отвечает прямо сейчас;
+      //   lastHumanReplyAt   — отвечал недавно. Одного takeover мало: он живёт
+      //                        30 минут, а этот крон срабатывает после 45, то
+      //                        есть к моменту проверки всегда уже истёк.
+      //
+      // Без этого крон принимал ВОПРОС МЕНЕДЖЕРА за неотвеченный вопрос бота:
+      // ручные ответы ложатся в историю с той же ролью assistant. У OLLEE бот
+      // так вписался в живой разговор менеджера с клиентом в Instagram.
+      humanTakeoverUntil: null,
+      lastHumanReplyAt: null,
     },
     take: MAX_BUSINESSES_PER_RUN,
     include: {
@@ -234,6 +247,19 @@ async function processChannelConversations(since: Date, until: Date): Promise<Pr
       outcome: { not: "escalated" },
       // web-виджет пропускаем — клиент мог уже закрыть вкладку
       channel: { in: ["whatsapp", "instagram", "facebook", "messenger"] },
+      // Диалог ведёт человек — автоматике сюда нельзя (29 сент 2026).
+      //
+      // Два независимых признака, оба нужны:
+      //   humanTakeoverUntil — менеджер отвечает прямо сейчас;
+      //   lastHumanReplyAt   — отвечал недавно. Одного takeover мало: он живёт
+      //                        30 минут, а этот крон срабатывает после 45, то
+      //                        есть к моменту проверки всегда уже истёк.
+      //
+      // Без этого крон принимал ВОПРОС МЕНЕДЖЕРА за неотвеченный вопрос бота:
+      // ручные ответы ложатся в историю с той же ролью assistant. У OLLEE бот
+      // так вписался в живой разговор менеджера с клиентом в Instagram.
+      humanTakeoverUntil: null,
+      lastHumanReplyAt: null,
     },
     take: MAX_BUSINESSES_PER_RUN,
     include: {

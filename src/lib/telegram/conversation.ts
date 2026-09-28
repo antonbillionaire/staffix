@@ -25,6 +25,8 @@ export async function getOrCreateConversation(
   extractedInfo: Record<string, unknown> | null;
   /** Дата истечения human-takeover окна (см. lib/human-takeover.ts). null = бот работает как обычно. */
   humanTakeoverUntil: Date | null;
+  /** Когда в диалоге последний раз отвечал человек — длинный горизонт тишины. */
+  lastHumanReplyAt: Date | null;
   /** Текущий исход диалога — нужен чтобы не затирать сильный исход слабым (Этап 2). */
   outcome: string | null;
   /** Стадия воронки 1..7 как состояние, а не догадка модели (Этап 4). */
@@ -104,6 +106,7 @@ export async function getOrCreateConversation(
         contextRefreshSoftWarning: softWarning,
         extractedInfo: (conversation.extractedInfo as Record<string, unknown> | null) || null,
         humanTakeoverUntil: conversation.humanTakeoverUntil ?? null,
+        lastHumanReplyAt: conversation.lastHumanReplyAt ?? null,
         outcome: conversation.outcome ?? null,
         funnelStage: conversation.funnelStage ?? 1,
         knownFacts: conversation.knownFacts ?? null,
@@ -130,7 +133,7 @@ export async function getOrCreateConversation(
       .catch((e) => console.error("[Webhook] totalConversations increment error:", e));
 
     // Новый диалог: стадия 1 (приветствие), фактов ещё нет.
-    return { id: conversation.id, messages: [], contextRefreshSoftWarning: false, extractedInfo: null, humanTakeoverUntil: null, outcome: null, funnelStage: 1, knownFacts: null, funnelStageUpdatedAt: null };
+    return { id: conversation.id, messages: [], contextRefreshSoftWarning: false, extractedInfo: null, humanTakeoverUntil: null, lastHumanReplyAt: null, outcome: null, funnelStage: 1, knownFacts: null, funnelStageUpdatedAt: null };
   } catch (error) {
     console.error("Error getting conversation:", error);
     throw error;

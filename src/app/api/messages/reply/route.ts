@@ -215,6 +215,10 @@ export async function POST(request: NextRequest) {
           data: {
             updatedAt: new Date(),
             humanTakeoverUntil: computeTakeoverExpiry(),
+            // Отметка «здесь работает человек» (29 сент 2026). Окно takeover
+            // живёт 30 минут, а крон follow-up срабатывает после 45 — к тому
+            // моменту оно истекало, и бот дописывал в разговор менеджера.
+            lastHumanReplyAt: new Date(),
           },
         });
       }
@@ -239,6 +243,7 @@ export async function POST(request: NextRequest) {
             updatedAt: new Date(),
             // Human takeover — см. коммент в telegram-ветке выше.
             humanTakeoverUntil: computeTakeoverExpiry(),
+            lastHumanReplyAt: new Date(),
           },
         });
       }

@@ -559,6 +559,12 @@ model Conversation {
   // просто без ответа бота — менеджер видит что клиент писал.
   humanTakeoverUntil DateTime?
 
+  // Когда в этом диалоге последний раз отвечал ЧЕЛОВЕК из кабинета
+  // (29 сент 2026). Ручной ответ неотличим от ботовского — оба ложатся
+  // с ролью assistant, — поэтому автоматика без этой отметки влезала в
+  // разговор, который ведёт менеджер. См. cron client-bot-follow-up.
+  lastHumanReplyAt DateTime?
+
   // Silent-follow-up nudge (28 июля 2026): cron client-bot-follow-up шлёт
   // ОДИН мягкий follow-up если бот задал вопрос, а клиент не ответил в
   // течение ~45 минут. nudgeCount ≥ 1 → больше не тревожим этот диалог.
@@ -1628,6 +1634,12 @@ model ChannelConversation {
   // в UI ставит null досрочно. Входящие клиента всё равно сохраняются в history,
   // просто без ответа бота — менеджер видит что клиент писал.
   humanTakeoverUntil DateTime?
+
+  // Когда в этом диалоге последний раз отвечал ЧЕЛОВЕК из кабинета
+  // (29 сент 2026). Ручной ответ неотличим от ботовского — оба ложатся
+  // с ролью assistant, — поэтому автоматика без этой отметки влезала в
+  // разговор, который ведёт менеджер. См. cron client-bot-follow-up.
+  lastHumanReplyAt DateTime?
 
   // Silent-follow-up nudge (28 июля 2026) — см. Conversation.nudgeCount.
   nudgeCount  Int       @default(0)

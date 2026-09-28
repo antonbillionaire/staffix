@@ -69,7 +69,11 @@ export async function POST(request: NextRequest) {
       }
       await prisma.conversation.update({
         where: { id: conv.id },
-        data: { humanTakeoverUntil: null },
+        // Снимаем и отметку «отвечал человек» (29 сент 2026): иначе диалог
+        // навсегда остался бы исключён из проактивных напоминаний. Кнопка
+        // «вернуть боту» — явный сигнал владельца, что автоматика снова может
+        // вести этот разговор.
+        data: { humanTakeoverUntil: null, lastHumanReplyAt: null },
       });
     } else if (CHANNEL_CONV_CHANNELS.includes(channel)) {
       const conv = await prisma.channelConversation.findFirst({
@@ -81,7 +85,11 @@ export async function POST(request: NextRequest) {
       }
       await prisma.channelConversation.update({
         where: { id: conv.id },
-        data: { humanTakeoverUntil: null },
+        // Снимаем и отметку «отвечал человек» (29 сент 2026): иначе диалог
+        // навсегда остался бы исключён из проактивных напоминаний. Кнопка
+        // «вернуть боту» — явный сигнал владельца, что автоматика снова может
+        // вести этот разговор.
+        data: { humanTakeoverUntil: null, lastHumanReplyAt: null },
       });
     } else {
       return NextResponse.json({ error: "Invalid channel" }, { status: 400 });

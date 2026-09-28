@@ -3,6 +3,7 @@ import {
   getHumanTakeoverMinutes,
   computeTakeoverExpiry,
   isBotSilenced,
+  isBotOnHold,
 } from "../human-takeover";
 
 const ORIG_ENV = process.env.HUMAN_TAKEOVER_MINUTES;
@@ -108,5 +109,53 @@ describe("isBotSilenced", () => {
     const now = new Date("2026-09-04T12:00:00Z");
     const expiry = new Date(now.getTime() + 1);
     expect(isBotSilenced(expiry, now)).toBe(true);
+  });
+});
+
+// ─── Длинный горизонт: диалог ведёт человек (29 сент 2026) ────────────────
+// Реальный случай OLLEE: менеджер разбирал покраснение лица после SPF-крема,
+// клиент отвечал через 4 ч 53 мин и через 1 ч 20 мин. 30-минутное окно к тому
+// моменту истекало, и бот отвечал поверх менеджера — трижды за диалог.
+describe("isBotOnHold — бот не лезет в разговор, который ведёт человек", () => {
+  const NOW = new Date("2026-09-28T14:00:00.000Z");
+  const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3600_000);
+
+  it("чистый диалог — бот работает", () => {
+    expect(isBotOnHold({}, NOW)).toBe(false);
+    expect(isBotOnHold({ humanTakeoverUntil: null, lastHumanReplyAt: null }, NOW)).toBe(false);
+  });
+
+  it("активное окно takeover — молчим (как и раньше)", () => {
+    expect(isBotOnHold({ humanTakeoverUntil: new Date(NOW.getTime() + 60_000) }, NOW)).toBe(true);
+  });
+
+  it("окно истекло, но человек отвечал час назад — всё равно молчим", () => {
+    // Это и есть починка: раньше здесь бот отвечал поверх менеджера
+    expect(
+      isBotOnHold(
+        { humanTakeoverUntil: hoursAgo(1), lastHumanReplyAt: hoursAgo(1) },
+        NOW
+      )
+    ).toBe(true);
+  });
+
+  it("клиент вернулся через 5 часов — менеджер всё ещё ведёт диалог", () => {
+    expect(isBotOnHold({ lastHumanReplyAt: hoursAgo(5) }, NOW)).toBe(true);
+  });
+
+  it("человек отвечал двое суток назад — бот возвращается", () => {
+    expect(isBotOnHold({ lastHumanReplyAt: hoursAgo(48) }, NOW)).toBe(false);
+  });
+
+  it("ровно на границе суток — уже не держим", () => {
+    expect(isBotOnHold({ lastHumanReplyAt: hoursAgo(24) }, NOW)).toBe(false);
+  });
+
+  it("обе отметки сняты кнопкой «Вернуть боту» — бот работает сразу", () => {
+    expect(isBotOnHold({ humanTakeoverUntil: null, lastHumanReplyAt: null }, NOW)).toBe(false);
+  });
+
+  it("поля отсутствуют (старый диалог до миграции) — бот работает", () => {
+    expect(isBotOnHold({ humanTakeoverUntil: undefined, lastHumanReplyAt: undefined }, NOW)).toBe(false);
   });
 });
