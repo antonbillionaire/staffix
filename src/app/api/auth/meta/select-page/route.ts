@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     await subscribePageWebhooks(
       page.id,
       page.access_token,
-      "messages,messaging_postbacks,messaging_handovers,feed"
+      "messages,message_echoes,messaging_postbacks,messaging_handovers,feed"
     );
     await subscribePageWebhooks(page.id, page.access_token, "leadgen");
 

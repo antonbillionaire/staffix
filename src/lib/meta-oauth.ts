@@ -139,6 +139,22 @@ export async function getUserPages(userAccessToken: string): Promise<MetaPage[]>
 
 /**
  * Subscribe a Facebook Page to receive webhook events.
+ *
+ * ПРО `message_echoes` (29 сентября 2026). Эхо — это копия сообщения, которое
+ * отправил САМ бизнес: менеджер ответил клиенту из приложения Instagram, из
+ * входящих страницы или из Business Suite. Без эха Staffix об этом ответе не
+ * знает, human takeover не ставится, и бот продолжает отвечать поверх живого
+ * человека — ровно та жалоба, что пришла от менеджера OLLEE.
+ *
+ * Поля разные у двух платформ (проверено в доках Meta, не по памяти):
+ *   Instagram — эхо приходит в поле `messages` с флагом `is_echo`;
+ *   Messenger — нужна ОТДЕЛЬНАЯ подписка `message_echoes`.
+ *
+ * Дефолт ниже оставлен как был, чтобы не менять поведение вызовов, которые
+ * его не передают; актуальный набор задают вызывающие в auth/meta/*.
+ *
+ * ⚠️ Уже подключённым страницам новое поле не добавится само — подписка
+ * обновляется при переподключении канала в дашборде.
  */
 export async function subscribePageWebhooks(
   pageId: string,
