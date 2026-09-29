@@ -48,12 +48,33 @@ import {
   bootstrapStage,
 } from "@/lib/funnel-state";
 import { buildFunnelStateBlock } from "@/lib/funnel-prompt";
+import { isBotOnHold } from "@/lib/human-takeover";
 import { outcomeFromTools, shouldUpgradeOutcome } from "@/lib/conversation-outcome";
 // Anti-probe boundary — prepended to every WA/IG/FB user-bot system prompt
 // so it has the highest LLM attention weight.
 import { ANTI_PROBE_USER_BOT } from "@/lib/security-prompts";
 
-type HistoryMessage = { role: "user" | "assistant"; content: string };
+/**
+ * Сообщение в истории канального диалога.
+ *
+ * `at` и `by` добавлены 29 сентября 2026. До этого история была массивом
+ * {role, content} без времени, и дашборд показывал ВСЕМ сообщениям одну и ту
+ * же отметку — `conv.updatedAt` (см. api/conversations: `// approximate`).
+ * Из-за этого разобрать жалобу «бот встревает в разговор» было нечем: на
+ * экране все 35 сообщений стояли одной минутой, хотя на деле разговор шёл
+ * часами. Оба поля опциональны — старые записи остаются как есть.
+ *
+ * `by` отличает ответ менеджера от ответа бота: оба ложатся с ролью
+ * assistant, и без пометки их не различить ни в интерфейсе, ни в коде.
+ */
+type HistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+  /** ISO-время сообщения */
+  at?: string;
+  /** Кто отправил assistant-сообщение: бот или человек из кабинета */
+  by?: "bot" | "human";
+};
 
 // Channel booking tools — subset of full booking tools + lead qualification
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -718,7 +739,6 @@ export async function generateChannelAIResponse(
     // Молчим, пока диалог ведёт человек: короткое окно takeover ИЛИ сутки
     // после последнего ручного ответа. Одного окна мало — клиенты отвечают
     // через часы, и бот вклинивался поверх менеджера (см. human-takeover.ts).
-    const { isBotOnHold } = await import("@/lib/human-takeover");
     if (isBotOnHold(conv)) {
       const existingHistory = (conv.history as Array<{ role: string; content: string }>) || [];
       const nextHistory = [...existingHistory, { role: "user", content: userMessage }];
@@ -1619,13 +1639,52 @@ export async function generateChannelAIResponse(
     // при следующем turn'e видит его в контексте и может начать копировать
     // «уточню детали» / «извините» вместо реальных ответов. User-turn сохраняем —
     // это факт что клиент писал (важно для message counter'а и для контекста).
+    // ПОВТОРНАЯ проверка перед сохранением и отправкой (29 сент 2026).
+    //
+    // Первая была на входе, до вызова модели. Между ними проходит 5-8 секунд —
+    // за это время менеджер успевает ответить клиенту сам, и ответ бота падает
+    // поверх живого разговора. В дашборде это выглядит так, как прислал
+    // менеджер OLLEE: его сообщение, сообщение клиента и ответ бота подряд.
+    //
+    // Читаем свежую строку: `conv` загружен до вызова модели и уже устарел.
+    const freshHold = await prisma.channelConversation.findUnique({
+      where: { id: conv.id },
+      select: { humanTakeoverUntil: true, lastHumanReplyAt: true },
+    });
+    if (freshHold && isBotOnHold(freshHold)) {
+      console.log(
+        `[Channel AI] Manager replied while the model was thinking — dropping bot reply. conv=${conv.id} (${channel})`
+      );
+      // Сообщение клиента всё равно сохраняем — менеджер должен его видеть.
+      await prisma.channelConversation
+        .update({
+          where: { id: conv.id },
+          data: {
+            history: [
+              ...history,
+              { role: "user" as const, content: userMessage, at: new Date().toISOString() },
+            ].slice(-40),
+            messageCount: { increment: 1 },
+            clientName: clientName || conv.clientName,
+          },
+        })
+        .catch((e) => console.error("[Channel AI] save after drop failed:", e));
+      turn.markSafetyNet("human_takeover_race");
+      return { text: "", imageUrls: [] };
+    }
+
     const replyForHistory = replyText.replace(/\n\n— staffix\.io$/g, "").trim();
     const historyEntries: HistoryMessage[] = [
       ...history,
-      { role: "user" as const, content: userMessage },
+      { role: "user" as const, content: userMessage, at: new Date().toISOString() },
     ];
     if (!isFallback) {
-      historyEntries.push({ role: "assistant" as const, content: replyForHistory });
+      historyEntries.push({
+        role: "assistant" as const,
+        content: replyForHistory,
+        at: new Date().toISOString(),
+        by: "bot" as const,
+      });
     } else {
       console.warn(
         `[Channel AI] FALLBACK detected — NOT saving assistant reply to history. conv=${conv.id}`

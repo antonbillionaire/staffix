@@ -233,8 +233,21 @@ export async function POST(request: NextRequest) {
       });
       if (conv) {
         // Read fresh history to avoid race with bot AI reply
-        const history = (conv.history as Array<{ role: string; content: string }>) || [];
-        history.push({ role: "assistant", content: cleanText });
+        const history =
+          (conv.history as Array<{
+            role: string;
+            content: string;
+            at?: string;
+            by?: string;
+          }>) || [];
+        // by:"human" — иначе ответ менеджера неотличим от ответа бота: оба
+        // ложатся с ролью assistant (29 сент 2026).
+        history.push({
+          role: "assistant",
+          content: cleanText,
+          at: new Date().toISOString(),
+          by: "human",
+        });
         await prisma.channelConversation.update({
           where: { id: conv.id },
           data: {

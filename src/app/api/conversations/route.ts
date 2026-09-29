@@ -71,13 +71,19 @@ export async function GET(request: NextRequest) {
           .catch((e) => console.warn("[messages] mark-read failed:", e));
 
         // History is stored as JSON array [{role, content}]
-        const history = (conv.history as Array<{ role: string; content: string }>) || [];
+        const history =
+          (conv.history as Array<{ role: string; content: string; at?: string; by?: string }>) || [];
         return NextResponse.json({
           messages: history.map((m, idx) => ({
             id: `${conv.id}-${idx}`,
             role: m.role,
             content: m.content,
-            createdAt: conv.updatedAt.toISOString(), // approximate
+            // Настоящее время сообщения, если оно есть (с 29 сент 2026).
+            // У старых записей его нет — там по-прежнему время диалога.
+            createdAt: m.at ?? conv.updatedAt.toISOString(),
+            // Кто ответил: бот или менеджер. Раньше в интерфейсе они выглядели
+            // одинаково, и разобрать «бот встревает» было невозможно.
+            by: m.by ?? null,
           })),
           conversationId: conv.id,
           clientName: conv.clientName,

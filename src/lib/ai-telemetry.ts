@@ -28,7 +28,12 @@ import { prisma } from "@/lib/prisma";
 import { estimateCostUsd } from "@/lib/ai-pricing";
 
 /** Что сработало в safety-net за оборот. null — ничего не срабатывало. */
-export type SafetyNetKind = "notify_manager" | "phone_guard" | "handoff_guard";
+export type SafetyNetKind =
+  | "notify_manager"
+  | "phone_guard"
+  | "handoff_guard"
+  /** Менеджер ответил, пока модель думала — ответ бота выброшен (29 сент 2026) */
+  | "human_takeover_race";
 
 export interface TurnTrackerInit {
   businessId: string;

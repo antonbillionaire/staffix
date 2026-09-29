@@ -473,7 +473,10 @@ async function applyManagerEchoTakeover(
         lastHumanReplyAt: new Date(),
         // Кладём сообщение менеджера в историю — иначе в дашборде диалог
         // выглядит с дырой, а бот при возврате не знает что уже сказали.
-        history: [...history, { role: "assistant", content: echoText }],
+        history: [
+          ...history,
+          { role: "assistant", content: echoText, at: new Date().toISOString(), by: "human" },
+        ],
         messageCount: { increment: 1 },
         updatedAt: new Date(),
       },
