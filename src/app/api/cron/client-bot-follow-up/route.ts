@@ -266,6 +266,11 @@ async function processChannelConversations(since: Date, until: Date): Promise<Pr
       business: {
         select: {
           id: true, name: true, timezone: true,
+          // botActive (2 окт 2026): главный выключатель бота проверялся только
+          // в telegram-ветке этого крона. Бизнес на паузе всё равно мог
+          // получить проактивное напоминание в IG/WA/FB — то есть «пауза»
+          // была неполной.
+          botActive: true,
           waActive: true, waPhoneNumberId: true, waAccessToken: true,
           igActive: true, igBusinessAccountId: true,
           fbActive: true, fbPageId: true, fbPageAccessToken: true,
@@ -278,6 +283,11 @@ async function processChannelConversations(since: Date, until: Date): Promise<Pr
   r.scanned = candidates.length;
 
   for (const conv of candidates) {
+    // Бот на паузе — никакой проактивной активности от его имени.
+    if (!conv.business.botActive) {
+      r.skippedNoCredentials++;
+      continue;
+    }
     if (!inWorkHours(conv.business.timezone)) {
       r.skippedNightHours++;
       continue;
