@@ -14,6 +14,7 @@ export const maxDuration = 60;
 
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { areBotsPaused } from "@/lib/bots-paused";
 import { parseWAWebhook, sendWAMessage, sendWAImage, markWAMessageRead } from "@/lib/whatsapp-utils";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
 import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
@@ -162,10 +163,12 @@ export async function POST(request: Request) {
     // Find business to get WA credentials and reply
     const biz = await prisma.business.findFirst({
       where: businessId ? { id: businessId } : { waPhoneNumberId: msg.phoneNumberId, waActive: true },
-      select: { waPhoneNumberId: true, waAccessToken: true },
+      select: { waPhoneNumberId: true, waAccessToken: true, botActive: true },
     });
     const nonTextToken = biz?.waAccessToken || process.env.WHATSAPP_ACCESS_TOKEN;
-    if (biz?.waPhoneNumberId && nonTextToken) {
+    // Пауза бота — выше шаблонного ответа (2 окт 2026): эта ветка отвечала
+    // клиенту до проверки botActive.
+    if (biz?.waPhoneNumberId && nonTextToken && biz.botActive && !areBotsPaused()) {
       sendWAMessage(biz.waPhoneNumberId, nonTextToken, msg.waId, "Извините, я не распознаю изображения и файлы. Опишите вопрос текстом или отправьте голосовое сообщение — я отвечу.").catch(() => {});
     }
     return respond200();

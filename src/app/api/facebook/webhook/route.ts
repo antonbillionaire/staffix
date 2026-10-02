@@ -17,6 +17,7 @@ export const maxDuration = 60;
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { areBotsPaused } from "@/lib/bots-paused";
 import { parseFBWebhookAll, parseFBEchoes, sendFBMessage, sendFBImage, sendFBTyping, parseLeadgenEvents, fetchLeadAdData, getPageAccessToken } from "@/lib/facebook-utils";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
 import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
@@ -159,9 +160,12 @@ export async function POST(request: Request) {
       if (!(await markWebhookProcessed(msg.messageId))) continue;
       const biz = await prisma.business.findFirst({
         where: businessId ? { id: businessId } : { fbPageId: msg.pageId, fbActive: true },
-        select: { fbPageAccessToken: true },
+        select: { fbPageAccessToken: true, botActive: true },
       });
-      if (biz?.fbPageAccessToken) {
+      // Пауза бота — выше любых шаблонных ответов (2 окт 2026). Эти ветки
+      // отвечали клиенту ДО проверки botActive, то есть выключенный бот всё
+      // равно писал в чат.
+      if (biz?.fbPageAccessToken && biz.botActive && !areBotsPaused()) {
         sendFBMessage(biz.fbPageAccessToken, msg.senderId, "Извините, я не распознаю изображения и файлы. Опишите вопрос текстом или отправьте голосовое сообщение — я отвечу.", msg.pageId).catch(() => {});
       }
       continue;
@@ -387,6 +391,7 @@ async function processLeadAdEvent(evt: {
     select: {
       id: true,
       name: true,
+      botActive: true,
       fbPageId: true,
       fbPageAccessToken: true,
       igBusinessAccountId: true,
@@ -463,6 +468,13 @@ async function processLeadAdEvent(evt: {
       clientName: clientName || undefined,
     },
   });
+
+  // Пауза бота — выше автоприветствия (2 окт 2026). Лид из рекламной формы
+  // сохраняем всегда, но здороваться от имени выключенного бота нельзя.
+  if (!business.botActive || areBotsPaused()) {
+    console.log(`[LeadAds] Bot paused — lead saved, greeting suppressed (biz=${business.id})`);
+    return;
+  }
 
   // Send greeting message via the best available channel
   const greeting = clientName

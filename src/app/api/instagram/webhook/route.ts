@@ -13,6 +13,7 @@ export const maxDuration = 60;
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { areBotsPaused } from "@/lib/bots-paused";
 import { generateChannelAIResponse } from "@/lib/channel-ai";
 import { generateStaffixSalesResponse } from "@/lib/staffix-sales-ai";
 import { verifyMetaWebhookSignature } from "@/lib/meta-webhook-verify";
@@ -253,10 +254,17 @@ export async function POST(request: Request) {
               { fbPageId: accountId, igActive: true },
             ],
           },
-          select: { id: true, fbPageAccessToken: true, fbPageId: true },
+          select: { id: true, fbPageAccessToken: true, fbPageId: true, botActive: true },
         });
         if (!biz?.fbPageAccessToken || !biz.fbPageId) {
           console.log(`[IG Webhook] emoji-only ${emojiClass} → biz not found or no token`);
+          continue;
+        }
+        // Пауза бота — выше эмодзи-шортката (2 окт 2026). Раньше клиент ставил
+        // 👍 и получал «Спасибо!» от выключенного бота: botActive здесь не
+        // запрашивался вовсе.
+        if (!biz.botActive || areBotsPaused()) {
+          console.log(`[IG Webhook] emoji-only ${emojiClass} → bot paused, suppressed (biz=${biz.id})`);
           continue;
         }
         // Human takeover (14 сент 2026): пока менеджер ведёт диалог, бот не
