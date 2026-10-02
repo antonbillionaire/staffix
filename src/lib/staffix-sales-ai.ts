@@ -6,6 +6,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import { areBotsPaused } from "@/lib/bots-paused";
 import { prisma } from "@/lib/prisma";
 import { getSalesSystemPrompt } from "@/lib/sales-bot/system-prompt";
 import { getInstagramUserProfile } from "@/lib/sales-bot/meta-api";
@@ -487,6 +488,15 @@ export async function generateStaffixSalesResponse(
   clientName?: string,
   clientPhone?: string
 ): Promise<string> {
+  // Глобальная пауза платформы (2 окт 2026). Собственные боты Staffix не
+  // привязаны к Business и его выключателю `botActive`, поэтому остановить их
+  // можно было только снятием вебхука. Пустая строка = вызывающий ничего не
+  // отправляет; лид при этом всё равно заводится и сообщение сохраняется.
+  if (areBotsPaused()) {
+    console.log(`[Staffix Sales] STAFFIX_BOTS_PAUSED=1 — ответ лиду не отправляется (${channel})`);
+    await getOrCreateLead(channel, channelId, clientName, clientPhone).catch(() => {});
+    return "";
+  }
   try {
     const lead = await getOrCreateLead(channel, channelId, clientName, clientPhone);
     const history = (lead.history as HistoryMessage[]) || [];

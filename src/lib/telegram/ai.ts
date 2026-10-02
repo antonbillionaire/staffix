@@ -47,6 +47,7 @@ import {
   bootstrapStage,
 } from "@/lib/funnel-state";
 import { buildFunnelStateBlock } from "@/lib/funnel-prompt";
+import { areBotsPaused } from "@/lib/bots-paused";
 import { botPromisedHandoffRegex } from "@/lib/handoff-detector";
 import { detectPhone, type PhoneCountry } from "@/lib/phone-parser";
 import { evaluateHandoffGuard } from "@/lib/handoff-guard";
@@ -226,7 +227,11 @@ export async function generateAIResponse(
     // См. channel-ai.ts: одного 30-минутного окна мало, клиенты отвечают
     // через часы. Бот молчит сутки после ручного ответа менеджера.
     const { isBotOnHold } = await import("@/lib/human-takeover");
-    if (isBotOnHold(conversation)) {
+    // Глобальная пауза платформы — см. channel-ai.ts.
+    if (areBotsPaused()) {
+      console.log(`[Webhook] STAFFIX_BOTS_PAUSED=1 — ответ не отправляется (conv=${conversation.id})`);
+    }
+    if (areBotsPaused() || isBotOnHold(conversation)) {
       await saveMessage(conversation.id, "user", userMessage);
       await updateConversationMessageCount(conversation.id);
       console.log(

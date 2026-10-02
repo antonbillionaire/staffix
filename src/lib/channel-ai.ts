@@ -49,6 +49,7 @@ import {
 } from "@/lib/funnel-state";
 import { buildFunnelStateBlock } from "@/lib/funnel-prompt";
 import { isBotOnHold } from "@/lib/human-takeover";
+import { areBotsPaused } from "@/lib/bots-paused";
 import { outcomeFromTools, shouldUpgradeOutcome } from "@/lib/conversation-outcome";
 // Anti-probe boundary — prepended to every WA/IG/FB user-bot system prompt
 // so it has the highest LLM attention weight.
@@ -739,7 +740,12 @@ export async function generateChannelAIResponse(
     // Молчим, пока диалог ведёт человек: короткое окно takeover ИЛИ сутки
     // после последнего ручного ответа. Одного окна мало — клиенты отвечают
     // через часы, и бот вклинивался поверх менеджера (см. human-takeover.ts).
-    if (isBotOnHold(conv)) {
+    // Глобальная пауза платформы — выше любых настроек бизнеса.
+    // Сообщение клиента всё равно сохраняем: на паузе теряться оно не должно.
+    if (areBotsPaused()) {
+      console.log(`[Channel AI] STAFFIX_BOTS_PAUSED=1 — ответ не отправляется (conv=${conv.id}, ${channel})`);
+    }
+    if (areBotsPaused() || isBotOnHold(conv)) {
       const existingHistory = (conv.history as Array<{ role: string; content: string }>) || [];
       const nextHistory = [...existingHistory, { role: "user", content: userMessage }];
       await prisma.channelConversation.update({
