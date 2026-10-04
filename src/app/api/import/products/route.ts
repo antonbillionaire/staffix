@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createAnthropic } from "@/lib/anthropic-client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
@@ -179,7 +180,7 @@ export async function POST(request: NextRequest) {
           .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, "")
           .slice(0, 50000);
 
-        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const anthropic = createAnthropic(process.env.ANTHROPIC_API_KEY);
         const aiResponse = await anthropic.messages.create({
           model: "claude-sonnet-5",
           max_tokens: 4096,
@@ -242,7 +243,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Use Claude to extract products from PDF text
-        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const anthropic = createAnthropic(process.env.ANTHROPIC_API_KEY);
         const aiResponse = await anthropic.messages.create({
           model: "claude-sonnet-5",
           max_tokens: 4096,

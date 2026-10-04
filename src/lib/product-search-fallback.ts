@@ -16,6 +16,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import { createAnthropic } from "@/lib/anthropic-client";
 import { prisma } from "./prisma";
 
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
@@ -68,7 +69,7 @@ export async function normalizeProductQuery(
 - если ничего похожего: {"match": null}`;
 
   try {
-    const anthropic = new Anthropic({ apiKey });
+    const anthropic = createAnthropic(apiKey);
     const response = await anthropic.messages.create({
       model: HAIKU_MODEL,
       max_tokens: 100,

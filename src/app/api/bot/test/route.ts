@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createAnthropic } from "@/lib/anthropic-client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
 import { buildChannelSystemPrompt } from "@/lib/channel-ai";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Клиент создаётся ЛЕНИВО, а не на уровне модуля (4 окт 2026): фабрика
+// бросает ошибку, когда AI выключен, и создание при импорте роняло бы весь
+// роут на старте, а не отдельный вызов.
+const anthropic = () => createAnthropic(process.env.ANTHROPIC_API_KEY);
 
 // POST /api/bot/test — test bot response without side effects
 export async function POST(request: NextRequest) {
@@ -61,7 +65,7 @@ export async function POST(request: NextRequest) {
 
     const systemPrompt = buildChannelSystemPrompt(business, "test");
 
-    const response = await anthropic.messages.create({
+    const response = await anthropic().messages.create({
       model: "claude-sonnet-5",
       max_tokens: 500,
       system: systemPrompt + "\n\nЭто тестовое сообщение от владельца бизнеса. Отвечай как если бы это был реальный клиент. НЕ используй инструменты (записи, квалификация) — просто ответь текстом.",

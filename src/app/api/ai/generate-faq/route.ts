@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createAnthropic } from "@/lib/anthropic-client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const anthropic = new Anthropic({ apiKey });
+    const anthropic = createAnthropic(apiKey);
 
     const message = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",

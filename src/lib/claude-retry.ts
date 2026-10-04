@@ -15,6 +15,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import { createAnthropic } from "@/lib/anthropic-client";
 
 type MessageCreateParams = Anthropic.MessageCreateParamsNonStreaming;
 type Message = Anthropic.Message;
@@ -23,7 +24,7 @@ type Message = Anthropic.Message;
 let _anthropic: Anthropic | null = null;
 function getClient(): Anthropic {
   if (!_anthropic) {
-    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    _anthropic = createAnthropic(process.env.ANTHROPIC_API_KEY);
   }
   return _anthropic;
 }

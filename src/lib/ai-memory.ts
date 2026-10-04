@@ -4,6 +4,7 @@
  */
 
 import { prisma } from "./prisma";
+import { createAnthropic } from "@/lib/anthropic-client";
 import Anthropic from "@anthropic-ai/sdk";
 import { normalizeOutcome, shouldUpgradeOutcome } from "./conversation-outcome";
 
@@ -810,7 +811,7 @@ export async function generateConversationSummary(
 
     if (!conversation || conversation.messages.length < 3) return null;
 
-    const anthropic = new Anthropic({ apiKey });
+    const anthropic = createAnthropic(apiKey);
 
     const messagesText = conversation.messages
       .map((m) => `${m.role === "user" ? "Клиент" : "AI"}: ${m.content}`)
@@ -973,7 +974,7 @@ export async function extractCustomFieldsFromConversation(
       .join("\n");
     const messagesText = messages.map((m) => m.content).reverse().join("\n");
 
-    const anthropic = new Anthropic({ apiKey });
+    const anthropic = createAnthropic(apiKey);
     const response = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 400,
@@ -1106,7 +1107,7 @@ export async function updateClientSummary(
 
     if (conversations.length === 0 && bookings.length === 0) return null;
 
-    const anthropic = new Anthropic({ apiKey });
+    const anthropic = createAnthropic(apiKey);
 
     let contextText = "";
 

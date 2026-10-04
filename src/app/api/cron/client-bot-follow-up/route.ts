@@ -19,6 +19,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { createAnthropic } from "@/lib/anthropic-client";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { checkCronAuth } from "@/lib/cron-auth";
@@ -37,7 +38,10 @@ const WORK_HOURS_START = 9;
 const WORK_HOURS_END = 21;
 const MAX_BUSINESSES_PER_RUN = 200;
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Клиент создаётся ЛЕНИВО, а не на уровне модуля (4 окт 2026): фабрика
+// бросает ошибку, когда AI выключен, и создание при импорте роняло бы весь
+// роут на старте, а не отдельный вызов.
+const anthropic = () => createAnthropic(process.env.ANTHROPIC_API_KEY);
 
 type HistoryMessage = { role: string; content: string };
 
@@ -113,7 +117,7 @@ async function generateNudgeText(
   businessId: string
 ): Promise<string | null> {
   try {
-    const response = await anthropic.messages.create({
+    const response = await anthropic().messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 200,
       system: SILENT_FOLLOWUP_SYSTEM,

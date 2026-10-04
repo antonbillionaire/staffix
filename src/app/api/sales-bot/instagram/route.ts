@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createAnthropic } from "@/lib/anthropic-client";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { getSalesSystemPrompt } from "@/lib/sales-bot/system-prompt";
@@ -52,7 +53,7 @@ async function generateAIResponse(
   }
 
   try {
-    const anthropic = new Anthropic({ apiKey });
+    const anthropic = createAnthropic(apiKey);
     let history = await getLeadHistory(senderId);
 
     if (history.length > 20) {

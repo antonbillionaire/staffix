@@ -15,6 +15,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import { createAnthropic } from "@/lib/anthropic-client";
 
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 const MAX_TOKENS = 600;
@@ -213,7 +214,7 @@ ${input.knownCategories!.map((c) => `- ${c}`).join("\n")}
 }`;
 
   try {
-    const anthropic = new Anthropic({ apiKey });
+    const anthropic = createAnthropic(apiKey);
     const response = await anthropic.messages.create({
       model: HAIKU_MODEL,
       max_tokens: MAX_TOKENS,

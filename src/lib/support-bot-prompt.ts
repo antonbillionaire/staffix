@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { createAnthropic } from "@/lib/anthropic-client";
 
 // Общий системный промпт службы поддержки Staffix.
 // Используется и в Telegram-боте (@staffix_support_bot), и в виджете на дашборде.
@@ -303,7 +304,7 @@ export async function generateSupportReply(
   }
 
   try {
-    const anthropic = new Anthropic({ apiKey });
+    const anthropic = createAnthropic(apiKey);
     const trimmed = history.slice(-20);
     const conversationMessages: Anthropic.MessageParam[] = [
       ...trimmed.map((m) => ({ role: m.role, content: m.content })),

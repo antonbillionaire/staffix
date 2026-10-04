@@ -6,6 +6,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import { createAnthropic } from "@/lib/anthropic-client";
 import { areBotsPaused } from "@/lib/bots-paused";
 import { prisma } from "@/lib/prisma";
 import { getSalesSystemPrompt } from "@/lib/sales-bot/system-prompt";
@@ -13,7 +14,10 @@ import { getInstagramUserProfile } from "@/lib/sales-bot/meta-api";
 import { notifyAdmin } from "@/lib/admin-notify";
 import { ONBOARDING_STEPS, formatOnboardingContextForVictor, getOnboardingStep } from "@/lib/onboarding-steps";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Клиент создаётся ЛЕНИВО, а не на уровне модуля (4 окт 2026): фабрика
+// бросает ошибку, когда AI выключен, и создание при импорте роняло бы весь
+// роут на старте, а не отдельный вызов.
+const anthropic = () => createAnthropic(process.env.ANTHROPIC_API_KEY);
 
 type HistoryMessage = { role: "user" | "assistant"; content: string };
 
@@ -389,7 +393,7 @@ async function regeneratePoliteResponse(
       `Твой предыдущий текст:\n"""${rudeText}"""`,
   };
 
-  const response = await anthropic.messages.create({
+  const response = await anthropic().messages.create({
     model: "claude-sonnet-5",
     max_tokens: 1024,
     system: systemPrompt,
@@ -549,7 +553,7 @@ export async function generateStaffixSalesResponse(
 6. ТЫ САМ ВЕДЁШЬ ЛИДА ДО ЗАКРЫТИЯ. Цель — регистрация на staffix.io прямо в этом разговоре. НЕ передавай контакты, НЕ обещай встречу/звонок, НЕ говори «свяжемся». Если клиент хочет «человека» — отвечаешь что обсудишь всё сам прямо сейчас. schedule_demo — только если лид трижды настоял на встрече после твоих попыток закрыть в чате.`;
 
     // Call Claude with tools
-    let response = await anthropic.messages.create({
+    let response = await anthropic().messages.create({
       model: "claude-sonnet-5",
       max_tokens: 1024,
       system: systemPrompt,
@@ -591,7 +595,7 @@ export async function generateStaffixSalesResponse(
       // Add tool results and get next response
       allMessages.push({ role: "user", content: toolResults });
 
-      response = await anthropic.messages.create({
+      response = await anthropic().messages.create({
         model: "claude-sonnet-5",
         max_tokens: 1024,
         system: systemPrompt,

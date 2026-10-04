@@ -5,6 +5,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { createAnthropic } from "@/lib/anthropic-client";
 import Anthropic from "@anthropic-ai/sdk";
 import { trackClaudeUsage } from "@/lib/claude-retry";
 
@@ -15,7 +16,7 @@ import { trackClaudeUsage } from "@/lib/claude-retry";
 let anthropicClient: Anthropic | null = null;
 function getAnthropic(): Anthropic {
   if (!anthropicClient) {
-    anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    anthropicClient = createAnthropic(process.env.ANTHROPIC_API_KEY);
   }
   return anthropicClient;
 }

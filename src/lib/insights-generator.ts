@@ -13,6 +13,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import { createAnthropic } from "@/lib/anthropic-client";
 import { prisma } from "@/lib/prisma";
 
 const ANALYSIS_WINDOW_DAYS = 7;
@@ -177,7 +178,7 @@ async function clusterQuestions(
     return [];
   }
 
-  const anthropic = new Anthropic({ apiKey });
+  const anthropic = createAnthropic(apiKey);
 
   const context =
     theme === "faq"

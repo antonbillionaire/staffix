@@ -24,6 +24,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { createAnthropic } from "@/lib/anthropic-client";
 import { areBotsPaused } from "@/lib/bots-paused";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
@@ -34,7 +35,10 @@ export const maxDuration = 60;
 
 type HistoryMessage = { role: "user" | "assistant"; content: string };
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Клиент создаётся ЛЕНИВО, а не на уровне модуля (4 окт 2026): фабрика
+// бросает ошибку, когда AI выключен, и создание при импорте роняло бы весь
+// роут на старте, а не отдельный вызов.
+const anthropic = () => createAnthropic(process.env.ANTHROPIC_API_KEY);
 
 /**
  * Локальное время в timezone Виктора — простая проверка «рабочих часов».
@@ -110,7 +114,7 @@ async function generateNudge(history: HistoryMessage[]): Promise<string | null> 
     .join("\n");
 
   try {
-    const response = await anthropic.messages.create({
+    const response = await anthropic().messages.create({
       model: "claude-haiku-4-5-20251001", // Haiku достаточно — это простой follow-up
       max_tokens: 150,
       system: `Ты — Виктор, AI-продажник Staffix. Клиент замолчал после твоего последнего сообщения. Напиши ОДНУ короткую follow-up реплику (1-2 предложения, до 200 символов), которая деликатно возвращает диалог. Правила:

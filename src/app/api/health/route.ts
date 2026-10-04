@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createAnthropic } from "@/lib/anthropic-client";
 import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@/auth";
@@ -28,7 +29,7 @@ export async function GET() {
   // 3. Test Anthropic API
   if (apiKey) {
     try {
-      const anthropic = new Anthropic({ apiKey });
+      const anthropic = createAnthropic(apiKey);
       const res = await anthropic.messages.create({
         model: "claude-sonnet-5",
         max_tokens: 5,

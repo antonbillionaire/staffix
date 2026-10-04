@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createAnthropic } from "@/lib/anthropic-client";
 import Anthropic from "@anthropic-ai/sdk";
 import { CONSULTATION_SYSTEM_PROMPT } from "@/lib/consultation-prompt";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const anthropic = new Anthropic({ apiKey });
+    const anthropic = createAnthropic(apiKey);
 
     // Keep only last 20 messages for context
     const recentMessages = messages.slice(-20).map((msg: { role: string; content: string }) => ({
