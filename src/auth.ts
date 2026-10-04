@@ -1,4 +1,5 @@
 import NextAuth from "next-auth";
+import { isSignupClosed } from "@/lib/signup-closed";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { cookies } from "next/headers";
@@ -140,6 +141,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
 
           if (!existingUser) {
+            // Регистрация закрыта (4 окт 2026). Вход через Google создаёт
+            // аккаунт в обход /api/auth/register — без этой проверки «сайт
+            // закрыт для регистрации» обходился одной кнопкой.
+            // Существующих пользователей это не касается: сюда попадают
+            // только те, кого в базе ещё нет.
+            if (isSignupClosed()) {
+              console.warn(`[auth] Signup closed — Google sign-up refused: ${user.email}`);
+              return false;
+            }
             // Партнёрская атрибуция: читаем cookie ДО создания user, чтобы знать
             // привязывать ли реферала. Cookie установлен middleware при ?ref=CODE.
             const cookieStore = await cookies();

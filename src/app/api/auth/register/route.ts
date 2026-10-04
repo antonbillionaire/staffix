@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { normalizeEmail } from "@/lib/partner-helpers";
 import { validateEmailAddress } from "@/lib/email-validator";
+import { isSignupClosed, SIGNUP_CLOSED_MESSAGE } from "@/lib/signup-closed";
 
 // Generate 6-digit verification code
 function generateVerificationCode(): string {
@@ -13,6 +14,12 @@ function generateVerificationCode(): string {
 
 export async function POST(request: NextRequest) {
   try {
+    // Регистрация закрыта на время остановки платформы (4 окт 2026).
+    // Проверка ПЕРВОЙ — раньше rate limit и любых запросов к БД.
+    if (isSignupClosed()) {
+      return NextResponse.json({ error: SIGNUP_CLOSED_MESSAGE }, { status: 503 });
+    }
+
     // Rate limiting: 3 регистрации за 60 минут с одного IP
     const ip = getClientIp(request);
     const { allowed, retryAfterSeconds } = await rateLimit(`register:${ip}`, 3, 60, "closed");

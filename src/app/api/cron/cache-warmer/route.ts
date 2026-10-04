@@ -114,6 +114,19 @@ export async function GET(request: Request) {
   // (cron срабатывает раз в 30 мин, есть 5 минут maxDuration), а
   // последовательный код не выжигает rate limit Anthropic'а.
   for (const biz of candidates) {
+    // Бот выключен — греть нечего (4 окт 2026).
+    //
+    // `botActive` здесь раньше использовался ТОЛЬКО как «греть ли телеграм»,
+    // а каналы брались по `ChannelConnection.isConnected` — отдельному флагу,
+    // который при остановке платформы никто не снимает. В результате после
+    // полной остановки ботов 2 октября прогрев продолжал ходить в Sonnet и
+    // Haiku дважды в час по десяти подключениям: кэш грелся для ботов,
+    // которые никогда не ответят. Это и был счёт за Claude на выключенном
+    // продукте.
+    if (!biz.botActive) {
+      result.skippedNoChannel++;
+      continue;
+    }
     // Пропускаем бизнесы у которых сейчас ночь по их локальному времени
     if (!isBusinessHoursNow(biz.timezone)) {
       result.skippedNight++;

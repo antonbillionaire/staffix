@@ -24,6 +24,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { areBotsPaused } from "@/lib/bots-paused";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { sendInstagramMessage, sendWhatsAppMessage } from "@/lib/sales-bot/meta-api";
@@ -141,6 +142,14 @@ async function generateNudge(history: HistoryMessage[]): Promise<string | null> 
 export async function GET(request: NextRequest) {
   const cronAuth = checkCronAuth(request);
   if (!cronAuth.ok) return cronAuth.response!;
+
+  // Глобальная пауза платформы (4 окт 2026). Виктор — собственный продающий
+  // бот Staffix, он не привязан к Business и его выключателю botActive,
+  // поэтому остановить его проактивные сообщения можно только отсюда.
+  if (areBotsPaused()) {
+    console.log("[victor-follow-up] STAFFIX_BOTS_PAUSED=1 — пропускаем прогон");
+    return NextResponse.json({ skipped: "bots_paused" });
+  }
 
   const now = new Date();
   const startedAt = now.getTime();
