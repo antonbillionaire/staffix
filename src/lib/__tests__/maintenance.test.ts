@@ -5,6 +5,7 @@ import {
   MAINTENANCE_MODE,
   MAINTENANCE_HTML,
   WEBHOOK_PREFIXES,
+  ALWAYS_ALLOWED_PREFIXES,
 } from "@/lib/maintenance";
 
 describe("режим заглушки", () => {
@@ -59,5 +60,29 @@ describe("вебхуки не должны получать заглушку", (
     expect(found.length).toBeGreaterThan(0);
     const uncovered = found.filter((r) => !WEBHOOK_PREFIXES.some((p) => r.startsWith(p)));
     expect(uncovered).toEqual([]);
+  });
+});
+
+describe("удаление персональных данных работает и при закрытом сайте", () => {
+  // Обязательство по Platform Terms Meta (3(d)(i)). Заглушка отдавала сюда
+  // 503, то есть запросы на удаление молча не исполнялись бы.
+  it("колбэк удаления пропускается к роуту", () => {
+    expect(ALWAYS_ALLOWED_PREFIXES.some((p) => "/api/meta/data-deletion".startsWith(p))).toBe(true);
+  });
+
+  it("страница статуса удаления тоже доступна", () => {
+    // Её адрес мы сами отдаём Meta в ответе колбэка
+    expect(ALWAYS_ALLOWED_PREFIXES.some((p) => "/meta/deletion-status".startsWith(p))).toBe(true);
+  });
+
+  it("эти пути НЕ в списке вебхуков — им нужен настоящий ответ, а не пустой 200", () => {
+    for (const p of ALWAYS_ALLOWED_PREFIXES) {
+      expect(WEBHOOK_PREFIXES.some((w) => p.startsWith(w))).toBe(false);
+    }
+  });
+
+  it("роуты удаления существуют в репозитории", () => {
+    expect(fs.existsSync("src/app/api/meta/data-deletion/route.ts")).toBe(true);
+    expect(fs.existsSync("src/app/meta/deletion-status/page.tsx")).toBe(true);
   });
 });

@@ -3,6 +3,7 @@ import {
   MAINTENANCE_MODE,
   MAINTENANCE_HTML,
   WEBHOOK_PREFIXES,
+  ALWAYS_ALLOWED_PREFIXES,
 } from "@/lib/maintenance";
 
 // Routes that must remain public (no auth check)
@@ -31,21 +32,28 @@ export function middleware(request: NextRequest) {
   // Стоит ПЕРВОЙ и без исключений: ни страницы, ни API, ни вход, ни дашборд.
   // Как вернуть сайт — в lib/maintenance.ts.
   if (MAINTENANCE_MODE) {
+    // Удаление персональных данных по запросу Meta работает всегда: это
+    // обязательство по их Platform Terms, а не функция продукта, и закрытый
+    // проект от него не освобождает. Пропускаем к роуту, он исполняется.
+    const alwaysAllowed = ALWAYS_ALLOWED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+
     // Вебхукам отвечаем пустым 200 — иначе Meta отключит подписку страницы, а
     // Telegram снимет вебхук бота за повторяющиеся ошибки, и после возврата
     // проекта каналы пришлось бы переподключать у каждого клиента вручную.
     // Это не работа Staffix: запрос до роута не доходит, не выполняется ничего.
-    if (WEBHOOK_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-      return new NextResponse(null, { status: 200 });
-    }
-    return new NextResponse(MAINTENANCE_HTML, {
+    if (!alwaysAllowed) {
+      if (WEBHOOK_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+        return new NextResponse(null, { status: 200 });
+      }
+      return new NextResponse(MAINTENANCE_HTML, {
       status: 503,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store",
         "Retry-After": "86400",
-      },
-    });
+        },
+      });
+    }
   }
 
   // ─── AUTH: Protect dashboard pages and API routes ───
