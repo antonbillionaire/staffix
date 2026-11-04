@@ -1,4 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  MAINTENANCE_MODE,
+  MAINTENANCE_HTML,
+  LOGIN_PATHS,
+  SESSION_COOKIES,
+  WEBHOOK_PREFIXES,
+} from "@/lib/maintenance";
 
 // Routes that must remain public (no auth check)
 const PUBLIC_API_PREFIXES = [
@@ -21,6 +28,34 @@ function isPublicApiRoute(pathname: string): boolean {
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  // ─── ЗАГЛУШКА «ПРОЕКТ В РАЗРАБОТКЕ» (4 ноября 2026) ───
+  // Стоит ПЕРВОЙ: ни одна страница и ни один API не выполняются, пока проект
+  // закрыт. Как вернуть сайт — в lib/maintenance.ts.
+  if (MAINTENANCE_MODE) {
+    const hasSession = SESSION_COOKIES.some((name) => request.cookies.get(name)?.value);
+    const isLoginPath = LOGIN_PATHS.some((p) => pathname.startsWith(p));
+    // Регистрация закрыта заглушкой наравне со всем остальным — входить
+    // можно только тем, у кого аккаунт уже есть.
+    const isRegister = pathname.startsWith("/register") || pathname.startsWith("/api/auth/register");
+
+    if (!hasSession && (!isLoginPath || isRegister)) {
+      // Вебхукам отвечаем пустым 200 — иначе Meta и Telegram отключат подписки
+      // за повторяющиеся ошибки, и после возврата проекта каналы пришлось бы
+      // переподключать у каждого клиента вручную.
+      if (WEBHOOK_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+        return new NextResponse(null, { status: 200 });
+      }
+      return new NextResponse(MAINTENANCE_HTML, {
+        status: 503,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          "Retry-After": "86400",
+        },
+      });
+    }
+  }
 
   // ─── AUTH: Protect dashboard pages and API routes ───
   const sessionCookie =
