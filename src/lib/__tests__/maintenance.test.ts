@@ -4,7 +4,6 @@ import path from "node:path";
 import {
   MAINTENANCE_MODE,
   MAINTENANCE_HTML,
-  LOGIN_PATHS,
   WEBHOOK_PREFIXES,
 } from "@/lib/maintenance";
 
@@ -25,9 +24,10 @@ describe("режим заглушки", () => {
     expect(MAINTENANCE_HTML).toMatch(/noindex/);
   });
 
-  it("вход остаётся доступен, регистрации в исключениях нет", () => {
-    expect(LOGIN_PATHS).toContain("/login");
-    expect(LOGIN_PATHS.some((p) => p.includes("register"))).toBe(false);
+  it("исключений для входа и дашборда нет — проект закрыт целиком", () => {
+    const src = fs.readFileSync("src/middleware.ts", "utf8");
+    const gate = src.slice(src.indexOf("ЗАГЛУШКА"), src.indexOf("AUTH: Protect"));
+    expect(gate).not.toMatch(/login|session|dashboard/i);
   });
 
   it("в модуле нет захардкоженного секрета", () => {
